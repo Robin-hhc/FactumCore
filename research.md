@@ -49,7 +49,7 @@
 | GitHub Copilot Memory 第一方 A/B [S025](https://github.blog/ai-and-ml/github-copilot/building-an-agentic-memory-system-for-github-copilot/) | merge 任务为 90% 对 83%，review 为 77% 对 75%；作者报告显著性检验 | 带引用、反馈和按需验证的 memory 可能提高跨会话任务 | 产品实验不能替代当前代码事实或 WiFi 评测 |
 | SWE-Bench 5G [S026](https://arxiv.org/abs/2604.26278) | 规格注入总体由 24% 到 30%，平均增加 12% Token；规格依赖类别增加 16.7–25 points，generic 类别为 0 | 领域知识收益依赖任务，必须 paired A/B 和执行验收 | 5G Core 结果不等于 WiFi MAC 效果 |
 | SWE-Skills-Bench [S027](https://arxiv.org/abs/2603.15401) | 平均仅 +1.2%；错误版本 Skill 最多 -10%；Token 最多 +451% 且通过率不变 | Skill 需精确匹配、版本兼容和负收益测试 | 不能因平均收益低而否定所有专门 Skill |
-| RepoMem [S028](https://openreview.net/pdf?id=8yjWLJy2eX) | Verified 的 Acc@5 为 76.5% 对 71.6%，resolve 为 40.4% 对 37.0%；稀疏历史组反而由 67.4% 降到 54.3% | 历史 memory 只能作候选，且需判断适用性 | 不能把历史摘要当当前 revision 事实 |
+| RepoMem [S028](https://arxiv.org/abs/2510.01003) | Verified 的 Acc@5 为 76.5% 对 71.6%，resolve 为 40.4% 对 37.0%；稀疏历史组反而由 67.4% 降到 54.3% | 历史 memory 只能作候选，且需判断适用性 | 不能把历史摘要当当前 revision 事实 |
 
 ## 3. WiFiDemo 所代表的工作负载
 
@@ -104,7 +104,7 @@ WiFiDemo 当前 checkout 提供八个结构最小案例。它们不是 Benchmark
 | 编译输入与 AST/IR | [Clang compilation database/LibTooling](https://clang.llvm.org/docs/JSONCompilationDatabase.html)、[LLVM IR](https://llvm.org/docs/LangRef.html) | 真实 argv、AST location、CFG/SSA 分析底座 | TU 边界、AST/IR 身份连接、自建服务成本 | L1 基础；L2/L3 的核验源 |
 | 语义身份/交叉引用 | [SCIP/scip-clang](https://github.com/sourcegraph/scip-clang)、[Kythe](https://kythe.io/docs/schema-overview.html) | 符号身份、definition/reference、Target/revision 模型 | 不提供深 CFG/dataflow | identity 组件/参考 |
 | 可查询代码数据库 | [CodeQL](https://codeql.github.com/docs/codeql-language-guides/advanced-dataflow-scenarios-cpp/) | 声明式 AST/CFG/dataflow/路径查询 | 引擎/CLI 许可边界；非默认开放内核 | 参考与 oracle 候选 |
-| CPG | [Joern](https://docs.joern.io/code-property-graph/)、[Fraunhofer CPG](https://fraunhofer-aisec.github.io/cpg/) | 联合图、查询、部分 dataflow/slicing/summary | WiFiDemo 的 compdb、宏、函数指针和 Target 隔离未验证 | L2 可替换核心候选 |
+| CPG | [Joern](https://docs.joern.io/code-property-graph/)、[Fraunhofer CPG](https://github.com/Fraunhofer-AISEC/cpg) | 联合图、查询、部分 dataflow/slicing/summary | WiFiDemo 的 compdb、宏、函数指针和 Target 隔离未验证 | L2 可替换核心候选 |
 | 深度分析 | [SVF](https://github.com/SVF-tools/SVF)、[PhASAR](https://github.com/secure-software-engineering/phasar)、[Frama-C Eva](https://www.frama-c.com/fc-plugins/eva.html) | points-to/value-flow、LLVM 数据流框架、抽象解释/切片 | 成本、IR→source 映射、摘要和许可证差异 | 按需 provider 候选 |
 | 规则检查 | [Semgrep CE](https://github.com/semgrep/semgrep) | 快速语法/规则查询与源码结果 | 开源 CE 与 Pro 深分析边界；不是 Target compiler view | 局部规则组件 |
 

@@ -2,6 +2,8 @@
 
 核验日期：2026-08-13
 
+> 2026-08-14 更新：跨检索、程序分析与领域知识方案的固定维度比较、硬门槛和候选分层，见 [evidence-matrix.md](./evidence-matrix.md)。本档案保留逐方案事实，不再用局部能力暗示完整方案排名。
+
 ## 1. 本轮问题边界
 
 本档案只回答两类问题：
@@ -623,3 +625,9 @@ Task 5 仍不选最终存储技术，但把完整架构的硬要求收窄为：
 5. Wiki/Skill/memory 按需加载，且允许 abstain/not-applicable；
 6. 支持 raw source、compiled knowledge 和 runtime query 的不同更新周期；
 7. 后续以 specification-dependent/generic、rich/sparse history、current/stale knowledge 等分层 Benchmark 验证，而不是只测平均通过率。
+
+## 15. Task 6 的候选分层
+
+证据矩阵把纯检索、单独 Tree-sitter 图、直接采用 GitNexus、以 CodeQL 作为默认开放核心、以及未经验证的 LLM/embedding 事实写入，排除为完整方案；它们中的若干能力仍保留为组件或设计参考。[S001–S009][S013][S023][S027]
+
+进入后续实验的不是某个预设赢家，而是三个可替换组件的架构族：L1 编译器原生分层、L2 Target-specific CPG 分层、L3 轻量结构发现加编译器核验。开源偏好只在正确性、效果、成本和运维约束没有决定性差异时作为 tie-break，不能代替实验结论。

@@ -202,3 +202,262 @@ Codebase-Memory、CodeGraph 和 GitNexus 均采用 Tree-sitter 类结构抽取�
 | 生命周期链接 | revision/Target 变化检测 | created_at、validated_at、invalidated_by、conflict state | 代码变更后不得无条件沿用旧领域声明 |
 
 这使 CodeGraph/Codebase-Memory 一类结构图可以成为代码证据提供者，Understand Anything 一类领域生成流程可以成为候选映射提供者，但最终知识架构必须在二者之上增加 Target-aware identity、provenance、confidence、冲突和重验证机制。
+
+## 8. 语义程序表示与深度程序分析路线
+
+### 8.1 技术中立的分层
+
+深度程序分析不是单一工具类别。对 WiFiDemo 类 C 驱动项目，至少要拆成下列层次：
+
+| 层次 | 主要问题 | 代表路线 | 不能自动证明的内容 |
+|---|---|---|---|
+| 编译输入事实 | 这个文件在什么 Target、宏、include 和工作目录下被编译？ | Clang compilation database、Kythe KCD | 调用/数据流正确性 |
+| 语义身份与交叉引用 | 这个 occurrence 定义/引用了哪个符号？ | Clang AST、scip-clang/SCIP、Kythe | CFG、taint、slice |
+| 编译器 IR | 在某个已选 Target 中实际产生了什么控制和内存操作？ | LLVM IR、debug metadata、MemorySSA | 源码领域含义、跨 Target 统一身份 |
+| 可查询代码数据库 | 如何声明式查询 AST、CFG、dataflow 和安全模式？ | CodeQL | 开放引擎、领域知识治理 |
+| 联合图表示 | 如何在一张图中跨 AST/CFG/PDG/DFG 查询？ | Joern、Fraunhofer CPG | frontend 自动等价于真实编译语义 |
+| 专门深度分析 | 函数指针、alias、value-flow、抽象状态和 slice 如何求解？ | SVF、PhASAR、Frama-C | Agent-ready 检索和知识存储 |
+| 规则化检查 | 如何快速编码项目规范并返回源码告警？ | Semgrep CE | 开源跨文件深层数据流 |
+
+关键结论是：CPG 是表示和查询组织方式，不是精度来源本身。函数指针、dataflow 和 slice 的质量来自 frontend、构建输入、alias/points-to 算法、外部函数摘要和分析预算；把这些边存成图不会自动提高正确性。[S010][S014–S020]
+
+### 8.2 能力标记约定
+
+- `D`：官方文档明确提供该能力，但尚未在 WiFiDemo 实测。
+- `P`：仅提供部分能力、需额外组件或有明确范围限制。
+- `U`：官方材料不足，保持 unknown。
+- `—`：产品定位明确不提供。
+
+| 路线 | 真实编译输入 | 多 Target 隔离 | direct call | function pointer | CFG | dataflow/taint | slice | 源码证据 | 增量/交换 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Clang AST + LLVM IR | D | P | D | P | D | P | — | D | P |
+| scip-clang/SCIP | D | P | D | U | — | — | — | D | D |
+| Kythe | D | D | D | U | — | — | — | D | D |
+| CodeQL | D | P | D | P | D | D | P | D | P |
+| Joern | U | U | D | U | D | D | D | D | D |
+| Fraunhofer CPG | P | U | D | P | D | D | P | D | D |
+| SVF | P | P | D | D | D | D | P | P | P |
+| PhASAR | P | P | D | D | D | D | P | P | P |
+| Frama-C | P | P | D | D | D | D | D | D | P |
+| Semgrep CE | — | — | P | — | P | P | — | D | P |
+
+这里的 `D` 只表示“文档化能力存在”，不表示对 WiFiDemo 的 accuracy 已被证明。例如 Kythe KCD 原生记录 target/revision，但 WiFiDemo 的四个 Target 是否能稳定抽取成四组 hermetic compilation units 仍待实验；SVF 明确维护 function-pointer target 集合，但实际召回率和候选规模仍待测。
+
+## 9. 深度程序分析方案档案
+
+### A01 — Clang AST/LibTooling + LLVM IR
+
+- **定位**：以真实编译命令为入口，分别获得源码级 AST/位置和低层 CFG/SSA/alias 分析载体。
+- **最新活动**：官方 Clang/LLVM 24.0.0git 文档在 2026-08 仍持续更新 [S010]。
+- **开源/许可证**：Apache-2.0 WITH LLVM-exception。
+- **核心表示**：每 translation unit 的 Clang AST、LLVM IR/bitcode、CFG、debug metadata、alias results 与函数内 MemorySSA。
+- **事实来源**：`compile_commands.json` 中的工作目录、argv、源文件和可选 output；同一源文件可有多条不同配置命令 [S010]。
+- **Agent 接口**：原生是 C++ API、命令行和序列化 IR，不是 MCP；需自建稳定导出、索引和查询层。
+- **公开数据**：无可用于本研究排序的 Agent/WiFi Benchmark；官方只定义接口与保守语义。
+- **WiFiDemo 直接证据**：W01–W04 强烈要求保留四个 Target 的独立命令与 occurrence；本轮未运行工具。
+- **优点**：最接近编译器实际看到的 C；宏/include/语言模式与 Target 绑定；AST source location 精确；IR 为 CFG、alias、MemorySSA 和其他分析提供统一底座。
+- **缺点**：AST 以 TU 为边界；IR 可读性和源码构造会损失，优化级别影响图形；MemorySSA 是 intraprocedural；需要大量工程把两层身份重新连接并服务给 Agent。
+- **Unknown**：WiFiDemo 是否能由 CMake 为四 Target 产生完整、无重复污染的 compdb；GCC 扩展/内联汇编兼容；函数指针在基础 LLVM AA 下的候选质量。
+- **代码—领域链接**：应把 `TargetProfile -> CompileCommand -> TUOccurrence -> AST/IR node -> SourceSpan` 作为确定性主链；Feature/Chip/Side 只链接到 TargetProfile 或有证据的 occurrence，不能直接链接裸 source symbol。
+- **可借鉴**：把 compilation database 当作知识图的一级事实，而不是索引器临时参数；同时保存 source ID 与 Target occurrence ID。
+- **初步分类**：核心基础路线，几乎不可由纯结构图替代；仍需上层查询和知识治理。
+
+### A02 — scip-clang/SCIP
+
+- **定位**：把 Clang 的精确 C/C++ occurrence、定义和引用导出为开放、紧凑的代码智能交换格式。
+- **最新活动**：SCIP v0.7.1 于 2026-04-14 发布；scip-clang 当前基于 Clang 21 [S011]。
+- **开源/许可证**：scip-clang 与 SCIP 均为 Apache-2.0；完整 Sourcegraph 服务端不作为本候选的必要依赖。
+- **核心表示**：document、symbol、occurrence、relationship 和 source range 的 protobuf index。
+- **事实来源**：JSON compilation database；官方展示 include、macro、type references 和跨仓导航。
+- **Agent 接口**：输出 `index.scip`，需自建 reader/SQLite/MCP 或接兼容服务；不是 dataflow query engine。
+- **公开数据**：官方建议约每 TU 2 MB 临时空间和每核约 2 GB RAM，但无精度 Benchmark [S011]。
+- **WiFiDemo 直接证据**：W03/W04 的宏 occurrence、W08 的同名符号消歧适合此路线；本轮未运行。
+- **优点**：编译视角与源码位置兼得；开放格式有利于替换 frontend；适合稳定“代码身份层”，比自行解析 clangd YAML 风险低。
+- **缺点**：不含 CFG、dataflow、taint、slice；多 Target 若直接合并同一 document，必须由我们另加 Target namespace；不支持 PCH。
+- **Unknown**：同一 source range 在多 compdb command 中的 occurrence 合并策略；C static symbol/macro identity 的稳定性；Windows/WSL 产物兼容。
+- **代码—领域链接**：领域边可以锚定 SCIP symbol/occurrence 与 Target ID；但必须另存 revision、compile-command digest 和 evidence generator。
+- **可借鉴**：采用开放 interchange 隔离 Clang frontend 与知识存储；把 source-range occurrence 作为面向 Agent 的最小证据对象。
+- **初步分类**：语义身份层短名单；与深度分析互补，不单独构成知识架构。
+
+### A03 — Kythe
+
+- **定位**：以 hermetic compilation unit 为核心的跨语言、跨 revision、跨 target 交叉引用生态。
+- **最新活动**：官方仓库和文档在 2026-08 仍活跃，提供 C++ indexer、extractor、schema 与 serving 工具 [S012]。
+- **开源/许可证**：Apache-2.0。
+- **核心表示**：content-addressed compilation unit、VName、anchor、semantic node、typed edge、serving tables。
+- **事实来源**：捕获真实 compile action 及全部输入/依赖/flags；KCD index 明示 revision、target、source、corpus 与 language 字段。
+- **Agent 接口**：交叉引用/decoration API 和命令行；无原生 MCP，需要包装。
+- **公开数据**：无 WiFi/Agent 效果数字。
+- **WiFiDemo 直接证据**：其 compilation-unit/target 模型与 W01–W07 高度吻合，但本轮未运行 extractor。
+- **优点**：Target 和 revision 是原生索引维度；anchor 将语义实体严格指回源码跨度；generated-code 采用不同节点加 `generates` 边，而不是错误合并身份；schema 可扩展。
+- **缺点**：部署和构建抽取比 SCIP 重；主要解决 xref，不解决 dataflow/slice；扩展领域 node 后，通用客户端的理解能力有限。
+- **Unknown**：CMake 四 Target extraction 的可用性、C function pointer call edge、增量 rebuild 成本、Windows 支持。
+- **代码—领域链接**：是本轮最强的确定性身份/证据建模参考：领域实体保持独立 VName，用 typed edge 连到 anchor/semantic node，并保留 corpus/revision/target。
+- **可借鉴**：content digest、compile-unit digest、source anchor 和“连接而不合并”原则。
+- **初步分类**：身份/provenance 架构强参考；实现复杂度需与 SCIP+自建 metadata 方案比较。
+
+### A04 — CodeQL
+
+- **定位**：把编译后的 C/C++ 程序抽取为关系数据库，用声明式 QL 查询语法、控制流、dataflow 和 taint。
+- **最新活动**：CLI v2.25.5 于 2026-05-22 发布，query/model packs 持续更新 [S013]。
+- **开源/许可证**：查询与库为 MIT；CLI/engine 单独授权，闭源代码与自动化内部工程分析通常需要商业许可。
+- **核心表示**：CodeQL database、QL relations/classes、CFG/dataflow/taint libraries、path query。
+- **事实来源**：C/C++ database creation 过程观察 build；库模型与 model pack 补足不可见外部函数。
+- **Agent 接口**：CLI、VS Code 和 query packs；需自建受限查询/MCP 门面。
+- **公开数据**：本轮不使用 GitHub 产品营销数据或漏洞数排序；只确认功能和许可边界。
+- **WiFiDemo 直接证据**：理论上适合 W04/W06 的路径查询，但未验证四 Target database 的隔离和宏 provenance。
+- **优点**：成熟声明式查询、C/C++ pointer/pointee dataflow、path explanation、丰富标准库；规则可版本化和测试。
+- **缺点**：engine 非开源且闭源项目采用受限；难以替换底层 extractor；设计重心是安全扫描，不是自由扩展的领域知识底座。
+- **Unknown**：四 Target 分库资源成本、ops 表函数指针解析质量、数据库事实能否以稳定开放格式全部导出。
+- **代码—领域链接**：model pack 展示了“用版本化模型补充库/框架语义”的机制；领域规则仍需独立 metadata 与 evidence，不能锁死在不可开放导出的 query result 中。
+- **可借鉴**：声明式规则包、source/sink model、path explanation 和 query test；不宜作为默认开源核心。
+- **初步分类**：强 Benchmark 对照与设计参考；因 engine/闭源许可不进入优先开源实现短名单。
+
+### A05 — Joern
+
+- **定位**：以统一 CPG 和 Scala DSL 查询 AST、call/control/dataflow，并导出 data-flow/usage slice。
+- **最新活动**：v4 持续发布，检索到 v4.0.548（2026-05-27）；项目由 OverflowDB 迁移到 FlatGraph [S015]。
+- **开源/许可证**：Apache-2.0。
+- **核心表示**：CPG base schema + overlays、FlatGraph、CPGQL、OSS dataflow、JSON slice。
+- **事实来源**：`c2cpg` 等 frontend 从源码目录生成 CPG，后续 overlay 增加 semantic/dataflow；external method 可用 custom semantics。
+- **Agent 接口**：shell、script、server、JSON export/slice；无必须依赖通用图数据库。
+- **公开数据**：经典 CPG 论文的 18 个 Linux kernel 漏洞只证明 2014 方法案例 [S014]，不能当作当前 Joern 准确率；本轮未发现可比 WiFi/Agent Benchmark。
+- **WiFiDemo 直接证据**：尚未运行；官方材料未证明 consumption of compdb 或多 Target occurrence isolation。
+- **优点**：跨 AST/CFG/dataflow 的查询体验成熟；切片输出包含 file/line/column，适合 Agent 消费；custom semantics 可表达外部 API flow；开源且活跃。
+- **缺点**：当前 C frontend 的真实编译输入能力证据不足；type recovery/custom semantics 可能混合推断与确定性事实；Scala/JVM/DSL 运维成本较高；“CPG”名称不能保证函数指针精度。
+- **Unknown**：WiFiDemo 真实宏集、header include、static 同名符号、ops 表函数指针、四 Target 分图资源和跨图身份。
+- **代码—领域链接**：可用 TAG/自定义 overlay 挂领域边，但每条边必须另存 `Target/revision/generator/confidence/evidence`；custom semantics 应作为规则层，不能伪装 parser fact。
+- **可借鉴**：overlay、统一 traversal DSL、可裁剪 JSON 和 external semantics；后续 Benchmark 中只作为一个 CPG 候选。
+- **初步分类**：CPG 路线短名单候选之一，不是预设答案。
+
+### A06 — Fraunhofer AISEC CPG
+
+- **定位**：可嵌入 JVM 项目的 CPG library，以 language frontend + passes 构造 EOG/DFG/CDG 等多层图。
+- **最新活动**：文档于 2026-06 更新，README 当前依赖示例为 9.0.2 [S016]。
+- **开源/许可证**：Apache-2.0。
+- **核心表示**：typed Kotlin graph model、AST/EOG/DFG/CDG、scope/symbol、passes、function summaries 与 inference rules。
+- **事实来源**：C/C++ frontend 使用 Eclipse CDT；也可从 LLVM IR 建图；passes 进行 symbol/call/type/dataflow refinement。
+- **Agent 接口**：Kotlin query API、library embedding、Neo4j export；没有现成 MCP。
+- **公开数据**：无可比较 WiFi/Agent 效果数字。
+- **WiFiDemo 直接证据**：未运行；C17 支持与 W01–W08 的宏/Target 要求并不等价。
+- **优点**：frontend 与 pass 严格分层；作为 library 易于增加自定义 pass/overlay；function summary 是外部 API/领域规则入口；图模型比单一安全扫描器更可扩展。
+- **缺点**：C frontend 的 CDT 依赖和构建配置精度需验证；Neo4j export 增加运维但不是必须；文档化“支持函数指针 trait”不等于解析质量数据。
+- **Unknown**：compdb/预处理输入、跨 TU/函数指针 precision、增量更新、四 Target 图大小和 JVM 内存。
+- **代码—领域链接**：pass/overlay 可产生 domain typed edge；应给每个 inference/summary 边标注规则版本、Target、证据与置信度。
+- **可借鉴**：frontend→passes 分层、可嵌入 library、function summary 和显式 inference rules。
+- **初步分类**：CPG 路线短名单候选之一；需与 Joern 在 WiFi C 上实测，而非按知名度选择。
+
+### A07 — SVF
+
+- **定位**：LLVM IR 上专门求解 C/C++ pointer/alias、call graph、ICFG、Memory SSA 和 value-flow。
+- **最新活动**：SVF 3.3 于 2026-05-20 发布，当前项目声明支持 LLVM 21 [S017]。
+- **开源/许可证**：AGPL-3.0-or-later，另含单独授权的第三方组件；属于强 copyleft，作为内部独立工具运行与嵌入/修改后提供网络服务的合规边界应分别评估。
+- **核心表示**：SVF IR、constraint graph、call graph、ICFG、SVFG、interprocedural Memory SSA、points-to sets。
+- **事实来源**：每个 Target 编译/链接得到的 LLVM bitcode；分析器构造 indirect-call target 集合和 value-flow。
+- **Agent 接口**：C++ API、工具和新增 Python bindings；无原生 MCP/通用查询 DSL。
+- **公开数据**：项目列出 CC/FSE/TSE/CGO 等算法论文，但旧算法结果不用于当前实现排序；本轮只确认能力存在。
+- **WiFiDemo 直接证据**：W05 的 ops 表和函数指针是其最关键潜在价值；尚未运行。
+- **优点**：本轮候选中对函数指针和 value-flow 最专门；可补足 CPG/结构图的 indirect call 弱点；分析敏感度可选择。
+- **缺点**：必须先产生完整 bitcode；source construct 和宏 provenance 会弱化；全程序/高敏感度分析可能昂贵；不是知识存储。
+- **Unknown**：四 Target bitcode 生成、外部/汇编函数处理、实际函数指针候选 precision/recall、结果稳定 ID，以及预期部署方式下的 AGPL 合规边界。
+- **代码—领域链接**：只应输出带 Target 的 `may_call`/`value_flows_to` 候选及 analysis configuration；领域层可把关键 ops slot 映射到 domain role，但不能把 may-call 写成 must-call。
+- **可借鉴**：把 function-pointer resolution 作为独立可替换分析 provider，并保留 sensitivity/configuration provenance。
+- **初步分类**：深度分析补充短名单，不作为主知识数据库。
+
+### A08 — PhASAR
+
+- **定位**：LLVM IR 上可编程的 interprocedural data-flow framework，重点是 IFDS/IDE/WPDS、taint 和路径重建。
+- **最新活动**：当前项目支持 LLVM 16–22.1，并持续维护 C++20 API [S020]。
+- **开源/许可证**：MIT。
+- **核心表示**：LLVMProjectIRDB、ICFG、call graph、type hierarchy、alias sets、IFDS/IDE facts、taint paths。
+- **事实来源**：Target-specific LLVM IR；source/sink/summary 可来自 IR annotation、JSON 或 callback。
+- **Agent 接口**：C++ library/CLI 输出；无原生 MCP，但 JSON 配置适合由上层生成受控分析任务。
+- **公开数据**：2019 论文含 case study，但当前版本变化较大，本研究不引用旧 runtime 排名。
+- **WiFiDemo 直接证据**：适合验证 W06 的 Host/Device event dataflow 和定制 source/sink；尚未运行。
+- **优点**：比固定漏洞扫描器更适合定义领域 data-flow problem；支持多种 call graph、path reconstruction 和 SVF points-to integration；宽松许可证。
+- **缺点**：IR 构建与 source mapping 工程量大；需要自己定义问题和 summaries；不是查询数据库或知识生命周期系统。
+- **Unknown**：WiFiDemo bitcode 可构建性、分析规模、函数指针配置、输出与 source occurrence 的稳定对齐。
+- **代码—领域链接**：JSON/callback source/sink 是清晰的规则化领域入口；每条配置必须引用 domain entity、Target、revision、rule version，结果 path 必须回连 source span。
+- **可借鉴**：把“领域问题定义”与“通用 dataflow solver”分离，避免把领域规则硬编码进基础图 schema。
+- **初步分类**：开源深度 dataflow 短名单；可能与 Clang/SCIP 身份层组合。
+
+### A09 — Frama-C
+
+- **定位**：面向 C 的统一分析平台，以 Eva 抽象解释、ACSL 规格、依赖/PDG、impact 和 slicing 处理高可信问题。
+- **最新活动**：33.0 beta 于 2026-06-25 发布；Eva 改进 volatile pointer 支持并新增 secure-flow 选项 [S018]。
+- **开源/许可证**：LGPL；可另行双许可。
+- **核心表示**：规范化 C AST、abstract states、alarms、ACSL properties、functional dependencies、PDG 和 sliced project。
+- **事实来源**：预处理后的 C、入口/库模型、用户 ACSL 规格和插件分析结果。
+- **Agent 接口**：CLI、GUI、OCaml plugin API、SARIF 辅助项目；无原生 MCP。
+- **公开数据**：Eva 提供 soundness 契约，但无 alarm 不等于“所有领域问题正确”；本轮不引用跨工具准确率。
+- **WiFiDemo 直接证据**：嵌入式 C、volatile、函数指针和 slicing 高度相关；尚未验证 GCC 扩展/asm/四 Target。
+- **优点**：C 专用且分析类型互补；可生成满足准则的真正程序切片；ACSL 能把人工领域约束转成可验证 property；对 runtime error 具有比结构图更强的语义保证。
+- **缺点**：环境与库建模成本高；复杂驱动可能产生大量 alarms/unknown；多 Target 必须分别分析；输出需再结构化给 Agent。
+- **Unknown**：WiFiDemo 预处理兼容、volatile/MMIO/asm 模型、全仓规模、slice 可读性与跨 Host/Device event 表达。
+- **代码—领域链接**：ACSL property 可作为 `domain claim -> formal property -> proof/alarm -> source span` 链，但人工规格维护成本和适用范围必须显式记录。
+- **可借鉴**：区分 proven/invalid/unknown，而不是单一 confidence；将 slicing 用于证据压缩而非知识存储。
+- **初步分类**：高可信 C 分析/切片短名单，适合作为按需验证器而非全局主图。
+
+### A10 — Semgrep CE
+
+- **定位**：用近似源码的 pattern DSL 快速编码项目级语法/局部 dataflow 规则并返回精确位置。
+- **最新活动**：v1.164.0 于 2026-05-27 发布；官方已有本地 MCP/Agent integrations [S019]。
+- **开源/许可证**：Community Edition 为 LGPL-2.1；深层 Pro Engine 为 proprietary。
+- **核心表示**：generic AST、pattern/metavariable、单函数/单文件 dataflow 和 rule findings。
+- **事实来源**：源码与 YAML 规则；通常不消费真实 compdb，也不建立 Target occurrence。
+- **Agent 接口**：CLI、JSON/SARIF、本地 MCP、skills/plugins。
+- **公开数据**：官方明确 CE 的单函数/单文件边界；本研究不采用营销页提升百分比。
+- **WiFiDemo 直接证据**：适合 W03 的宏约束、API 配对和禁止模式等局部规则；本轮未运行。
+- **优点**：规则编写和测试门槛低；源码证据清楚；适合把少量成熟领域规范变为持续检查；Agent 接入现成。
+- **缺点**：开源 CE 不具备跨文件/interprocedural C/C++ 深层分析；不理解四 Target 编译差异；finding 不是知识实体数据库。
+- **Unknown**：WiFi C parser 对扩展语法的覆盖、规则误报率、宏展开前后匹配行为。
+- **代码—领域链接**：每条 rule 可链接 domain policy ID，并把 finding 作为有版本的 evidence；但只能证明“匹配规则”，不能推导完整业务流程。
+- **可借鉴**：领域规则包、rule tests、SARIF/MCP 输出和快速反馈；作为检查层而非核心程序分析层。
+- **初步分类**：保留为轻量规则组件；排除用 CE 单独承担跨 Target 深度分析。
+
+## 10. Task 4 的阶段性收敛
+
+本轮没有选出单一工具，收敛的是组合边界：
+
+1. **编译真相层不能省略**：Clang compilation database 的“一文件多编译命令”语义与 WiFiDemo 四 Target 直接匹配。无论上层选 CPG、数据库还是 IR，都必须以 Target Profile/compile-command digest 分区。
+2. **身份层优先考察开放格式**：scip-clang/SCIP 与 Kythe 都比纯 Tree-sitter 更适合产生可追溯 occurrence；SCIP 轻，Kythe 的 target/revision/provenance 模型更完整。
+3. **CPG 保留两个实现候选**：Joern 与 Fraunhofer CPG 使用同一字段继续比较；前者查询/切片成熟，后者 library/pass/overlay 扩展更直接。两者都没有公开证明 WiFiDemo 所需的真实 Target 输入和函数指针质量。
+4. **深度分析应可插拔**：SVF/PhASAR 负责 LLVM 层函数指针与 dataflow；Frama-C 负责 C 源码抽象解释、形式规格与 slicing。它们提供的是按需高成本事实，不宜全部预计算进主图。
+5. **CodeQL 是重要上界而非默认实现**：查询与模型设计值得借鉴，但 engine 与闭源项目许可使其不符合优先开源核心的方向。
+6. **Semgrep 是领域规则执行器，不是图谱**：适合把确认过的局部规范持续化，不能替代跨文件语义。
+7. **SVF 的开放源码不等于宽松集成**：技术上保留为函数指针/value-flow 候选，但 AGPL-3.0-or-later 使其部署方式成为独立筛选维度；PhASAR 的 MIT 许可更利于嵌入式组合方案。
+
+### 10.1 当前排除或降级
+
+- 排除“单一 Tree-sitter 图即可回答函数指针、dataflow 和 Target 问题”的假设。
+- 排除把未消费真实编译命令的目录级 CPG 当作最终编译事实。
+- CodeQL 降为 Benchmark/设计参考，除非后续确认组织已有满足闭源自动化分析的许可证。
+- Semgrep CE 降为局部规则组件；Pro Engine 不进入优先开源短名单。
+- LLVM IR/SVF/PhASAR/Frama-C 不作为主检索数据库，而作为 Target-specific 按需 analysis provider。
+
+### 10.2 必须进入后续 Benchmark 的问题
+
+| ID | 问题 | 对应 WiFiDemo | 主要候选 | 指标 |
+|---|---|---|---|---|
+| PA01 | 四 Target 是否产生互不污染的 source occurrence 与宏事实 | W01–W04、W07 | Clang、SCIP、Kythe、两种 CPG | Target precision/recall、source evidence accuracy |
+| PA02 | direct call 与同名 static symbol 是否正确消歧 | W08 | SCIP、Kythe、Joern、Fraunhofer CPG | edge precision/recall |
+| PA03 | ops 表/函数指针候选是否覆盖真实实现且候选集合可控 | W05 | LLVM AA、SVF、PhASAR、Frama-C、CPG | recall、precision、候选数、耗时 |
+| PA04 | Host→Device event 路径能否产生带源码证据的 dataflow/slice | W06 | Joern、Fraunhofer CPG、PhASAR、Frama-C | path precision、gold coverage、slice size |
+| PA05 | 外部函数 summary/semantics 错误如何暴露 | W04–W06 | CodeQL、Joern、Fraunhofer CPG、PhASAR | FP/FN、rule provenance、conflict detection |
+| PA06 | 修改一个 Target 后哪些事实失效、哪些可复用 | W03、W07 | SCIP、Kythe、CPG、metadata layer | reindex latency、invalidated fact precision |
+
+## 11. 对代码—领域知识链接的新增结论
+
+Task 4 进一步说明领域知识不应直接绑定“函数名”，而应绑定可验证的程序事实：
+
+```text
+DomainEntity / Claim
+  -> RuleOrSpecification(version, author, confidence)
+  -> TargetProfile(revision, compile-command digest)
+  -> CodeOccurrence(source span, semantic symbol)
+  -> AnalysisFact(kind, generator, configuration)
+  -> EvidencePath / Slice
+  -> ValidationState(proven | observed | inferred | unknown | invalid)
+```
+
+其中有四种成熟机制可学习：Kythe 的 anchor/VName 与 `generates` 边 [S012]，CodeQL/Fraunhofer/Joern 的外部函数 model/summary/semantics [S013][S015][S016]，PhASAR 的 JSON/callback source-sink 配置 [S020]，以及 Frama-C 的 ACSL property 与 proof/alarm 状态 [S018]。共同原则是：领域规则、分析结果和 parser/compiler 事实必须分层，并且能追溯到 Target-specific 源码证据。

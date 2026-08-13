@@ -71,8 +71,8 @@
 | 状态 | 数量 |
 |---|---:|
 | discovered | 0 |
-| primary-read | 4 |
-| claim-verified | 5 |
+| primary-read | 14 |
+| claim-verified | 6 |
 | rejected | 0 |
 
 ## 8. 已登记来源
@@ -256,3 +256,223 @@
 - 限制：没有公开的结构边或领域映射准确率 Benchmark；领域知识主要由 LLM 从代码生成，未见外部领域文档、Target/revision、claim provenance、confidence 和冲突生命周期的完整治理；许可证为 MIT。
 - WiFi MAC 相关性：间接
 - 正文位置：第 5 章代码—领域链接路线、第 7 章待验证问题
+
+### S010 — Clang Tooling、Compilation Database 与 LLVM IR 官方文档
+
+- 状态：primary-read
+- 发布日期：持续更新；访问版本 Clang/LLVM 24.0.0git
+- 访问日期：2026-08-14
+- 来源类型：项目官方功能说明
+- 发布者/作者：LLVM Project
+- 原始 URL：https://clang.llvm.org/docs/JSONCompilationDatabase.html；https://clang.llvm.org/docs/LibTooling.html；https://clang.llvm.org/docs/LibASTMatchers.html；https://llvm.org/docs/LangRef.html；https://llvm.org/docs/SourceLevelDebugging.html；https://llvm.org/docs/MemorySSA.html；https://llvm.org/docs/AliasAnalysis.html
+- 独立属性：first-party
+- 研究对象：C/C++ 编译命令重放、AST 查询、LLVM IR、源码映射、alias 与 MemorySSA
+- 样本与语言：官方规范与接口文档；不提供 WiFi MAC 效果样本
+- 模型/Agent：not-applicable
+- 对照基线：none
+- 指标：none
+- 可引用声明：`compile_commands.json` 的每个 command object 表示一个 translation unit 的一种编译方式，同一文件可以因不同配置出现多条 command；LibTooling/AST Matchers 可基于这些命令访问 AST 和 source location。LLVM IR 提供 CFG/SSA 等分析载体，debug metadata 可把 IR instruction 映回文件和行；MemorySSA 是函数内的 memory def-use/use-def 表示，alias API 返回 Must/Partial/May/NoAlias 等保守结果。
+- 数字与语境：文档版本号和枚举数量只描述接口，不是准确率数据。
+- 限制：Clang AST 是 translation-unit 视角；LLVM IR 会丢失或降低部分源码级构造可读性，优化也会改变 IR 形态；MemorySSA 明确是 intraprocedural。上述组件不是现成的知识存储或 Agent 查询服务。
+- WiFi MAC 相关性：直接基础
+- 正文位置：第 4 章编译器原生路线、第 6 章 Target-aware 输入
+
+### S011 — scip-clang 与 SCIP 官方材料
+
+- 状态：primary-read
+- 发布日期：SCIP v0.7.1 发布于 2026-04-14；访问快照 2026-08-14
+- 访问日期：2026-08-14
+- 来源类型：项目官方功能说明
+- 发布者/作者：Sourcegraph/scip-code
+- 原始 URL：https://github.com/sourcegraph/scip-clang；https://github.com/scip-code/scip
+- 独立属性：first-party
+- 研究对象：基于 Clang 21 的 C/C++/CUDA 精确代码索引与开放 SCIP 交换格式
+- 样本与语言：官方展示 Boost、Chromium、LLVM 等导航案例；未提供可比较 accuracy Benchmark
+- 模型/Agent：not-applicable
+- 对照基线：none
+- 指标：资源估算约每个 TU 2 MB 临时空间、每核约 2 GB RAM；属于部署建议而非效果数据
+- 可引用声明：scip-clang 从 JSON compilation database 生成 `index.scip`，支持 include、macro、type 的 references 和跨仓导航；SCIP 协议为 Apache-2.0。
+- 数字与语境：资源估算是项目建议，不能外推到 WiFiDemo；预编译头不受支持。
+- 限制：功能目标是代码导航与 occurrence，不提供 CFG、dataflow、taint 或 slice；Sourcegraph 完整服务端并非全部开源，但 SCIP 格式和 scip-clang 源码可独立检查。
+- WiFi MAC 相关性：直接基础
+- 正文位置：第 4 章跨文件语义索引、第 6 章代码身份
+
+### S012 — Kythe Compilation Database 与 Schema 官方文档
+
+- 状态：primary-read
+- 发布日期：持续更新；访问快照 2026-08-14
+- 访问日期：2026-08-14
+- 来源类型：项目官方功能说明
+- 发布者/作者：Kythe Project
+- 原始 URL：https://kythe.io/docs/kythe-compilation-database.html；https://kythe.io/docs/schema-overview.html；https://kythe.io/docs/schema/writing-an-indexer.html；https://kythe.io/docs/schema/indexing-generated-code.html；https://github.com/kythe/kythe
+- 独立属性：first-party
+- 研究对象：可插拔代码索引、hermetic compilation unit、anchor/semantic node/cross-reference schema
+- 样本与语言：官方提供 C++、Go、Java indexer；无 WiFi MAC 效果样本
+- 模型/Agent：not-applicable
+- 对照基线：none
+- 指标：none
+- 可引用声明：Kythe 的 compilation database 捕获一次真实 compile action、输入、依赖和 flags，并按 revision、target、source、corpus、language 建索引；schema 用 anchor 把定义、引用和 call site 定位到源码跨度，并用 VName 表达语义身份。生成代码可通过 `generates`/`imputes` 边与源实体保持不同身份后再连接。
+- 数字与语境：SHA-256 content addressing、字段与边类型是数据模型事实，不是效果数据。
+- 限制：核心目标是交叉引用和代码导航；默认 schema 不提供通用 CFG、dataflow 或 slice；构建抽取与服务管线复杂，领域知识需要扩展 schema 和消费端支持。
+- WiFi MAC 相关性：直接基础
+- 正文位置：第 4 章可查询交叉引用、第 5 章代码—领域链接模式
+
+### S013 — CodeQL C/C++ 文档、查询库与 CLI 许可
+
+- 状态：primary-read
+- 发布日期：CodeQL CLI v2.25.5 发布于 2026-05-22；访问快照 2026-08-14
+- 访问日期：2026-08-14
+- 来源类型：公司官方实践、项目官方功能说明
+- 发布者/作者：GitHub
+- 原始 URL：https://github.com/github/codeql；https://github.com/github/codeql-cli-binaries；https://codeql.github.com/docs/codeql-language-guides/advanced-dataflow-scenarios-cpp/；https://docs.github.com/en/code-security/concepts/code-scanning/codeql/query-packs
+- 独立属性：company-practice
+- 研究对象：把代码编译为可查询数据库，并以 QL 定义 C/C++ dataflow/taint 与安全查询
+- 样本与语言：C/C++ 为正式 query pack；本阶段未引用漏洞检测效果数字
+- 模型/Agent：not-applicable
+- 对照基线：none
+- 指标：none
+- 可引用声明：CodeQL 的开源查询/库仓库采用 MIT，C/C++ dataflow 区分 pointer value 与 pointee，并允许 query/model pack 扩展库/框架语义；CLI/engine 单独授权，闭源代码和自动化工程使用需要相应商业许可。
+- 数字与语境：版本与 pack 种类是产品事实，不是准确率数据。
+- 限制：核心 engine 不开源且内部闭源 WiFi 代码采用受许可约束；database extractor 和事实 schema 不是自由替换的开放引擎；主要面向安全分析，不是 Agent-ready 领域知识系统。
+- WiFi MAC 相关性：间接
+- 正文位置：第 4 章声明式代码数据库、第 8 章许可约束
+
+### S014 — Modeling and Discovering Vulnerabilities with Code Property Graphs
+
+- 状态：claim-verified
+- 发布日期：2014-05
+- 访问日期：2026-08-14
+- 来源类型：经典基础论文
+- 发布者/作者：Fabian Yamaguchi、Nico Golde、Daniel Arp、Konrad Rieck；IEEE Symposium on Security and Privacy
+- 原始 URL：https://www.ieee-security.org/TC/SP2014/papers/ModelingandDiscoveringVulnerabilitieswithCodePropertyGraphs.pdf；https://ieeexplore.ieee.org/document/6956589
+- 独立属性：foundational
+- 研究对象：把 AST、CFG 和 PDG 合并为 property graph，并以 traversal 表达漏洞模板
+- 样本与语言：Linux kernel C 源码案例
+- 模型/Agent：not-applicable
+- 对照基线：论文中的代码审计方法；本研究不复述未重新核验的横向基线分数
+- 指标：新发现漏洞数量和查询案例
+- 可引用声明：CPG 的经典定义是 AST、CFG 和 program dependence graph 的联合表示，而不是任意“节点+边”的代码图；论文在 Linux kernel 案例中报告发现 18 个此前未知漏洞。
+- 数字与语境：18 是论文作者在 2014 Linux kernel 案例中的发现数，不是现代 CPG 的通用准确率，也不能比较 Joern 与其他当前工具。
+- 限制：旧论文用于定义表示及历史有效案例；不证明当前 frontend、跨 TU、宏、多 Target、Agent 接口或维护状态。持续相关性由 S015/S016 的 2026 活跃实现与规范补充。
+- WiFi MAC 相关性：基础定义
+- 正文位置：第 4 章 CPG 定义、第 9 章旧引用用途限定
+
+### S015 — Joern、CPG Specification 与官方查询文档
+
+- 状态：primary-read
+- 发布日期：Joern v4 系列持续发布；检索到 v4.0.548（2026-05-27）
+- 访问日期：2026-08-14
+- 来源类型：项目官方功能说明
+- 发布者/作者：Joern/Qwiet AI 开源项目
+- 原始 URL：https://github.com/joernio/joern；https://docs.joern.io/code-property-graph/；https://docs.joern.io/frontends/；https://docs.joern.io/cpg-slicing/；https://docs.joern.io/dataflow-semantics/；https://cpg.joern.io/
+- 独立属性：first-party
+- 研究对象：多语言 CPG、Scala DSL、dataflow、custom semantics 与 JSON slicing
+- 样本与语言：官方支持 C/C++ 等多种 source/binary frontend；未发现宏密集多 Target C 的公开准确率数据
+- 模型/Agent：not-applicable；可通过 server/脚本由 Agent 封装
+- 对照基线：none
+- 指标：none
+- 可引用声明：Joern CPG 提供 AST、call/control/dataflow overlays 与 CPGQL；`joern-slice` 可导出 interprocedural backward data-flow slice 或 usage slice 为 JSON，并携带 file/line/column。未建模 external method 时默认数据流语义为保守传播，custom semantics 可提高精度但引入人工模型依赖。
+- 数字与语境：默认 slice depth 20 是 CLI 默认值，不是分析完整性指标。
+- 限制：当前官方 frontend 总览没有证明读取 `compile_commands.json` 并为同一源码的多个真实编译配置建立隔离 occurrence；目录级 import 和类型恢复不能替代真实 Target 编译；缺少 Agent/WiFiDemo 对比数据。
+- WiFi MAC 相关性：间接
+- 正文位置：第 4 章 CPG 候选之一、第 6 章适配性
+
+### S016 — Fraunhofer AISEC Code Property Graph 官方材料
+
+- 状态：primary-read
+- 发布日期：文档更新于 2026-06；当前 README 示例版本 9.0.2
+- 访问日期：2026-08-14
+- 来源类型：项目官方功能说明
+- 发布者/作者：Fraunhofer AISEC
+- 原始 URL：https://fraunhofer-aisec.github.io/cpg/；https://fraunhofer-aisec.github.io/cpg/CPG/impl/language/；https://fraunhofer-aisec.github.io/cpg/GettingStarted/query/；https://fraunhofer-aisec.github.io/cpg/CPG/specs/dfg-function-summaries/；https://github.com/Fraunhofer-AISEC/cpg
+- 独立属性：first-party
+- 研究对象：可嵌入 library 的多语言 CPG、EOG/DFG/CDG、passes 和 query API
+- 样本与语言：C/C++（README 标注 C17）、LLVM IR 等；无 WiFi MAC 效果样本
+- 模型/Agent：not-applicable
+- 对照基线：none
+- 指标：none
+- 可引用声明：该项目把 frontend AST 转换与后续 analysis passes 分离，提供 C/C++、LLVM IR、dataflow、reachability、constant propagation、函数摘要和 interprocedural query API；可作为库使用或导出 Neo4j，采用 Apache-2.0。
+- 数字与语境：版本、语言数和 API 是功能事实，不是准确率。
+- 限制：C/C++ frontend 基于 Eclipse CDT 依赖，未证明真实 compilation database、多 Target occurrence 或函数指针解析精度；外部函数摘要与 inference rules 必须记录来源，否则可能与 parser 事实混淆。
+- WiFi MAC 相关性：间接
+- 正文位置：第 4 章 CPG 对照、第 5 章 overlay/领域扩展
+
+### S017 — SVF Static Value-Flow Analysis 官方项目与文档
+
+- 状态：primary-read
+- 发布日期：SVF 3.3 发布于 2026-05-20
+- 访问日期：2026-08-14
+- 来源类型：项目官方功能说明、经典论文实现
+- 发布者/作者：SVF-tools；Yulei Sui 等
+- 原始 URL：https://github.com/SVF-tools/SVF；https://svf-tools.github.io/SVF/；https://svf-tools.github.io/SVF-doxygen/html/classSVF_1_1PointerAnalysis.html
+- 独立属性：first-party
+- 研究对象：LLVM-based pointer analysis、value-flow、ICFG、Memory SSA 和 source-sink bug detection
+- 样本与语言：LLVM-based C/C++；当前项目声明支持 LLVM 21
+- 模型/Agent：not-applicable
+- 对照基线：相关论文包含算法比较，但本阶段不跨版本引用性能数字
+- 指标：none registered for ranking
+- 可引用声明：SVF 提供 field/flow/context-sensitive pointer analysis、call graph、ICFG、constraint/value-flow graph、interprocedural Memory SSA，并显式维护 callsite 到 function-pointer target 集合；主项目许可证为 AGPL-3.0-or-later，且包含单独授权的第三方组件。
+- 数字与语境：版本号和分析类型是功能事实；旧论文只用于算法基础，不证明当前 WiFiDemo 表现。
+- 限制：输入是 LLVM IR，需另外保存 source/Target identity；不是通用图数据库、领域知识系统或现成 Agent API；分析规模、precision 和构建链兼容性必须实测。
+- WiFi MAC 相关性：直接基础
+- 正文位置：第 4 章深度 dataflow/函数指针路线、第 6 章能力补足
+
+### S018 — Frama-C、Eva 与 Slicing 官方材料
+
+- 状态：primary-read
+- 发布日期：Frama-C 33.0 beta 发布于 2026-06-25；官方用户手册持续更新
+- 访问日期：2026-08-14
+- 来源类型：项目官方功能说明
+- 发布者/作者：CEA List/Inria Frama-C team
+- 原始 URL：https://frama-c.com/；https://frama-c.com/html/news.html；https://www.frama-c.com/fc-plugins/eva.html；https://frama-c.com/download/frama-c-user-manual.pdf；https://www.frama-c.com/html/contact.html
+- 独立属性：first-party
+- 研究对象：C 源码的抽象解释、ACSL 规格、PDG/依赖、impact 与程序切片
+- 样本与语言：ISO C；C++ frontend 为实验性，不影响本项目 C 重点
+- 模型/Agent：not-applicable
+- 对照基线：none
+- 指标：Eva 的“无 alarm 则相应运行时错误不会发生”属于 soundness 契约，不是经验准确率
+- 可引用声明：Frama-C 以统一 C AST 和 ACSL 作为插件协作媒介；Eva 提供 value analysis，Slicing 使用 Eva 与 functional dependency 结果生成满足准则的程序切片；项目为 LGPL，2026 仍活跃。
+- 数字与语境：release/version 是维护事实，不报告跨工具精度数字。
+- 限制：严格分析依赖完整环境、入口、库模型、volatile/asm 等建模；可能需要 ACSL 人工规格；输出不是默认的 Agent 查询图，且多 Target 必须分别预处理/分析。
+- WiFi MAC 相关性：直接基础
+- 正文位置：第 4 章 C 专用抽象解释与切片、第 6 章验证能力
+
+### S019 — Semgrep Community Edition 与 Pro Engine 官方材料
+
+- 状态：primary-read
+- 发布日期：Semgrep v1.164.0 发布于 2026-05-27；访问快照 2026-08-14
+- 访问日期：2026-08-14
+- 来源类型：公司官方实践、项目官方功能说明
+- 发布者/作者：Semgrep Inc.
+- 原始 URL：https://github.com/semgrep/semgrep；https://semgrep.dev/products/semgrep-vs-ce；https://semgrep.dev/docs/writing-rules/experiments/join-mode/overview；https://semgrep.dev/products/pro-engine/
+- 独立属性：company-practice
+- 研究对象：类源码 pattern DSL、规则化静态检查、taint 与跨文件分析
+- 样本与语言：官方声明 C/C++ 支持；本阶段不采用营销页效果百分比作为候选排序证据
+- 模型/Agent：可运行本地 MCP，但核心分析不依赖 LLM
+- 对照基线：Community Edition 与 proprietary Pro Engine 的能力边界
+- 指标：none registered for ranking
+- 可引用声明：Semgrep CE 为 LGPL-2.1，适合轻量规则检查，但官方明确其 dataflow 限于单函数/单文件；C/C++ 的 interfile/interprocedural deep analysis 属于 proprietary Pro Engine。
+- 数字与语境：语言数、规则数和营销提升数字不进入本文排序，因为实验设置与 WiFi MAC 不可比。
+- 限制：开源 CE 无法承担跨 Host/Device/Target 的深层语义；Pro 能力与许可证不符合“优先开源实现”的默认方向；pattern finding 也不是稳定代码事实数据库。
+- WiFi MAC 相关性：间接
+- 正文位置：第 4 章声明式规则路线、第 8 章能力/许可排除
+
+### S020 — PhASAR LLVM-based Static Analysis Framework 官方材料
+
+- 状态：primary-read
+- 发布日期：持续更新；访问快照 2026-08-14
+- 访问日期：2026-08-14
+- 来源类型：项目官方功能说明、经典论文实现
+- 发布者/作者：Paderborn University/Fraunhofer IEM Secure Software Engineering Group
+- 原始 URL：https://github.com/secure-software-engineering/phasar；https://link.springer.com/chapter/10.1007/978-3-030-17465-1_22
+- 独立属性：first-party
+- 研究对象：LLVM IR 上的 IFDS/IDE/WPDS、ICFG、points-to、taint 和 path reconstruction
+- 样本与语言：LLVM-based C/C++；当前项目支持 LLVM 16–22.1
+- 模型/Agent：not-applicable
+- 对照基线：旧论文包含 case study；本阶段不以旧性能数字排序当前实现
+- 指标：none registered for ranking
+- 可引用声明：PhASAR 允许以 API 定义任意 interprocedural data-flow problem，提供多种 call-graph、alias/points-to、ICFG、IFDS/IDE、taint 和具体 path reconstruction；source/sink 可来自 IR annotation、JSON 或 callback；许可证为 MIT。
+- 数字与语境：LLVM 版本范围和功能列表是当前官方材料中的接口事实；2019 论文只用于设计持续性与许可证补充。
+- 限制：需要把每个 Target 构建为 LLVM IR；不是现成知识数据库或 MCP；source/sink JSON 是领域规则入口但必须另加 revision、Target、evidence 和审核治理。
+- WiFi MAC 相关性：直接基础
+- 正文位置：第 4 章 dataflow framework、第 5 章领域 source/sink 映射

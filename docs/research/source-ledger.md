@@ -676,3 +676,99 @@
 - 限制：无受控基线、主要代码也由同一 Agent 生成、keyword retrieval 较简单；不能证明对成熟 C 驱动仓或多人团队有效。
 - WiFi MAC 相关性：间接架构参考
 - 正文位置：hot/cold knowledge、领域 Agent 和按需规格
+
+### S031 — Zephyr 4.4.0 release 与仓库
+
+- 状态：primary-read
+- 发布日期：2026-04-14
+- 访问日期：2026-08-14
+- 来源类型：开源项目发布页、仓库
+- 发布者/作者：Zephyr Project
+- 原始 URL：https://github.com/zephyrproject-rtos/zephyr/releases/tag/v4.4.0；https://github.com/zephyrproject-rtos/zephyr
+- 独立属性：project-primary
+- 研究对象：大型嵌入式 C RTOS、驱动与多板/多架构构建
+- 固定版本：`v4.4.0`，release commit `684c9e8`
+- 许可证：Apache-2.0；仓库含 `LICENSES`，具体样本依赖仍需扫描
+- 可引用声明：仓库以 C 为主，包含 `arch`、`boards`、`drivers`、`subsys`、Kconfig、devicetree 与 CMake/west 构建；4.4.0 默认最低 C17，并新增 Wi-Fi P2P 支持。
+- 限制：体量和构建矩阵远大于 WiFiDemo；不能把整个仓库作为单一 Benchmark 单元。
+- WiFi MAC 相关性：高；适合 Target、Kconfig/devicetree、driver/API 与事件路径案例
+- 正文位置：后续 Benchmark 数据集
+
+### S032 — Zephyr 官方构建与配置文档
+
+- 状态：primary-read
+- 发布日期：持续维护，4.4 文档快照
+- 访问日期：2026-08-14
+- 来源类型：开源项目官方文档
+- 发布者/作者：Zephyr Project
+- 原始 URL：https://docs.zephyrproject.org/4.4.0/build/index.html；https://docs.zephyrproject.org/4.4.0/build/kconfig/index.html；https://docs.zephyrproject.org/4.4.0/build/dts/index.html
+- 独立属性：project-primary
+- 研究对象：board/SoC configuration、Kconfig、devicetree、生成构建产物
+- 可引用声明：最终配置和硬件描述由构建生成；Benchmark 应保存 `.config`、生成 devicetree、编译命令和选中源码作为 Target ground truth，而非只读源文件条件。
+- 限制：文档定义流程，不提供候选知识图准确率。
+- WiFi MAC 相关性：高
+- 正文位置：后续 Benchmark ground truth
+
+### S033 — RIOT 2026.04.01 release 与仓库
+
+- 状态：primary-read
+- 发布日期：2026-05-22
+- 访问日期：2026-08-14
+- 来源类型：开源项目发布页、仓库
+- 发布者/作者：RIOT community
+- 原始 URL：https://github.com/RIOT-OS/RIOT/releases/tag/2026.04.01；https://github.com/RIOT-OS/RIOT
+- 独立属性：project-primary
+- 研究对象：模块化嵌入式 C OS、board/CPU/driver/network stack
+- 固定版本：`2026.04.01`，release commit `4a70282`
+- 许可证：LGPL-2.1；外部 source/package 可有不同许可，样本依赖需扫描
+- 可引用声明：RIOT 以 board、CPU、driver、sys/pkg 和 module 分层，构建由 BOARD、USEMODULE、FEATURES 与 Makefile 依赖解析决定。
+- 限制：FEATURE 与 MODULE 并非一一对应；不能用目录或名称直接生成领域事实。
+- WiFi MAC 相关性：高；适合 board/CPU/feature/module 和 radio driver 案例
+- 正文位置：后续 Benchmark 数据集
+
+### S034 — RIOT 官方结构与构建文档
+
+- 状态：primary-read
+- 发布日期：持续维护
+- 访问日期：2026-08-14
+- 来源类型：开源项目官方文档
+- 发布者/作者：RIOT community
+- 原始 URL：https://doc.riot-os.org/general/structure/；https://doc.riot-os.org/build-system/build_system_basics/；https://doc.riot-os.org/build-system/build_system/
+- 独立属性：project-primary
+- 研究对象：board/CPU/driver/module 结构与 build dependency resolution
+- 可引用声明：`info-modules`、`info-build`、最终 CFLAGS 和依赖解析输出可构造 Target ground truth；FEATURE 表示硬件/构建约束，不保证存在同名 MODULE。
+- 限制：官方文档没有为知识图工具提供 gold labels。
+- WiFi MAC 相关性：高
+- 正文位置：后续 Benchmark 结构映射和反事实
+
+### S035 — Contiki-NG 5.1 release 与仓库
+
+- 状态：primary-read
+- 发布日期：release page 标记 09-20，年份以 tag 元数据为准
+- 访问日期：2026-08-14
+- 来源类型：开源项目发布页、仓库
+- 发布者/作者：Contiki-NG team
+- 原始 URL：https://github.com/contiki-ng/contiki-ng/releases/tag/release%2Fv5.1；https://github.com/contiki-ng/contiki-ng
+- 独立属性：project-primary
+- 研究对象：低功耗网络嵌入式 C OS、MAC/network stack、platform/CPU/device drivers
+- 固定版本：`release/v5.1`，release commit `2b87baf`
+- 许可证：BSD-3-Clause 为默认；例外文件/子模块需逐项扫描
+- 可引用声明：仓库将 OS/network stack 放在 `os`，硬件相关 CPU/device/platform driver 放在 `arch`，examples/tests 与工具分离。
+- 限制：低功耗 802.15.4 网络栈与 Wi-Fi MAC 不同；只作为结构相邻案例。
+- WiFi MAC 相关性：中高
+- 正文位置：后续 Benchmark 数据集
+
+### S036 — Contiki-NG 官方构建与配置文档
+
+- 状态：primary-read
+- 发布日期：持续维护
+- 访问日期：2026-08-14
+- 来源类型：开源项目官方文档
+- 发布者/作者：Contiki-NG team
+- 原始 URL：https://docs.contiki-ng.org/en/develop/doc/getting-started/The-Contiki-NG-build-system.html；https://docs.contiki-ng.org/en/develop/doc/getting-started/The-Contiki-NG-configuration-system.html；https://docs.contiki-ng.org/en/master/doc/programming/Repository-structure.html
+- 独立属性：project-primary
+- 研究对象：TARGET/BOARD/CPU/module、header configuration 与可生成预处理文件
+- 可引用声明：`TARGET` 和可选 `BOARD` 选择 platform，Makefile 链接 CPU/module 源码；`%.e` 可生成预处理结果；MAC 层由 `MAKE_MAC` 等配置选择。
+- 限制：配置系统多由 Makefile 和 header 共同决定，需要以构建产物为准。
+- WiFi MAC 相关性：高
+- 正文位置：后续 Benchmark ground truth

@@ -461,3 +461,165 @@ DomainEntity / Claim
 ```
 
 其中有四种成熟机制可学习：Kythe 的 anchor/VName 与 `generates` 边 [S012]，CodeQL/Fraunhofer/Joern 的外部函数 model/summary/semantics [S013][S015][S016]，PhASAR 的 JSON/callback source-sink 配置 [S020]，以及 Frama-C 的 ACSL property 与 proof/alarm 状态 [S018]。共同原则是：领域规则、分析结果和 parser/compiler 事实必须分层，并且能追溯到 Target-specific 源码证据。
+
+## 12. 代码—领域混合知识方案档案
+
+以下档案使用与 R01–R07、A01–A10 相同的字段，但评价对象是知识组织和链接机制，不把文档问答结果当作代码语义准确率。
+
+### H01 — Graphify
+
+- **定位**：把代码、文档、PDF、ADR/RFC 等映射到同一 typed graph，并通过 Skill/CLI/MCP 供 Agent 查询。
+- **最新活动**：概念文档更新于 2026-07-01，官方仓库在 2026-08 仍活跃 [S021]。
+- **开源/许可证**：官方仓库同时标示 Apache-2.0/MIT 文件；采用前需按具体组件确认适用条款。
+- **核心表示**：Tree-sitter 代码节点/边、LLM 语义节点/边、`EXTRACTED`/`INFERRED`/`AMBIGUOUS` 标签、local graph JSON。
+- **事实来源**：代码由本地 AST parser；文档/媒体由配置的 LLM；WHY comment、ADR/RFC citation 可成为节点。
+- **Agent 接口**：Skill、CLI query/path/explain、stdio/HTTP MCP。
+- **公开数据**：官方通用 memory Benchmark 不测 C Target、代码—领域边 precision 或失效修复，不能用于本研究排序。
+- **WiFiDemo 直接证据**：未运行；W01–W08 的宏、Target、函数指针均超出公开效果证据。
+- **优点**：显式区分解析边、推断边和歧义边；文档与代码可双向遍历；本地开放接口和增量工作流完整。
+- **缺点**：Tree-sitter 不是编译事实；公开 schema 缺少 revision-qualified Target occurrence、人工 edge 权威级别和完整 stale lifecycle。
+- **Unknown**：C 宏/同名 static/函数指针边质量；文档边的 evidence granularity、rename repair、人工审核与冲突行为。
+- **代码—领域链接**：以 inferred doc edge 连接 AST entity，能说明来源类别但不能证明领域关系；必须外接 Target/semantic identity 和 assertion lifecycle。
+- **可借鉴**：EXTRACTED/INFERRED/AMBIGUOUS、WHY/ADR 一等节点、path/explain 和 scoped subgraph。
+- **初步分类**：混合图短名单/架构参考；不能单独成为 Target-aware 代码事实源。
+
+### H02 — Understand Anything
+
+- **定位**：由 Agent 从仓库结构生成 architecture、process、convention 和 specification 等可读知识资产；R07 已记录其代码探索特征。
+- **最新活动**：官方材料访问于 2026-08-13 [S009]。
+- **开源/许可证**：MIT。
+- **核心表示**：目录/结构分析、LLM 生成领域页面和可浏览关系。
+- **事实来源**：代码结构、项目文档与模型推断。
+- **Agent 接口**：生成式研究/文档工作流；并非稳定 typed-query code DB。
+- **公开数据**：没有代码—领域链接 precision、Target isolation、stale repair 或独立 Agent Benchmark。
+- **WiFiDemo 直接证据**：未运行；适合观察是否能生成 Feature/Flow 草稿，不可作为 truth test。
+- **优点**：领域页面可读；强调 architecture/process，而非只生成 symbol graph；适合作为人工知识采集入口。
+- **缺点**：生成知识的模型/prompt/provenance/confidence 和 revision lifecycle 公开治理不足。
+- **Unknown**：外部规范、Target occurrence、人工修正、重命名、矛盾页面和失效传播。
+- **代码—领域链接**：主要是 LLM 从代码到领域页面的软链接；若无确定性 anchor 和验证活动，只能处于 inferred 状态。
+- **可借鉴**：将“理解产物”独立为可审阅文件，并允许人修改；生成层不直接污染代码事实层。
+- **初步分类**：领域知识生成参考，不作为事实或链接底座。
+
+### H03 — LLM-Wiki + WiCER 式知识编译
+
+- **定位**：把原始资料编译成有目录、页面、双向链接和源引用的 Wiki，并以错误/失败 probe 迭代修正。
+- **最新活动**：LLM-Wiki 与 WiCER 均发布于 2026-05 [S022][S023]。
+- **开源/许可证**：论文/实验材料公开；实现许可证需按对应仓库核验，不在本轮假设为统一组件。
+- **核心表示**：Markdown page tree、aliases/tags/facts、bidirectional wikilinks、source archive、Error Book、diagnostic probes。
+- **事实来源**：原始文档经 LLM compiler 生成，结构 validator 与 source-grounded checker 修复；WiCER 用失败事实 pinning 重新编译。
+- **Agent 接口**：wiki search/read/traversal 或 full-context/KV cache；可包装为本地文件/工具接口。
+- **公开数据**：LLM-Wiki 在多文档问题上提升明显但单文档低 2.3 points；WiCER 的 blind compilation catastrophic rate 为 53–60%，1–2 次 refinement 恢复 80% 丢失质量 [S022][S023]。
+- **WiFiDemo 直接证据**：未运行；公开实验不含代码、宏或 Target。
+- **优点**：保留 raw sources 和 page-level provenance；双向链接适合领域导航；错误/遗漏有显式生命周期和重新验证机制。
+- **缺点**：Wiki 是有损派生物；编译/校验昂贵；LLM verifier 近似；不能替代当前代码分析。
+- **Unknown**：代码 anchor 接入、revision/Target 更新、规格版本冲突、WiFi 文档规模的 compression/attention crossover。
+- **代码—领域链接**：Wiki page 应连到外部 TargetOccurrence ID，而不是复制函数名；source reference 和 diagnostic probe 负责审计及重验证。
+- **可借鉴**：raw→compiled→schema 三层、双向 wikilink、Error Book、compile-evaluate-refine。
+- **初步分类**：领域叙事/Wiki 层候选；必须与代码身份/事实层组合。
+
+### H04 — RepoMem（Commit/Issue Repository Memory）
+
+- **定位**：以历史 commit/issue 为 episodic memory，以活跃文件摘要为 semantic memory，引导当前代码定位。
+- **最新活动**：ICLR 2026 论文与 Microsoft Research 页面当前有效 [S028]。
+- **开源/许可证**：论文材料公开；具体实现复用条件需后续核验。
+- **核心表示**：历史 commit/issue 检索、活跃文件 summary、Agent memory tools。
+- **事实来源**：固定时间点之前的仓库演化历史和生成摘要。
+- **Agent 接口**：为 LocAgent 增加 memory search/retrieve tools，再回到当前代码图验证。
+- **公开数据**：Verified Acc@5 76.5% 对 LocAgent 71.6%，resolve 40.4% 对 37.0%；历史稀疏分组 Acc@5 反而 -13.1 points [S028]。
+- **WiFiDemo 直接证据**：未运行；可利用芯片/feature 历史，但本项目历史密度和 issue 质量未知。
+- **优点**：历史能表达当前 snapshot 不含的设计惯例和类似变更；实验证明可改善定位和下游修复。
+- **缺点**：memory 是历史线索，不是当前代码事实；相关性错误会明显干扰；主要实验证据来自 Python。
+- **Unknown**：WiFiDemo commit/issue 质量、时间衰减、Target-aware retrieval、C 符号映射和最佳 abstention 策略。
+- **代码—领域链接**：commit/issue→changed artifacts 是历史证据边；使用时必须解析到当前 revision occurrence 并验证，不能直接继承旧 symbol/file-line。
+- **可借鉴**：episodic/semantic memory 分离、严格时间切分、当前代码二次验证、负迁移检测。
+- **初步分类**：历史经验检索组件；不是主知识库或确定性链接层。
+
+### H05 — GitHub Copilot Repository Memory
+
+- **定位**：跨 coding/review/CLI Agent 共享 repository-scoped、citation-backed 的可演化事实。
+- **最新活动**：2026-05 增加用户/仓库 scope 与删除控制 [S025]。
+- **开源/许可证**：专有 GitHub 产品；公开设计可作为架构证据。
+- **核心表示**：subject、fact、reason、多个 `file:line` citations、timestamp/scope。
+- **事实来源**：Agent 在任务或 Review 中发现并调用 memory tool 写入；使用时检查当前 branch 源码。
+- **Agent 接口**：Copilot coding agent、CLI 和 code review 共享 memory。
+- **公开数据**：GitHub 第一方 A/B 报告 PR merge 90% 对 83%、review positive feedback 77% 对 75%，p<0.00001；样本量/任务构成未公开 [S025]。
+- **WiFiDemo 直接证据**：无；file-line citation 机制可直接借鉴，但缺 Target。
+- **优点**：把“何时遗忘”转化为低成本 read-time verification；错误 citation 可自我修正；权限和 repository scope 清晰。
+- **缺点**：专有；公开 retrieval/prioritization 简单；没有 typed domain ontology、semantic ID 或 Target occurrence。
+- **Unknown**：memory 生成 precision、错误修正率、长期规模、分支合并行为和 C 多 Target 适用性。
+- **代码—领域链接**：领域 fact 以多个代码 citation 支撑，当前源码优先；可扩展为 `Target+revision+semantic anchor+file-line`。
+- **可借鉴**：citation-backed assertion、just-in-time verification、corrected replacement、scope 和权限。
+- **初步分类**：生命周期强参考；产品本身不作为开源实现候选。
+
+### H06 — Progressive Skills / References / MCP
+
+- **定位**：以 Skill metadata 选择领域程序，按需加载 instructions/references，并通过 MCP/API/script 获取当前事实。
+- **最新活动**：Google ADK 指南发布于 2026-04，AWS Agent Toolkit 文档当前持续更新 [S024]。
+- **开源/许可证**：模式开放；具体 ADK/Toolkit/Skills 各自授权，架构不依赖单一供应商。
+- **核心表示**：L1 metadata、L2 SKILL.md instructions、L3 references、deterministic scripts、MCP/API tools。
+- **事实来源**：人工/团队维护的程序与资料；运行时工具返回环境/代码事实。
+- **Agent 接口**：list/load/read resource 与 MCP tool calls。
+- **公开数据**：Google 的约 90% baseline context reduction 是 10-Skill 示例算术，不是正确率实验；SWE-Skills-Bench 提供独立负收益证据 [S024][S027]。
+- **WiFiDemo 直接证据**：未运行；可把 Feature/Event 分析方法做成 Skill，而不是把全仓知识塞进 prompt。
+- **优点**：渐进披露、上下文可控；稳定 procedure、原始 reference、确定性 tool 职责清楚；天然适合离线开源组合。
+- **缺点**：Skill selection 和版本正确性不是自动保证；内容可过期；Skill 不提供代码 identity 或查询引擎。
+- **Unknown**：WiFi 领域 Skill 粒度、触发准确率、版本矩阵、Token/收益、自动回归测试与安全治理。
+- **代码—领域链接**：Skill 引用 domain ID 和查询模板，MCP 以 Target 参数返回 occurrence/evidence；避免在 Skill 内缓存易漂移 file-line。
+- **可借鉴**：metadata/instruction/reference/tool 四层、按需释放、Skill tests 和版本约束。
+- **初步分类**：Agent 上下文组织短名单组件；不能替代知识事实和生命周期存储。
+
+### H07 — Specification-as-Skill（SWE-Bench 5G / SWE-Skills-Bench）
+
+- **定位**：把简短、任务匹配的权威规范或工程程序作为推理时领域上下文，并用 paired execution test 评估边际效果。
+- **最新活动**：两个 Benchmark 分别发布于 2026-04 与 2026-03 [S026][S027]。
+- **开源/许可证**：Benchmark 数据/代码公开；3GPP 文本权利与具体 Skill 内容需独立管理。
+- **核心表示**：concise spec Markdown/Skill、task-to-skill mapping、with/without paired condition、deterministic verifier。
+- **事实来源**：权威规范条款、公开 Skill、固定 commit 仓库和验收条件。
+- **Agent 接口**：在任务上下文中按需注入；不要求建立图数据库。
+- **公开数据**：5G 50 项 A/B 总体 +6 resolve points、+12% Token，规格依赖类别 +16.7 至 +25 points、generic 类别为 0；Skills 平均 +1.2%，3 个版本不匹配 Skill 最多 -10%，Token 最高 +451% 且 pass 不变 [S026][S027]。
+- **WiFiDemo 直接证据**：未运行；5G Core 的 C/协议规范场景是相邻证据，不等于 WiFi MAC。
+- **优点**：直接证明领域知识效用是任务条件性的；paired execution design 可转化为 WiFi Benchmark。
+- **缺点**：样本/任务异质；规格摘要由研究者准备；不解决自动链接、更新或冲突。
+- **Unknown**：WiFi 规范任务比例、最佳片段长度、自动 clause linking、错误/旧版本规范的负迁移。
+- **代码—领域链接**：应记录 `Task/DomainRule -> spec clause/version -> TargetOccurrence -> verifier`，不能只保存一段无来源 prompt。
+- **可借鉴**：任务类型分层、paired A/B、Token/负收益、固定 commit 和执行式验收。
+- **初步分类**：领域注入评估方法与可选组件；不是独立知识架构。
+
+## 13. Task 5 的知识生命周期收敛
+
+### 13.1 分层对象
+
+| 对象 | 允许来源 | 默认状态 | 变化后的动作 |
+|---|---|---|---|
+| 代码事实 | compiler/indexer/static analyzer | verified-code | 输入 digest 改变后重建 |
+| 推断标签/软链接 | embedding/LLM/聚类 | inferred-candidate/inferred | model/prompt/content 改变后全部重算 |
+| 人工知识 | reviewer/领域专家/ADR | manual-reviewed/verified-domain | 依赖 evidence 变化后通知 owner 复核 |
+| 原始资料 | 规范、issue、commit、设计文档 | primary-source | 内容/版本不可静默覆盖，生成新 revision |
+| 编译知识 | Wiki/page/summary/Skill | derived | source 变化或 probe 失败后 stale/重新编译 |
+| 验证记录 | test/analyzer/human review | validation activity | 保留历史，不覆盖旧 verdict |
+
+### 13.2 当前排除或降级
+
+- 排除 embedding score 或 LLM confidence 自动升级为代码事实。
+- 排除领域声明只绑定裸函数名或易漂移 file-line。
+- 排除不保存 raw sources 的 Wiki/summary 作为唯一真源。
+- 排除把所有 Skill、规范和 memory 常驻 prompt；attention dilution 与 Token/负迁移均有实证风险。[S023][S027]
+- Graphify/Understand Anything 保留为混合图/知识生成参考，但必须补 Target identity、revision 和 assertion lifecycle。
+- GitHub Memory 保留为生命周期参考，产品本身不进入优先开源核心。
+- RepoMem 保留为历史检索组件，必须允许历史稀疏或不相关时 abstain。
+
+### 13.3 新增 Benchmark 问题
+
+详细问题见 `docs/research/code-domain-linkage.md` 的 DL01–DL09。Task 6 只基于当前证据给候选分类，不用这些待测问题伪造得分。
+
+## 14. 本轮对架构候选的影响
+
+Task 5 仍不选最终存储技术，但把完整架构的硬要求收窄为：
+
+1. 能表示 repository/revision/Target/occurrence，而不是只有 symbol/file；
+2. parser/analyzer fact、rule、manual assertion 和 LLM/embedding candidate 不同层或至少不同状态；
+3. 每条领域边能回到当前代码与原始资料，并支持双向导航；
+4. 有 assertion-level provenance、confidence、conflict、stale、invalid 和重新验证；
+5. Wiki/Skill/memory 按需加载，且允许 abstain/not-applicable；
+6. 支持 raw source、compiled knowledge 和 runtime query 的不同更新周期；
+7. 后续以 specification-dependent/generic、rich/sparse history、current/stale knowledge 等分层 Benchmark 验证，而不是只测平均通过率。

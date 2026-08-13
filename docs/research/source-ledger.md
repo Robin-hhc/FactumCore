@@ -71,8 +71,8 @@
 | 状态 | 数量 |
 |---|---:|
 | discovered | 0 |
-| primary-read | 14 |
-| claim-verified | 6 |
+| primary-read | 18 |
+| claim-verified | 12 |
 | rejected | 0 |
 
 ## 8. 已登记来源
@@ -476,3 +476,203 @@
 - 限制：需要把每个 Target 构建为 LLVM IR；不是现成知识数据库或 MCP；source/sink JSON 是领域规则入口但必须另加 revision、Target、evidence 和审核治理。
 - WiFi MAC 相关性：直接基础
 - 正文位置：第 4 章 dataflow framework、第 5 章领域 source/sink 映射
+
+### S021 — Graphify 官方仓库与概念文档
+
+- 状态：primary-read
+- 发布日期：概念文档更新于 2026-07-01；访问快照 2026-08-14
+- 访问日期：2026-08-14
+- 来源类型：开源项目官方功能说明、项目第一方 Benchmark
+- 发布者/作者：Graphify Labs
+- 原始 URL：https://github.com/Graphify-Labs/graphify；https://graphify.com/concepts
+- 独立属性：first-party
+- 研究对象：以 Tree-sitter 解析代码、以 LLM 连接文档/媒体的混合知识图和 Agent Skill/MCP 接口
+- 样本与语言：官方声明 36 种代码语言；README 的 memory Benchmark 不是代码—领域链接准确率实验
+- 模型/Agent：文档语义阶段使用用户配置的模型；代码阶段不使用 LLM
+- 对照基线：官方 LOCOMO/LongMemEval 对照，不用于 WiFi MAC 排序
+- 指标：官方报告 memory recall/QA 指标，但没有 Target-aware C、领域边 precision 或失效修复指标
+- 可引用声明：Graphify 将 AST 产生的代码边标为 `EXTRACTED`，模型产生的文档/语义边标为 `INFERRED`，不能完全消歧的边标为 `AMBIGUOUS`；`# WHY:`/ADR/RFC 引用可成为一等节点，结果可通过 Skill、CLI 或 MCP 查询。
+- 数字与语境：README 中的 LOCOMO 与 LongMemEval 是通用 memory 数据集，不能证明 C 调用图或 WiFi 领域链接质量。
+- 限制：Tree-sitter 代码边不等于真实 Target 编译事实；公开材料没有 stable semantic ID、revision/Target occurrence、人工审核优先级或源码重命名后的领域边修复准确率。
+- WiFi MAC 相关性：间接
+- 正文位置：混合图方案、软硬边分层和 provenance 标签
+
+### S022 — Retrieval as Reasoning: Self-Evolving Agent-Native Retrieval via LLM-Wiki
+
+- 状态：claim-verified
+- 发布日期：2026-05-29
+- 访问日期：2026-08-14
+- 来源类型：论文
+- 发布者/作者：Haoliang Ming、Feifei Li、Xiaoqing Wu、Wenhui Que；Tencent/WeChat
+- 原始 URL：https://arxiv.org/abs/2605.25480；https://arxiv.org/html/2605.25480
+- 独立属性：author-evaluation
+- 研究对象：把原始资料编译成带目录、页面、双向链接、源引用和 Error Book 的可演化 Wiki
+- 样本与语言：HotpotQA、MuSiQue、2WikiMultiHopQA 各前 500 个样本，以及 AuthTrace
+- 模型/Agent：统一使用 GLM-5.1；embedding 为 Qwen3-Embedding-8B
+- 对照基线：7 个闭卷、Dense RAG、GraphRAG/LightRAG/HippoRAG 2 等基线
+- 指标：F1、AuthTrace judged accuracy、错误类别占比、延迟/工具调用
+- 可引用声明：LLM-Wiki 相比最强图基线在三个多跳 QA 数据集提高 2.0–8.1 F1；AuthTrace 总体高 2.1 accuracy points，高多文档问题高 8.9 points，但单文档问题低 2.3 points。页面保存 source references 和双向 wikilinks；Error Book 对结构与内容错误执行发现、归因、约束、注入和重新验证。
+- 数字与语境：实验是给定语料的文档问答，不是代码修改或 C 语义验证；dangling links 占检测错误的 29.1–63.8%，说明生成式链接本身需要持续校验。
+- 限制：统一模型且主要为作者实验；source-grounded LLM verifier 仍不是确定性证明；更大的 query tool budget 与一次性编译成本没有被消除。
+- WiFi MAC 相关性：间接架构证据
+- 正文位置：Wiki 编译、双向领域链接、Error Book 生命周期
+
+### S023 — WiCER: Wiki-memory Compile, Evaluate, Refine
+
+- 状态：claim-verified
+- 发布日期：2026-05-08
+- 访问日期：2026-08-14
+- 来源类型：论文、公开实验代码
+- 发布者/作者：Juan M. Huerta
+- 原始 URL：https://arxiv.org/abs/2605.07068；https://arxiv.org/html/2605.07068
+- 独立属性：author-evaluation
+- 研究对象：用诊断问题和失败驱动的重新编译，修复 Wiki 编译的信息丢失
+- 样本与语言：17 个 RepLiQA 领域、每种条件合计 6,800 个问题；另有 30 篇 Policygenius 文章
+- 模型/Agent：Claude Sonnet 用作 Wiki compiler；本地模型用于 full-context/KV cache；LLM-as-judge 评分
+- 对照基线：RAG、raw full-context、三种 blind Wiki compression、WiCER 迭代
+- 指标：1–5 answer quality、score-1 catastrophic rate、TTFT、压缩率、Token/成本
+- 可引用声明：30 篇/67K token 的 curated context 得分 4.38 对 RAG 4.08，TTFT 快 7.3 倍；80 篇/55–95K token 时 full-context 因 attention dilution 低于 RAG（3.47 对 3.64）。blind compilation 得分 2.14–2.32、catastrophic rate 53–60%；1–2 次 WiCER 迭代恢复 80% 丢失质量并将 catastrophic failures 相对降低 55%。
+- 数字与语境：每次 80 文档迭代约 130K API input、17K output、约 50 分钟；评估依赖近似 LLM-as-judge，不能外推为 WiFiDemo 效果。
+- 限制：修复已知 probe 暴露的遗漏可能挤掉其他事实；17 个主题中一项无收益；不存在代码实体、Target 或编译语义。
+- WiFi MAC 相关性：领域文档编译与重验证机制直接相关，代码语义间接
+- 正文位置：原始资料—编译知识分层、失败驱动重验证
+
+### S024 — Google ADK 与 AWS Agent Toolkit 的 Skills/Progressive Disclosure 官方材料
+
+- 状态：primary-read
+- 发布日期：Google 指南发布于 2026-04；AWS 文档访问快照 2026-08-14
+- 访问日期：2026-08-14
+- 来源类型：AI 公司官方实践
+- 发布者/作者：Google Developers、Amazon Web Services
+- 原始 URL：https://developers.googleblog.com/en/developers-guide-to-building-adk-agents-with-skills/；https://docs.aws.amazon.com/agent-toolkit/latest/userguide/skills.html
+- 独立属性：company-practice
+- 研究对象：Skill metadata、按需 instructions/references、scripts 与 MCP/API 工具分层
+- 样本与语言：官方架构指南与 AWS 产品工作流；没有 WiFi MAC Benchmark
+- 模型/Agent：Google ADK Agent；AWS-compatible coding agents
+- 对照基线：monolithic prompt 与 progressive disclosure 的估算比较
+- 指标：Google 示例的基线 context token 估算；无任务正确率
+- 可引用声明：Google 将 Skill 分为约 100-token metadata、少于 5,000-token instructions 和按需 resources，10 个 Skill 的示例把基线 context 从约 10,000 降到约 1,000 token；AWS 将 `SKILL.md`、references、deterministic scripts 与运行时 MCP/API 分开，并在任务结束后释放 Skill 内容。
+- 数字与语境：90% 是架构示例的 token 算术，不是受控 Agent 效果实验。
+- 限制：官方资料证明工业设计选择和接口边界，不证明领域 Skill 被正确选择、内容当前有效或能改善 WiFi C 任务。
+- WiFi MAC 相关性：间接架构证据
+- 正文位置：按需上下文、Skill/Reference/Tool 分层
+
+### S025 — GitHub Copilot Agentic Memory 官方设计与 A/B 数据
+
+- 状态：claim-verified
+- 发布日期：2026-01-15；访问快照 2026-08-14
+- 访问日期：2026-08-14
+- 来源类型：AI 公司官方实践、产品第一方 A/B
+- 发布者/作者：GitHub；Tiferet Gazit
+- 原始 URL：https://github.blog/ai-and-ml/github-copilot/building-an-agentic-memory-system-for-github-copilot/；https://github.blog/changelog/2026-05-26-copilot-memory-has-more-controls-for-deletion-scope-and-the-copilot-cli/
+- 独立属性：company-practice
+- 研究对象：repository-scoped cross-agent memory、源码 citation、just-in-time verification、纠错与访问范围
+- 样本与语言：真实 Copilot coding agent/code review 流量；样本量未公开
+- 模型/Agent：GitHub Copilot coding agent、CLI、code review
+- 对照基线：有 memory 与无 memory 的产品 A/B
+- 指标：PR merge rate、review comment positive feedback、p-value
+- 可引用声明：memory 保存 subject/fact/reason 与多个 `file:line` citations，使用前在当前 branch 实时核验；无效或矛盾 citation 触发修正，重新确认会刷新时间戳。GitHub 报告 coding-agent PR merge rate 90% 对 83%，review positive feedback 77% 对 75%，两者 p<0.00001。
+- 数字与语境：A/B 未公开样本量、模型分层、任务构成或绝对因果机制；属于 GitHub 产品第一方数据，不可外推 WiFi MAC accuracy。
+- 限制：公开数据没有 Target occurrence、typed domain edge 或自动 stale detection 的 precision/recall；目前 retrieval 以近期 memory 注入为主，未来 search/weighted prioritization 尚属计划。
+- WiFi MAC 相关性：生命周期设计直接相关
+- 正文位置：citation-backed memory、读时验证、冲突与作用域
+
+### S026 — SWE-Bench 5G
+
+- 状态：claim-verified
+- 发布日期：2026-04-29
+- 访问日期：2026-08-14
+- 来源类型：论文、公开 Benchmark
+- 发布者/作者：Jiao Chen、Jianhua Tang、Xiaotong Yang、Zuohong Lv
+- 原始 URL：https://arxiv.org/abs/2604.26278；https://arxiv.org/html/2604.26278；https://huggingface.co/datasets/tenderzada/SWEBench5G
+- 独立属性：author-evaluation
+- 研究对象：真实开源 5G Core 缺陷修复与 3GPP 规格片段注入
+- 样本与语言：free5GC、Open5GS、Magma 的 210 个验证实例；Go、C、Python；Skill A/B 子集 50 项
+- 模型/Agent：Qwen3.5-Flash、Kimi-128k、GPT-4.1、Claude Sonnet 4；最多 5 轮反馈
+- 对照基线：无规格与加入平均 350-token 规格文档的 paired A/B
+- 指标：diagnosed、patch applied、resolved、Token overhead
+- 可引用声明：四模型诊断率均超过 91%，但多轮 resolve 仅 10–30%。Claude Sonnet 4 的 50 项规格注入 A/B 总体由 24% 提升到 30%（+6 points，平均 +12% Token）；三类 specification-dependent bug 提升 +16.7 至 +25 points，六类 generic defensive bug 均为 0。
+- 数字与语境：50 项 A/B 中各领域仅 4–8 项；142/210 个验证采用 diff-based intent test，不能与纯运行时测试等同。
+- 限制：5G Core 不等于 WiFi MAC；规格摘要由研究者构造并附任务 implication，未评估错误规格、版本冲突或自动代码实体链接。
+- WiFi MAC 相关性：直接邻域证据
+- 正文位置：领域知识注入的条件收益和后续 Benchmark 设计
+
+### S027 — SWE-Skills-Bench
+
+- 状态：claim-verified
+- 发布日期：2026-03-16
+- 访问日期：2026-08-14
+- 来源类型：论文、公开 Benchmark
+- 发布者/作者：Tingxu Han、Yi Zhang、Wei Song、Chunrong Fang、Zhenyu Chen、Youcheng Sun、Lijie Hu
+- 原始 URL：https://arxiv.org/abs/2603.15401；https://github.com/GeniusHTX/SWE-Skills-Bench
+- 独立属性：author-evaluation; preprint
+- 研究对象：真实 GitHub 工程任务中 Skill 注入的边际效用
+- 样本与语言：49 个公开 SWE Skills、约 565 个固定 commit 任务、6 个工程子领域
+- 模型/Agent：Claude Code + Claude Haiku 4.5；Ubuntu 24.04 CPU-only Docker；执行式 deterministic verifier
+- 对照基线：每项任务 with-skill 与 without-skill paired condition
+- 指标：pass rate、Token 开销、验收条件覆盖
+- 可引用声明：39/49 Skills 没有 pass-rate 提升，平均仅 +1.2%；7 个专门 Skill 最高 +30%，3 个因版本不匹配最高下降 10%；Token 开销可在 pass rate 不变时最高增加 451%。
+- 数字与语境：预印本明确标注 preliminary/work in progress；任务由公开 Skill 与生成的需求/测试配对，不代表所有真实维护任务。
+- 限制：不同 Skill/仓库异质，平均数不能直接推断具体 WiFi Skill；结果支持“精确匹配、版本兼容、执行验证”，不支持全局否定 Skill。
+- WiFi MAC 相关性：直接方法学证据
+- 正文位置：Skill 选择、负收益、版本与 Token 成本
+
+### S028 — Improving Code Localization with Repository Memory
+
+- 状态：claim-verified
+- 发布日期：2025-10-01；ICLR 2026 版本
+- 访问日期：2026-08-14
+- 来源类型：同行评审论文、Microsoft Research 官方页面
+- 发布者/作者：Boshi Wang、Weijian Xu、Yunsheng Li、Mei Gao、Yujia Xie、Huan Sun、Dongdong Chen
+- 原始 URL：https://arxiv.org/abs/2510.01003；https://openreview.net/pdf?id=8yjWLJy2eX；https://www.microsoft.com/en-us/research/publication/improving-code-localization-with-repository-memory/
+- 独立属性：author-evaluation
+- 研究对象：以历史 commit/issue 为 episodic memory、以活跃文件摘要为 semantic memory 的代码定位
+- 样本与语言：SWE-bench Verified 500 项/12 个 Python 仓；SWE-bench Live 子集 130 项/62 个仓
+- 模型/Agent：LocAgent + GPT-4o-2024-05-13；每题使用此前最多 7,000 commits 和 200 个活跃文件
+- 对照基线：CodeRankEmbed、Agentless、LocAgent、episodic-only、semantic-only、combined RepoMem
+- 指标：file localization Acc@1/3/5、issue resolve rate、成本
+- 可引用声明：RepoMem 在 Verified 的 Acc@5 为 76.5%，LocAgent 为 71.6%；下游 resolve 为 40.4% 对 37.0%。Live Acc@5 为 66.2% 对 63.1%。但历史较少的 `others` 分组从 67.4% 降到 54.3%，显示不相关 memory 会干扰定位。
+- 数字与语境：它改善的是 Python bug localization；丰富历史与收益相关，不能外推到新仓、C 语义或领域事实正确性。
+- 限制：memory 由历史文本和摘要形成，不是当前 revision 的确定性代码事实；固定 7,000 commits/200 files 是启发式；需要在使用后回到当前代码验证。
+- WiFi MAC 相关性：间接但强方法学证据
+- 正文位置：仓库历史 memory、软候选与当前代码验证
+
+### S029 — SWHID、W3C PROV-O 与 SARIF 2.1 官方规范
+
+- 状态：primary-read
+- 发布日期：SWHID 成为 ISO/IEC 18670:2025；PROV-O 2013；SARIF 2.1.0 2020
+- 访问日期：2026-08-14
+- 来源类型：国际/行业标准、经典持续有效规范
+- 发布者/作者：SWHID Working Group/ISO、W3C、OASIS
+- 原始 URL：https://www.swhid.org/specification/v1.2/0.Introduction/；https://www.iso.org/cms/live/live/en/sites/isoorg/contents/data/standard/08/99/89985.html；https://www.w3.org/TR/prov-o/；https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/sarif-v2.1.0-os.html
+- 独立属性：standards
+- 研究对象：软件工件 intrinsic ID、provenance entity/activity/agent/derivation/invalidation、静态分析结果 revision/location/fingerprint
+- 样本与语言：规范性数据模型；无效果 Benchmark
+- 模型/Agent：not-applicable
+- 对照基线：none
+- 指标：none
+- 可引用声明：SWHID 用内容寻址的 intrinsic ID 精确定位 content、directory、revision 等软件工件；PROV-O 区分 Entity、Activity、Agent、derivation、revision 和 invalidation；SARIF 可记录扫描 revision、多仓 version-control provenance、源码 location 与跨版本 result fingerprint。
+- 数字与语境：标准年份不代表实现成熟度或性能；它们提供可借鉴语义，不要求完整照搬 RDF/SARIF 存储。
+- 限制：SWHID 不解决符号级 identity/重命名；PROV-O 不定义 WiFi 领域 ontology；SARIF 的 fingerprint 是生产者选择，不能自动证明同一领域事实。
+- WiFi MAC 相关性：生命周期与交换模型直接相关
+- 正文位置：实体 ID、provenance、失效与重验证分类法
+
+### S030 — Codified Context: Infrastructure for AI Agents in a Complex Codebase
+
+- 状态：primary-read
+- 发布日期：2026-02-24
+- 访问日期：2026-08-14
+- 来源类型：论文、开源伴随项目、观察性案例
+- 发布者/作者：Aristidis Vasilopoulos
+- 原始 URL：https://arxiv.org/abs/2602.20478；https://github.com/arisvas4/codified-context-infrastructure
+- 独立属性：single-project observational
+- 研究对象：always-loaded constitution、19 个 domain agents、34 个按需规格文档和 MCP retrieval 的三层上下文
+- 样本与语言：一个 108,000-line C# 分布式系统；283 sessions、2,801 human prompts、1,197 agent invocations、16,522 agent turns
+- 模型/Agent：Claude Code；单开发者在人工架构指导下使用 Agent 生成代码
+- 对照基线：无随机或并行对照；按 Git 历史重建三个阶段
+- 指标：规模、会话/交互数、四个观察性案例
+- 可引用声明：该项目把 hot conventions、task-specific domain agents 和 cold on-demand specifications 分层，并以 trigger/retrieval 选择上下文；展示了该架构可在长期单项目中运作。
+- 数字与语境：规模和会话数字是建设记录，不是正确率或因果收益；作者、项目和工具均为单一实例。
+- 限制：无受控基线、主要代码也由同一 Agent 生成、keyword retrieval 较简单；不能证明对成熟 C 驱动仓或多人团队有效。
+- WiFi MAC 相关性：间接架构参考
+- 正文位置：hot/cold knowledge、领域 Agent 和按需规格

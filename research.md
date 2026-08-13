@@ -3,41 +3,33 @@
 **日期：2026-08-12**  
 **调研范围：重点关注 2026-02-12 ～ 2026-08-12 的论文、官方技术资料和近期项目数据**
 
+**稿件状态：研究骨架；现有项目数字和链接将在证据台账中逐条复核后使用。**
+
 ## 摘要
 
-本调研关注的问题不是“是否应该建设知识图谱”，而是：
+本研究调查适用于宏密集、多 Target、Host/Device 分离的 WiFi MAC C/C++ 代码仓的成熟代码知识与领域知识方案。当前阶段不预设 Joern、CPG、知识图数据库、Wiki、RAG 或混合架构为最终答案，也不要求给出唯一选型。论文将以公开论文、AI 公司官方实践和开源项目原始资料建立证据矩阵，排除明显不适配方案，提取可借鉴设计，并形成后续 Benchmark 的候选短名单。
 
-> 面对百万级、宏密集、多 Target、Host/Device 分离的嵌入式 WiFi MAC 代码仓，Agent 应如何同时获得可靠的代码事实和工程领域知识？
-
-近期研究和一线 Agent 厂商的实践表现出比较一致的趋势：
-
-**代码结构索引负责提供可验证的程序事实；领域知识、工程经验和长期记忆独立管理；Agent 根据当前任务按需获取两类信息。**
-
-建议的整体形态为：
-
-```text
-                    Agent / Workflow
-                           |
-                      WiFiGraph MCP
-                           |
-             +-------------+-------------+
-             |                           |
-    Engineering Knowledge          Code Fact Plane
-             |                           |
-   Metadata / Wiki / Skill              Joern CPG
-             |                           |
- Feature / Flow / Event /        AST / Call / CFG /
- Target / Chip / Side /          Dataflow / Source
- Domain Rules / Edge Cases
-```
-
-这里所谓“分开”，主要指**事实来源、可信度、生命周期和更新方式分开**，并不强制要求物理上使用两个数据库。
+现有初稿中的数字、项目能力和架构判断均视为待复核材料。只有进入 `docs/research/source-ledger.md` 且状态为 `claim-verified` 的数字声明，才能进入最终摘要与候选收敛结论。
 
 ---
 
-# 第一部分：为什么领域知识与代码事实应该分层
+## 1. 研究背景与问题定义
 
-## 1. Code Graph 能显著降低 Agent 的代码探索成本，但不能完全替代源码分析
+目标代码仓具有百万行级 C/C++、开放 Target 集合、条件编译、运行时 ops、Host/Device 事件和工程知识随版本变化等特征。核心问题不是“是否建设知识图谱”，而是当前有哪些成熟方案、它们的效果在什么数据上得到证明、哪些明显不适用，以及哪些值得进入后续精确选型。
+
+## 2. 研究方法、检索协议和证据等级
+
+主要来源限定为论文原文、AI 公司官方技术文章和开源项目官方资料。近期材料优先，经典旧资料仅在仍能解释当前技术时用于基础定义。第一方 Benchmark、独立实验、公司实践和功能说明分开表述；完整规则见 `docs/research/source-ledger.md`。
+
+## 3. 目标代码仓工作负载模型
+
+WiFiDemo 只用于说明目标结构和代码模式，不产生本研究的工具性能数据。工作负载案例将覆盖 Target occurrence、宏条件、直接/间接调用、ops、Host/Device Event、公共代码归属、日志定位以及代码—领域知识链接。
+
+## 4. 当前成熟方案与实证结果
+
+以下内容来自初始调研，保留为待证据台账复核的方案材料；其中的阶段性架构判断不是最终选型。
+
+### 4.1 Code Graph 能显著降低 Agent 的代码探索成本，但不能完全替代源码分析
 
 2026 年论文 **Codebase-Memory: Tree-Sitter-Based Knowledge Graphs for LLM Code Exploration via MCP** 在 31 个真实代码仓、66 种语言上评估了持久化 Code Graph。
 
@@ -64,7 +56,7 @@ https://github.com/DeusData/codebase-memory-mcp citeturn911723search0tu
 
 ---
 
-## 2. 工业领域知识确实能够显著提高 Coding Agent 的问题解决率
+### 4.2 工业领域知识确实能够显著提高 Coding Agent 的问题解决率
 
 2026 年 4 月的 **SWE-Bench 5G** 与 WiFi MAC 场景尤其接近。
 
@@ -122,7 +114,7 @@ WiFi MAC Agent
 
 ---
 
-## 3. 但领域知识并不是“越多越好”
+### 4.3 但领域知识并不是“越多越好”
 
 2026 年的 **SWE-Skills-Bench** 对 49 个公开 Agent Skill、约 565 个真实软件工程任务进行了带 Skill / 不带 Skill 的成对测试。
 
@@ -173,7 +165,7 @@ WiFi Everything Skill
 
 ---
 
-## 4. Google 的最新 Agent 架构也采用按需知识加载
+### 4.4 Google 的最新 Agent 架构也采用按需知识加载
 
 Google 在 2026 年 4 月发布的 ADK Agent Skills 指南中，将领域知识加载明确拆成三级：
 
@@ -226,7 +218,7 @@ L3
 
 ---
 
-## 5. GitHub Copilot 同样把 Repository Knowledge 与代码事实分开
+### 4.5 GitHub Copilot 同样把 Repository Knowledge 与代码事实分开
 
 GitHub 在 2026 年 3 月公开的 **Copilot Memory** 中，会保存 repository-specific knowledge，例如：
 
@@ -262,7 +254,7 @@ Engineering Knowledge
 
 ---
 
-## 6. AWS 也把领域知识拆成 Skill、Reference 和 MCP
+### 4.6 AWS 也把领域知识拆成 Skill、Reference 和 MCP
 
 AWS 在 2026 年 2 月发布 Agent Plugins 时，明确将 Agent 专业能力拆为：
 
@@ -301,7 +293,7 @@ Joern
 
 ---
 
-## 7. “让 LLM 从源码自动生成一个权威知识库”风险较大
+### 4.7 “让 LLM 从源码自动生成一个权威知识库”风险较大
 
 项目组对“没有文档、完全依赖 AI 生成知识图谱”的质疑是有依据的。
 
@@ -368,7 +360,7 @@ chip8-host 中函数存在
 
 ---
 
-## 8. 第一部分结论
+### 4.8 初始阶段性假设
 
 近期论文和 Google、GitHub、AWS 的实践比较一致地支持：
 
@@ -432,9 +424,9 @@ Known Edge Cases
 
 ---
 
-# 第二部分：主流解决方案评估
+### 4.9 主流解决方案初始评估
 
-## 9. Understand Anything
+#### 4.9.1 Understand Anything
 
 项目：  
 https://github.com/Egonex-AI/Understand-Anything
@@ -538,7 +530,7 @@ WiFi直接使用：          不建议
 
 ---
 
-# 10. CodeGraph
+#### 4.9.2 CodeGraph
 
 项目：  
 https://github.com/colbymchenry/codegraph
@@ -665,7 +657,7 @@ Joern
 
 ---
 
-# 11. Graphify
+#### 4.9.3 Graphify
 
 项目：  
 https://github.com/Graphify-Labs/graphify
@@ -739,7 +731,7 @@ Code Fact：             ★★★☆☆
 
 ---
 
-# 12. GitNexus
+#### 4.9.4 GitNexus
 
 项目：  
 https://github.com/abhigyanpatwari/GitNexus
@@ -792,7 +784,7 @@ Target preprocessing
 
 ---
 
-# 13. LLM-Wiki
+#### 4.9.5 LLM-Wiki
 
 论文：
 
@@ -901,7 +893,7 @@ Edge Case / Design知识：非常适合
 
 ---
 
-# 14. Joern
+#### 4.9.6 Joern
 
 官网：  
 https://joern.io/
@@ -936,7 +928,7 @@ Very High
 
 ---
 
-## Joern 与 Agent 的结合已经有近期研究实现
+##### Joern 与 Agent 的结合已经有近期研究实现
 
 2026 年论文：
 
@@ -983,7 +975,9 @@ semantic navigation
 
 ---
 
-# 15. 横向定位
+## 5. 候选架构族比较
+
+### 5.1 初始横向定位
 
 | 方案 | Code Facts | Domain Knowledge | 深度程序分析 | 更适合 WiFiGraph 哪层 |
 |---|---:|---:|---:|---|
@@ -996,7 +990,9 @@ semantic navigation
 
 ---
 
-# 16. 为什么目前仍建议 Joern，而不是直接采用 CodeGraph
+## 6. WiFi MAC 场景适配分析
+
+### 6.1 初稿中的 Joern 与 CodeGraph 判断
 
 这次调研以后，这个论点应该说得更加准确：
 
@@ -1059,7 +1055,9 @@ https://arxiv.org/abs/2603.24837
 
 ---
 
-## 17. 但这个结论仍然需要我们自己验证
+## 7. 证据缺口与后续 Benchmark 研究议程
+
+### 7.1 Joern、CodeGraph 与 GitNexus 的目标场景缺少公开 head-to-head 数据
 
 目前没有找到一份近期独立论文直接进行：
 
@@ -1089,7 +1087,11 @@ macro-heavy embedded C/C++
 
 ---
 
-# 18. 推荐 WiFiGraph 最终分层
+## 8. 排除项、可借鉴设计与候选短名单
+
+以下内容是原始调研提出的候选分层，不是当前研究的最终选择。后续将根据证据矩阵把具体方案分为排除、架构参考、组件候选和 Benchmark 短名单。
+
+### 8.1 原始候选分层
 
 综合论文和项目实践，建议最终形成三类知识资产：
 
@@ -1112,7 +1114,7 @@ macro-heavy embedded C/C++
 
 ---
 
-## Code Facts
+#### Code Facts
 
 来源：
 
@@ -1130,7 +1132,7 @@ verified
 
 ---
 
-## Structured Engineering Metadata
+#### Structured Engineering Metadata
 
 例如：
 
@@ -1157,7 +1159,7 @@ inferred
 
 ---
 
-## Narrative Engineering Knowledge
+#### Narrative Engineering Knowledge
 
 例如：
 
@@ -1182,7 +1184,7 @@ Skill
 
 ---
 
-# 19. 对项目组争议的最终回答
+### 8.2 原始争议回答
 
 我们不应该提出：
 
@@ -1253,7 +1255,7 @@ https://aws.amazon.com/blogs/developer/introducing-agent-plugins-for-aws/
 
 ---
 
-# 20. 建议下一步：建立 WiFi MAC Benchmark
+### 8.3 后续 WiFi MAC Benchmark 初始设想
 
 最终技术选型不能只依赖公开项目 benchmark。
 
@@ -1315,3 +1317,11 @@ Agent Tokens
 > **Joern 是否应该成为 WiFiGraph 最终 Code Fact Engine。**
 
 公开资料可以帮助我们缩小候选范围，但最终工程证据应该来自我们自己的 WiFi MAC 代码形态。
+
+## 9. 有效性威胁与未解决问题
+
+当前初稿混合了论文实验、公司官方实践、项目第一方 Benchmark 和功能说明，部分数字尚未记录完整样本、模型、基线和限制。公开代码智能 Benchmark 也未必覆盖宏密集、多 Target 的 C 项目。最终稿必须把这些来源拆分，使用 `unknown` 表示缺少可比数据，并把无法通过公开证据裁决的问题移入后续 Benchmark 清单。
+
+## 10. 结论
+
+本研究尚不宣布唯一方案。最终交付将说明哪些成熟方案有直接数据支持、哪些只能作为架构参考、哪些因 WiFi MAC 硬约束被排除，以及哪些开源架构族和组件值得进入后续精确 Benchmark。

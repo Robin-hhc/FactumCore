@@ -4,7 +4,7 @@
 
 **Goal:** 产出一篇基于可审计公开证据的 WiFi MAC 代码知识架构调研，系统比较成熟方案、排除明显不适配者、提取可借鉴设计，并形成开源优先的后续 Benchmark 候选短名单。
 
-**Architecture:** 研究过程分为证据台账、目标工作负载案例、解决方案档案、横向证据矩阵、候选收敛和论文综合六个边界清晰的产物。任何数字和能力声明先进入证据台账，再进入方案档案与正文；无法由公开证据裁决的问题进入后续 Benchmark 清单，不在当前研究中通过临时实验补齐。
+**Architecture:** 研究过程分为证据台账、目标工作负载案例、解决方案档案、代码—领域知识链接模式、横向证据矩阵、候选收敛和论文综合七个边界清晰的产物。任何数字和能力声明先进入证据台账，再进入方案档案与正文；无法由公开证据裁决的问题进入后续 Benchmark 清单，不在当前研究中通过临时实验补齐。
 
 **Tech Stack:** Markdown、Git、PowerShell、`rg`、GitHub/项目官方文档、论文原文、AI 公司官方技术文章、WiFiDemo 源码只读案例。
 
@@ -19,6 +19,9 @@
 - 数字声明必须记录样本、模型、基线、指标定义、时间和限制。
 - 不同定义的 accuracy、coverage、pass rate、F1、Token 和 tool calls 不直接合并。
 - 缺少可比数据的能力标记为 `unknown`，不换算为零分，也不根据功能列表填入准确率。
+- 深度程序分析按技术路线中立调查；Joern 只是候选之一，不作为默认基线或预设答案。
+- 每个混合知识方案必须说明代码实体与领域知识如何链接、如何双向导航、如何绑定 Target/revision，以及如何失效和重新验证。
+- 外部案例优先选择嵌入式项目；样本不足时允许选择具有相关结构的其他开源 C 项目。
 - 效果相近仅表示公开证据未显示决定性差异；此时优先让开源、自托管、接口开放的方案进入后续 Benchmark。
 - 用户新增的 `目标代码仓注意事项.md` 是只读研究输入；未经用户另行授权，不修改或纳入本计划的提交。
 
@@ -27,6 +30,7 @@
 - Create: `docs/research/source-ledger.md` — 来源登记、证据等级、数字语境和引用状态的唯一台账。
 - Create: `docs/research/wifidemo-workload-casebook.md` — WiFiDemo 结构特征和代码案例，不含工具效果结论。
 - Create: `docs/research/solution-inventory.md` — 每个成熟方案的统一档案、优缺点、适用边界和可借鉴设计。
+- Create: `docs/research/code-domain-linkage.md` — 代码事实与领域知识之间的链接模式、身份、provenance 和生命周期比较。
 - Create: `docs/research/evidence-matrix.md` — 方案与 WiFi MAC 硬约束的横向证据矩阵。
 - Create: `docs/research/benchmark-backlog.md` — 当前公开证据无法裁决、需后续实验回答的问题。
 - Modify: `research.md` — 面向读者的最终调研论文，引用上述证据但保持自包含。
@@ -174,7 +178,7 @@ git diff --cached --check
 git commit -m "docs: survey code retrieval and structural graph systems"
 ```
 
-### Task 4: 调研 CPG 与深度程序分析方案
+### Task 4: 调研语义代码表示与深度程序分析路线
 
 **Files:**
 - Modify: `docs/research/source-ledger.md`
@@ -182,51 +186,61 @@ git commit -m "docs: survey code retrieval and structural graph systems"
 
 **Interfaces:**
 - Consumes: 统一方案档案和 WiFiDemo `Wxx` 场景。
-- Produces: CPG、CFG、数据流、程序切片类方案的证据化档案。
+- Produces: 编译器语义索引/IR、可查询程序表示、CPG、CFG、数据流和程序切片路线的证据化档案。
 
-- [ ] **Step 1: 登记 CPG 的经典定义与持续相关性证据**
+- [ ] **Step 1: 先定义技术中立的路线与纳入标准**
 
-经典论文只用于解释 CPG/AST/CFG/PDG 的技术基础；当前能力、语言支持、安装要求和版本状态必须引用近期官方资料。
+路线至少包括：编译器 AST/索引与 IR、跨文件语义索引、可查询代码数据库、CPG、声明式静态分析、CFG/控制依赖、dataflow/taint 和程序切片。统一按 C/C++ 预处理输入、compile database、跨 translation unit、函数指针、证据位置、查询接口、开源性和维护状态筛选。
 
-- [ ] **Step 2: 登记 Joern 与 Agent 集成证据**
+- [ ] **Step 2: 调研编译器原生语义索引和 IR 路线**
 
-至少覆盖 Joern 官方文档、CPG specification、当前 C/C++ frontend 信息，以及 codebadger/同类 CPG-to-Agent 论文。案例研究必须标注样本数量有限，不能改写为横向准确率结论。
+从 Clang AST/LibTooling/index、LLVM IR 及检索到的活跃同类方案中选择有官方资料和可用接口的代表；记录它们提供的是编译事实、交叉引用还是深度分析，不能把编译器能力自动等同于 Agent-ready 知识系统。
 
-- [ ] **Step 3: 搜索并登记其他开源 CPG/编译器语义候选**
+- [ ] **Step 3: 调研可查询代码数据库和声明式分析路线**
 
-至少核对 Fraunhofer CPG 及检索到的活跃同类方案；记录编译数据库、宏参数、跨 translation unit、函数指针、CFG/dataflow 和导出接口证据。
+覆盖 CodeQL 类代码数据库、Kythe 类交叉引用系统及检索到的 C/C++ 活跃项目。分别记录源代码是否开放、查询层是否开放、数据是否可导出、是否适合完全离线内部部署，以及公开数据能证明什么。
 
-- [ ] **Step 4: 明确 CPG 对 WiFi MAC 的已证与未证能力**
+- [ ] **Step 4: 调研 CPG 和图式程序表示路线**
 
-把 direct call、CFG、dataflow、slice 与 Target preprocessing 分开。没有公开嵌入式多 Target 数据时，将其列入 `unknown` 和 Benchmark backlog。
+覆盖 CPG 的经典定义、Joern、Fraunhofer CPG 及检索到的活跃同类方案。Joern 只占一个候选档案；其官方文档、当前 C/C++ frontend 和 Agent 集成案例与其他路线使用同一字段评估。案例研究必须标明样本限制，不能改写为横向准确率结论。
 
-- [ ] **Step 5: 核验所有旧引用的持续相关性说明**
+- [ ] **Step 5: 调研独立静态分析、dataflow 和切片能力**
+
+调查能补足或替代图式表示的开源分析引擎与论文方案；区分“能检测某类缺陷”“能导出稳定代码事实”“能被 Agent 高层查询”三种不同能力。
+
+- [ ] **Step 6: 统一映射 WiFi MAC 已证与未证能力**
+
+对所有路线把 Target preprocessing、direct call、function pointer、CFG、dataflow、slice、源码证据和增量更新分别标记。没有公开宏密集多 Target C 数据时，将其列入 `unknown` 和 Benchmark backlog。
+
+- [ ] **Step 7: 核验路线平衡与旧引用持续相关性**
 
 Run:
 
 ```powershell
+rg -n '编译器|语义索引|代码数据库|CPG|静态分析|dataflow|程序切片' docs/research/solution-inventory.md
 rg -n '经典|持续相关|当前版本|发布日期|unknown' docs/research/source-ledger.md docs/research/solution-inventory.md
 ```
 
-Expected: 每个用于架构论证的旧来源都有用途限定或近期状态补充。
+Expected: 至少三个非 Joern 技术路线有独立档案；每个旧来源都有用途限定或近期状态补充。
 
-- [ ] **Step 6: 提交程序分析调研**
+- [ ] **Step 8: 提交程序分析调研**
 
 ```powershell
 git add -- docs/research/source-ledger.md docs/research/solution-inventory.md
 git diff --cached --check
-git commit -m "docs: survey CPG and semantic program analysis systems"
+git commit -m "docs: survey semantic code analysis approaches"
 ```
 
-### Task 5: 调研代码与领域知识的混合方案
+### Task 5: 调研代码与领域知识的混合方案及链接机制
 
 **Files:**
 - Modify: `docs/research/source-ledger.md`
 - Modify: `docs/research/solution-inventory.md`
+- Create: `docs/research/code-domain-linkage.md`
 
 **Interfaces:**
 - Consumes: 统一方案档案、研究问题 RQ4-RQ6。
-- Produces: Knowledge Graph、Wiki、Memory、Skill 和按需上下文方案档案。
+- Produces: Knowledge Graph、Wiki、Memory、Skill 和按需上下文方案档案，以及独立的代码—领域知识链接模式比较。
 
 - [ ] **Step 1: 登记代码与文档混合图项目**
 
@@ -248,12 +262,31 @@ git commit -m "docs: survey CPG and semantic program analysis systems"
 
 分别讨论代码事实、推断标签、人工知识、原始资料、过期、重新验证和 provenance；不在此步提前确定最终存储技术。
 
-- [ ] **Step 6: 提交混合知识方案调研**
+- [ ] **Step 6: 建立代码—领域知识链接分类法**
+
+在 `docs/research/code-domain-linkage.md` 中逐项比较：稳定代码实体 ID、Target occurrence、显式 typed edge、文档中的 symbol/file-line 引用、命名/目录/宏规则、embedding 相似度、LLM 推断和人工映射。每类记录粒度、双向导航、provenance、confidence、冲突处理和可失效性。
+
+- [ ] **Step 7: 对每个混合方案回答同一组链接问题**
+
+必须回答：从 Function 如何找到 Feature/Flow/Event/Rule/Document；从领域概念如何回到当前 revision 和 Target 的源码；链接由 Parser、规则、LLM 还是人工产生；源码移动、重命名和重新索引后如何修复；多个来源冲突时谁有优先级。
+
+- [ ] **Step 8: 核验没有把软链接冒充代码事实**
+
+Run:
 
 ```powershell
-git add -- docs/research/source-ledger.md docs/research/solution-inventory.md
+rg -n '实体 ID|Target occurrence|typed edge|file-line|embedding|LLM 推断|人工映射|失效|重新验证' docs/research/code-domain-linkage.md
+rg -n 'verified|inferred|manual|provenance|confidence' docs/research/code-domain-linkage.md
+```
+
+Expected: 每种链接方式均标明事实强度和生命周期；LLM/embedding 只作为软链接或候选发现，除非另有验证证据。
+
+- [ ] **Step 9: 提交混合知识与链接机制调研**
+
+```powershell
+git add -- docs/research/source-ledger.md docs/research/solution-inventory.md docs/research/code-domain-linkage.md
 git diff --cached --check
-git commit -m "docs: survey hybrid code and domain knowledge systems"
+git commit -m "docs: survey code domain knowledge linkage patterns"
 ```
 
 ### Task 6: 构建横向证据矩阵并收敛候选
@@ -263,12 +296,12 @@ git commit -m "docs: survey hybrid code and domain knowledge systems"
 - Modify: `docs/research/solution-inventory.md`
 
 **Interfaces:**
-- Consumes: 所有 `claim-verified` 来源、方案档案和 `W01` 至 `W08`。
+- Consumes: 所有 `claim-verified` 来源、方案档案、代码—领域知识链接模式和 `W01` 至 `W08`。
 - Produces: 排除、架构参考、组件候选、短名单四类结论。
 
 - [ ] **Step 1: 创建矩阵列和证据编码**
 
-列固定为：Target/宏、直接调用、间接调用、CFG、dataflow、Host/Device Event、源码证据、歧义/abstention、索引、增量、查询、Agent 效果、领域知识、离线、许可证、维护、复现。
+列固定为：Target/宏、直接调用、间接调用、CFG、dataflow、Host/Device Event、源码证据、代码—领域链接类型、链接 provenance、双向导航、Target/revision 绑定、链接失效/修复、歧义/abstention、索引、增量、查询、Agent 效果、领域知识、离线、许可证、维护、复现。
 
 单元格只允许：`verified`、`claimed`、`unsupported`、`unknown`，并附来源编号。
 
@@ -322,7 +355,7 @@ git commit -m "docs: classify architecture candidates by evidence"
 
 - [ ] **Step 3: 记录外部有效性候选数据集筛选门槛**
 
-对 Zephyr、RIOT、Contiki-NG 等只记录候选和需核实属性：构建变体、条件编译、函数指针、跨组件链、固定版本、许可证和可构造 ground truth 的程度。
+优先记录 Zephyr、RIOT、Contiki-NG 等嵌入式候选；同时允许其他开源 C 项目，只要覆盖复杂构建变体、条件编译、函数指针/回调、插件或协议分发、跨组件事件、公共代码复用或代码—领域文档映射中的至少一种。每项记录固定版本、许可证、结构对应关系和可构造 ground truth 的程度。
 
 - [ ] **Step 4: 规定未来实验的公平性控制**
 
@@ -355,7 +388,7 @@ git commit -m "docs: define follow-up architecture benchmark backlog"
 
 - [ ] **Step 3: 按问题而非项目名单组织成熟方案章节**
 
-先解释代码导航、深度程序分析、领域知识、Agent context 四类问题，再在每类中比较代表性项目，避免连续堆叠 README 功能。
+先解释代码导航、语义代码分析、代码—领域知识链接、领域知识管理、Agent context 五类问题，再在每类中比较代表性项目，避免连续堆叠 README 功能或以 Joern 为中心组织章节。
 
 - [ ] **Step 4: 写优缺点、排除项和可借鉴设计**
 
@@ -386,6 +419,7 @@ git commit -m "docs: rewrite WiFi MAC architecture research"
 **Files:**
 - Modify: `docs/research/source-ledger.md`
 - Modify: `docs/research/solution-inventory.md`
+- Modify: `docs/research/code-domain-linkage.md`
 - Modify: `docs/research/evidence-matrix.md`
 - Modify: `docs/research/benchmark-backlog.md`
 - Modify: `research.md`
@@ -418,7 +452,17 @@ rg -n 'benchmark|Benchmark|案例|独立|第一方|项目报告|官方实践' re
 
 Expected: 所有项目 Benchmark 均标明第一方或独立属性；案例不被描述为统计证明。
 
-- [ ] **Step 4: 审计范围和最终选型措辞**
+- [ ] **Step 4: 审计代码—领域知识链接结论**
+
+Run:
+
+```powershell
+rg -n '链接|实体|revision|Target|provenance|confidence|失效|重新验证' research.md docs/research/code-domain-linkage.md
+```
+
+Expected: 每个进入短名单的混合方案都说明链接创建者、绑定粒度、证据、方向和生命周期；软链接不被描述为已验证代码事实。
+
+- [ ] **Step 5: 审计范围和最终选型措辞**
 
 Run:
 
@@ -428,7 +472,7 @@ rg -n -i '最终选型|唯一方案|一定优于|已经证明.*WiFi|直接替代
 
 Expected: 若有匹配，只能出现在否定、限制或未来工作语境中。
 
-- [ ] **Step 5: 审计辅助文档一致性和占位符**
+- [ ] **Step 6: 审计辅助文档一致性和占位符**
 
 Run:
 
@@ -439,7 +483,7 @@ git diff --check
 
 Expected: 无占位符、无空白结论、无 Markdown 空白错误。
 
-- [ ] **Step 6: 核对工作区只包含计划内修改**
+- [ ] **Step 7: 核对工作区只包含计划内修改**
 
 Run:
 
@@ -450,14 +494,14 @@ git diff --name-status HEAD~1..HEAD
 
 Expected: `目标代码仓注意事项.md` 仍保持用户原状态；研究提交只包含 `research.md` 和 `docs/research/**`。
 
-- [ ] **Step 7: 提交终审修订**
+- [ ] **Step 8: 提交终审修订**
 
 ```powershell
-git add -- research.md docs/research/source-ledger.md docs/research/solution-inventory.md docs/research/evidence-matrix.md docs/research/benchmark-backlog.md
+git add -- research.md docs/research/source-ledger.md docs/research/solution-inventory.md docs/research/code-domain-linkage.md docs/research/evidence-matrix.md docs/research/benchmark-backlog.md
 git diff --cached --check
 git commit -m "docs: audit architecture research evidence and scope"
 ```
 
-- [ ] **Step 8: 输出最终核验摘要**
+- [ ] **Step 9: 输出最终核验摘要**
 
 报告：来源总数、`claim-verified` 数量、论文/公司/项目来源分布、包含数字的声明数量、排除项数量、架构参考数量、组件候选数量、短名单数量和 Benchmark backlog 条目数量。任何未核验来源不得计入核心结论。

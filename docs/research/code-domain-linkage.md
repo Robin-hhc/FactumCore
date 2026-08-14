@@ -5,7 +5,7 @@
 
 ## 1. 问题边界
 
-本文件回答 RQ4–RQ6：Feature、Flow、Event、Protocol Rule、设计原因和 Known Edge Case 如何链接到当前 revision、当前 Target 下的代码事实；链接如何双向导航、携带 provenance/confidence、处理冲突，并在代码或知识变化后失效和重新验证。
+本文件回答 RQ4–RQ6：Feature、Flow、Event、Protocol Rule、设计原因和 Known Edge Case 如何链接到当前 `repository_revision`、当前 Target 下的代码事实；链接如何双向导航、携带 provenance/confidence、处理冲突，并在代码或知识变化后失效和重新验证。
 
 “同一数据库中同时出现代码和文档”不等于两者已经建立可靠链接。链接至少是一条可独立审计的 assertion，并且必须区分：
 
@@ -18,35 +18,35 @@
 
 | 实体 | 最小身份 | 作用 |
 |---|---|---|
-| `Repository` | canonical repo ID | 隔离同名文件和多仓来源 |
-| `Revision` | commit ID；可附 SWHID revision ID | 冻结一次可重现的源码状态 [S029] |
-| `SourceArtifact` | repo + revision + path + content digest/SWHID | 表达文件内容，不把路径当永久身份 |
+| `Repository` | canonical repository ID | 隔离同名文件和多仓来源 |
+| `RepositoryRevision` | repository ID + immutable code commit/SWHID revision ID | 冻结一次可重现的被分析源码状态 [S029] |
+| `SourceArtifact` | repository ID + `repository_revision` + path + content digest/SWHID | 表达代码文件内容，不把路径当永久身份 |
 | `TargetProfile` | target name + toolchain + macro/include/flags digest | 表达真实编译视角 |
 | `CodeEntity` | frontend namespace + semantic symbol ID/signature | 表达函数、类型、变量等语义实体 |
 | `TargetOccurrence` | CodeEntity + TargetProfile + TU + source span | 表达同一源码在某 Target 中实际存在的 occurrence |
 | `AnalysisFact` | kind + inputs + generator/version/config digest | 表达 call、may-call、CFG、dataflow、slice 等结果 |
 | `DomainEntity` | namespace + stable domain ID | 表达 Feature、Flow、Event、Protocol、Rule，以及原始领域来源 `Document` / `Specification` / `Issue` / `Test` / `Log` |
-| `SourceRevision` | source stable ID + immutable revision/content digest | 来源注册：冻结某一原始来源版本，不把版本号写进领域实体身份 |
-| `SourceLocation` | SourceRevision + locator/span + quoted digest | 来源注册：定位条款、段落、日志片段或代码证据；可随 revision 变化重建 |
-| `SourceRegistration` | source stable ID + revision + license + accessed_at | 来源注册：保存 `License`、`AccessedAt`、获取方式和适用限制 |
+| `SourceRevision` | source stable ID + immutable `source_revision_id`/content digest | 来源注册：冻结某一原始领域来源版本，不把版本号写进领域实体身份 |
+| `SourceLocation` | `source_revision_id` + locator/span + quoted digest | 来源注册：定位条款、段落、日志片段或代码证据；可随来源版本变化重建 |
+| `SourceRegistration` | source stable ID + `source_revision_id` + license + accessed_at | 来源注册：保存 `License`、`AccessedAt`、获取方式和适用限制；`source_revision_id` 外键关联 `SourceRevision` |
 | `Assertion` | assertion ID + subject + typed edge + object | 把领域实体、代码 occurrence 和分析事实连接起来 |
 | `Evidence` | SourceRevision + SourceLocation + quote/digest | 说明 assertion 的原始依据 |
 | `ValidationActivity` | validator + version + time + inputs + result | 记录四级权限的产生、审核与重新验证活动 |
 
-`Document`、`Specification`、`Issue`、`Test` 和 `Log` 是原始来源对象；`SourceRevision`、`SourceLocation`、`License` 和 `AccessedAt` 是其版本化来源注册信息。Wiki、Skill 和 Memory 都是派生知识资产：只能以 stable ID 引用这些原始对象及其注册信息，不能替代它们成为无来源的事实根。SWHID 的 intrinsic content/revision ID、Kythe 的 VName/anchor、SCIP occurrence 和 SARIF 的 revision/location/fingerprint 可作为身份与交换设计参考，但没有单一标准同时解决符号重命名和多 Target occurrence。[S011][S012][S029]
+`Document`、`Specification`、`Issue`、`Test` 和 `Log` 是原始来源对象；`SourceRevision`、`SourceLocation`、`License` 和 `AccessedAt` 是其版本化来源注册信息。`SourceRegistration.source_revision_id` 与 `SourceLocation.source_revision_id` 必须外键关联 `SourceRevision.source_revision_id`，使领域材料版本可机器追溯；它们绝不能复用代码仓的 `repository_revision`。Wiki、Skill 和 Memory 都是派生知识资产：只能以 stable ID 引用这些原始对象及其注册信息，不能替代它们成为无来源的事实根。SWHID 的 intrinsic content/revision ID、Kythe 的 VName/anchor、SCIP occurrence 和 SARIF 的 revision/location/fingerprint 可作为身份与交换设计参考，但没有单一标准同时解决符号重命名和多 Target occurrence。[S011][S012][S029]
 
 ## 3. 规范链接链
 
 ```text
 DomainEntity(Feature | Flow | Event | Protocol | Rule | Document | Specification | Issue | Test | Log)
   -> Assertion(machine_status, predicate, provenance, confidence, review_state)
-  -> TargetOccurrence(repository, revision, target, TU, semantic ID, file-line)
+  -> TargetOccurrence(repository_id, repository_revision, target/build profile, TU, semantic ID, file-line)
   -> AnalysisFact(kind, generator, version, configuration)
   -> Evidence(SourceRevision + SourceLocation + source span | spec clause | test | path | slice)
   -> Lifecycle(active | stale | contradicted | invalid | superseded)
 ```
 
-领域实体不应直接连接裸函数名。最短可靠落点是当前 revision/Target 中的 `TargetOccurrence`；如果链接依据是调用路径或数据流，则落点还应包含产生该路径的 `AnalysisFact`。
+领域实体不应直接连接裸函数名。最短可靠落点是当前 `repository_revision`/Target 中的 `TargetOccurrence`；如果链接依据是调用路径或数据流，则落点还应包含产生该路径的 `AnalysisFact`。
 
 ## 4. 链接分类法
 
@@ -54,20 +54,20 @@ DomainEntity(Feature | Flow | Event | Protocol | Rule | Document | Specification
 
 | 链接方式 | 典型粒度与产生者 | 双向导航 | provenance / confidence | 冲突处理 | 失效与重新验证 |
 |---|---|---|---|---|---|
-| 稳定代码实体 ID | compiler/indexer 的 Function/Type/Symbol；SCIP/Kythe/SWHID 参考 | 强：symbol→refs 和 occurrence→symbol | generator/version/semantic ID；`EXTRACTED` | 同 ID 不同 definition 视为 identity conflict | revision 或 frontend schema 变化时重新索引；rename 需基于新旧语义/内容映射 |
+| 稳定代码实体 ID | compiler/indexer 的 Function/Type/Symbol；SCIP/Kythe/SWHID 参考 | 强：symbol→refs 和 occurrence→symbol | generator/version/semantic ID；`EXTRACTED` | 同 ID 不同 definition 视为 identity conflict | `repository_revision` 或 frontend schema 变化时重新索引；rename 需基于新旧语义/内容映射 |
 | Target occurrence | compiler command + TU + macro/include digest + source span | 强：Target→occurrence→symbol，也可反查哪些 Target 包含它 | exact compile input；`EXTRACTED`，不使用模糊 confidence | 不同 Target 的相反事实可同时成立，不互相覆盖 | command digest、源内容、依赖头变化即失效并重建 |
-| 显式 typed edge | `implements_feature`、`produces_event`、`constrained_by`、`explained_by` | 强：索引 subject/object 两端 | `RULE_DERIVED` 的 edge rule 或 `CURATED` 的 author/reviewer，以及 evidence | 按事实类型而非全局单一优先级裁决 | 任一端 revision、rule version 或 evidence digest 变化时进入 stale |
-| 文档 symbol/file-line 引用 | 文档、ADR、规范中的 symbol、path、line/range | 中：需要解析 citation 并建反向索引 | document revision、locator、quoted digest | citation 与当前源码矛盾时标 contradicted | 行号移动先用 quoted digest/AST anchor 修复，失败则人工复核；裸 file-line 不可静默漂移 |
+| 显式 typed edge | `implements_feature`、`produces_event`、`constrained_by`、`explained_by` | 强：索引 subject/object 两端 | `RULE_DERIVED` 的 edge rule 或 `CURATED` 的 author/reviewer，以及 evidence | 按事实类型而非全局单一优先级裁决 | 任一端 `repository_revision`、rule version 或 evidence digest 变化时进入 stale |
+| 文档 symbol/file-line 引用 | 文档、ADR、规范中的 symbol、path、line/range | 中：需要解析 citation 并建反向索引 | `source_revision_id`、locator、quoted digest | citation 与当前源码矛盾时标 contradicted | 行号移动先用 quoted digest/AST anchor 修复，失败则人工复核；裸 file-line 不可静默漂移 |
 | 命名/目录/宏规则 | 规则引擎依据路径、prefix、宏、注册表 | 中：可从 rule 与匹配 occurrence 双向查询 | rule ID/version、match trace；`RULE_DERIVED` | 与 compiler fact 冲突时 compiler 决定“代码是否存在”；人工/规范决定“领域含义是否成立” | source/Target/rule digest 改变即重跑；结果必须保留旧新差异 |
 | embedding 相似度 | 文档块↔代码摘要、概念↔symbol 的近邻 | 弱：可保存双向候选，但不是语义边 | model/version/chunk/query/score/top-k；`INFERRED_CANDIDATE` | 不参与覆盖 `EXTRACTED`/`CURATED` assertion，只生成候选或排序 | 任一内容、embedding model、chunker 变化时失效；必须重新计算并重新阈值校准 |
 | LLM 推断 | 模型从代码、文档、历史生成实体和关系 | 中：若输出结构化 edge 可双向查 | model/prompt/input digests/evidence set/confidence；`INFERRED_CANDIDATE` | 与原始资料或代码证据冲突时拒绝作为事实；模型不能自行升级 | 输入或模型/prompt 变化即 stale；通过规则、源码、测试或人工重新验证 |
-| 人工映射 | 专家把 Feature/Flow/Rule 映射到 occurrence/path | 强：结构化保存后天然双向 | author/reviewer/time/reason/evidence；`CURATED` | 对领域意图可高于模型/启发式，但不能覆盖当前编译事实 | 依赖的 revision/Target/evidence 变化时通知 owner；必须显式确认、修复或废弃 |
+| 人工映射 | 专家把 Feature/Flow/Rule 映射到 occurrence/path | 强：结构化保存后天然双向 | author/reviewer/time/reason/evidence；`CURATED` | 对领域意图可高于模型/启发式，但不能覆盖当前编译事实 | 依赖的 `repository_revision`/Target/evidence 变化时通知 owner；必须显式确认、修复或废弃 |
 
 ### 4.2 为什么 `file-line` 不能单独作为长期身份
 
 GitHub memory 的公开设计证明 `file:line` citation 适合低成本读时核验：使用 memory 前读取当前 branch 的引用位置，若内容矛盾或位置不存在，就写入修正版。[S025] 但长期知识系统还需要：
 
-1. 保存 citation 创建时的 revision 与引用内容 digest；
+1. 保存 citation 创建时的 `source_revision_id` 与引用内容 digest；
 2. 以 semantic ID 或 AST/source anchor 辅助行号移动修复；
 3. 把修复视为新的 validation activity，不能悄悄改写历史 assertion；
 4. 对多 Target 源文件，citation 必须落到 Target occurrence，而不是只落到文件。
@@ -78,10 +78,10 @@ GitHub memory 的公开设计证明 `file:line` citation 适合低成本读时�
 
 | `machine_status` | 允许生产者 | 最小证据 | 可见范围 | 能否支持确定性回答 | 升级条件 | 失效行为 |
 |---|---|---|---|---|---|---|
-| `EXTRACTED` | 编译器、Parser、Indexer 或固定配置的分析器 | `Repository`、`Revision`、Target/build profile（如适用）、可重放的工具输入/版本、`SourceRevision` 与 `source span` | 对应 revision/Target 的代码结构或分析输出 | 可以；答案必须带 revision、Target 与证据路径 | 不以模型评分升级；需要领域含义时另建有原始来源的 `CURATED` assertion | 源、编译命令、Target、工具版本或分析配置变化时标为 `stale`，重建而非静默改写 |
-| `RULE_DERIVED` | 已登记且版本化的确定性规则引擎；规则维护者可发布规则但不绕过证据要求 | 规则 ID/version、完整 match trace、输入 revision/Target 与每个引用的原始来源/代码证据 | 规则明示的 repository、revision、Target 与领域范围 | 可以作为可复现的派生回答；必须返回 rule trace 和作用域 | 经人工审核原始来源、规则前提和边语义后可另建或提升为 `CURATED` | 任一输入、规则版本或所引来源 revision 变化时标为 `stale` 并重跑；保留新旧差异 |
-| `INFERRED_CANDIDATE` | Agent、LLM、embedding、聚类、名称/目录启发式或未审核的外部建议 | 生成方法/version、prompt 或 query/input digest、候选 subject/object stable ID、可追溯的原始来源或代码证据集合（缺失须显式标记） | 候选检索、人工审核队列和排序；不得混入确定性事实视图 | 不可以；只能回答为待核验线索并返回证据缺口 | 仅有具备项目授权的人类审核者，依据原始来源和适用 revision/Target，才能升为 `CURATED`；也可由确定性工具重新产出独立 `EXTRACTED`/`RULE_DERIVED` assertion | 模型、prompt、embedding、输入内容或阈值变化时批量标为 `stale`；不得复用旧分数作确认 |
-| `CURATED` | 具备项目授权的人工领域维护者/审核者；可以引用 `EXTRACTED` 或 `RULE_DERIVED` 作为补充，但必须保留原始来源 | 审核者、审核时间、原始 `Document`/`Specification`/`Issue`/`Test`/`Log` 的 `SourceRevision`、`SourceLocation`、适用范围与审核理由 | 明示的 repository/revision、Target（若相关）、产品/规范版本和领域范围 | 可以；须返回原始引用、审核者及适用范围，且不能伪装成编译事实 | 可由后续人工审核修订为新的 `CURATED` assertion；Agent 无权升级任何 assertion | 原始来源 revision、适用范围、代码/Target 依赖或人工纠正变化时标为 `stale`、`contradicted` 或 `superseded`；保留历史审计 |
+| `EXTRACTED` | 编译器、Parser、Indexer 或固定配置的分析器 | `Repository`、`repository_revision`、Target/build profile（如适用）、可重放的工具输入/版本、`SourceRevision` 与 `source span` | 对应 `repository_revision`/Target 的代码结构或分析输出 | 可以；答案必须带 `repository_revision`、Target 与证据路径 | 不以模型评分升级；需要领域含义时另建有原始来源的 `CURATED` assertion | 源、编译命令、Target、工具版本或分析配置变化时标为 `stale`，重建而非静默改写 |
+| `RULE_DERIVED` | 已登记且版本化的确定性规则引擎；规则维护者可发布规则但不绕过证据要求 | 规则 ID/version、完整 match trace、输入 `repository_revision`/Target 与每个引用的原始来源/代码证据 | 规则明示的 repository、`repository_revision`、Target 与领域范围 | 可以作为可复现的派生回答；必须返回 rule trace 和作用域 | 经人工审核原始来源、规则前提和边语义后可另建或提升为 `CURATED` | 任一输入、规则版本或所引来源 `source_revision_id` 变化时标为 `stale` 并重跑；保留新旧差异 |
+| `INFERRED_CANDIDATE` | Agent、LLM、embedding、聚类、名称/目录启发式或未审核的外部建议 | 生成方法/version、prompt 或 query/input digest、候选 subject/object stable ID、可追溯的原始来源或代码证据集合（缺失须显式标记） | 候选检索、人工审核队列和排序；不得混入确定性事实视图 | 不可以；只能回答为待核验线索并返回证据缺口 | 仅有具备项目授权的人类审核者，依据原始来源和适用 `repository_revision`/Target，才能升为 `CURATED`；也可由确定性工具重新产出独立 `EXTRACTED`/`RULE_DERIVED` assertion | 模型、prompt、embedding、输入内容或阈值变化时批量标为 `stale`；不得复用旧分数作确认 |
+| `CURATED` | 具备项目授权的人工领域维护者/审核者；可以引用 `EXTRACTED` 或 `RULE_DERIVED` 作为补充，但必须保留原始来源 | 审核者、审核时间、原始 `Document`/`Specification`/`Issue`/`Test`/`Log` 的 `SourceRevision`、`SourceLocation`、适用范围与审核理由 | 明示的 repository/`repository_revision`、Target（若相关）、产品/规范版本和领域范围 | 可以；须返回原始引用、审核者及适用范围，且不能伪装成编译事实 | 可由后续人工审核修订为新的 `CURATED` assertion；Agent 无权升级任何 assertion | 原始来源 `source_revision_id`、适用范围、代码/Target 依赖或人工纠正变化时标为 `stale`、`contradicted` 或 `superseded`；保留历史审计 |
 
 Agent 只能创建 `INFERRED_CANDIDATE`，不能自行升级为 `EXTRACTED`、`RULE_DERIVED` 或 `CURATED`，也不能自行把候选写成确定性事实。LLM 不得直接写入确定性事实；embedding 不得直接写入确定性事实。确定性工具只能写入其输入范围内的 `EXTRACTED` 或 `RULE_DERIVED`，并不替代领域审核。
 
@@ -95,16 +95,17 @@ Graphify 的 `EXTRACTED`、`INFERRED` 和 `AMBIGUOUS` 是该来源项目对其�
 assertion_id: domain-link:<uuid>
 subject_stable_id: domain:<namespace>:<id>
 predicate: implements_feature | participates_in_flow | produces_event | constrained_by | explained_by
-object_stable_id: occurrence:<repo>:<revision>:<target>:<semantic-id>:<span>
-repository: <canonical-repository-id>
-revision: <commit-or-source-revision-id>
+object_stable_id: occurrence:<repository-id>:<repository-revision>:<target>:<semantic-id>:<span>
+repository_id: <canonical-code-repository-id>
+repository_revision: <immutable-code-commit-or-SWHID-revision-id>
 target_build_profile_scope: <target-name-and-command/macro/include/flags-digest>
 machine_status: EXTRACTED | RULE_DERIVED | INFERRED_CANDIDATE | CURATED
 producer: <tool-or-authorized-human>
 method_version: <parser/analyzer/rule/model/embedding/review-method-and-version>
 source_citation:
-  source_revision: <immutable-source-revision-or-content-digest>
-  source_location: <stable-locator>
+  source_id: <stable-domain-source-id>
+  source_revision_id: <immutable-domain-source-revision-or-content-digest>
+  source_location: <source-revision-id-plus-stable-locator>
   source_span: <file-line/AST-anchor/spec-clause/log-range>
 confidence:
   kind: exact | calibrated-score | ordinal | none
@@ -120,14 +121,14 @@ invalidation:
   caused_by: <optional-event-and-input-digest>
 ```
 
-这里的 `subject_stable_id` / `object_stable_id`、`repository`、`revision`、`target_build_profile_scope`、`predicate`、`source_citation`、`source_span`、`producer`、`method_version`、`confidence`、`review.state`、`created_at` / `validated_at`、`lifecycle_state` 和 `invalidation.reason` 均为 Assertion 最小字段；实现可以扩展字段，但不得省略这些审计锚点。`source span` 与 `invalidation reason` 以可读名称保留，便于人工审计和接口映射。
+这里的 `subject_stable_id` / `object_stable_id`、`repository_id`、`repository_revision`、`target_build_profile_scope`、`predicate`、`source_citation.source_id` / `source_revision_id` / `source_location` / `source_span`、`producer`、`method_version`、`confidence`、`review.state`、`created_at` / `validated_at`、`lifecycle_state` 和 `invalidation.reason` 均为 Assertion 最小字段；实现可以扩展字段，但不得省略这些审计锚点。`repository_revision` 只能标识被分析代码仓的不可变版本；领域材料只能通过 `source_citation.source_revision_id` 关联来源注册。`source span` 与 `invalidation reason` 以可读名称保留，便于人工审计和接口映射。
 
 ### 5.2 双向查询合同
 
 下列查询是 A0/A1/B0/B1 共用的协议，而不是某个 Agent 的私有提示词；每个结果都必须返回 assertion ID、`machine_status`、`lifecycle_state` 与原始证据路径。
 
-1. **从代码到领域：**给定 `TargetOccurrence`（repository、revision、Target/build profile 和 occurrence stable ID），查询仍为 `active` 的 `EXTRACTED` / `RULE_DERIVED` / `CURATED` assertion，返回关联的 `Feature`、`Flow`、`ProtocolRule`、`Event` 以及其 `SourceRevision`、`SourceLocation` 和 `source span`；`INFERRED_CANDIDATE` 只能作为可选“待审核候选”分组返回。
-2. **从领域到代码：**给定 `Feature` 或 `Event` stable ID、当前 revision 和 Target/build profile，查询仍为 `active` 且作用域匹配的 `TargetOccurrence`，连同 source citation、分析/规则 trace 和失效检查路径；没有匹配 occurrence 时明确返回“当前 Target 无有效代码证据”，不能回退为裸函数名或历史 Memory 的断言。
+1. **从代码到领域：**给定 `TargetOccurrence`（`repository_id`、`repository_revision`、Target/build profile 和 occurrence stable ID），只查询相同 `repository_revision` 且仍为 `active` 的 `EXTRACTED` / `RULE_DERIVED` / `CURATED` assertion，返回关联的 `Feature`、`Flow`、`ProtocolRule`、`Event` 以及其 `source_citation.source_revision_id`、`SourceLocation` 和 `source span`；`INFERRED_CANDIDATE` 只能作为可选“待审核候选”分组返回。
+2. **从领域到代码：**给定 `Feature` 或 `Event` stable ID、当前 `repository_id` / `repository_revision` 和 Target/build profile，只查询仍为 `active`、代码版本及作用域匹配的 `TargetOccurrence`，连同 source citation、分析/规则 trace 和失效检查路径；没有匹配 occurrence 时明确返回“当前 Target 无有效代码证据”，不能回退为裸函数名或历史 Memory 的断言。
 
 Host/Device 的二进制边界仍须经 `Event`/`Message` 断言连接；不得为了图遍历制造跨二进制的 `CALLS` edge。
 
@@ -141,7 +142,7 @@ W3C PROV-O 的 Entity/Activity/Agent、generation/derivation/revision/invalidati
 | compile command/Target digest 改变 | 该 Target 下全部 occurrence 与分析事实 | 整个 Target snapshot 失效，不传播到其他 Target |
 | symbol rename/move | semantic ID、文档 citation、人工映射 | 尝试 content/AST/rename map；保留旧 assertion 并生成 replacement |
 | analyzer/version/config 改变 | 该 generator 产生的 AnalysisFact | 并行生成新版本；差异视为 evidence conflict |
-| domain document/spec revision 改变 | derived rule、Skill、Wiki page、领域 edge | 按 source reference 反向找到 assertions，进入重新验证队列 |
+| domain document/spec `source_revision_id` 改变 | derived rule、Skill、Wiki page、领域 edge | 按 `source_revision_id` 反向找到 assertions，进入重新验证队列 |
 | embedding/model/prompt 改变 | 全部软链接 | 批次作废重算，不能沿用旧 score |
 | human correction | 被否定或替代的 assertion | 保存 supersedes/contradicts，不物理删除审计历史 |
 
@@ -153,7 +154,7 @@ W3C PROV-O 的 Entity/Activity/Agent、generation/derivation/revision/invalidati
 - “某协议应当如何工作”：适用版本的权威规范高于代码现状；代码不一致可能代表缺陷，而不是规范错误。
 - “项目为何采用某设计”：经审核 ADR/人工声明高于从代码形状推断的理由。
 - “某调用是否可能发生”：sound may-analysis 与 observed runtime trace 可以同时保留；二者语义不同，不互相覆盖。
-- “旧经验是否仍适用”：当前 revision 的验证结果高于历史 memory；历史仍可作为候选定位依据。
+- “旧经验是否仍适用”：当前 `repository_revision` 的验证结果高于历史 memory；历史仍可作为候选定位依据。
 
 GitHub 的 citation-backed just-in-time verification 是轻量实现参考；LLM-Wiki 的 source archive、双向 wikilink 和 Error Book 是批量编译/修复参考；WiCER 表明必须用失败 probe 检测被编译 Wiki 丢掉的事实。[S022][S023][S025]
 
@@ -335,7 +336,7 @@ KnownEdgeCase
 ## 10. Task 5 阶段性结论
 
 1. 领域知识应与代码事实分层存储或至少分层标注；物理上是否同库不是首要问题。
-2. 确定性链接的核心不是裸 symbol，而是 repository + revision + TargetProfile + semantic entity + source occurrence。
+2. 确定性链接的核心不是裸 symbol，而是 `repository_id` + `repository_revision` + TargetProfile + semantic entity + source occurrence。
 3. typed edge 必须是一等 assertion，携带 generator、inputs、evidence、provenance、confidence、review 和 invalidation 状态。
 4. embedding 和 LLM 推断适合候选发现与检索排序，只能形成 `INFERRED_CANDIDATE`，不得自动升级为确定性事实。
 5. 原始资料、编译 Wiki、Skill、memory 和分析结果具有不同更新周期；任何派生知识都必须能回到原始资料和当前源码。

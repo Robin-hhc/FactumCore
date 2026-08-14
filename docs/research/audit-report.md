@@ -1,77 +1,117 @@
-# 架构研究最终审计报告
+# 架构研究证据终审报告
 
 审计日期：2026-08-14
 
-## 1. 结论
+审计基线：`fca7a8c90c79a2716711f9a3b30cdc608c01295e`
 
-本轮审计通过。`research.md` 的核心结论只使用论文/公开 Benchmark、AI 公司技术文章、开源项目官方材料和标准；没有搜索结果页或二手媒体进入正文。当前研究没有声称执行过 WiFiDemo 候选工具实验，没有确定唯一方案，也没有用 aggregate score 覆盖 Target、源码证据或不确定性硬门槛。
+## 1. 审计结论
 
-审计中发现 RepoMem 的 OpenReview PDF 会进入 browser challenge、Fraunhofer CPG 旧文档主页会重定向；正文已分别改为可直接访问的 arXiv 原文和官方 GitHub 仓库。随后重新打开并核验。
+本轮证据终审通过，保留两条不阻断提交的 deferred minor 供最终审查。当前结论是两个待测主骨架和四个变体，不是唯一产品选型；没有运行 WiFiDemo 或候选工具实验，也没有新增本地测量。正文、证据矩阵和链接合同没有把 MCP 可调用性、架构容纳或第一方案例升级为 WiFi MAC 效果证明。
 
-## 2. 证据规模
+审计独立重算来源、状态、类型、数字行、候选角色和 Benchmark，没有复用上一版审计报告的 `S001–S036`、三架构短名单或 24 profile 计数。旧审计中的三族编号已随旧文本被替换；当前研究结论和证据矩阵均不再使用该分类。
 
-| 项目 | 数量 | 口径 |
+## 2. 独立重算结果
+
+| 项目 | 实际数量 | 重算口径 |
 |---|---:|---|
-| 登记来源 | 36 | `S001–S036` |
-| claim-verified | 12 | 已复核原始论文/结果中的可引用声明 |
-| primary-read | 24 | 官方论文/文档/仓库/标准已阅读，但不声称 WiFiDemo 复现 |
-| 论文/公开 Benchmark | 12 | 互斥主分类；含经典 CPG 论文和开源伴随论文 |
-| AI 公司技术文章 | 2 | Google/AWS Skills 与 GitHub Copilot Memory；Microsoft RepoMem 按论文计 |
-| 开源项目官方材料 | 21 | 项目文档、README、release 与构建文档 |
-| 标准 | 1 | SWHID/PROV-O/SARIF 合并登记为一个标准来源组 |
-| 正文含量化结果的行 | 7 | 每行均含直接原始 URL、来源身份和外推限制 |
+| 来源记录 | 40 | `source-ledger.md` 中 `### S001` 至 `### S040`，编号连续 |
+| `claim-verified` | 14 | 只计来源记录内精确的 `- 状态：claim-verified`；不计状态说明或汇总表 |
+| `primary-read` | 26 | 只计来源记录内精确的 `- 状态：primary-read` |
+| 论文材料 | 15 | 按来源记录的非互斥类型和原始材料逐条复核 |
+| AI 公司官方材料 | 5 | 按 `公司官方实践`/`AI 公司官方实践` 的来源记录复核；Microsoft Research 的论文伴随页不重复作为公司工程实践 |
+| 开源项目材料 | 30 | 按官方仓库、项目文档、公开实验代码/Benchmark 伴随材料逐条复核 |
+| 标准记录 | 1 | S029；一个记录组包含 SWHID、PROV-O 与 SARIF |
+| 正文数字扫描命中行 | 9 | `research.md` 第 90、92、94、96、116、130、132、134、136 行 |
+| 含效果或对照数字的行 | 8 | 上述 9 行中第 92 行只报告样本/标注规模，不含效果数字 |
+| 逐项目档案 | 28 | R01–R09 共 9、A01–A12 共 12、H01–H07 共 7 |
+| 核心架构族 | 2 | A Agent 原生的联邦语义服务骨架；B Target-specific CPG 主骨架 |
+| 待测变体 | 4 | A0、A1、B0、B1；0/1 是查询模式，不是第三个主骨架 |
+| 排除为完整方案的对象组 | 5 | `solution-inventory.md` 第 17 章角色表；局部能力可保留 |
+| 架构参考组 | 8 | 同一角色表，以逗号分隔的对象组计数 |
+| 通用组件候选组 | 7 | 同一角色表“组件候选”行 |
+| 可进入两主骨架的程序事实/Agent 接口组件组 | 7 | 同一角色表单列，不能与通用组件候选相加成互斥总数 |
+| Benchmark | 15 | B01–B15 连续，共 15 项 |
 
-分类数字使用互斥主分类，避免同一“论文 + 公司页面”重复计数。来源状态只有 `claim-verified` 和 `primary-read`；无 rejected source 进入结论。
+来源类型是非互斥分布，不能相加为 40。带论文和官方仓库的同一 S 记录可以同时进入论文与开源项目材料分组，但来源总数仍只计一次。
 
-## 3. 候选与实验规模
+`research.md` 第 14.1 节另有 6 条“排除为完整代码事实核心/完整方案”的显式说明；第 6 条把 Graphify/Understand Anything 作为一组排除出代码事实核心，但它们在 inventory 中仍归“架构参考”。因此角色表的 5 个“排除为完整方案”对象组与正文 6 条排除说明是不同口径，不应混算。
 
-| 项目 | 数量 | 说明 |
-|---|---:|---|
-| 固定维度方案 profile | 24 | R01–R07、A01–A10、H01–H07 |
-| 排除为完整方案的对象组 | 5 | 能力仍可作为组件/参考，不表示项目毫无价值 |
-| 架构参考组 | 4 | identity、混合图、memory/Wiki、声明式查询 |
-| 组件候选组 | 5 | compiler/identity、CPG、deep analysis、navigation、rule/knowledge delivery |
-| 完整架构短名单 | 3 | L1 compiler-native、L2 Target-specific CPG、L3 discovery + verification |
-| Benchmark backlog | 15 | B01–B10 WiFiDemo 主线，B11–B15 跨仓/知识/运维/许可 |
-| 外部 C 案例仓 | 3 | Zephyr、RIOT、Contiki-NG；均固定 tag/hash 与许可证边界 |
+brief 给出的 `rg -c '核验状态：`claim-verified`'` 与当前 ledger schema 不一致：实际记录字段为 `- 状态：claim-verified`。字面命令无匹配，使用 record-level 锚定命令后得到 14；不能把说明段和汇总表中的三个额外 `claim-verified` 字符串计入来源状态。
 
-上述“排除/参考/组件”以证据矩阵中的对象组为计数单位，不与 24 个 profile 强行一一对应。短名单是架构族，不是已经胜出的产品组合。
+## 3. 数字、样本、基线与限制审计
 
-## 4. 审计项目
+数字扫描共命中 9 行。每行均有 S 编号和直接原始 URL；相关 ledger 记录保存样本、模型/Agent、对照、指标、数字语境和外推限制。
 
-### 4.1 数字与来源
+| `research.md` 行 | 来源 | 审计判断 |
+|---:|---|---|
+| 90 | S001 | 427 样本与 27%–35% 漏检均限定为文件检索，不外推程序语义或 WiFi Target |
+| 92 | S002、S003 | 只报告查询、标注、任务、仓库、语言和 Agent 样本规模；不计效果数字行 |
+| 94 | S005、S006 | 83%/92%、Token/调用倍数保留 31 仓第一方语境；当前 README 能力不与论文快照混写 |
+| 96 | S007 | 88%/53%/62%/44%/80% 保留 7 仓、每臂 4 次、第一方架构问答语境；不解释为调用边准确率 |
+| 116 | S039、S040 | 8,000 是单案例规模；53.4% 对 10% 限定为 176 CVE、111 个 Java 项目的作者对照 |
+| 130 | S022、S023 | Wiki 数字保留多跳问答、LLM-as-judge 和非代码任务限制 |
+| 132 | S024、S025 | S024 的约 90% 是 10-Skill 示例算术而非效果实验；S025 是未公开样本量的 GitHub 第一方 A/B |
+| 134 | S026、S027 | 5G/Skill 结果保留任务类型、版本与负收益语境，不外推 WiFiDemo |
+| 136 | S028、S030 | RepoMem 限定 Python bug localization；108,000 行/283 sessions 只是观察性案例规模 |
 
-运行：
+S024 为 `primary-read`，其约 90% 只用于否定“示例算术等于受控效果”的错误解释，不作为性能结论；其余效果/对照数字均由相应 `claim-verified` 记录支撑。
 
-```powershell
-rg -n '[0-9]+([.,][0-9]+)?%|[0-9]+([.,][0-9]+)?[×xX]|[0-9]+ 个|[0-9]+ 倍' research.md
-```
+## 4. Agent 证据三字段审计
 
-结果为 7 行，全部位于“数字证据的解释规则”表；每行有论文、公司原文或项目第一方 Benchmark 的直接 URL，并显式说明不能外推到 WiFiDemo 的内容。
+正文已把 `Agent evidence`、`Producer relation`、`Review status` 分成三个可组合字段，并明确 A/B/C/D 与架构 A/B 属于不同命名空间。项目地图逐行保留三字段：
 
-### 4.2 正文 URL
+- Serena：B；project first-party；project self-test + official docs。约 20 项任务是 Agent 自评，不是固定受控 Benchmark。
+- Sourcegraph MCP / SCIP：D；产品为 company first-party、协议为 project first-party；均是 official docs。MCP 和开放协议只证明接口存在。
+- Codebase-Memory：A；author/project first-party；preprint + official docs。31 仓对照不是独立复现。
+- CodeGraph：A；project first-party；project self-test + official docs。7 仓、每臂 4 次的第一方结果不证明调用边精度。
+- Joern / codebadger：B；Joern project first-party、codebadger author first-party；official docs + preprint。三个案例不是 aggregate accuracy。
+- CodeQL / QLCoder：A；CodeQL company first-party、QLCoder author first-party；official docs + preprint。受控结果限定在 Java/CVE/CodeQL。
 
-从 Markdown 正文提取 37 个唯一 HTTP(S) URL，逐一打开。最终正文 URL 全部落到论文原文、AI 公司文章、开源项目官方文档/仓库/release 或标准正文。没有搜索页、聚合博客或不可读 challenge 页保留在正文。
+正文明确写出“高层任务工具相对 raw DSL”只是 B10 待验证原则。MCP、LSP、CPG、开放协议和产品功能均未被描述为 Agent 效果证明。
 
-### 4.3 来源 ID 与本地链接
+## 5. 身份、权限、生命周期与 Host/Device 边界
 
-- 正文和 `docs/research` 中没有 undefined `Sxxx`；
-- `S001–S036` 均在 ledger 外的研究材料中至少被引用一次；
-- `research.md` 链接的六个研究附录均存在；
-- WiFiDemo 案例明确指向 W01–W08，未伪装成工具实测。
+`code-domain-linkage.md` 已覆盖以下终审门槛：
 
-### 4.4 代码—领域链接
+1. 代码主体按 `Repository`、`RepositoryRevision`、`SourceArtifact`、`CodeEntity`、`TargetProfile`、`TargetOccurrence`、TU 和 source span 分离；领域来源另用 `SourceRevision`/`source_revision_id`。
+2. `EXTRACTED`、`RULE_DERIVED`、`INFERRED_CANDIDATE`、`CURATED` 是唯一四种 `machine_status`。Agent 只能创建 `INFERRED_CANDIDATE`，不能自行升级权限。
+3. Assertion 最小字段含 producer、method version、provenance、confidence、review state、repository/source revision、Target、source span、lifecycle 和 invalidation reason。
+4. `active`、`stale`、`contradicted`、`invalid`、`superseded` 是生命周期而非第五种事实权限；代码、Target、规则、来源或模型变化触发有界重建/重验。
+5. Host 与 Device 保持独立编译视角，只通过 `Event`/`Message` 断言及分段证据连接；正文和链接合同均禁止制造跨二进制 `CALLS` edge。
 
-以下概念在正文和专门调研中均有明确语义：Source Entity、Target Occurrence、typed Assertion、repository/revision/Target、file:line、generator/provenance、confidence/review、conflict、stale/invalid、双向导航和重新验证。Host/Device Event 使用协议实体连接两个编译视角，不伪装为直接 C 调用。
+## 6. 候选范围、旧文档与越界措辞
 
-### 4.5 范围与措辞
+范围词扫描在 `research.md` 与 `evidence-matrix.md` 中没有命中“最终选型”“唯一方案”“一定优于”“已经证明…WiFi”“必须采用”或“直接替代”。旧三族编号和旧三方案措辞也没有出现在当前候选结论中。
 
-范围词审计只命中“当前证据不足以确定唯一方案”等否定/限制语句。正文没有“已经证明某方案适用于 WiFi”“一定优于”“直接替代”或“必须采用某产品”的结论。开源偏好只作为无决定性差异时的 tie-break。
+`docs/superpowers/specs/2026-08-13-wifi-mac-knowledge-architecture-research-design.md` 是历史设计文档，未修改；它已被 `docs/superpowers/specs/2026-08-14-research-synthesis-and-candidate-reassessment-design.md` 取代。当前研究只以 2026-08-14 spec 的两个主骨架、两种查询模式和四个待测变体为现行设计。
 
-### 4.6 格式与占位
+## 7. 新增 URL 与本地交叉引用
 
-占位标记扫描与 `git diff --check` 均无错误。审计命令本身不写入正文，以免被后续占位扫描误判为待办内容。
+逐个打开 `research.md` 中 S037–S040 的 8 个新增唯一 URL：
 
-## 5. 仍然开放的问题
+- S037：Serena 官方 GitHub 与官方 evaluation 文档；均可访问，分别支持 MCP/LSP 接口和“Agent 自评”语境。
+- S038：Sourcegraph MCP 官方产品页可访问；SCIP 官方 GitHub 链接重定向到 `scip-code/scip`，仍是官方仓库。没有搜索页或转载页。
+- S039：arXiv 原文与 codebadger 官方 GitHub 均可访问；论文摘要明确是三个案例。
+- S040：arXiv 原文与 QLCoder 官方 GitHub 均可访问；论文摘要明确 176 CVE、111 个 Java 项目、53.4% 对 10%。
 
-审计通过不等于架构选型完成。多 Target compdb、宏分支、函数指针、Event 链接、稳定 ID、失效修复、Agent 最终效果、资源和许可证组合仍需按 `benchmark-backlog.md` 实验。任何新的量化结论必须追加 fixed version、原始输出和 counterfactual；不能把本报告的文献审计状态升级为工程验证状态。
+`research.md` 的 6 个本地研究附录链接均存在：source ledger、solution inventory、WiFiDemo workload casebook、code-domain linkage、evidence matrix 和 benchmark backlog。没有悬空的 `docs/research/*.md` 路径。
+
+## 8. 未解决问题与 deferred minor
+
+本审计通过不等于候选实验通过。以下问题仍须由 B01–B15 裁决：
+
+- Target frontend 是否忠实消费真实编译命令、宏、include、生成物和 active source set；
+- 函数指针/ops、alias、dataflow 与 slice 的 precision/recall 和候选规模；
+- SourceEntity/TargetOccurrence 稳定 ID、跨 Target/跨 revision merge-split 行为；
+- assertion invalidation、repair、revalidation 的 precision/recall 与错误沿用率；
+- 最终 Agent 正确性、证据完整率、错误引用、拒答、raw DSL fallback 和成本；
+- 逐组件许可、依赖/模型/容器再分发、离线复现和替代路径。
+
+两条 deferred minor：
+
+1. S038 的 Sourcegraph MCP 产品许可、自托管和部署边界仍为 `unknown`；开放 SCIP 协议不能替代产品许可审计。
+2. `research.md` 结论仍使用“先导出八层骨架……当前范围因此缩小为两个主骨架”的推导措辞。正文已有“当前范围”“尚未确定唯一赢家”“架构推断偏差”和 Benchmark 可推翻条件，因此没有宣称候选空间完备；最终审查仍应判断该句是否可能被读成穷尽性结论。本任务未获授权修改 `research.md`。
+
+## 9. 最终检查
+
+占位符扫描、`git diff --check`、暂存区空白检查和工作树范围检查必须在提交前重新执行。计划内 Git 修改只允许 `docs/research/audit-report.md`；Task 6 执行报告写入 `.superpowers/sdd/.../task-6-report.md`，不纳入研究文档提交。

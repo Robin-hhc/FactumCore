@@ -30,6 +30,19 @@
 - **检索效率**：Recall@k、MRR、context yield、工具调用、Token、索引/增量/查询时延和资源；
 - **最终 Agent 正确性**：答案/补丁通过率、证据完整率、错误引用率、counterfactual sensitivity。
 
+### 2.1 成对受控对比与交互
+
+四臂不是一次无控制的横向排名。每个任务、Counterfactual 和重复 seed/run 都按下表形成配对样本；同一 pair 使用相同任务顺序、Agent 模型与 prompt/scaffold、高层工具合同、Token/工具调用/轮次上限、Target、`repository_revision`、输入 digest、硬件和失败重试策略。配对内不得给模式 1 追加预算；discovery、核验与 fallback 均从同一总预算扣除。
+
+| 裁决效应 | 固定 pair | 必须保持不变 | 唯一允许的主差异 |
+|---|---|---|---|
+| A 上的 discovery 效应 | A0 ↔ A1 | A 主骨架实现、全部事实/deep provider 的版本与配置、snapshot/Target、Agent、高层工具合同和总预算 | A1 增加已冻结版本/配置的轻量 discovery；A0 直接查询 A |
+| B 上的 discovery 效应 | B0 ↔ B1 | B 主骨架实现、CPG 与全部 deep provider 的版本与配置、snapshot/Target、Agent、高层工具合同和总预算 | B1 增加与 A1 同一版本/配置/候选预算的轻量 discovery；B0 直接查询 B |
+| 模式 0 下的骨架效应 | A0 ↔ B0 | 直接查询模式、snapshot/Target、Agent、高层工具合同、共同 assertion layer、外接 deep provider（若调用）和总预算 | 程序事实主干由 A 换为 B；主干固有 provider/存储实现按臂冻结并公开 |
+| 模式 1 下的骨架效应 | A1 ↔ B1 | 轻量 discovery 的实现/索引/版本/配置/候选预算、snapshot/Target、Agent、高层工具合同、共同 assertion layer、外接 deep provider（若调用）和总预算 | 程序事实主干由 A 换为 B；主干固有 provider/存储实现按臂冻结并公开 |
+
+每个事实准确性、检索效率和最终 Agent 指标分别报告四臂原值及上述 pair 的 paired delta/区间，不折叠为总分。另报告二因素交互 `Δinteraction = (A1 - A0) - (B1 - B0)`：它只表示 discovery 效应是否随主骨架改变，不能单独替代任一硬门槛或主效应。若某臂因硬门槛停止，保留失败记录并将依赖该臂的 delta/interaction 标为不可估计，不用剩余臂外推。
+
 ## 3. WiFiDemo 主案例
 
 以下编号直接映射 `wifidemo-workload-casebook.md` 的 W01–W08。
@@ -46,6 +59,20 @@
 | B08 领域标签链接 | 共同 assertion layer；A/B 仅作为等价代码证据输入 | Feature/Chip/Side/Event 链接可区分 `EXTRACTED`、`RULE_DERIVED`、`INFERRED_CANDIDATE`、`CURATED`，且支持双向导航与拒答 | W01–W08 的最小领域标签及原始设计注意事项 | 双人标注 typed assertions；分歧保留 conflict，不强制多数投票 | link P/R/F1、类型准确率、provenance 完整率、calibration、abstention | 加入无证据标签、同名领域词和过时设计声明 | 标注/审核时间、查询 Token | 共同领域 schema、Agent/LLM 候选权限和人工审核边界；不裁决 A/B |
 | B09 链接失效与修复 | 共同 assertion layer；在 A/B 代码事实输入上各重放一次 | 代码/Target/`repository_revision` 或领域 `source_revision_id` 变化能精准标 stale/invalid，并避免未受影响链接全量重审 | B02/B05/B06 的 patch 序列和断言图 | 预期受影响 assertion 集、重建后的 compiler facts | invalidation precision/recall、错误沿用率、自动修复正确率、重验范围 | revert、rename、Target 删除、宏翻转、evidence 行移动 | 增量时延、重验调用和人工审核量 | 共同 assertion lifecycle、依赖追踪及代码/来源 revision 分离；不裁决 A/B |
 | B10 Agent 端到端 | A0/A1/B0/B1 及 no-graph/lexical 基线 | 模式 1 只有在最终回答引用正确 Target 和证据、且效率净收益覆盖错误候选与核验成本时才有价值 | W01–W08 改写为固定问答/诊断/变更影响任务 | assertion-style expected facts、允许答案集合、执行式 verifier；保留每步高层工具与 raw DSL 轨迹 | 高层工具选择正确率、无效工具调用、原始 DSL 退回次数（raw DSL fallback）、结果截断、abstention、Token、工具调用、task pass、evidence completeness、unsupported claim、Target leakage、最终任务正确率 | 对 gold fact 做单点变更，答案必须同步变化 | 每臂至少多次运行的模型费用和方差；区分 discovery、核验与 fallback 成本 | 0/1 查询模式的净收益、高层接口是否足够、检索质量与最终推理质量是否脱节 |
+
+### 3.1 B10 Agent 接口标注与评分协议
+
+B10 在运行前为每个任务发布机器可读的 scorer annotation；annotation 与执行 trace、provider 原始响应和最终答案一起版本化。协议不要求唯一工具序列，而是允许一个或多个等价计划：
+
+1. **valid/equivalent plan**：每个允许计划表示为有限状态 DAG；边记录可接受的高层工具族、必需的 Target/`repository_revision`/参数约束、预期 evidence ID/type，以及可选的等价工具集合、可交换步骤和预先声明的 recovery/diagnostic 动作。能从起点走到接受态并取得任务所需 gold evidence 的路径均为 valid plan；多个 DAG 或同一 DAG 的多条接受路径均为 equivalent plans。评分器不以单一人工轨迹作为唯一 gold。
+2. **tool-selection opportunity**：一次实际高层工具选择尝试记为一个 opportunity；在仍有可表达该 goal 的高层工具边时使用 raw DSL，也记为一个高层 opportunity；若运行在仍有必需高层下一步的非接受态终止，再记一个 omission opportunity。分母固定为 `高层工具选择尝试 + 代替高层工具的非必要 raw DSL 尝试 + 必需高层步骤未选择次数`，包含重复和错误调用，不能只按 gold 步骤数计算。annotation 明示高层合同不能表达该 goal 时，justified raw DSL fallback 不进入高层 opportunity 分母，单独按第 5 条评分。
+3. **valid selection 与高层工具选择正确率**：在调用发生时，若高层工具、参数作用域和 evidence goal 能匹配至少一个尚可达的 equivalent plan 高层边，则为 valid selection 并按该边推进；否则不推进计划状态。`tool-selection accuracy = valid high-level selections / tool-selection opportunities`。若一次调用同时匹配多条计划，只计一次 valid selection，并保留所有仍可达计划，直到后续轨迹消歧。
+4. **invalid call**：以下任一情形由 annotation/scorer 确定为 invalid：不匹配任何仍可达计划边；Target 或 `repository_revision` 错误；违反冻结预算/allowlist；在没有 annotation 标记的 recovery 理由时重复获取已经足够的 evidence；调用结果类型不可能满足当前 evidence goal。invalid call 的计数和 `invalid calls / tool-selection opportunities` 单独报告；超时/工具故障另标 infrastructure failure，不自动归咎于选择错误。
+5. **DSL fallback**：任何绕过冻结高层合同、直接调用 provider 原始 DSL/traversal/query language 的选择均计一次 fallback。只有 annotation 明示“现有高层工具不能表达该 evidence goal”，且该调用匹配对应 fallback 边时才是 justified fallback；它不进入高层 opportunity 分母。其余为 unjustified fallback，同时按 invalid call 计，并在存在可用高层边时进入高层 opportunity 分母。分别报告总次数、justified/unjustified 次数，以及 `fallbacks / 全部工具选择次数`；高层工具正确率仍使用第 2 条的独立分母。
+6. **truncation 与 truncation-lost-gold**：每个工具响应记录请求 limit、返回条数、`truncated` 标记和 evidence IDs。对所有 truncated 响应，以同一 snapshot/provider/query/config 在 scorer 环境中提高到预登记 oracle cap 重放；若 gold evidence 位于 oracle 结果但不在 Agent 实际响应中，则记 `truncation-lost-gold = 1`。分别报告 `lost-gold / truncated responses`、受影响任务数和后续是否通过等价路径恢复；oracle 重放不计入 Agent 预算或工具选择分母。
+7. **最终答案独立评分**：task pass、最终任务正确率、evidence completeness、unsupported claim、Target leakage、abstention 和 Counterfactual sensitivity 以任务/run 为分母独立评分，不与 tool-selection accuracy、invalid-call rate、fallback 或 truncation 指标合成。合法工具计划不保证答案正确，非最短但 valid 的计划也不因长度单独判错；效率由 Token、调用、轮次和延迟另报。
+
+发布 scorer 时必须附至少一个 valid trace、一个等价顺序 trace、一个 invalid-call trace、一个 omission trace 和一个 truncation-lost-gold fixture，并在 A0/A1/B0/B1 上使用同一 annotation 版本。annotation 若遗漏实际可行的等价计划，先由盲审裁决并发布新版本，再重算全部四臂，禁止只修正单臂分数。
 
 ## 4. 外部 C 案例集
 
@@ -71,9 +98,9 @@
 
 ## 6. 执行顺序与停止条件
 
-1. **Phase A：ground truth** — B01–B06、B11。分别裁决 A/B 的事实主干与 Target correctness；若候选无法稳定绑定 Target、源码证据或 `repository_revision`，停止其“完整方案”评估，但可继续作为局部组件。
+1. **Phase A：ground truth** — B01–B06、B11。分别裁决 A/B 的事实主干与 Target correctness；若候选无法稳定绑定 Target、源码证据或 `repository_revision`，或 B02 预登记硬门槛 assertion 中任一宏值/active branch 与 compiler ground truth 不一致、任一其他 Target 的分支被返回为当前 Target active fact，则记为硬失败并停止其“完整方案”评估，但可继续作为局部组件。
 2. **Phase B：知识链接** — B08–B09、B13。只验证共同 assertion layer；若 `INFERRED_CANDIDATE` 不能保守 abstain、失效或回溯来源，不允许进入确定性事实视图。
 3. **Phase C：Agent 与成本** — B07、B10、B12、B14。只有前两阶段通过后，才比较 0/1 查询模式、CPG/LLVM/deep provider 的实际效果与资源。
 4. **Phase D：采用审计** — B15。审计 A0/A1/B0/B1 的具体组合和替代路径；许可证或离线复现失败可以排除具体实现，但不能自动否定同一架构族。
 
-任何单一 aggregate score 都不得覆盖 B01/B03/B08/B09 的硬失败。若候选效果区间接近且没有决定性约束差异，再以开放许可证、可离线复现、维护活跃度和更低适配成本作为 tie-break。
+任何单一 aggregate score 都不得覆盖 B01/B02/B03/B08/B09 的硬失败；B02 的宏真值、active-branch F1 和跨 Target 泄漏必须逐项公开，不得被其他指标补偿。若候选效果区间接近且没有决定性约束差异，再以开放许可证、可离线复现、维护活跃度和更低适配成本作为 tie-break。

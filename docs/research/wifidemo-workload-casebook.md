@@ -1,13 +1,32 @@
 # WiFiDemo 目标工作负载案例集
 
 源码根目录：`E:/WiFiDemo/WiFiDemo`
-核验日期：2026-08-13
+核验日期：2026-08-14
 
 ## 1. 使用边界
 
-本案例集只说明与工业 WiFi MAC 相似的代码结构为什么会影响知识架构。它不运行或评价任何候选工具，不产生准确率、召回率、Token、延迟或成本结论。源码行号来自上述目录的当前 checkout；正式 Benchmark 必须再固定 commit。
+本案例集只说明与工业 WiFi MAC 相似的代码结构为什么会影响知识架构。它不运行或评价任何候选工具，不产生准确率、召回率、Token、延迟或成本结论。源码行号和配置观察固定到下述不可变快照，不再随上述目录之后的 checkout 漂移；正式 Benchmark 仍须为实验输入、补丁、submodule 和构建产物建立独立快照。
 
-每个案例回答六件事：问题模式、最小代码证据、为何普通调用图不足、知识架构必须表达什么、代码与领域知识如何连接、本研究不声称什么。
+每个案例回答六件事：问题模式、最小源码/配置观察、为何普通调用图不足、知识架构必须表达什么、代码与领域知识如何连接、本研究不声称什么。
+
+### 1.1 可复现源码快照
+
+| 字段 | 固定值或状态 |
+|---|---|
+| canonical origin URL | `https://github.com/Robin-hhc/WiFiDemo.git` |
+| branch（仅描述核验时 checkout，不作为身份） | `main` |
+| full HEAD / `repository_revision` | `8102322afbe5f81ecf6a35601ac4731ed14feb2d` |
+| dirty 状态 | `clean`；tracked unstaged、tracked staged、untracked 均为空 |
+| tracked patch SHA-256 | `not applicable`；clean snapshot 没有 tracked patch |
+| untracked manifest SHA-256 / 范围 | `not applicable`；untracked path 数为 0，范围为空 |
+
+只读核验使用 `git remote get-url origin`、`git rev-parse HEAD`、`git status --porcelain=v1 --untracked-files=all`、`git diff --quiet HEAD --`、`git diff --cached --quiet HEAD --` 和 `git ls-files --others --exclude-standard`；后两个 diff 检查均退出 0，status 与 untracked manifest 无条目。本轮未修改 `E:/WiFiDemo/WiFiDemo`。
+
+### 1.2 观察与 ground truth 的边界
+
+W01–W08 的路径、行号、CMake/Python 条件和 C 片段都是固定 revision 上的**源码/配置观察**。它们可以证明“文本和配置逻辑如此表达”，不能单独证明某 Target 的实际 compiler argv、最终宏集合、active source set、对象文件、AST/IR 或有效调用边。
+
+候选实验的 **compiler-artifact ground truth** 必须在成功构建相同 `repository_revision` 后，从实际 compiler argv、`flags.make`/compilation database、`-dM`/`-E` 预处理输出、对象/符号和生成文件中取得，并保存 Target/toolchain/config digest。本轮按范围没有运行构建、没有生成或读取新的 compiler artifacts，也没有运行 A0/A1/B0/B1 或任何候选工具实验。
 
 ## W01 — Host 共代码包含多芯片实现
 
@@ -15,7 +34,7 @@
 
 Host target 同时编译 chip2 和 chip8 的实现，芯片差异主要在运行时选择。源码目录名不能直接等价于“只存在于该芯片 Target”。
 
-**代码证据**
+**源码/配置观察**
 
 - `host/CMakeLists.txt:17-24`：同一个 `chip` 静态库同时包含 `chip_chip2.c` 与 `chip_chip8.c`。
 - `host/CMakeLists.txt:56-70`：同一个 `hal` 静态库同时包含 chip2 和 chip8 的 HAL product 源文件。
@@ -51,7 +70,7 @@ add_library(chip STATIC ${CHIP_SOURCES})
 
 Device 与 Host 的构建组织不同：Device 在配置阶段按 `CHIP_TYPE` 选择独立宏文件和源集合。
 
-**代码证据**
+**源码/配置观察**
 
 - `device/CMakeLists.txt:5-9`：按 chip2/chip8 include 不同 `macro_config.cmake`。
 - `device/CMakeLists.txt:21-50`：chip2 和 chip8 进入互斥的 `CHIP_SOURCES` 分支。
@@ -87,7 +106,7 @@ Feature 或芯片能力标签应链接到 Target Profile 和宏来源；不能�
 
 Host 大部分源码共用，但 `_PRE_WLAN_FEATURE_HOST_TX_OFFLOAD` 只在 chip8 Host Target 中定义。
 
-**代码证据**
+**源码/配置观察**
 
 - `build.py:14-35`：四个公开构建 Target 分别组合 chip2/chip8 与 host/device。
 - `host/CMakeLists.txt:9-14`：仅 `CHIP_TYPE=CHIP8` 追加 offload 宏。
@@ -121,7 +140,7 @@ add_definitions(${wifi_common_macro})
 
 同一个宏在多个模块改变控制路径，领域含义不是单一 `#ifdef` 节点能够表达的。
 
-**代码证据**
+**源码/配置观察**
 
 - `host/wifi/dpe/hcc/hcc_core.c:202-214`：宏开时调用 `dpa_forward_to_device`，宏关时调用 `hcc_tx_queue_put`。
 - `host/wifi/hmac/tx/hmac_tx_data.c:66-78`：宏开时 DEVICE_RING 可跳过 `hmac_tx_fill_seqno`，宏关时始终填充 seqno。
@@ -156,7 +175,7 @@ add_definitions(${wifi_common_macro})
 
 芯片差异通过函数指针表和全局规格表选择，而不是普通直接调用或单一编译期宏。
 
-**代码证据**
+**源码/配置观察**
 
 - `host/platform/main/platform_main.c:31-53`：`platform_init` 依次执行 `chip_init`、`hal_ops_select` 和 `spec_select`。
 - `host/wifi/chip/chip_common.c:13-25`：`chip_ops_select` 根据 `chip_type` 复制不同 ops 表。
@@ -193,7 +212,7 @@ if (chip_type == CHIP_TYPE_CHIP8) {
 
 Host producer 与 Device consumer 不构成 C 语言直接调用；链路通过共享消息结构、HCC、回调和 FRW 注册表连接。
 
-**代码证据**
+**源码/配置观察**
 
 - `shared/include/wifi_hcc.h:13-38`：Host/Device 共用通道、消息头和 `hcc_tx_msg_stru`。
 - `host/wifi/dpe/hcc/hcc_core.c:202-214`：Host 发送 TX 事件。
@@ -229,7 +248,7 @@ Event/Message 是一级实体，保存 producer、consumer、side、Target、sub
 
 `hcc_core.c` 等 Host 公共源码参与多个 Host Target，但其中部分边受 chip8 专用宏控制。源码身份、编译存在性和芯片领域归属是三种不同关系。
 
-**代码证据**
+**源码/配置观察**
 
 - `build.py:25-34`：chip2/chip8 Host 是两个 Target。
 - `host/CMakeLists.txt:9-14`：两个 Host Target 只有 offload 宏差异。
@@ -257,7 +276,7 @@ Function—Feature 或 Function—Chip 链接应允许多值、Target 约束和 
 
 不同芯片目录中存在同名 Device 函数和相同日志字符串。仅按函数名或字符串返回单个结果会误导 Target 选择。
 
-**代码证据**
+**源码/配置观察**
 
 - `device/wifi/chip2/hcc/hcc_device.c:79-107` 与 `device/wifi/chip8/hcc/hcc_device.c:79-107`：两个文件都定义 `hcc_device_rx_handler`，并包含相同 `[HCC_DEVICE] RX` 日志。
 - `device/wifi/chip2/frw/frw_event.c:15` 与 `device/wifi/chip8/frw/frw_event.c:12`：两个芯片目录都定义 `frw_event_dispatch`。

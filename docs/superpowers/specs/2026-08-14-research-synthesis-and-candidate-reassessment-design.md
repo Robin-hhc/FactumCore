@@ -5,7 +5,7 @@
 
 ## 1. 背景与问题
 
-现有 `research.md` 已分别调查代码导航与检索、语义程序表示与深度分析、代码与领域知识链接、领域知识管理与 Agent 上下文，并建立了证据等级、WiFiDemo 工作负载和后续 Benchmark 清单。这些内容提供了足够的材料，但正文从四条独立调研线直接跳到 L1、L2、L3 三个候选架构族，缺少以下中间论证：
+现有 `research.md` 已分别调查代码导航与检索、语义程序表示与深度分析、代码与领域知识链接、领域知识管理与 Agent 上下文，并建立了证据等级、WiFiDemo 工作负载和后续 Benchmark 清单。这些内容提供了足够的材料，但正文曾从四条独立调研线直接跳到旧三族候选，缺少以下中间论证：
 
 1. 成熟方案共同解决了什么问题；
 2. 它们在哪些关键设计选择上不同；
@@ -14,7 +14,7 @@
 5. 为什么若干组件能够组成一个候选架构；
 6. 为什么某些项目只能作为组件或参考，而不能独立成为完整候选。
 
-旧候选还混合了不同抽象层级：L1 和 L2 主要描述程序事实主干，L3“轻量发现 + 编译器核验”主要描述查询与成本优化方式。三者并非互斥的同级架构族，因此不应继续作为论文的最终分类。
+旧候选还混合了不同抽象层级：其中两族主要描述程序事实主干，另一族“轻量发现 + 编译器核验”主要描述查询与成本优化方式。三者并非互斥的同级架构族，因此不应继续作为论文的最终分类。
 
 ## 2. 重构目标
 
@@ -146,7 +146,9 @@
 
 词法、向量、RepoMap、Tree-sitter 图、Wiki、Skill 和 Memory 是可附加能力，不再作为与程序事实主干同级的架构族。
 
-## 9. 两个核心架构族
+## 9. 当前两个可归因、可证伪的主实验骨架
+
+以下 A/B 是依据当前证据和决策轴构造的初始实验骨架，不是候选空间穷尽证明。后续 Benchmark 若发现新的独立决策轴、混杂或共享硬失败，可以在下一轮预注册前拆分、增加或重定义实验臂，并记录变更原因。
 
 ### 9.1 A：Agent 原生的联邦语义服务骨架
 
@@ -208,18 +210,18 @@ Target/编译快照
 - **0：直接模式。** Agent 通过有界高层工具直接查询程序事实主干和断言层；
 - **1：轻量发现加速模式。** Agent 先用 Tree-sitter 图、Codebase-Memory/CodeGraph 或其他低成本索引寻找候选，再回到程序事实主干或源码核验。
 
-因此后续实验对象为 A0、A1、B0、B1 四个部署变体，但论文应明确它们只包含两个核心架构族。加速层是否值得存在由 Token、工具调用、延迟、错误候选率、核验成本和一致性成本共同裁决。
+因此 A0、A1、B0、B1 是当前四个初始部署变体，覆盖两个主实验骨架，而不是全部可能架构。加速层是否值得存在由 Token、工具调用、延迟、错误候选率、核验成本和一致性成本共同裁决；Benchmark 也可因新证据重定义 arms。
 
 ## 11. 代码与领域知识的共同链接模型
 
-所有候选共享同一链接模型，避免用领域层差异掩盖程序事实主干差异。断言按权限分为：
+所有候选共享同一链接模型，避免用领域层差异掩盖程序事实主干差异。`Evidence` 是以 `kind` 判别的联合：`CodeEvidence` 引用 `RepositoryRevision`、`TargetOccurrence`、`SourceArtifact` 与代码 source span；`DomainEvidence` 才引用领域 `SourceRevision`、`SourceLocation` 与 quoted digest。代码 `repository_revision` 与领域 `source_revision_id` 绝不复用。断言按权限分为：
 
-- `EXTRACTED`：源码、配置或领域来源直接明示；
+- `EXTRACTED`：确定性工具在输入范围内抽取；`code_fact` 只要求 `CodeEvidence`，`domain_statement` 只要求 `DomainEvidence`，不从单侧证据产生跨域语义；
 - `RULE_DERIVED`：由有版本的确定性规则推导；
 - `INFERRED_CANDIDATE`：由 LLM、embedding 或启发式产生，只能作为候选；
 - `CURATED`：经过人工复核的领域断言。
 
-每条断言至少携带：subject/object stable ID、repository/revision/Target 范围、predicate、source citation、source span、producer、method/version、confidence、review state、created/validated time、lifecycle state 和 invalidation reason。
+每条断言至少携带：subject/object stable ID、`predicate_class`、predicate、按范围条件填写的 repository/revision/Target、`evidence[]`、producer、method/version、confidence、review state、created/validated time、lifecycle state 和 invalidation reason。最低 evidence kind 由 `predicate_class × machine_status` 决定：代码事实需 code，领域声明需 domain，代码—领域链接需两者；`INFERRED_CANDIDATE` 缺失的 kind 必须写入 `evidence_gaps`。不得为了满足 schema 强制纯代码 assertion 填领域 citation。
 
 Agent 可以读取所有允许状态并提出 `INFERRED_CANDIDATE`，但不能把候选直接升级为确定性事实。源码重命名、Target 变化、编译命令变化或领域来源更新时，系统按依赖关系将相关断言标记为 stale，重新验证后才能恢复有效状态。
 
@@ -237,13 +239,13 @@ Agent 可以读取所有允许状态并提出 `INFERRED_CANDIDATE`，但不能�
 8. 按骨架分类项目与 Agent 结合证据；
 9. 代码与领域知识链接模型；
 10. 真正的架构决策轴；
-11. 两个核心架构族与四个部署变体；
+11. 当前两个主实验骨架与四个初始部署变体；
 12. 统一优缺点和 WiFiDemo 工作负载覆盖矩阵；
 13. 排除项、组件候选与架构参考；
 14. 后续 Benchmark；
 15. 有效性威胁与阶段性结论。
 
-旧第 4 至第 7 节的调查材料尽量保留，但增加综合章节作为候选推导的桥梁。旧 L1/L2/L3 表格和基于该表的结论删除或重写，不为保持旧结论而扭曲新分类。
+旧第 4 至第 7 节的调查材料尽量保留，但增加综合章节作为候选推导的桥梁。旧三族表格和基于该表的结论删除或重写，不为保持旧结论而扭曲新分类。
 
 ## 13. 统一比较与表述规则
 
@@ -286,13 +288,13 @@ Agent 可以读取所有允许状态并提出 `INFERRED_CANDIDATE`，但不能�
 1. 候选出现前已经解释共同规律、差异和八层骨架；
 2. 每个项目都能定位到一个或多个骨架层，不再按项目热度平铺；
 3. Agent 结合证据具有 A-D 分级，MCP 不被当作效果证明；
-4. 旧 L1/L2/L3 被两个核心架构族和两种部署模式取代；
+4. 旧三族编号不再作为现行决策分类，当前证据被操作化为两个主实验骨架和两种部署模式；
 5. A0、A1、B0、B1 使用同一模板和工作负载矩阵比较；
 6. Graphify、Understand Anything 等项目的领域设计被吸收，但不被误写为 Target-specific 程序事实核心；
 7. codebadger 等近期证据改变 Joern/CPG 的 Agent 成熟度判断，但不会绕过 Target correctness 实验；
 8. 代码与领域知识如何双向链接、核验、失效和重验证有完整说明；
 9. 所有数字保留样本、基线、指标、证据性质和局限；
-10. 结论只缩小到待实验短名单，不宣布未经 Benchmark 证明的唯一赢家；
+10. 结论只构造待实验的初始 arms，不宣布未经 Benchmark 证明的唯一赢家或候选空间穷尽；
 11. `git diff --check`、链接检查和文档一致性检查通过；
 12. 原始注意事项文件继续保留并纳入提交。
 
@@ -302,6 +304,6 @@ Agent 可以读取所有允许状态并提出 `INFERRED_CANDIDATE`，但不能�
 
 - 成熟 Agent 代码知识系统普遍采用确定性结构或语义工具、渐进检索、高层工具接口和受限上下文，而不是让模型无约束读取全仓或直接操纵底层查询语言；
 - 对多 Target WiFi MAC C 项目，Target-specific 编译事实、来源定位和断言生命周期是所有方案的共同硬门槛；
-- 当前公开证据足以将完整候选缩小为联邦语义服务和 Target-specific CPG 两种主骨架，并分别评估是否增加轻量发现层；
+- 当前公开证据足以构造联邦语义服务和 Target-specific CPG 两个可归因、可证伪的主实验骨架，并分别评估是否增加轻量发现层；这不是候选空间穷尽，Benchmark 可要求拆分、增加或重定义实验臂；
 - 代码与领域知识应通过独立、带证据和生命周期的断言层连接；混合图项目可提供设计参考，但尚不能替代编译事实主干；
 - 当前证据仍不足以在 A0、A1、B0、B1 中确定唯一赢家，最终选择必须由后续 Benchmark 裁决；若效果接近，再以开源、离线、开放格式和可维护性作为 tie-break。

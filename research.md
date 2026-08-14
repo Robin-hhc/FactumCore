@@ -1,4 +1,4 @@
-# 面向多 Target WiFi MAC 驱动的代码知识架构：从独立证据到两类主骨架与查询模式
+# 面向多 Target WiFi MAC 驱动的代码知识架构：从独立证据到可证伪主实验骨架与查询模式
 
 版本：2026-08-14
 
@@ -6,9 +6,9 @@
 
 本文研究一个限定问题：对多芯片、多 Target、Host/Device 分离、宏与函数指针密集的 C WiFi MAC 驱动，怎样为 Agent 组织可核验的代码事实、领域原始来源和按需查询能力。研究不沿用 FactumCore 的既有实现，不预设图数据库、MCP、向量库或某一程序分析产品，也不把本轮未运行的候选实验写成结果。
 
-本文先独立考察四条研究线：代码导航与检索、语义程序分析、代码—领域知识链接、领域知识与 Agent 上下文。跨线综合得到八层参考骨架，并把代码事实流与领域来源流限定为只在共同断言层连接。由程序事实主干和查询拓扑两个主决策推出两类完整骨架：A Agent 原生的联邦语义服务骨架与 B Target-specific CPG 主骨架；再由是否增加轻量发现后核验，得到 A0、A1、B0、B1 四个待测变体。共同断言层统一使用 EXTRACTED、RULE_DERIVED、INFERRED_CANDIDATE、CURATED 四种机器权限，代码版本使用 repository_revision，领域来源版本使用 source_revision_id，Host/Device 通过 Event/Message 而非跨二进制 CALLS 连接。
+本文先独立考察四条研究线：代码导航与检索、语义程序分析、代码—领域知识链接、领域知识与 Agent 上下文。跨线综合得到八层参考骨架，并把代码事实流与领域来源流限定为只在共同断言层连接。由程序事实主干和查询拓扑两个主决策构造两个当前可归因、可证伪的主实验骨架：A Agent 原生的联邦语义服务骨架与 B Target-specific CPG 主骨架；再由是否增加轻量发现后核验，得到 A0、A1、B0、B1 四个初始待测变体。共同断言层统一使用 EXTRACTED、RULE_DERIVED、INFERRED_CANDIDATE、CURATED 四种机器权限；`evidence[]` 是 `CodeEvidence`/`DomainEvidence` 判别联合，代码版本使用 repository_revision，领域来源版本使用 source_revision_id，Host/Device 通过 Event/Message 而非跨二进制 CALLS 连接。
 
-当前结论只把范围缩小到两个主骨架与两种查询模式，尚未确定唯一赢家。四变体都在架构上容纳 WiFiDemo W01–W08，但本轮没有候选工具的 WiFiDemo 实验，实际正确性、Agent 效果、资源、许可与运维均须由 B01–B15 Benchmark 裁决。
+当前结论没有穷尽候选空间，只把现有证据操作化为两个主实验骨架与两种查询模式，尚未确定唯一赢家。四个初始变体都在架构上容纳 WiFiDemo W01–W08，但本轮没有候选工具的 WiFiDemo 实验；B01–B15 不仅裁决实际正确性、Agent 效果、资源、许可与运维，也可以因新决策轴、混杂或硬失败要求拆分、增加或重定义实验臂。
 
 ## 1. 研究问题与贡献
 
@@ -64,7 +64,7 @@ Agent evidence、证据生产者关系和审阅状态是三个可组合字段，
 
 ## 3. WiFiDemo 工作负载与硬门槛
 
-本轮只读取已登记的代码结构案例，没有运行任何候选工具，也没有新增本地测量。W01–W08 的完整源码位置与反例见 [WiFiDemo workload casebook](docs/research/wifidemo-workload-casebook.md)。
+本轮只读取固定 WiFiDemo 快照 `https://github.com/Robin-hhc/WiFiDemo.git` @ `8102322afbe5f81ecf6a35601ac4731ed14feb2d` 的源码/配置结构；核验时 checkout 为 clean，因此 tracked patch SHA-256 与 untracked manifest SHA-256 均为 `not applicable`。没有运行构建或候选工具，也没有新增 compiler-artifact ground truth 或本地测量。W01–W08 的完整源码位置、快照字段、观察/ground-truth 边界与反例见 [WiFiDemo workload casebook](docs/research/wifidemo-workload-casebook.md)。
 
 | 案例 | 已登记的结构事实 | 架构必须表达 |
 |---|---|---|
@@ -80,7 +80,7 @@ Agent evidence、证据生产者关系和审阅状态是三个可组合字段，
 由此得到三个完整方案硬门槛：
 
 1. **Target-specific compilation view**：repository、repository_revision、Target/build profile、编译命令、宏/include、生成物与 source occurrence 可表达；
-2. **可定位源码证据**：代码事实能回到 repository_revision、Target、file:line、生成器和输入 digest，领域声明能回到 source_revision_id 与原始 locator；
+2. **typed 可定位证据**：代码事实以 `CodeEvidence` 回到 repository_revision、TargetOccurrence、SourceArtifact、source span、生成器和输入 digest，不要求领域 `SourceRevision`；领域声明以 `DomainEvidence` 回到 source_revision_id 与 `SourceLocation`；跨域链接按 predicate/status 同时要求两者；
 3. **不确定性治理**：确定性抽取、规则派生、模型候选和人工知识分权，并支持 provenance、冲突、stale/invalid 与重新验证。
 
 ## 4. 四条独立调研主线
@@ -129,7 +129,8 @@ Understand Anything 明确分离确定性结构与 LLM 生成的 architecture/pr
 
 LLM-Wiki 的作者实验在 HotpotQA、MuSiQue、2WikiMultiHopQA 三组各前 500 个样本和 AuthTrace 上统一使用 GLM-5.1；它显示多文档综合收益，但 AuthTrace 单文档问题比 HippoRAG 2 低 2.3 accuracy points，这不是代码任务结论。[[S022](https://arxiv.org/abs/2605.25480)] WiCER 的作者实验覆盖 17 个 RepLiQA 领域、每种条件合计 6,800 个问题，另有 30 篇 Policygenius 文章；blind Wiki compilation 的 catastrophic rate 为 53%–60%，1–2 次 refinement 恢复约 80% 丢失质量，而 80 文档时 full-context 还因 attention dilution 低于 RAG。评估依赖 LLM-as-judge，且不存在代码实体、Target 或编译语义。[[S023](https://arxiv.org/abs/2605.07068)] 这些数字说明 Wiki 是可评估、有损、可重编译的派生资产，而不是原始真源。
 
-Google ADK 与 AWS Agent Toolkit 展示 metadata → instructions → references/tools 的 progressive disclosure；Google 的约 90% baseline context reduction 是 10-Skill 示例算术，不是正确率实验。[[S024/Google](https://developers.googleblog.com/en/developers-guide-to-building-adk-agents-with-skills/)] [[S024/AWS](https://docs.aws.amazon.com/agent-toolkit/latest/userguide/skills.html)] GitHub Copilot Memory 的第一方 A/B 报告 PR merge 90% 对 83%、review positive feedback 77% 对 75%、p<0.00001，但没有公开样本量与任务构成；可借鉴的是 citation、scope、删除和读时核验，不是产品效果外推。[[S025](https://github.blog/ai-and-ml/github-copilot/building-an-agentic-memory-system-for-github-copilot/)]
+Google ADK 与 AWS Agent Toolkit 展示 metadata → instructions → references/tools 的 progressive disclosure，但这些官方指南不提供受控正确性或性能 Benchmark；本文只采用其按需加载设计含义。[[S024/Google](https://developers.googleblog.com/en/developers-guide-to-building-adk-agents-with-skills/)] [[S024/AWS](https://docs.aws.amazon.com/agent-toolkit/latest/userguide/skills.html)]
+GitHub Copilot Memory 的第一方 A/B 报告 PR merge 90% 对 83%、review positive feedback 77% 对 75%、p<0.00001，但没有公开样本量与任务构成；可借鉴的是 citation、scope、删除和读时核验，不是产品效果外推。[[S025](https://github.blog/ai-and-ml/github-copilot/building-an-agentic-memory-system-for-github-copilot/)]
 
 领域上下文的收益具有任务条件。SWE-Bench 5G 的 50 项 paired A/B 中，平均约 350-token 的 3GPP context 使 Claude Sonnet 4 resolve 从 24% 到 30%，Token 平均增加 12%；规格依赖类提升，六类 generic nil/crash 防御任务均无提升。[[S026](https://arxiv.org/abs/2604.26278)] SWE-Skills-Bench 约 565 项任务中，39/49 Skills 没有 pass-rate 提升，平均仅 +1.2%；三个版本不匹配 Skill 最多降低 10%，结果不变时 Token 最高增加 451%。[[S027](https://arxiv.org/abs/2603.15401)]
 
@@ -203,13 +204,13 @@ MCP 是交付协议，向量是候选召回机制，可视化是阅读界面，S
 
 ### 9.1 身份、版本与最短可靠链
 
-共同实体至少包括 Repository、RepositoryRevision、SourceArtifact、TargetProfile、CodeEntity、TargetOccurrence、AnalysisFact、DomainEntity、SourceRevision、SourceLocation、SourceRegistration、Assertion、Evidence 与 ValidationActivity。
+共同实体至少包括 Repository、RepositoryRevision、SourceArtifact、TargetProfile、CodeEntity、TargetOccurrence、AnalysisFact、DomainEntity、SourceRevision、SourceLocation、SourceRegistration、Assertion、Evidence（`CodeEvidence | DomainEvidence` 判别联合）与 ValidationActivity。
 
-代码仓的不可变版本只能写入 repository_revision；规范、设计文档、issue、test、log 等领域来源以独立 source_revision_id 注册。两者不得复用。最短可靠链为：
+代码仓的不可变版本只能写入 repository_revision；规范、设计文档、issue、test、log 等领域来源以独立 source_revision_id 注册。两者不得复用。Assertion 使用 `evidence[]`，最低 evidence kind 由 `predicate_class × machine_status` 决定，而不是强制所有 assertion 都有领域 citation。最短可靠结构为：
 
-DomainEntity → Assertion → TargetOccurrence(repository_revision + Target/build profile + semantic ID + source span) → AnalysisFact(generator + version + config) → Evidence(source_revision_id + locator 或代码 evidence path) → lifecycle。
+DomainEntity/CodeEntity/TargetOccurrence/AnalysisFact → Assertion(`predicate_class` + `evidence[]`) → `CodeEvidence`(`RepositoryRevision` + `TargetOccurrence` + `SourceArtifact` + code source span，optional `AnalysisFact`) 和/或 `DomainEvidence`(`SourceRevision` + `SourceLocation` + quoted digest) → lifecycle。
 
-裸函数名或裸 file-line 不能作为长期链接身份；file:line 适合读时核验，但必须结合创建时 revision、quoted digest、semantic/source anchor 和 Target occurrence。该身份与 provenance 设计分别借鉴 SCIP/Kythe/SWHID/PROV/SARIF，但不声称某个标准已解决全部问题。[[S011](https://github.com/scip-code/scip)] [[S012](https://kythe.io/docs/schema/writing-an-indexer.html)] [[S029](https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/sarif-v2.1.0-os.html)]
+裸函数名或裸 file-line 不能作为长期链接身份；代码 file:line 适合读时核验，但必须结合 `CodeEvidence.repository_revision`、SourceArtifact digest、semantic/source anchor 和 Target occurrence；领域 locator 则结合 `DomainEvidence.source_revision_id`、SourceLocation 与 quoted digest。该身份与 provenance 设计分别借鉴 SCIP/Kythe/SWHID/PROV/SARIF，但不声称某个标准已解决全部问题。[[S011](https://github.com/scip-code/scip)] [[S012](https://kythe.io/docs/schema/writing-an-indexer.html)] [[S029](https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/sarif-v2.1.0-os.html)]
 
 ### 9.2 四种机器权限
 
@@ -217,16 +218,16 @@ DomainEntity → Assertion → TargetOccurrence(repository_revision + Target/bui
 
 | machine_status | 允许生产者 | 能否支持确定性回答 | 最小审计条件 | 变化后的动作 |
 |---|---|---|---|---|
-| EXTRACTED | compiler、parser、indexer、固定配置 analyzer | 可以，但只在输入范围内 | repository_revision、Target/profile、工具/配置、source span | 输入或生成器变化后 stale 并重建 |
-| RULE_DERIVED | 登记且版本化的确定性规则 | 可以，必须返回 rule trace 与作用域 | rule ID/version、match trace、代码与 source_revision_id 证据 | 任一输入变化后 stale、重跑并保留差异 |
-| INFERRED_CANDIDATE | Agent、LLM、embedding、聚类、未审核启发式 | 不可以；只作候选/排序/审核队列 | 方法/模型/prompt/input digest、候选 ID、证据缺口 | 模型/输入/阈值变化后批量作废重算 |
-| CURATED | 授权人工领域维护者/审核者 | 可以，但不能伪装成编译事实 | reviewer/time/reason、原始 SourceRevision/Location、适用 Target/产品范围 | 依赖变化后 stale/contradicted/superseded，保留历史 |
+| EXTRACTED | compiler、parser、indexer、固定配置 deterministic extractor | 可以，但只在输入范围内，不产生跨域语义 | `code_fact` 至少一个 `CodeEvidence`；`domain_statement` 至少一个 `DomainEvidence`。代码事实不要求 `SourceRevision` | 各 evidence kind 的实际输入或生成器变化后 stale 并重建 |
+| RULE_DERIVED | 登记且版本化的确定性规则 | 可以，必须返回 rule trace 与作用域 | rule ID/version、match trace；代码规则需 code evidence，领域规则需 domain evidence，跨域链接需两者 | 任一实际依赖变化后 stale、重跑并保留差异 |
+| INFERRED_CANDIDATE | Agent、LLM、embedding、聚类、未审核启发式 | 不可以；只作候选/排序/审核队列 | 方法/模型/prompt/input digest、候选 ID、实际 `evidence[]` 与 `evidence_gaps` | 模型/输入/阈值变化后批量作废重算 |
+| CURATED | 授权人工领域维护者/审核者 | 可以，但不能伪装成编译事实 | reviewer/time/reason；领域声明需 domain evidence，代码—领域链接同时需 code/domain evidence | 任一实际依赖变化后 stale/contradicted/superseded，保留历史 |
 
 Agent 只能创建 INFERRED_CANDIDATE，不能自行升级为其他三类；确定性工具也只能在其输入和生成器权限内写 EXTRACTED/RULE_DERIVED，不能替代领域审核。Graphify 的项目内标签只是来源项目事实，不覆盖本文四状态合同。[[S021](https://graphify.com/concepts)]
 
 ### 9.3 双向导航、冲突、失效与重验证
 
-从代码到领域：给定 repository_revision、Target/build profile 和 TargetOccurrence，只返回作用域匹配且 active 的 EXTRACTED、RULE_DERIVED、CURATED assertion；候选单列。从领域到代码：给定 Feature/Event stable ID、当前 repository_revision 与 Target，只返回当前有效 occurrence 与原始来源/分析 trace；没有证据时明确返回“当前 Target 无有效代码证据”。
+从代码到领域：给定 repository_revision、Target/build profile 和 TargetOccurrence，只返回具有匹配 `CodeEvidence`、active 且 predicate 为 code-domain link 的 RULE_DERIVED/CURATED assertion；纯 `EXTRACTED code_fact` 只是链接输入，不能自动获得领域语义，候选单列。从领域到代码：给定 Feature/Event stable ID、当前 repository_revision 与 Target，只返回同时具有匹配 code/domain evidence 的当前有效链接、occurrence 与原始来源/分析 trace；没有证据时明确返回“当前 Target 无有效代码证据”。
 
 冲突不能用单一总排序：函数是否在 Target 中存在由当前 compiler/indexer fact 裁决；协议应如何工作由适用版本的权威规范裁决，代码不一致可能是 defect；设计原因由经审核 ADR/人工来源裁决；sound may-analysis 与 runtime observation 可以并存；历史 memory 只能让位于当前 revision 的验证结果。
 
@@ -242,7 +243,7 @@ Host producer 与 Device consumer 属于独立编译视角，不能制造跨二�
 
 A/B 都必须满足第 3 章三个硬门槛，并共享第 1、4–8 层合同。共同 assertion layer、source registry、snapshot consistency、许可证审计，以及 Agent evidence/producer relation/review status 三个证据字段不是 A/B 胜负项。
 
-### 10.2 从四轴收敛为两个主骨架
+### 10.2 从四轴构造当前两个主实验骨架
 
 | 决策轴 | 当前可裁决部分 | 对候选的推导 |
 |---|---|---|
@@ -253,9 +254,9 @@ A/B 都必须满足第 3 章三个硬门槛，并共享第 1、4–8 层合同�
 
 先前所谓“轻量发现 + 编译器核验”不再作为第三个程序事实主骨架：它没有定义强事实最终驻留于何处，只定义查询先由低成本组件生成候选，再回到主骨架核验。因此它被严格降为模式 1；词法、向量、RepoMap、Codebase-Memory、CodeGraph 都只能作为可替换 discovery/rerank 组件。
 
-## 11. 两个完整主骨架
+## 11. 当前两个可证伪主实验骨架
 
-本节是基于前述证据的**架构推断**，不是任何单一来源的第一方结论，也不是 WiFiDemo 实测。
+本节是基于前述证据构造的**架构推断与初始实验设计**，不是任何单一来源的第一方结论，也不是 WiFiDemo 实测，更不是候选空间穷尽证明。B01–B15 可以要求后续拆分、增加或重定义实验臂。
 
 ### 11.1 A — Agent 原生的联邦语义服务骨架
 
@@ -370,9 +371,9 @@ Benchmark 不生成掩盖硬门槛的总分，而按阶段停止：
 
 | 案例 | 固定来源 | 结构相邻性与 ground truth |
 |---|---|---|
-| Zephyr v4.4.0 / 684c9e8 | release [[S031](https://github.com/zephyrproject-rtos/zephyr/releases/tag/v4.4.0)]；build/Kconfig/devicetree [[S032](https://docs.zephyrproject.org/4.4.0/build/index.html)] | board/SoC/Kconfig/devicetree/driver 映射 Target/config；保存 .config、生成 devicetree、compdb/对象 |
-| RIOT 2026.04.01 / 4a70282 | release [[S033](https://github.com/RIOT-OS/RIOT/releases/tag/2026.04.01)]；structure/build [[S034](https://doc.riot-os.org/build-system/build_system_basics/)] | BOARD/CPU/FEATURE/USEMODULE/driver；保存最终 flags、对象和 Make 依赖 |
-| Contiki-NG 5.1 / 2b87baf | release [[S035](https://github.com/contiki-ng/contiki-ng/releases/tag/release%2Fv5.1)]；build/config [[S036](https://docs.contiki-ng.org/en/develop/doc/getting-started/The-Contiki-NG-build-system.html)] | TARGET/BOARD/CPU、arch driver、os/net/mac；保存构建清单与预处理结果 |
+| Zephyr annotated tag v4.4.0 / dereferenced commit `684c9e8f32e4373a21098559f748f06915f950c9` | release [[S031](https://github.com/zephyrproject-rtos/zephyr/releases/tag/v4.4.0)]；build/Kconfig/devicetree [[S032](https://docs.zephyrproject.org/4.4.0/build/index.html)] | board/SoC/Kconfig/devicetree/driver 映射 Target/config；保存 .config、生成 devicetree、compdb/对象 |
+| RIOT annotated tag 2026.04.01 / dereferenced commit `4a70282b1f1ac6e004138b4ada684a4dc4639653` | release [[S033](https://github.com/RIOT-OS/RIOT/releases/tag/2026.04.01)]；structure/build [[S034](https://doc.riot-os.org/build-system/build_system_basics/)] | BOARD/CPU/FEATURE/USEMODULE/driver；保存最终 flags、对象和 Make 依赖 |
+| Contiki-NG lightweight tag release/v5.1（不是 branch）/ commit `2b87baf3ebdde3c8e37ca791d2bc84bfd76c49a4` | release [[S035](https://github.com/contiki-ng/contiki-ng/releases/tag/release%2Fv5.1)]；build/config [[S036](https://docs.contiki-ng.org/en/develop/doc/getting-started/The-Contiki-NG-build-system.html)] | TARGET/BOARD/CPU、arch driver、os/net/mac；保存构建清单与预处理结果 |
 
 三者与 WiFiDemo 结构相邻但不等价；新增案例也必须先登记 fixed commit、许可、结构映射和可构造 gold，不能仅因“是 C 项目”加入。
 
@@ -389,12 +390,12 @@ Benchmark 不生成掩盖硬门槛的总分，而按阶段停止：
 - **C/C++ Target 外推**：Zephyr、RIOT、Contiki-NG 与 WiFiDemo 结构相邻而非同一产品；通用 Python/Java/C# Agent 结果也不能直接外推到宏密集多 Target C。
 - **Ground truth 不完美**：compiler artifact 能证明编译存在与宏真值，不能自动证明 Feature/Flow/Protocol 意义；Event/Message 和人工领域链接仍需多源或动态证据。
 - **许可证变化**：仓库主许可证不等于依赖、engine、模型、数据、容器和再分发路径许可；B15 必须在实验时重新快照。
-- **架构推断偏差**：八层、A/B 与 0/1 是本文综合框架，不是论文或项目直接给出的分类；B01–B15 可推翻其成本、正确性或完整性假设。
+- **架构推断与候选空间偏差**：八层、A/B 与 0/1 是本文综合框架，不是论文或项目直接给出的分类，也不证明候选空间穷尽；B01–B15 可推翻其成本、正确性或完整性假设，并要求拆分、增加或重定义实验臂。
 
 ## 16. 结论
 
 独立调研没有支持“一个 MCP、一个图数据库、一个向量库或一个 CPG 产品即可成为完整 WiFi MAC 知识架构”。共同规律要求确定性入口、低成本发现与高成本核验分工、source-grounded progressive disclosure，以及派生 Wiki/Skill/memory 回到当前代码和原始资料验证；高层任务工具相对 raw DSL 的收益只是 B10 待验证设计原则，不是跨任务一般规律。
 
-这些规律先导出八层骨架和共同断言层，再把真正的架构差异限制为程序事实主干与查询拓扑。当前范围因此缩小为两个主骨架：A Agent 原生的联邦语义服务骨架、B Target-specific CPG 主骨架；以及两种模式：0 直接查询、1 轻量发现后核验，组合为 A0、A1、B0、B1。
+这些规律先导出八层骨架和共同断言层，再以程序事实主干与查询拓扑作为当前可控决策轴，构造两个可归因、可证伪的主实验骨架：A Agent 原生的联邦语义服务骨架、B Target-specific CPG 主骨架；以及两种模式：0 直接查询、1 轻量发现后核验，组合为 A0、A1、B0、B1。这是初始实验设计而非候选空间穷尽；Benchmark 可以依据新证据拆分、增加或重定义实验臂。
 
 四变体都在设计上容纳 W01–W08，并共享 repository_revision/source_revision_id 分离、EXTRACTED/RULE_DERIVED/INFERRED_CANDIDATE/CURATED 权限、Event/Message 跨 Host/Device、可定位证据与生命周期合同。但架构容纳不是工具通过：当前没有任何候选的 WiFiDemo 实测证据，唯一赢家仍为 **unknown / benchmark required**。下一阶段必须按 B01–B15 先淘汰 Target、来源或权限硬失败，再分别比较事实准确性、检索效率、最终 Agent 正确性、资源、运维与许可；只有结果无决定性差异时，开源与可复现性才作为 tie-break。

@@ -1,6 +1,6 @@
 # 来源与证据台账
 
-访问截止日期：2026-08-13
+访问截止日期：2026-08-14
 
 ## 1. 用途
 
@@ -551,10 +551,10 @@
 - 研究对象：Skill metadata、按需 instructions/references、scripts 与 MCP/API 工具分层
 - 样本与语言：官方架构指南与 AWS 产品工作流；没有 WiFi MAC Benchmark
 - 模型/Agent：Google ADK Agent；AWS-compatible coding agents
-- 对照基线：monolithic prompt 与 progressive disclosure 的估算比较
-- 指标：Google 示例的基线 context token 估算；无任务正确率
-- 可引用声明：Google 将 Skill 分为约 100-token metadata、少于 5,000-token instructions 和按需 resources，10 个 Skill 的示例把基线 context 从约 10,000 降到约 1,000 token；AWS 将 `SKILL.md`、references、deterministic scripts 与运行时 MCP/API 分开，并在任务结束后释放 Skill 内容。
-- 数字与语境：90% 是架构示例的 token 算术，不是受控 Agent 效果实验。
+- 对照基线：none；官方指南解释 progressive disclosure 工作流，不构成受控对照
+- 指标：none；不把指南中的示例 token 算术登记为效果或性能测量
+- 可引用声明：Google 将 Skill 分为先加载 metadata、再按需加载 instructions 与 resources；AWS 将 `SKILL.md`、references、deterministic scripts 与运行时 MCP/API 分开，并在任务结束后释放 Skill 内容。
+- 数字与语境：未登记效果或性能数字；该记录只支持 progressive disclosure 的设计含义。
 - 限制：官方资料证明工业设计选择和接口边界，不证明领域 Skill 被正确选择、内容当前有效或能改善 WiFi C 任务。
 - WiFi MAC 相关性：间接架构证据
 - 正文位置：按需上下文、Skill/Reference/Tool 分层
@@ -689,7 +689,7 @@
 - 原始 URL：https://github.com/zephyrproject-rtos/zephyr/releases/tag/v4.4.0；https://github.com/zephyrproject-rtos/zephyr
 - 独立属性：project-primary
 - 研究对象：大型嵌入式 C RTOS、驱动与多板/多架构构建
-- 固定版本：`v4.4.0`，release commit `684c9e8`
+- 固定版本：annotated tag `refs/tags/v4.4.0`；tag object `4f50f0ba8905f27b2f60123d0ee0934fda6fe134`，dereferenced commit `684c9e8f32e4373a21098559f748f06915f950c9`
 - 许可证：Apache-2.0；仓库含 `LICENSES`，具体样本依赖仍需扫描
 - 可引用声明：仓库以 C 为主，包含 `arch`、`boards`、`drivers`、`subsys`、Kconfig、devicetree 与 CMake/west 构建；4.4.0 默认最低 C17，并新增 Wi-Fi P2P 支持。
 - 限制：体量和构建矩阵远大于 WiFiDemo；不能把整个仓库作为单一 Benchmark 单元。
@@ -721,7 +721,7 @@
 - 原始 URL：https://github.com/RIOT-OS/RIOT/releases/tag/2026.04.01；https://github.com/RIOT-OS/RIOT
 - 独立属性：project-primary
 - 研究对象：模块化嵌入式 C OS、board/CPU/driver/network stack
-- 固定版本：`2026.04.01`，release commit `4a70282`
+- 固定版本：annotated tag `refs/tags/2026.04.01`；tag object `56ab5471996e422657d7fac81bd76da3b07378df`，dereferenced commit `4a70282b1f1ac6e004138b4ada684a4dc4639653`
 - 许可证：LGPL-2.1；外部 source/package 可有不同许可，样本依赖需扫描
 - 可引用声明：RIOT 以 board、CPU、driver、sys/pkg 和 module 分层，构建由 BOARD、USEMODULE、FEATURES 与 Makefile 依赖解析决定。
 - 限制：FEATURE 与 MODULE 并非一一对应；不能用目录或名称直接生成领域事实。
@@ -753,7 +753,7 @@
 - 原始 URL：https://github.com/contiki-ng/contiki-ng/releases/tag/release%2Fv5.1；https://github.com/contiki-ng/contiki-ng
 - 独立属性：project-primary
 - 研究对象：低功耗网络嵌入式 C OS、MAC/network stack、platform/CPU/device drivers
-- 固定版本：`release/v5.1`，release commit `2b87baf`
+- 固定版本：lightweight tag `refs/tags/release/v5.1`（虽含 `/`，不是 branch）；直接指向 commit `2b87baf3ebdde3c8e37ca791d2bc84bfd76c49a4`，没有 annotated-tag dereference
 - 许可证：BSD-3-Clause 为默认；例外文件/子模块需逐项扫描
 - 可引用声明：仓库将 OS/network stack 放在 `os`，硬件相关 CPU/device/platform driver 放在 `arch`，examples/tests 与工具分离。
 - 限制：低功耗 802.15.4 网络栈与 Wi-Fi MAC 不同；只作为结构相邻案例。

@@ -4,9 +4,9 @@
 
 ## 1. 目的与边界
 
-本文件把证据矩阵中的 `architecturally accommodated` 和 `unknown / benchmark required` 转成可执行问题。当前研究没有运行这些实验，也不把计划写成结果。Benchmark 的目标不是生成一个掩盖硬门槛的总分，而是回答：A Agent 原生的联邦语义服务骨架与 B Target-specific CPG 主骨架是否能产生正确、可追溯、Target-aware 的代码事实；共同 assertion layer 是否能可靠连接领域知识；0/1 查询模式是否提高 Agent 最终答案，并在什么成本下成立。
+本文件把证据矩阵中的 `architecturally accommodated` 和 `unknown / benchmark required` 转成可执行问题。当前研究没有运行这些实验，也不把计划写成结果。Benchmark 的目标不是生成一个掩盖硬门槛的总分，而是回答：由当前证据构造的 A Agent 原生联邦语义服务与 B Target-specific CPG 两个主实验骨架能否产生正确、可追溯、Target-aware 的代码事实；共同 assertion layer 是否能可靠连接领域知识；0/1 查询模式是否提高 Agent 最终答案，并在什么成本下成立。
 
-固定裁决对象如下：
+当前初始裁决对象如下；它们是可归因、可证伪的实验起点，不是候选空间穷尽证明。若 B01–B15 暴露混杂变量、共享硬失败或新的独立决策轴，Benchmark 可以在预注册下一轮前拆分、增加或重定义实验臂，并版本化记录原因；单轮成对比较一旦开始，其 arm definition 仍须冻结。
 
 - **程序事实主干**：A 与 B；共同第 1、4–8 层不是胜负项。
 - **查询模式**：0 直接查询，1 轻量发现后核验；模式 1 不是第三个事实主干。
@@ -56,7 +56,7 @@
 | B05 Host/Device Event 路径 | A、B + 共同 assertion layer | send/receive/dispatch/handler 能连接成带方向、侧别与证据的 Event 路径 | W06 的消息 ID、发送/接收 API、dispatch 和 handler | 枚举/表项、direct/indirect call、人工事件序列；必要时日志/trace | event-edge P/R/F1、方向/Side 准确率、完整路径率 | 修改 event ID 或交换 handler，检查旧链接失效 | 领域规则编写与重验证时间 | A/B 提供路径证据的质量；共同 assertion 的规则/推断边界与动态证据需求 |
 | B06 共享代码与符号身份 | A、B；SCIP/Kythe/CPG 与 SWHID/SARIF 风格 identity | shared source 在不同 Target 下既可合并 source identity，又能隔离 occurrence/semantic facts | W01 共享文件、W08 同名函数 | content/revision ID、compiler occurrence、人工等价类 | merge/split error、跨 revision retention、rename/move match accuracy | 仅移动文件、仅改注释、仅改宏、语义改动四种 patch | ID 计算与迁移成本 | A/B 的 source identity、Target occurrence 与跨 revision 增量策略 |
 | B07 日志到代码再到领域 | A0/A1/B0/B1；保留 lexical 与 no-graph 基线 | exact log/宏名由词法优先；模式 1 只有在轻量发现提高召回且最终回到主干代码证据时才成立 | W07 日志串与 W08 问题描述 | log literal/source、调用者、Target、人工关联的 Event/Feature | Recall@k、MRR、context yield、错误 Target、最终答案正确率 | 删除字面日志、同义改写问题、加入相似干扰日志 | 索引、查询、Token/工具调用 | 0/1 查询模式在 A/B 上的净收益；向量或轻量图是否值得保留 |
-| B08 领域标签链接 | 共同 assertion layer；A/B 仅作为等价代码证据输入 | Feature/Chip/Side/Event 链接可区分 `EXTRACTED`、`RULE_DERIVED`、`INFERRED_CANDIDATE`、`CURATED`，且支持双向导航与拒答 | W01–W08 的最小领域标签及原始设计注意事项 | 双人标注 typed assertions；分歧保留 conflict，不强制多数投票 | link P/R/F1、类型准确率、provenance 完整率、calibration、abstention | 加入无证据标签、同名领域词和过时设计声明 | 标注/审核时间、查询 Token | 共同领域 schema、Agent/LLM 候选权限和人工审核边界；不裁决 A/B |
+| B08 领域标签链接 | 共同 assertion layer；A/B 仅作为等价代码证据输入 | Feature/Chip/Side/Event 链接可区分 `EXTRACTED`、`RULE_DERIVED`、`INFERRED_CANDIDATE`、`CURATED`，并按 predicate/status 强制 `CodeEvidence`、`DomainEvidence` 或两者，且支持双向导航与拒答 | W01–W08 的最小领域标签及原始设计注意事项 | 双人标注 typed assertions 与 `evidence[]` 判别联合；代码事实只标 code evidence，领域声明只标 domain evidence，跨域链接标两者；分歧保留 conflict | link P/R/F1、evidence-kind/类型准确率、provenance 完整率、calibration、abstention | 加入无证据标签、同名领域词、缺少一侧 evidence 的跨域链接和过时设计声明 | 标注/审核时间、查询 Token | 共同领域 schema、Agent/LLM 候选权限和人工审核边界；不裁决 A/B |
 | B09 链接失效与修复 | 共同 assertion layer；在 A/B 代码事实输入上各重放一次 | 代码/Target/`repository_revision` 或领域 `source_revision_id` 变化能精准标 stale/invalid，并避免未受影响链接全量重审 | B02/B05/B06 的 patch 序列和断言图 | 预期受影响 assertion 集、重建后的 compiler facts | invalidation precision/recall、错误沿用率、自动修复正确率、重验范围 | revert、rename、Target 删除、宏翻转、evidence 行移动 | 增量时延、重验调用和人工审核量 | 共同 assertion lifecycle、依赖追踪及代码/来源 revision 分离；不裁决 A/B |
 | B10 Agent 端到端 | A0/A1/B0/B1 及 no-graph/lexical 基线 | 模式 1 只有在最终回答引用正确 Target 和证据、且效率净收益覆盖错误候选与核验成本时才有价值 | W01–W08 改写为固定问答/诊断/变更影响任务 | assertion-style expected facts、允许答案集合、执行式 verifier；保留每步高层工具与 raw DSL 轨迹 | 高层工具选择正确率、无效工具调用、原始 DSL 退回次数（raw DSL fallback）、结果截断、abstention、Token、工具调用、task pass、evidence completeness、unsupported claim、Target leakage、最终任务正确率 | 对 gold fact 做单点变更，答案必须同步变化 | 每臂至少多次运行的模型费用和方差；区分 discovery、核验与 fallback 成本 | 0/1 查询模式的净收益、高层接口是否足够、检索质量与最终推理质量是否脱节 |
 
@@ -76,13 +76,13 @@ B10 在运行前为每个任务发布机器可读的 scorer annotation；annotat
 
 ## 4. 外部 C 案例集
 
-外部仓库只补充结构多样性，不替代 WiFiDemo。开始实验时若上游 tag 与下列 hash 不一致，以 hash 为准并记录原因。
+外部仓库只补充结构多样性，不替代 WiFiDemo。下列 ref/object 由 2026-08-14 对官方 GitHub 仓库执行 `git ls-remote --tags` 核验；annotated tag 固定 dereferenced commit，lightweight tag 固定其直接 commit。开始实验时若上游 ref 与下列 commit 不一致，以完整 commit 为准并记录原因。
 
 | 数据集 | 固定版本 | 许可证边界 | 与 WiFiDemo 的结构映射 | 可构造 Ground truth | 适合任务 |
 |---|---|---|---|---|---|
-| Zephyr | `v4.4.0` / `684c9e8` [S031] | Apache-2.0；扫描 `LICENSES` 与模块依赖 | board/SoC/Kconfig/devicetree/driver/subsystem 对应 Target/Chip/config/driver；规模更大 | 构建生成 `.config`、devicetree、compdb/对象；固定 board/sample 后人工标注 driver/API/Event [S032] | Target/宏、生成配置、API→driver、Wi-Fi/网络事件、跨模块调用 |
-| RIOT | `2026.04.01` / `4a70282` [S033] | RIOT 主体 LGPL-2.1；外部 source/package 单审 | BOARD/CPU/FEATURE/USEMODULE/driver/sys 对应 Chip/Target/feature/module；radio driver 相邻 | `info-modules`、`info-build`、最终 CFLAGS、对象和 Make 依赖；FEATURE 不得自动等同 MODULE [S034] | Target/module 选择、feature-domain 链接、driver abstraction、反例消歧 |
-| Contiki-NG | `release/v5.1` / `2b87baf` [S035] | 默认 BSD-3-Clause；例外文件和 Cooja submodule 单审 | TARGET/BOARD/CPU、`arch` driver、`os/net/mac`、MAKE_MAC 对应平台/侧别/MAC 实现选择 | Make 构建清单、`%.e` 预处理结果、TARGET/BOARD 与 MAKE_MAC；人工标注 MAC driver path [S036] | MAC 选择、条件编译、platform-independent/arch-specific 分层、Event/packet path |
+| Zephyr | annotated tag `v4.4.0`；tag object `4f50f0ba8905f27b2f60123d0ee0934fda6fe134`；dereferenced commit `684c9e8f32e4373a21098559f748f06915f950c9` [S031] | Apache-2.0；扫描 `LICENSES` 与模块依赖 | board/SoC/Kconfig/devicetree/driver/subsystem 对应 Target/Chip/config/driver；规模更大 | 构建生成 `.config`、devicetree、compdb/对象；固定 board/sample 后人工标注 driver/API/Event [S032] | Target/宏、生成配置、API→driver、Wi-Fi/网络事件、跨模块调用 |
+| RIOT | annotated tag `2026.04.01`；tag object `56ab5471996e422657d7fac81bd76da3b07378df`；dereferenced commit `4a70282b1f1ac6e004138b4ada684a4dc4639653` [S033] | RIOT 主体 LGPL-2.1；外部 source/package 单审 | BOARD/CPU/FEATURE/USEMODULE/driver/sys 对应 Chip/Target/feature/module；radio driver 相邻 | `info-modules`、`info-build`、最终 CFLAGS、对象和 Make 依赖；FEATURE 不得自动等同 MODULE [S034] | Target/module 选择、feature-domain 链接、driver abstraction、反例消歧 |
+| Contiki-NG | lightweight tag `release/v5.1`（不是 branch）；commit `2b87baf3ebdde3c8e37ca791d2bc84bfd76c49a4` [S035] | 默认 BSD-3-Clause；例外文件和 Cooja submodule 单审 | TARGET/BOARD/CPU、`arch` driver、`os/net/mac`、MAKE_MAC 对应平台/侧别/MAC 实现选择 | Make 构建清单、`%.e` 预处理结果、TARGET/BOARD 与 MAKE_MAC；人工标注 MAC driver path [S036] | MAC 选择、条件编译、platform-independent/arch-specific 分层、Event/packet path |
 
 若上述仓库仍不能覆盖某项 C 结构，可增加单一目的的案例，例如 S026 已冻结的 Open5GS 规格依赖任务；新增项必须先登记 fixed commit、许可证、结构映射和可构造 gold，不能因为“是 C 项目”就加入。
 
@@ -98,7 +98,7 @@ B10 在运行前为每个任务发布机器可读的 scorer annotation；annotat
 
 ## 6. 执行顺序与停止条件
 
-1. **Phase A：ground truth** — B01–B06、B11。分别裁决 A/B 的事实主干与 Target correctness；若候选无法稳定绑定 Target、源码证据或 `repository_revision`，或 B02 预登记硬门槛 assertion 中任一宏值/active branch 与 compiler ground truth 不一致、任一其他 Target 的分支被返回为当前 Target active fact，则记为硬失败并停止其“完整方案”评估，但可继续作为局部组件。
+1. **Phase A：ground truth** — B01–B06、B11。分别裁决 A/B 的事实主干与 Target correctness；若候选无法稳定绑定 Target、源码证据或 `repository_revision`，或 B02 预登记硬门槛 assertion 中任一宏值/active branch 与 compiler ground truth 不一致、任一其他 Target 的分支被返回为当前 Target active fact，则记为硬失败并停止该主实验臂的后续评估，但可继续作为局部组件或触发下一轮 arm 拆分/重定义。
 2. **Phase B：知识链接** — B08–B09、B13。只验证共同 assertion layer；若 `INFERRED_CANDIDATE` 不能保守 abstain、失效或回溯来源，不允许进入确定性事实视图。
 3. **Phase C：Agent 与成本** — B07、B10、B12、B14。只有前两阶段通过后，才比较 0/1 查询模式、CPG/LLVM/deep provider 的实际效果与资源。
 4. **Phase D：采用审计** — B15。审计 A0/A1/B0/B1 的具体组合和替代路径；许可证或离线复现失败可以排除具体实现，但不能自动否定同一架构族。

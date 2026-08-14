@@ -71,9 +71,11 @@
 | 状态 | 数量 |
 |---|---:|
 | discovered | 0 |
-| primary-read | 18 |
-| claim-verified | 12 |
+| primary-read | 26 |
+| claim-verified | 14 |
 | rejected | 0 |
+
+按来源记录的非互斥类型统计如下：论文 15；AI 公司官方材料 5；开源项目材料 30。带论文和官方仓库的同一记录只计为一个来源编号，样本与数字不跨材料重复累计。
 
 ## 8. 已登记来源
 
@@ -772,3 +774,95 @@
 - 限制：配置系统多由 Makefile 和 header 共同决定，需要以构建产物为准。
 - WiFi MAC 相关性：高
 - 正文位置：后续 Benchmark ground truth
+
+### S037 — Serena 官方 README 与第一方 Agent 评估
+
+- 状态：primary-read
+- 发布日期：持续更新；评估文档版权 2025
+- 访问日期：2026-08-14
+- 来源类型：项目官方功能说明、项目第一方 Benchmark
+- 发布者/作者：Oraios AI / Serena contributors
+- 原始 URL：https://github.com/oraios/serena；https://oraios.github.io/serena/04-evaluation/000_evaluation-intro.html
+- 独立属性：first-party
+- 研究对象：通过 MCP 向编码 Agent 提供 LSP/IDE 后端的符号级检索、编辑与重构
+- 项目/论文版本：访问快照为 GitHub `main` 与 Serena Evaluation 文档；未把滚动仓库快照写成固定 release
+- 样本与语言：官方展示大型 Python 库、中型 Java 项目和大型多语言 monorepo；README 说明 LSP 后端支持 C/C++，评估页按导航、小改动、大改动、跨文件重构和工作流效果分类，未公开可供横向统计的固定样本总数
+- 模型/Agent：Claude Code（Opus 4.6）、Codex（GPT-5.4）、Copilot CLI（GPT-5.4）等官方展示配置；实际任务由 Agent 同时使用 Serena 与内建工具完成
+- 对照基线：同一 Agent 的内建文件、文本搜索和 shell 工具；不是独立的固定 Benchmark 基线
+- 指标：Agent 对工具是否增加能力、适用但无改进、或超出范围的任务级自评；记录调用数、payload 大小和前置步骤，但不登记可比较的准确率
+- 可引用声明：Serena 以 MCP 接入 Agent，提供符号级导航；LSP 后端覆盖 C/C++，并支持 find symbol、find declaration 和 find referencing symbols 等能力。其公开评估可在其他项目/Agent 上重跑，但属于项目第一方的 Agent 自评，不是独立固定 Benchmark。
+- 数字与语境：官方 README 将评估描述为约 20 项日常编码任务，并展示跨文件 rename、move 与 reference lookup 的工作流反馈；该描述不构成跨项目正确率、速度或成本的受控统计。
+- 限制：LSP 能力受具体语言服务器限制，README 也指出部分语言的 implementation/declaration 查询有限制；第一方 Agent 自评可能受提示、项目和 Agent 配置影响。MCP 接入及符号导航不证明 WiFi C 的 Target、宏或 Host/Device 语义准确率。
+- WiFi MAC 相关性：间接；可借鉴 Agent 的符号导航工具层，不能替代 Target-specific 编译事实层
+- 适用骨架层：Agent 工具适配层（符号导航与编辑）
+- Agent 证据等级：第一方、可重跑的 Agent 自评；只证明接口与可复现实验方法，不证明独立效果
+- 正文位置：第 4 章 Agent 代码导航接口、第 7 章 Agent 工具评估边界
+
+### S038 — Sourcegraph MCP 与 SCIP 官方材料
+
+- 状态：primary-read
+- 发布日期：持续更新；访问快照 2026-08-14
+- 访问日期：2026-08-14
+- 来源类型：公司官方实践、项目官方功能说明
+- 发布者/作者：Sourcegraph；scip-code community
+- 原始 URL：https://sourcegraph.com/mcp；https://github.com/sourcegraph/scip
+- 独立属性：company-practice；SCIP 部分为 first-party open-source project
+- 研究对象：以 MCP 为 Agent 提供跨仓代码检索/导航，以及语言无关的源码索引交换协议
+- 项目/论文版本：Sourcegraph MCP 产品页与 SCIP GitHub `main` 访问快照；SCIP GitHub URL 当前重定向至 `scip-code/scip`
+- 样本与语言：Sourcegraph 产品页展示公开开源仓的检索示例；SCIP 为语言无关协议，官方列出 scip-clang 可产出 C/C++ 索引；两页均未提供 WiFi MAC 效果样本
+- 模型/Agent：任意 MCP-aware Agent；产品页列出 Codex、Claude Code、Amp、Cursor 等兼容客户端
+- 对照基线：none；产品页的 Code Finder 相对时间/成本图不作为本研究候选效果排序证据
+- 指标：none；功能页说明的检索、导航与协议接口不是 Agent 任务正确率
+- 可引用声明：Sourcegraph MCP 向 Agent 暴露 search、read file、go-to-definition、find references、diffs 与 history 等操作。SCIP 是用于索引源码、支持 definition/reference/implementation 导航的语言无关开放协议，带公开 Protobuf schema、CLI 和 bindings；Sourcegraph 产品开放性与 SCIP 的开放代码智能表示应分别描述。
+- 数字与语境：不登记产品页的相对时间或成本数字；页面没有公开其任务集、模型和可比实验细节，不能据此证明 MCP 或 SCIP 改善 Agent 效果。
+- 限制：Sourcegraph MCP 是产品检索层而非开放的全量静态分析引擎；SCIP 主要编码代码导航信息，不提供 CFG、dataflow、taint、领域实体、Target occurrence 或 Agent 效果证明。MCP 可调用不等于效果已经被证明。
+- WiFi MAC 相关性：间接；可作为代码导航协议/Agent 检索接口参考
+- 适用骨架层：代码导航交换层（SCIP）与 Agent 检索工具层（MCP）
+- Agent 证据等级：功能接口证据；无公开、可用于本研究排序的 Agent 效果实验证据
+- 正文位置：第 4 章代码导航接口与交换格式、第 7 章待测 Agent 检索
+
+### S039 — codebadger / Bridging Code Property Graphs and Language Models for Program Analysis
+
+- 状态：claim-verified
+- 发布日期：2026-03-25（arXiv v1；仓库说明论文已被 ICSE 2026 Software Vulnerability Management Workshop 接收）
+- 访问日期：2026-08-14
+- 来源类型：论文、开源项目官方功能说明
+- 发布者/作者：Ahmed Lekssays；Lekssays/codebadger
+- 原始 URL：https://arxiv.org/abs/2603.24837；https://github.com/lekssays/codebadger
+- 独立属性：author-evaluation；开源材料为 first-party
+- 研究对象：把 Joern Code Property Graph 封装为供 LLM/Agent 调用的 MCP 程序分析服务
+- 项目/论文版本：arXiv:2603.24837v1；仓库 `main` 访问快照
+- 样本与语言：论文的三个真实案例为 8,000-method 的 GGML 代码库、libtiff 与 libxml2；仓库声明 Joern 前端覆盖 Java、C/C++、JavaScript、Python、Go、Kotlin、C# 等，三案例不是大规模受控 Benchmark
+- 模型/Agent：Claude Sonnet 4.5；GitHub Copilot Agent 负责编排 MCP 调用。论文未提供可用于跨工具排序的统一受控模型、提示和预算矩阵
+- 对照基线：none registered for ranking；论文是三个 case study，不把案例与未报告的系统基线比较
+- 指标：案例结果（8,000-method 导航审计、libtiff 缓冲区溢出、libxml2 CVE-2025-6021 patch）；不是 aggregate accuracy、precision 或 recall
+- 可引用声明：codebadger 把 Joern CPG 封装为高层 MCP 工具，允许 Agent/LLM 使用程序切片、污点跟踪、数据依赖和语义导航，而无需直接生成复杂 CPG 查询；论文报告 GGML、libtiff 与 libxml2 三个真实案例。
+- 数字与语境：8,000 是论文第一个案例中代码库的方法数；另两个案例分别是 libtiff 的此前未报告缓冲区溢出和 libxml2 中 CVE-2025-6021 整数溢出的首次正确 patch。它们是作者案例结果，不是大规模、受控的优越性证明。
+- 限制：案例数量为三，论文/仓库作者与实现相同；不公开 WiFi MAC、多 Target C、宏配置隔离、Host/Device 边界或领域问答的 accuracy。Joern CPG 的查询封装为 MCP 只证明可用接口，不能替代 Target-specific CPG 工件验证。
+- WiFi MAC 相关性：间接；说明 CPG 可经高层工具提供给 Agent，深层程序事实仍须按 Target 生成和核验
+- 适用骨架层：Target-local CPG 分析层的 Agent 工具封装层
+- Agent 证据等级：作者论文的三案例；证明可行性与接口形态，不证明通用 Agent 效果
+- 正文位置：第 4 章 CPG—Agent 适配、第 7 章 CPG 工具层待测项
+
+### S040 — QLCoder: A Query Synthesizer For Static Analysis of Security Vulnerabilities
+
+- 状态：claim-verified
+- 发布日期：2025-11-11；当前 arXiv v4 修订于 2026-03-25
+- 访问日期：2026-08-14
+- 来源类型：论文、开源项目官方功能说明
+- 发布者/作者：Claire Wang、Ziyang Li、Saikat Dutta、Mayur Naik；neuralprogram/qlcoder
+- 原始 URL：https://arxiv.org/abs/2511.08462；https://github.com/neuralprogram/qlcoder
+- 独立属性：author-evaluation；开源材料为 first-party
+- 研究对象：由 CVE metadata 驱动、带执行反馈的 Agentic CodeQL 漏洞查询合成
+- 项目/论文版本：arXiv:2511.08462v4；仓库 `main` 访问快照，README 指明论文使用 CodeQL 2.22.2
+- 样本与语言：176 个已有 CVE、111 个 Java 项目；不含 WiFi MAC C 项目
+- 模型/Agent：基于 Claude Code agent framework；LLM 在合成环中通过自定义 MCP 与 CodeQL LSP（语法指导）及 RAG 数据库（查询/文档语义检索）交互
+- 对照基线：仅使用 Claude Code 的查询合成
+- 指标：正确查询率；正确定义为查询在 vulnerable version 检出该 CVE、在 patched version 不检出
+- 可引用声明：QLCoder 在 176 个 CVE、111 个 Java 项目上报告 53.4% 正确查询，对照 Claude Code 为 10%；该结果支持 Agent 结合 LSP/CodeQL 查询合成与执行反馈的价值，不外推为 WiFi C 项目的代码理解准确率。
+- 数字与语境：53.4% 和 10% 都以 CVE 查询在易受攻击版本检出、修复版本不检出为分母条件；数据来自同一作者团队的 176-CVE/111-Java-project 实验，不能与导航、检索或 CPG accuracy 混合。
+- 限制：论文评估 Java 漏洞查询合成而非 C/C++ 代码理解、WiFi MAC 问答、Target/macro 解析或跨二进制事件建模；作者评估不是独立复现。仓库 README 的 `--build-mode=none` 数据库构造也不能证明真实编译 Target 语义。
+- WiFi MAC 相关性：间接但强方法学证据；适合“Agent 生成查询必须受确定性执行反馈约束”的评估设计
+- 适用骨架层：Agent 查询合成与确定性验证闭环；不作为 WiFi C 代码事实层
+- Agent 证据等级：作者论文的受控对照；结果仅限 CVE/Java/CodeQL 查询合成任务
+- 正文位置：第 7 章 Agent+分析工具闭环、第 9 章外部有效性边界

@@ -785,7 +785,7 @@
 - 原始 URL：https://github.com/oraios/serena；https://oraios.github.io/serena/04-evaluation/000_evaluation-intro.html
 - 独立属性：first-party
 - 研究对象：通过 MCP 向编码 Agent 提供 LSP/IDE 后端的符号级检索、编辑与重构
-- 项目/论文版本：访问快照为 GitHub `main` 与 Serena Evaluation 文档；未把滚动仓库快照写成固定 release
+- 项目/论文版本：Serena GitHub 访问时 `main` HEAD 为不可变 commit `27644053ada77f3492be845c85f287dc26052694`；评估文档为 2026-08-14 访问快照，未把滚动文档写成固定 release
 - 样本与语言：官方展示大型 Python 库、中型 Java 项目和大型多语言 monorepo；README 说明 LSP 后端支持 C/C++，评估页按导航、小改动、大改动、跨文件重构和工作流效果分类，未公开可供横向统计的固定样本总数
 - 模型/Agent：Claude Code（Opus 4.6）、Codex（GPT-5.4）、Copilot CLI（GPT-5.4）等官方展示配置；实际任务由 Agent 同时使用 Serena 与内建工具完成
 - 对照基线：同一 Agent 的内建文件、文本搜索和 shell 工具；不是独立的固定 Benchmark 基线
@@ -808,7 +808,7 @@
 - 原始 URL：https://sourcegraph.com/mcp；https://github.com/sourcegraph/scip
 - 独立属性：company-practice；SCIP 部分为 first-party open-source project
 - 研究对象：以 MCP 为 Agent 提供跨仓代码检索/导航，以及语言无关的源码索引交换协议
-- 项目/论文版本：Sourcegraph MCP 产品页与 SCIP GitHub `main` 访问快照；SCIP GitHub URL 当前重定向至 `scip-code/scip`
+- 项目/论文版本：Sourcegraph MCP 产品页为 2026-08-14 访问快照（产品页不伪造仓库 commit）；SCIP GitHub URL 当前重定向至 `scip-code/scip`，访问时 `main` HEAD 为不可变 commit `5890b2ac1c0970c5606b71c833b733cffd091c90`
 - 样本与语言：Sourcegraph 产品页展示公开开源仓的检索示例；SCIP 为语言无关协议，官方列出 scip-clang 可产出 C/C++ 索引；两页均未提供 WiFi MAC 效果样本
 - 模型/Agent：任意 MCP-aware Agent；产品页列出 Codex、Claude Code、Amp、Cursor 等兼容客户端
 - 对照基线：none；产品页的 Code Finder 相对时间/成本图不作为本研究候选效果排序证据
@@ -831,7 +831,7 @@
 - 原始 URL：https://arxiv.org/abs/2603.24837；https://github.com/lekssays/codebadger
 - 独立属性：author-evaluation；开源材料为 first-party
 - 研究对象：把 Joern Code Property Graph 封装为供 LLM/Agent 调用的 MCP 程序分析服务
-- 项目/论文版本：arXiv:2603.24837v1；仓库 `main` 访问快照
+- 项目/论文版本：arXiv:2603.24837v1；codebadger GitHub 访问时 `main` HEAD 为不可变 commit `76417d2cd635060b5512a09d88d7657b903bb73e`
 - 样本与语言：论文的三个真实案例为 8,000-method 的 GGML 代码库、libtiff 与 libxml2；仓库声明 Joern 前端覆盖 Java、C/C++、JavaScript、Python、Go、Kotlin、C# 等，三案例不是大规模受控 Benchmark
 - 模型/Agent：Claude Sonnet 4.5；GitHub Copilot Agent 负责编排 MCP 调用。论文未提供可用于跨工具排序的统一受控模型、提示和预算矩阵
 - 对照基线：none registered for ranking；论文是三个 case study，不把案例与未报告的系统基线比较
@@ -854,7 +854,7 @@
 - 原始 URL：https://arxiv.org/abs/2511.08462；https://github.com/neuralprogram/qlcoder
 - 独立属性：author-evaluation；开源材料为 first-party
 - 研究对象：由 CVE metadata 驱动、带执行反馈的 Agentic CodeQL 漏洞查询合成
-- 项目/论文版本：arXiv:2511.08462v4；仓库 `main` 访问快照，README 指明论文使用 CodeQL 2.22.2
+- 项目/论文版本：arXiv:2511.08462v4；QLCoder GitHub 访问时 `main` HEAD 为不可变 commit `6095f90f3b4906f36e2e2fe7d1d0bc987750ca2b`，README 指明论文使用 CodeQL 2.22.2
 - 样本与语言：176 个已有 CVE、111 个 Java 项目；不含 WiFi MAC C 项目
 - 模型/Agent：基于 Claude Code agent framework；LLM 在合成环中通过自定义 MCP 与 CodeQL LSP（语法指导）及 RAG 数据库（查询/文档语义检索）交互
 - 对照基线：仅使用 Claude Code 的查询合成

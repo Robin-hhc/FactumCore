@@ -1,17 +1,17 @@
 # 代码检索与结构化代码图方案档案
 
-核验日期：2026-08-13
+核验日期：2026-08-14
 
 > 2026-08-14 更新：跨检索、程序分析与领域知识方案的固定维度比较、硬门槛和候选分层，见 [evidence-matrix.md](./evidence-matrix.md)。本档案保留逐方案事实，不再用局部能力暗示完整方案排名。
 
 ## 1. 本轮问题边界
 
-本档案只回答两类问题：
+本档案以八层骨架组织项目档案，首要回答两类导航问题：
 
 1. Agent 怎样以可控成本找到相关文件、符号和源码证据；
 2. 轻量结构图怎样提供文件、符号、调用、引用、继承和部分框架关系。
 
-它不把上述能力写成 CFG、数据流、污点、切片、别名分析或编译配置语义。后一类能力属于 Task 4 的“语义程序表示与深度程序分析路线”，将按 compiler AST/index/IR、跨文件语义索引、可查询代码数据库、CPG 和声明式静态分析等类别独立比较，不预设 Joern 胜出。
+轻量导航能力不应被写成 CFG、数据流、污点、切片、别名分析或编译配置语义。这些深度事实在后文的“语义程序表示与深度程序分析路线”中按 compiler AST/index/IR、跨文件语义索引、可查询代码数据库、CPG 和声明式静态分析独立比较，不预设 Joern 胜出。
 
 评价基于两组证据：近期独立检索研究 [S001–S003]，以及项目论文、官方文档、第一方 Benchmark 与许可证 [S004–S009]。本轮未在 WiFiDemo 上运行任何候选工具。
 
@@ -33,7 +33,40 @@ Codebase-Memory、CodeGraph 和 GitNexus 均采用 Tree-sitter 类结构抽取�
 
 对 WiFiDemo 而言，这些系统尚未证明以下事实：同一源码在四个 Target 中的 occurrence 隔离、真实编译宏、Host/Device 差异、互斥源码集合、函数指针/ops 表的运行时绑定，以及领域声明到 revision/Target/file:line 的可追溯链接。故本轮只能将它们归为检索/结构层候选，不能替代后续深度程序分析和知识治理层。
 
-## 3. 快速比较
+## 3. 八层架构骨架与证据规则
+
+以下骨架按事实从输入到 Agent 交付的责任边界组织项目档案；它不是产品清单，也不预设某个数据库、可视化或 MCP 形态为架构族。一个项目可以覆盖多层，但其产物只能在拥有相应事实权限的一层被提升为事实。
+
+| 层 | 输入 | 产出 | 事实权限 | 代表项目/组件 | 当前空缺 |
+|---|---|---|---|---|---|
+| 1 输入与快照 | 仓库、revision、Target Profile、构建命令、生成物 | 可复现 snapshot、内容 digest、编译输入清单 | 只确认捕获到的原始内容与构建工件 | WiFiDemo Target 构建、SWHID/SARIF 模式 | 四 Target 的完整编译输入、生成物与失败快照仍需固化并测量 |
+| 2 身份与基础索引 | snapshot、源码 span、编译命令 | revision/Target-qualified occurrence、符号与引用索引 | indexer/编译器可确认 identity 与可定位导航，不确认深层语义 | Clang、scip-clang/SCIP、Kythe | 宏、静态同名符号和多 Target occurrence 的精度尚未在 WiFiDemo 验证 |
+| 3 语义分析提供者 | Target-local index、AST/IR/CPG、分析配置 | 调用、数据流、切片、告警及其生成配置 | 仅确定性分析器输出可成为程序分析事实；结果须带输入与规则 provenance | Joern、Fraunhofer CPG、SVF、PhASAR、Frama-C、CodeQL | 函数指针、Host/Device 事件路径与真实宏配置的质量未测 |
+| 4 领域原始来源 | 规范、设计文档、issue、commit、ADR、人工资料 | 不可静默覆盖的原文、版本和定位 | 原始资料只证明其自身内容与发布来源，不自动证明代码关系 | 规范/ADR、LLM-Wiki 的 raw source、RepoMem 历史 | WiFi 资料的授权、版本与条款级锚点治理待落实 |
+| 5 版本化来源注册 | snapshot 与领域原始来源 | 来源 ID、版本、许可证、内容关系与失效入口 | 注册层确认对象身份、版本和许可元数据，不生成程序或领域断言 | SWHID、PROV-O、SARIF 的可借鉴模型 | 跨仓 source registry、许可证审计与重命名/派生关联未实现 |
+| 6 断言与链接层 | 程序分析事实、原始来源、人工审核、软候选 | 带状态、confidence、冲突和 evidence path 的 claim/link | 只有验证活动或人工审核可提升断言；LLM/embedding/聚类始终先是候选 | Graphify、Understand Anything 的 claim/source 模式 | Target+revision+semantic anchor 的断言生命周期和失效传播待测 |
+| 7 查询编排与证据装配 | 索引、分析事实、断言、预算和查询意图 | 有范围的结果集及 Target/revision/file:line 证据包 | 编排不得新造事实；负责选择、交叉核验、拒答和证据装配 | 词法/向量检索、RepoMap、Serena、Sourcegraph MCP、codebadger、QLCoder | 召回、精度、上下文利用率和 evidence coverage 的联合门槛未跑 |
+| 8 Agent 交付 | 证据包、任务约束、可调用高层操作 | 有引用的答案、审阅建议、受控分析或编辑请求 | Agent 只能交付已装配证据或明确 unknown；编辑不是本研究的事实权限 | MCP-aware Agent、Serena 工作流、codebadger/QLCoder Agent loop | WiFi MAC 最终答案正确性、拒答和错误恢复尚无受控评估 |
+
+横切项（不形成独立架构族）：
+
+| 横切项 | 必须回答的问题 |
+|---|---|
+| snapshot consistency | 查询、分析和断言是否全部指向同一 revision、Target 与输入 digest？ |
+| provenance | 每个结果能否回到生成器、规则、原始资料和 `file:line`？ |
+| invalidation | revision、Target、规则、模型或原始资料变化后，哪些派生物必须 stale/rebuild？ |
+| evaluation | 是否分别报告事实准确率、检索效率和最终 Agent 正确性，并暴露 Target leakage？ |
+| license | 原始资料、索引器、分析器、模型和运行时的许可边界是否逐项可审计？ |
+| observability | 是否保留输入 digest、查询、预算、工具调用、失败、验证 verdict 与时延？ |
+
+### 3.1 Agent 证据双轴
+
+- **Agent evidence**：A 受控实验；B 正式工作流/真实案例；C 社区包装；D 仅理论可接入。
+- **Evidence provenance**：independent / peer-reviewed / company-first-party / project-first-party。
+
+两轴独立记录：`A + project-first-party` 不等于独立证据，`B + peer-reviewed case study` 也不等于受控对照。MCP 可调用、产品页面的功能说明或开源协议的存在，只能说明接口/组件可用性，不能自动成为 Agent 效果证明。后续卡片的“Agent 等级”和“来源等级”分别填写这一对标签。
+
+## 4. 快速比较
 
 | 方案 | 核心表示 | C/C++ 公开支持 | Agent 接口 | 公开效果数据 | 代码—领域链接 | 许可证 | 初步分类 |
 |---|---|---|---|---|---|---|---|
@@ -45,7 +78,7 @@ Codebase-Memory、CodeGraph 和 GitNexus 均采用 Tree-sitter 类结构抽取�
 | GitNexus | Tree-sitter + LadybugDB + 聚类/流程 + hybrid search | C/C++ 在支持表中，但 imports/named bindings 缺失 | stdio MCP、HTTP、Web UI | 未发现可比公开 Benchmark | cluster/process 是代码推导结构；无外部领域知识 provenance | PolyForm Noncommercial 1.0.0 | 排除直接采用；保留设计参考 |
 | Understand Anything | Tree-sitter 确定性图 + LLM 语义/领域图 | README 未提供可排序的 C/C++ 准确率证据 | Agent skills、本地图和 Dashboard | 未发现可比公开 Benchmark；首次分析 Token 可能较高 | 当前候选中最明确的 domain/flow/claim/source 设计，但领域映射依赖 LLM | MIT | 领域链接架构参考；不作代码事实核心 |
 
-## 4. 方案档案
+## 5. 方案档案
 
 ### R01 — 词法检索
 
@@ -166,22 +199,44 @@ Codebase-Memory、CodeGraph 和 GitNexus 均采用 Tree-sitter 类结构抽取�
 - **可借鉴**：领域图不污染代码事实层、可视化切换、增量 fingerprint、claim/source 类型和多阶段 review。
 - **初步分类**：领域知识链接架构参考；不进入核心代码事实引擎短名单。
 
-## 5. 本轮缩小范围
+### R08 — Serena
 
-### 5.1 保留到后续 Benchmark
+- **骨架层**：3 语义分析提供者（LSP/clangd 导航）、7 查询编排与证据装配、8 Agent 交付。
+- **Agent 等级**：B（项目第一方的日常编码工作流/真实任务自评；约 20 项任务描述，不是受控对照）。
+- **来源等级**：project-first-party [S037]。
+- **输入/输出**：输入为已配置语言服务器的工作区与 Agent 请求；输出为符号、声明、引用和受限的编辑/重构操作结果。README 明示其 LSP 后端覆盖 C/C++，高层 MCP 工具包括 symbol、declaration 与 referencing-symbol 导航。
+- **可引用数据**：官方评估按导航、小改动、大改动、跨文件重构和工作流效果分类，记录调用数、payload 与前置步骤；未发布可横向比较的固定样本数、准确率、速度或成本统计 [S037]。
+- **WiFi MAC 适用性**：可作为 Agent 的 C/C++ 符号导航工具层，帮助定位声明、定义和引用；返回值仍须与 Target/revision/source span 绑定后才能进入证据包。
+- **限制**：语言服务器能力因实现而异；其编辑能力不属于本研究核心。MCP 与符号导航均不证明真实宏、Target occurrence、Host/Device 边界或函数指针语义正确。
+- **候选角色**：可进入两个主骨架的 Agent 导航/证据装配组件；不是程序事实主干，也不是领域断言层。
+
+### R09 — Sourcegraph MCP / SCIP
+
+- **骨架层**：2 身份与基础索引（SCIP）、7 查询编排与证据装配（跨仓 search/read/definition/reference）、8 Agent 交付（MCP 接口）。
+- **Agent 等级**：D（公开功能接口使 Agent 可接入，但没有可用于本研究排序的 Agent 效果实验）。
+- **来源等级**：Sourcegraph MCP 为 company-first-party；SCIP 为 project-first-party 开源协议 [S038]。
+- **输入/输出**：Sourcegraph MCP 接收代码检索/导航请求并返回 search、read file、go-to-definition、find references、diff/history 等结果；SCIP 接收语言索引产物并以公开 schema 表示符号与 definition/reference/implementation 导航，`scip-clang` 可生成 C/C++ 索引。
+- **可引用数据**：产品页展示功能与兼容客户端，SCIP 提供公开 Protobuf schema、CLI 和 bindings；两者均未给出 WiFi MAC 任务集、模型、对照和可比较 Agent 正确率 [S038]。
+- **WiFi MAC 适用性**：SCIP 可作为跨 Target identity/索引交换候选，MCP 可作为跨仓发现和证据读取接口；必须以 Target Profile、编译输入和源码位置核验其返回。
+- **限制**：SCIP 的开放协议/实现不应外推为 Sourcegraph 产品的开放性、许可或可自托管范围；这些产品边界当前为 **unknown，需单独许可与部署审计**。SCIP 也不提供 CFG、dataflow、taint、领域实体或 Target occurrence 事实；MCP 可调用不等于效果已证明。
+- **候选角色**：SCIP 可进入程序事实主干的身份/导航交换层候选；Sourcegraph MCP 可进入 Agent 检索接口候选。两者均不能单独构成完整方案。
+
+## 6. 本轮缩小范围
+
+### 6.1 保留到后续 Benchmark
 
 - **必留基线**：词法检索、代码向量检索、RepoMap 类预算化结构检索。
 - **结构层实现短名单**：Codebase-Memory、CodeGraph。
 - **领域链接架构参考**：Understand Anything；重点学习确定性结构与非确定性领域边分层，而不是直接采用其 LLM 生成结果。
 
-### 5.2 当前排除
+### 6.2 当前排除
 
 - **把纯词法或纯向量检索作为完整知识架构**：它们没有程序关系、Target occurrence 和领域事实治理。
 - **把任一 Tree-sitter 结构图当作深度程序分析**：calls/imports/extends 等边不能替代 CFG、数据流、别名、污点或切片。
 - **直接采用 GitNexus**：PolyForm Noncommercial 许可证与预期采用条件冲突，且 C/C++ import 能力和效果数据不足；其 MCP 安全与多尺度导航设计仍可学习。
 - **把 LLM 生成的领域映射直接写入确定性事实层**：缺少 provenance、confidence、人工审核和变更失效机制。
 
-## 6. 对 Task 4 的输入约束
+## 7. 对 Task 4 的输入约束
 
 下一轮深度程序分析调研必须至少回答以下问题，且不得只围绕 Joern：
 
@@ -192,7 +247,7 @@ Codebase-Memory、CodeGraph 和 GitNexus 均采用 Tree-sitter 类结构抽取�
 5. 如何与本档案中的词法/向量/结构检索层组合，而不是重复建设；
 6. 许可证、离线部署、增量更新、资源成本和 Agent 查询接口是否满足工程约束。
 
-## 7. 对“代码—领域知识链接”的阶段性要求
+## 8. 对“代码—领域知识链接”的阶段性要求
 
 本轮证据支持一个保守的分层模型，但不构成最终选型：
 
@@ -205,9 +260,9 @@ Codebase-Memory、CodeGraph 和 GitNexus 均采用 Tree-sitter 类结构抽取�
 
 这使 CodeGraph/Codebase-Memory 一类结构图可以成为代码证据提供者，Understand Anything 一类领域生成流程可以成为候选映射提供者，但最终知识架构必须在二者之上增加 Target-aware identity、provenance、confidence、冲突和重验证机制。
 
-## 8. 语义程序表示与深度程序分析路线
+## 9. 语义程序表示与深度程序分析路线
 
-### 8.1 技术中立的分层
+### 9.1 技术中立的分层
 
 深度程序分析不是单一工具类别。对 WiFiDemo 类 C 驱动项目，至少要拆成下列层次：
 
@@ -223,7 +278,7 @@ Codebase-Memory、CodeGraph 和 GitNexus 均采用 Tree-sitter 类结构抽取�
 
 关键结论是：CPG 是表示和查询组织方式，不是精度来源本身。函数指针、dataflow 和 slice 的质量来自 frontend、构建输入、alias/points-to 算法、外部函数摘要和分析预算；把这些边存成图不会自动提高正确性。[S010][S014–S020]
 
-### 8.2 能力标记约定
+### 9.2 能力标记约定
 
 - `D`：官方文档明确提供该能力，但尚未在 WiFiDemo 实测。
 - `P`：仅提供部分能力、需额外组件或有明确范围限制。
@@ -245,7 +300,7 @@ Codebase-Memory、CodeGraph 和 GitNexus 均采用 Tree-sitter 类结构抽取�
 
 这里的 `D` 只表示“文档化能力存在”，不表示对 WiFiDemo 的 accuracy 已被证明。例如 Kythe KCD 原生记录 target/revision，但 WiFiDemo 的四个 Target 是否能稳定抽取成四组 hermetic compilation units 仍待实验；SVF 明确维护 function-pointer target 集合，但实际召回率和候选规模仍待测。
 
-## 9. 深度程序分析方案档案
+## 10. 深度程序分析方案档案
 
 ### A01 — Clang AST/LibTooling + LLVM IR
 
@@ -417,7 +472,29 @@ Codebase-Memory、CodeGraph 和 GitNexus 均采用 Tree-sitter 类结构抽取�
 - **可借鉴**：领域规则包、rule tests、SARIF/MCP 输出和快速反馈；作为检查层而非核心程序分析层。
 - **初步分类**：保留为轻量规则组件；排除用 CE 单独承担跨 Target 深度分析。
 
-## 10. Task 4 的阶段性收敛
+### A11 — codebadger / Joern Agent Interface
+
+- **骨架层**：3 语义分析提供者（既有 Joern CPG）、7 查询编排与证据装配、8 Agent 交付。
+- **Agent 等级**：B（作者论文报告 GGML、libtiff、libxml2 三个真实案例；没有登记可排序的统一受控对照）。
+- **来源等级**：project-first-party 开源材料 + 作者论文案例评估；独立复现状态 unknown [S039]。
+- **输入/输出**：输入为已生成的 Joern CPG、Agent 请求与高层分析操作；输出为语义导航、切片、污点跟踪和数据依赖结果。它是 Joern 上层的 MCP 编排接口，而不是新的 CPG 引擎。
+- **可引用数据**：论文案例覆盖一个约 8,000-method 的 GGML 代码库、libtiff 缓冲区溢出与 libxml2 CVE-2025-6021 patch；案例数为三，未给 aggregate accuracy、precision 或 recall [S039]。
+- **WiFi MAC 适用性**：启示在于把 Target-local CPG 的常用审计操作预实现为有边界的高层工具，使 Agent 不必默认生成原始 CPGQL；WiFi 仍须先建立并核验真实 Target CPG 工件。
+- **限制**：案例不覆盖多 Target C、宏配置、Host/Device 边界或领域问答；高层 MCP 封装不改善底层 CPG 输入错误，也不替代输入 digest、provenance 或事实验证。
+- **候选角色**：可进入两个主骨架的深分析 Agent 接口组件；程序事实主干仍是经 Target 验证的 Joern/其他分析提供者，而非 codebadger 本身。
+
+### A12 — QLCoder / CodeQL Agent Loop
+
+- **骨架层**：3 语义分析提供者（CodeQL）、7 查询编排与证据装配（查询合成、LSP 反馈、执行）、8 Agent 交付。
+- **Agent 等级**：A（作者在 176 个 CVE、111 个 Java 项目上对正确查询率做受控对照；任务边界不是 WiFi C 代码理解）。
+- **来源等级**：作者论文评估 + project-first-party 仓库材料；其独立复现和同行评审状态未在本档案核验 [S040]。
+- **输入/输出**：输入为 CVE metadata、CodeQL database、受约束 DSL 与小工具箱；输出为经 CodeQL LSP 语法反馈、RAG 检索和延迟完整执行筛选后的查询。论文报告 QLCoder 正确查询率 53.4%，Claude Code 基线为 10%。
+- **可引用数据**：上述数字以“易受攻击版本检出且修复版本不检出”为正确条件，分母是 176 CVE/111 Java 项目；不能与导航或 CPG 事实准确率混合 [S040]。
+- **WiFi MAC 适用性**：其方法学价值是小而明确的工具箱、受约束 DSL 生成、语法反馈和延迟完整执行，而不是把 Agent 直接暴露给任意查询语言。
+- **限制**：不升级 CodeQL 为开放核心：CodeQL 的许可/部署约束及 Java/CVE 任务外部有效性仍是独立问题。`--build-mode=none` 也不能证明真实编译 Target 语义。
+- **候选角色**：可进入两个主骨架的 Agent 查询合成与确定性反馈接口参考；不是 WiFi MAC 程序事实主干的默认实现。
+
+## 11. Task 4 的阶段性收敛
 
 本轮没有选出单一工具，收敛的是组合边界：
 
@@ -429,7 +506,7 @@ Codebase-Memory、CodeGraph 和 GitNexus 均采用 Tree-sitter 类结构抽取�
 6. **Semgrep 是领域规则执行器，不是图谱**：适合把确认过的局部规范持续化，不能替代跨文件语义。
 7. **SVF 的开放源码不等于宽松集成**：技术上保留为函数指针/value-flow 候选，但 AGPL-3.0-or-later 使其部署方式成为独立筛选维度；PhASAR 的 MIT 许可更利于嵌入式组合方案。
 
-### 10.1 当前排除或降级
+### 11.1 当前排除或降级
 
 - 排除“单一 Tree-sitter 图即可回答函数指针、dataflow 和 Target 问题”的假设。
 - 排除把未消费真实编译命令的目录级 CPG 当作最终编译事实。
@@ -437,7 +514,7 @@ Codebase-Memory、CodeGraph 和 GitNexus 均采用 Tree-sitter 类结构抽取�
 - Semgrep CE 降为局部规则组件；Pro Engine 不进入优先开源短名单。
 - LLVM IR/SVF/PhASAR/Frama-C 不作为主检索数据库，而作为 Target-specific 按需 analysis provider。
 
-### 10.2 必须进入后续 Benchmark 的问题
+### 11.2 必须进入后续 Benchmark 的问题
 
 | ID | 问题 | 对应 WiFiDemo | 主要候选 | 指标 |
 |---|---|---|---|---|
@@ -448,7 +525,7 @@ Codebase-Memory、CodeGraph 和 GitNexus 均采用 Tree-sitter 类结构抽取�
 | PA05 | 外部函数 summary/semantics 错误如何暴露 | W04–W06 | CodeQL、Joern、Fraunhofer CPG、PhASAR | FP/FN、rule provenance、conflict detection |
 | PA06 | 修改一个 Target 后哪些事实失效、哪些可复用 | W03、W07 | SCIP、Kythe、CPG、metadata layer | reindex latency、invalidated fact precision |
 
-## 11. 对代码—领域知识链接的新增结论
+## 12. 对代码—领域知识链接的新增结论
 
 Task 4 进一步说明领域知识不应直接绑定“函数名”，而应绑定可验证的程序事实：
 
@@ -464,9 +541,9 @@ DomainEntity / Claim
 
 其中有四种成熟机制可学习：Kythe 的 anchor/VName 与 `generates` 边 [S012]，CodeQL/Fraunhofer/Joern 的外部函数 model/summary/semantics [S013][S015][S016]，PhASAR 的 JSON/callback source-sink 配置 [S020]，以及 Frama-C 的 ACSL property 与 proof/alarm 状态 [S018]。共同原则是：领域规则、分析结果和 parser/compiler 事实必须分层，并且能追溯到 Target-specific 源码证据。
 
-## 12. 代码—领域混合知识方案档案
+## 13. 代码—领域混合知识方案档案
 
-以下档案使用与 R01–R07、A01–A10 相同的字段，但评价对象是知识组织和链接机制，不把文档问答结果当作代码语义准确率。
+以下档案使用与 R01–R09、A01–A12 相同的字段，但评价对象是知识组织和链接机制，不把文档问答结果当作代码语义准确率。
 
 ### H01 — Graphify
 
@@ -558,7 +635,7 @@ DomainEntity / Claim
 - **定位**：以 Skill metadata 选择领域程序，按需加载 instructions/references，并通过 MCP/API/script 获取当前事实。
 - **最新活动**：Google ADK 指南发布于 2026-04，AWS Agent Toolkit 文档当前持续更新 [S024]。
 - **开源/许可证**：模式开放；具体 ADK/Toolkit/Skills 各自授权，架构不依赖单一供应商。
-- **核心表示**：L1 metadata、L2 SKILL.md instructions、L3 references、deterministic scripts、MCP/API tools。
+- **核心表示**：metadata、SKILL.md instructions、references、deterministic scripts、MCP/API tools。
 - **事实来源**：人工/团队维护的程序与资料；运行时工具返回环境/代码事实。
 - **Agent 接口**：list/load/read resource 与 MCP tool calls。
 - **公开数据**：Google 的约 90% baseline context reduction 是 10-Skill 示例算术，不是正确率实验；SWE-Skills-Bench 提供独立负收益证据 [S024][S027]。
@@ -587,9 +664,32 @@ DomainEntity / Claim
 - **可借鉴**：任务类型分层、paired A/B、Token/负收益、固定 commit 和执行式验收。
 - **初步分类**：领域注入评估方法与可选组件；不是独立知识架构。
 
-## 13. Task 5 的知识生命周期收敛
+## 14. 成熟方案的共同点与差异
 
-### 13.1 分层对象
+### 14.1 共同点
+
+成熟方案虽覆盖的层不同，但共同保留以下边界：
+
+1. 用确定性结构或语义工具产生可定位的程序输入，而不把生成摘要当作代码真相；
+2. 先以廉价发现缩小范围，再按需进入高成本语义分析，实行渐进检索；
+3. 返回 source-grounded 结果，至少能携带源码/原始资料位置、revision 或生成器信息；
+4. 只向 Agent 暴露有边界的高层操作、受约束 DSL 或小工具箱，而不是默认暴露原始查询语言；
+5. 派生上下文（摘要、embedding、Wiki、memory、聚类）与事实源分离，并在输入变化后允许失效或重算。
+
+### 14.2 只按决策轴比较的差异
+
+| 决策轴 | 需要作出的选择 | 本档案中的可比输入 |
+|---|---|---|
+| 程序事实主干 | identity/index 优先，还是以 Target-local 深分析事实为主；两者怎样通过同一 snapshot 对齐 | Clang、SCIP、Kythe、Joern、Fraunhofer CPG、SVF/PhASAR/Frama-C |
+| 查询拓扑 | 先检索后验证、按需切片，还是预计算图查询；怎样约束候选扩张和证据包大小 | 词法/向量、RepoMap、Serena、Sourcegraph MCP、codebadger、QLCoder |
+| 分析时机 | ingest 时计算何种稳定事实，问答时再调用何种昂贵/特定 Target 分析 | 编译索引、CPG、points-to/dataflow、规则检查、延迟执行 loop |
+| 断言层物理组织 | 程序事实、原始来源、领域 claim、软候选和 validation record 如何分区、关联与失效 | Graphify、Understand Anything、LLM-Wiki/WiCER、GitHub Memory、PROV/SARIF 模式 |
+
+数据库品牌、可视化和是否提供 MCP 都是实现/交付属性，不能单独构成架构族；它们只在上述决策轴与硬门槛已满足时参与实现选择。
+
+## 15. Task 5 的知识生命周期收敛
+
+### 15.1 分层对象
 
 | 对象 | 允许来源 | 默认状态 | 变化后的动作 |
 |---|---|---|---|
@@ -600,7 +700,7 @@ DomainEntity / Claim
 | 编译知识 | Wiki/page/summary/Skill | derived | source 变化或 probe 失败后 stale/重新编译 |
 | 验证记录 | test/analyzer/human review | validation activity | 保留历史，不覆盖旧 verdict |
 
-### 13.2 当前排除或降级
+### 15.2 当前排除或降级
 
 - 排除 embedding score 或 LLM confidence 自动升级为代码事实。
 - 排除领域声明只绑定裸函数名或易漂移 file-line。
@@ -610,11 +710,11 @@ DomainEntity / Claim
 - GitHub Memory 保留为生命周期参考，产品本身不进入优先开源核心。
 - RepoMem 保留为历史检索组件，必须允许历史稀疏或不相关时 abstain。
 
-### 13.3 新增 Benchmark 问题
+### 15.3 新增 Benchmark 问题
 
 详细问题见 `docs/research/code-domain-linkage.md` 的 DL01–DL09。Task 6 只基于当前证据给候选分类，不用这些待测问题伪造得分。
 
-## 14. 本轮对架构候选的影响
+## 16. 本轮对架构候选的影响
 
 Task 5 仍不选最终存储技术，但把完整架构的硬要求收窄为：
 
@@ -626,8 +726,17 @@ Task 5 仍不选最终存储技术，但把完整架构的硬要求收窄为：
 6. 支持 raw source、compiled knowledge 和 runtime query 的不同更新周期；
 7. 后续以 specification-dependent/generic、rich/sparse history、current/stale knowledge 等分层 Benchmark 验证，而不是只测平均通过率。
 
-## 15. Task 6 的候选分层
+## 17. 项目角色与候选生成输入
 
-证据矩阵把纯检索、单独 Tree-sitter 图、直接采用 GitNexus、以 CodeQL 作为默认开放核心、以及未经验证的 LLM/embedding 事实写入，排除为完整方案；它们中的若干能力仍保留为组件或设计参考。[S001–S009][S013][S023][S027]
+本节只根据八层骨架和已登记证据组织项目角色；它不宣布完整方案赢家，也不把轻量发现提升为第三主骨架。
 
-进入后续实验的不是某个预设赢家，而是三个可替换组件的架构族：L1 编译器原生分层、L2 Target-specific CPG 分层、L3 轻量结构发现加编译器核验。开源偏好只在正确性、效果、成本和运维约束没有决定性差异时作为 tie-break，不能代替实验结论。
+后续实验只比较两种共享第 1、4–8 层的程序事实主干：一条以编译器/语义索引的 occurrence 与可查询事实为中心，另一条以 Target-local CPG 的语义事实为中心。轻量发现只能附着在两者的第 2 或第 7 层，用于候选生成、压缩和回退；它不是独立主骨架。
+
+| 角色 | 项目/组件 | 进入候选生成时的约束 |
+|---|---|---|
+| 排除为完整方案 | 纯词法/向量检索、单独 Tree-sitter 图、GitNexus 直接采用、CodeQL 作为默认开放核心、未经验证的 LLM/embedding 事实写入 | 分别缺少深层语义/Target 真相、许可证可采用性、开放核心条件或可验证事实权限；其中的局部能力仍可作为受控组件 [S001–S009][S013][S023][S027] |
+| 架构参考 | Aider RepoMap、GitNexus、Understand Anything、Graphify、LLM-Wiki/WiCER、GitHub Memory、Progressive Skills、H07 | 提供预算化上下文、claim/source、生命周期、渐进披露或评估设计；不得取代 snapshot-qualified 程序事实 |
+| 组件候选 | 词法/向量检索、Codebase-Memory、CodeGraph、Semgrep CE、RepoMem、SCIP、SWHID/PROV/SARIF 模式 | 以明示输入、许可、provenance 和 Benchmark 指标接入；轻量发现只可附着在事实主干之上，负责发现、压缩或候选生成 |
+| 可进入两个主骨架的程序事实或 Agent 接口组件 | Clang/scip-clang/SCIP/Kythe、Joern/Fraunhofer CPG、SVF/PhASAR/Frama-C、Serena、Sourcegraph MCP、codebadger、QLCoder | 程序事实必须由相同 snapshot、Target 与配置产生并带来源；Agent 接口只能编排、反馈和装配证据。最终保留由 WiFiDemo Benchmark 的正确性、成本、许可、可运维性决定 |
+
+开源偏好只在正确性、效果、成本和运维约束没有决定性差异时作为 tie-break，不能代替实验结论。

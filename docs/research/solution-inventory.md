@@ -712,7 +712,7 @@ DomainEntity / Claim
 
 ### 15.3 新增 Benchmark 问题
 
-详细问题见 `docs/research/code-domain-linkage.md` 的 DL01–DL09。Task 6 只基于当前证据给候选分类，不用这些待测问题伪造得分。
+详细问题见 `code-domain-linkage.md` 的 DL01–DL09。Task 6 只基于当前证据给候选分类，不用这些待测问题伪造得分。
 
 ## 16. 本轮对架构候选的影响
 

@@ -21,7 +21,7 @@
 5. 哪些项目只提供组件或接口证据，哪些能力可以组成完整架构？
 6. 在未运行候选实验时，怎样形成可证伪的 A0/A1/B0/B1 比较，而不是提前宣布产品赢家？
 
-本文的贡献是完整推导链，而不是静态工具排行榜：原始来源登记见 [source-ledger](docs/research/source-ledger.md)，逐项目档案见 [solution inventory](docs/research/solution-inventory.md)，WiFiDemo 结构证据见 [workload casebook](docs/research/wifidemo-workload-casebook.md)，共同链接合同见 [linkage study](docs/research/code-domain-linkage.md)，候选状态见 [evidence matrix](docs/research/evidence-matrix.md)，未来实验见 [benchmark backlog](docs/research/benchmark-backlog.md)。
+本文的贡献是完整推导链，而不是静态工具排行榜：原始来源登记见 [source-ledger](source-ledger.md)，逐项目档案见 [solution inventory](solution-inventory.md)，WiFiDemo 结构证据见 [workload casebook](wifidemo-workload-casebook.md)，共同链接合同见 [linkage study](code-domain-linkage.md)，候选状态见 [evidence matrix](evidence-matrix.md)，未来实验见 [benchmark backlog](benchmark-backlog.md)。
 
 ## 2. 方法与证据边界
 
@@ -64,7 +64,7 @@ Agent evidence、证据生产者关系和审阅状态是三个可组合字段，
 
 ## 3. WiFiDemo 工作负载与硬门槛
 
-本轮只读取固定 WiFiDemo 快照 `https://github.com/Robin-hhc/WiFiDemo.git` @ `8102322afbe5f81ecf6a35601ac4731ed14feb2d` 的源码/配置结构；核验时 checkout 为 clean，因此 tracked patch SHA-256 与 untracked manifest SHA-256 均为 `not applicable`。没有运行构建或候选工具，也没有新增 compiler-artifact ground truth 或本地测量。W01–W08 的完整源码位置、快照字段、观察/ground-truth 边界与反例见 [WiFiDemo workload casebook](docs/research/wifidemo-workload-casebook.md)。
+本轮只读取固定 WiFiDemo 快照 `https://github.com/Robin-hhc/WiFiDemo.git` @ `8102322afbe5f81ecf6a35601ac4731ed14feb2d` 的源码/配置结构；核验时 checkout 为 clean，因此 tracked patch SHA-256 与 untracked manifest SHA-256 均为 `not applicable`。没有运行构建或候选工具，也没有新增 compiler-artifact ground truth 或本地测量。W01–W08 的完整源码位置、快照字段、观察/ground-truth 边界与反例见 [WiFiDemo workload casebook](wifidemo-workload-casebook.md)。
 
 | 案例 | 已登记的结构事实 | 架构必须表达 |
 |---|---|---|
@@ -363,7 +363,7 @@ Benchmark 不生成掩盖硬门槛的总分，而按阶段停止：
 - **Phase C，B07、B10、B12、B14**：日志/混合检索、Agent 高层工具与 raw DSL fallback、深分析泛化、冷启动/增量/故障隔离；分别报告事实准确性、检索效率和最终 Agent 正确性。
 - **Phase D，B15**：逐组件 SPDX/SBOM、许可、冷机复现与替代路径；许可失败排除具体实现，不自动否定架构族。
 
-四臂采取配对设计：A0↔A1、B0↔B1 测 discovery 效应，A0↔B0、A1↔B1 测主骨架效应，并报告二因素交互；同 pair 固定任务、Target、repository_revision、Agent、prompt、预算、硬件与失败策略。详细假设、gold、counterfactual、指标和成本见 [B01–B15 backlog](docs/research/benchmark-backlog.md)。
+四臂采取配对设计：A0↔A1、B0↔B1 测 discovery 效应，A0↔B0、A1↔B1 测主骨架效应，并报告二因素交互；同 pair 固定任务、Target、repository_revision、Agent、prompt、预算、硬件与失败策略。详细假设、gold、counterfactual、指标和成本见 [B01–B15 backlog](benchmark-backlog.md)。
 
 ### 14.3 外部 C 案例与版本边界
 

@@ -21,7 +21,7 @@
 | AI 公司官方材料 | 5 | 按 `公司官方实践`/`AI 公司官方实践` 的来源记录复核 |
 | 开源项目材料 | 30 | 按官方仓库、项目文档、公开实验代码/Benchmark 伴随材料逐条复核 |
 | 标准记录 | 1 | S029；一个记录组包含 SWHID、PROV-O 与 SARIF |
-| 正文数字扫描命中行 | 9 | `research.md` 第 90、92、94、96、116、130、133、135、137 行 |
+| 正文数字扫描命中行 | 9 | `wifi-mac-knowledge-architecture-paper.md` 第 90、92、94、96、116、130、133、135、137 行 |
 | 含效果或对照数字的行 | 8 | 上述 9 行中第 92 行只报告样本/标注规模；S024 的第 132 行不在数字扫描内 |
 | 逐项目档案 | 28 | R01–R09 共 9、A01–A12 共 12、H01–H07 共 7 |
 | 当前主实验骨架 | 2 | A 与 B；是初始实验设计，不是完备候选数 |
@@ -34,7 +34,7 @@
 
 正文数字扫描共命中 9 行。每行均有 S 编号和直接原始 URL；相关 ledger 记录保存样本、模型/Agent、对照、指标、数字语境和外推限制。
 
-| `research.md` 行 | 来源 | 审计判断 |
+| `wifi-mac-knowledge-architecture-paper.md` 行 | 来源 | 审计判断 |
 |---:|---|---|
 | 90 | S001 | 427 样本与 27%–35% 漏检均限定为文件检索，不外推程序语义或 WiFi Target |
 | 92 | S002、S003 | 只报告查询、标注、任务、仓库、语言和 Agent 样本规模；不计效果数字行 |
@@ -75,7 +75,7 @@ S024 保持 `primary-read`，其台账不再记录精确示例百分比或把示
 
 ## 6. 候选范围与现行设计文档
 
-`research.md`、`evidence-matrix.md`、`benchmark-backlog.md` 和 2026-08-14 design spec 均将 A/B 表述为当前证据构造的初始实验 arms，明确不是候选空间穷尽，且允许 Benchmark 拆分、增加或重定义 arms。现行决策文档不再出现旧三族的标识符。
+`wifi-mac-knowledge-architecture-paper.md`、`evidence-matrix.md`、`benchmark-backlog.md` 和 2026-08-14 design spec 均将 A/B 表述为当前证据构造的初始实验 arms，明确不是候选空间穷尽，且允许 Benchmark 拆分、增加或重定义 arms。现行决策文档不再出现旧三族的标识符。
 
 `docs/superpowers/specs/2026-08-13-wifi-mac-knowledge-architecture-research-design.md` 是未修改的历史设计文档；它不属于现行决策扫描范围，也没有被改写成当前结论。
 
@@ -89,11 +89,11 @@ S024 保持 `primary-read`，其台账不再记录精确示例百分比或把示
 | RIOT `refs/tags/2026.04.01` | annotated tag object `56ab5471996e422657d7fac81bd76da3b07378df` | dereferenced `4a70282b1f1ac6e004138b4ada684a4dc4639653` |
 | Contiki-NG `refs/tags/release/v5.1` | lightweight tag；虽含 `/`，不是 branch | direct commit `2b87baf3ebdde3c8e37ca791d2bc84bfd76c49a4` |
 
-`source-ledger.md` 同时记录 annotated tag object 与 dereferenced commit；`research.md` 和 `benchmark-backlog.md` 使用完整 commit object ID，不再只写短 hash。
+`source-ledger.md` 同时记录 annotated tag object 与 dereferenced commit；`wifi-mac-knowledge-architecture-paper.md` 和 `benchmark-backlog.md` 使用完整 commit object ID，不再只写短 hash。
 
 ## 8. URL、本地交叉引用与有效性边界
 
-`research.md` 的本地研究附录链接指向 source ledger、solution inventory、WiFiDemo workload casebook、code-domain linkage、evidence matrix 和 benchmark backlog；提交前以 `if exist` 对六个目标逐项复核。新增外部 revision 只来自官方 GitHub remote，不使用搜索页或二手转述。
+`wifi-mac-knowledge-architecture-paper.md` 的本地研究附录链接指向 source ledger、solution inventory、WiFiDemo workload casebook、code-domain linkage、evidence matrix 和 benchmark backlog；提交前对六个目标逐项复核。新增外部 revision 只来自官方 GitHub remote，不使用搜索页或二手转述。
 
 本终审不等于候选实验通过。B01–B15 仍须裁决 Target frontend、宏/active source、函数指针/ops、alias/dataflow/slice、稳定 ID、断言失效/修复、最终 Agent 正确性、资源、离线复现与逐组件许可。Sourcegraph MCP 产品许可、自托管和部署边界仍为 `unknown`；开放 SCIP 协议不能替代产品许可审计。
 

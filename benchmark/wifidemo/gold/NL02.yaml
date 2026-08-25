@@ -1,0 +1,20 @@
+case_id: NL02
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["Core source anchors checked at 8102322; coverage and independent review pending."]
+facts:
+  - id: NL02-F01
+    critical: true
+    subject: frw_event_lookup_process_entry
+    relation: MAY_CALL
+    object: g_ast_event_table[type,pipeline].sub_table[subtype].p_func
+    target: chip8-wifi-device
+    side: device
+    confidence: candidate
+    aliases: ["event type and pipeline choose a subtable; subtype chooses the handler slot"]
+    evidence:
+      - {file: device/wifi/chip8/frw/frw_event_main.c, line_start: 212, line_end: 233, symbol: frw_event_lookup_process_entry}
+forbidden_claims:
+  - {id: NL02-X01, critical: true, pattern: "逐事件.*if.?else|未知.*subtype.*默认.*handler"}

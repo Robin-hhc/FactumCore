@@ -1,0 +1,53 @@
+case_id: NL16
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["BA_SYNC, Device BA_DONE and Host aggregation gate anchors checked; full state sequence pending."]
+facts:
+  - id: NL16-F01
+    critical: true
+    subject: hmac_tx_ba_start
+    relation: EMITS_EVENT
+    object: HOST_CTX subtype HOST_CTX_BA_SYNC to Device
+    target: chip8-wifi-host
+    side: cross
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/hmac/hmac_tid.c, line_start: 69, line_end: 107, symbol: hmac_tx_ba_start}
+  - id: NL16-F02
+    critical: true
+    subject: dmac_ba_sync_handler
+    relation: EMITS_EVENT
+    object: BA_DONE result to Host after Device BA establishment
+    target: chip8-wifi-device
+    side: cross
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: device/wifi/chip8/dmac/dmac_config.c, line_start: 161, line_end: 199, symbol: dmac_ba_sync_handler}
+  - id: NL16-F03
+    critical: true
+    subject: ba_established and support_tx_ba
+    relation: CONTROLS
+    object: TX_FLAG_AMPDU
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/dpe_tx.c, line_start: 104, line_end: 116, symbol: dpe_tx_send}
+  - id: NL16-F04
+    critical: true
+    subject: Host hcc_rx_process for BA_DONE
+    relation: CONTROLS
+    object: current source rewrites param.type to WLAN_TX_COMP before FRW dispatch
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: ["BA_DONE is currently collapsed into WLAN_TX_COMP by the Host receiver"]
+    evidence:
+      - {file: host/wifi/dpe/hcc/hcc_core.c, line_start: 217, line_end: 237, symbol: hcc_rx_process}
+forbidden_claims:
+  - {id: NL16-X01, critical: true, pattern: "BA.*只在Host.*完成|TX_FLAG_AMPDU.*独立字段|BA_DONE.*当前.*必然.*ba_established"}

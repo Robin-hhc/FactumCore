@@ -1,0 +1,32 @@
+case_id: CF20
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["Timer table, tick-to-TIMEOUT dispatch, registered handler and callback indirection checked."]
+facts:
+  - id: CF20-F01
+    critical: true
+    subject: frw_timer_tick active timer with remain_ticks zero
+    relation: EMITS_EVENT
+    object: FRW_EVENT_TYPE_TIMEOUT through Host FRW dispatch
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/frw/frw_timer.c, line_start: 41, line_end: 61, symbol: frw_timer_tick}
+  - id: CF20-F02
+    critical: true
+    subject: frw_timer_timeout_handler
+    relation: MAY_CALL
+    object: callback stored in g_timer_table with its param
+    target: chip8-wifi-host
+    side: host
+    confidence: candidate
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/frw/frw_timer.c, line_start: 16, line_end: 28, symbol: frw_timer_start}
+      - {file: host/wifi/dpe/frw/frw_timer.c, line_start: 63, line_end: 77, symbol: frw_timer_timeout_handler}
+forbidden_claims:
+  - {id: CF20-X01, critical: true, pattern: "frw_timer_tick.*直接调用.*业务回调|没有.*事件分发|chip2.*chip8.*能力.*无差异"}

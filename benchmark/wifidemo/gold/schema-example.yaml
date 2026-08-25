@@ -1,0 +1,24 @@
+case_id: NL14
+review:
+  reviewer_a: unassigned
+  reviewer_b: unassigned
+  status: draft
+facts:
+  - id: NL14-F01
+    critical: true
+    subject: "ring->state == RING_STATE_HOST"
+    relation: CONTROLS
+    object: g_hal_common_ops.hal_ring_push
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: ["RING_STATE_HOST controls host ring enqueue"]
+    evidence:
+      - file: host/wifi/dpe/dpe_tx.c
+        line_start: 104
+        line_end: 118
+        symbol: dpe_tx_send
+forbidden_claims:
+  - id: NL14-X01
+    critical: true
+    pattern: "按.*ring->mode.*分流"

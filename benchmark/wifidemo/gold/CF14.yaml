@@ -1,0 +1,31 @@
+case_id: CF14
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["Device ring-valid, BA-established and HAL-send conditions checked."]
+facts:
+  - id: CF14-F01
+    critical: true
+    subject: Device TID tx_ring.valid
+    relation: CONTROLS
+    object: dmac_tx_send rejects an uninitialized ring
+    target: chip8-wifi-device
+    side: device
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: device/wifi/chip8/dmac/dmac_tx.c, line_start: 162, line_end: 184, symbol: dmac_tx_send}
+  - id: CF14-F02
+    critical: true
+    subject: ampdu and Device BA session state
+    relation: CONTROLS
+    object: rejection unless DMAC_BA_STATE_ESTABLISHED before hal_tx_send
+    target: chip8-wifi-device
+    side: device
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: device/wifi/chip8/dmac/dmac_tx.c, line_start: 189, line_end: 208, symbol: dmac_tx_send}
+forbidden_claims:
+  - {id: CF14-X01, critical: true, pattern: "未初始化.*自动创建.*继续|不检查.*BA"}

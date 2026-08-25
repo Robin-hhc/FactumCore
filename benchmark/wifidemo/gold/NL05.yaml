@@ -1,0 +1,43 @@
+case_id: NL05
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["Compiler-produced Device manifests checked; full set comparison pending second review."]
+facts:
+  - id: NL05-F01
+    critical: true
+    subject: _PRE_WLAN_FEATURE_TX_BA
+    relation: PRESENT_IN
+    object: both Device Target compiler define sets
+    target: chip2-wifi-device
+    side: device
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: build_chip2_device/device/CMakeFiles/device.dir/flags.make, line_start: 4, line_end: 5, symbol: _PRE_WLAN_FEATURE_TX_BA}
+      - {file: build_chip8_device/device/CMakeFiles/device.dir/flags.make, line_start: 4, line_end: 5, symbol: _PRE_WLAN_FEATURE_TX_BA}
+  - id: NL05-F02
+    critical: true
+    subject: _PRE_WLAN_FEATURE_EMERGENCY_MODE
+    relation: PRESENT_IN
+    object: chip2 Device compiler defines
+    target: chip2-wifi-device
+    side: device
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: build_chip2_device/device/CMakeFiles/device.dir/flags.make, line_start: 4, line_end: 5, symbol: _PRE_WLAN_FEATURE_EMERGENCY_MODE}
+  - id: NL05-F03
+    critical: true
+    subject: _PRE_WLAN_FEATURE_11AX
+    relation: PRESENT_IN
+    object: chip8 Device compiler defines
+    target: chip8-wifi-device
+    side: device
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: build_chip8_device/device/CMakeFiles/device.dir/flags.make, line_start: 4, line_end: 5, symbol: _PRE_WLAN_FEATURE_11AX}
+forbidden_claims:
+  - {id: NL05-X01, critical: true, pattern: "HOST_TX_OFFLOAD.*Device.*能力|宏.*使用点.*定义点"}

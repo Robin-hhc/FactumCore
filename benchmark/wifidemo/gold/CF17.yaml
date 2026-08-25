@@ -1,0 +1,42 @@
+case_id: CF17
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["Transition checks, single pending context, event send and synchronous send-failure rollback checked."]
+facts:
+  - id: CF17-F01
+    critical: true
+    subject: dpe_tx_ring_switch direction and current state
+    relation: CONTROLS
+    object: adjacent-only transition and rejection while SWITCHING
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/dpe_tx.c, line_start: 340, line_end: 375, symbol: dpe_tx_ring_switch}
+  - id: CF17-F02
+    critical: true
+    subject: dpe_tx_ring_switch pending context
+    relation: EMITS_EVENT
+    object: HOST_CTX subtype 4 or 5 to Device
+    target: chip8-wifi-host
+    side: cross
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/dpe_tx.c, line_start: 368, line_end: 390, symbol: dpe_tx_ring_switch}
+  - id: CF17-F03
+    critical: true
+    subject: failed hcc_tx_event_send_to_device
+    relation: CONTROLS
+    object: original state restoration and pending.valid clear
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/dpe_tx.c, line_start: 390, line_end: 399, symbol: dpe_tx_ring_switch}
+forbidden_claims:
+  - {id: CF17-X01, critical: true, pattern: "非相邻.*允许|多个.*并发.*pending|发送失败.*不回滚"}

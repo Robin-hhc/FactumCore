@@ -1,0 +1,31 @@
+case_id: NL10
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["Shared ring model and per-TID binding checked; four-ring terminology review pending."]
+facts:
+  - id: NL10-F01
+    critical: true
+    subject: wifi_ring
+    relation: DEFINES
+    object: TX or RX direction plus Host or Device ownership
+    target: chip8-wifi-host
+    side: shared
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: shared/include/wifi_ring.h, line_start: 6, line_end: 27, symbol: wifi_ring}
+  - id: NL10-F02
+    critical: true
+    subject: each hmac_tid_info_stru
+    relation: REFERENCES
+    object: one allocated tx_ring pointer
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/tx/hmac_tx_ring_alloc.c, line_start: 60, line_end: 88, symbol: hmac_ring_tx_init}
+forbidden_claims:
+  - {id: NL10-X01, critical: true, pattern: "每个.*User.*TID.*四个.*独立.*ring|只有.*一个.*全局.*ring"}

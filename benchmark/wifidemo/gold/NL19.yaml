@@ -1,0 +1,42 @@
+case_id: NL19
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["Device-to-Host switch message and Host success/failure commit checked; independent review pending."]
+facts:
+  - id: NL19-F01
+    critical: true
+    subject: dmac_ring_switch_done after RING_SWITCH_TO_HOST
+    relation: EMITS_EVENT
+    object: RING_SWITCH_DONE result to Host
+    target: chip8-wifi-device
+    side: cross
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: device/wifi/chip8/dmac/dmac_ring.c, line_start: 67, line_end: 87, symbol: dmac_ring_switch_done}
+  - id: NL19-F02
+    critical: true
+    subject: dpe_tx_ring_switch_done_handler desc->len and direction
+    relation: CONTROLS
+    object: rollback on failure or Host ring reset and RING_STATE_HOST on success
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/dpe_tx.c, line_start: 248, line_end: 280, symbol: dpe_tx_ring_switch_done_handler}
+  - id: NL19-F03
+    critical: true
+    subject: Host hcc_rx_process for RING_SWITCH_DONE
+    relation: CONTROLS
+    object: current source rewrites param.type to WLAN_TX_COMP before the registered ring handler
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/hcc/hcc_core.c, line_start: 217, line_end: 237, symbol: hcc_rx_process}
+forbidden_claims:
+  - {id: NL19-X01, critical: true, pattern: "Host.*直接调用.*Device|dpe_tx_ring_switch.*CALLS.*dmac_ring_switch|失败.*仍.*RING_STATE_HOST|当前.*必然.*提交.*Host"}

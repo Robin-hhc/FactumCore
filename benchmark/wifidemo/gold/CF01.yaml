@@ -1,0 +1,31 @@
+case_id: CF01
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["Entry, local creation and VAP_ADD boundary anchors checked; independent path review pending."]
+facts:
+  - id: CF01-F01
+    critical: true
+    subject: hmac_config_add_vap
+    relation: CALLS
+    object: hmac_vap_alloc then hmac_vap_init then hmac_user_add
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/hmac/hmac_vap.c, line_start: 150, line_end: 189, symbol: hmac_config_add_vap}
+  - id: CF01-F02
+    critical: true
+    subject: hmac_vap_init
+    relation: EMITS_EVENT
+    object: VAP_ADD event consumed by Device configuration dispatch
+    target: chip8-wifi-host
+    side: cross
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/hmac/hmac_vap.c, line_start: 112, line_end: 120, symbol: hmac_vap_init}
+forbidden_claims:
+  - {id: CF01-X01, critical: true, pattern: "Host.*内存.*Device.*直接共享|hmac_config_add_vap.*CALLS.*dmac_config_add_vap"}

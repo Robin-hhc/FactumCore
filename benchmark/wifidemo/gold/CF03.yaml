@@ -1,0 +1,31 @@
+case_id: CF03
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["TID initialization, ring allocation and pointer binding order checked."]
+facts:
+  - id: CF03-F01
+    critical: true
+    subject: hmac_ring_tx_init
+    relation: CALLS
+    object: hmac_tid_info_init before ring allocation and initialization
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/tx/hmac_tx_ring_alloc.c, line_start: 60, line_end: 88, symbol: hmac_ring_tx_init}
+  - id: CF03-F02
+    critical: true
+    subject: newly allocated wifi_ring
+    relation: DATA_FLOWS_TO
+    object: tid_info->tx_ring
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/tx/hmac_tx_ring_alloc.c, line_start: 73, line_end: 88, symbol: hmac_ring_tx_init}
+forbidden_claims:
+  - {id: CF03-X01, critical: true, pattern: "hmac_tid_info_init.*绑定后|所有.*TID.*共用.*ring"}

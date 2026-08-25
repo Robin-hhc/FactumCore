@@ -1,0 +1,31 @@
+case_id: CF10
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["Input, TID/ring, switching exits and mutually exclusive success branches checked."]
+facts:
+  - id: CF10-F01
+    critical: true
+    subject: dpe_tx_send parameter, TID, ring-valid and switching checks
+    relation: CONTROLS
+    object: early failure before sending
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/dpe_tx.c, line_start: 74, line_end: 102, symbol: dpe_tx_send}
+  - id: CF10-F02
+    critical: true
+    subject: ring->state
+    relation: CONTROLS
+    object: mutually exclusive Host HAL push and Device HCC send success branches
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/dpe_tx.c, line_start: 104, line_end: 170, symbol: dpe_tx_send}
+forbidden_claims:
+  - {id: CF10-X01, critical: true, pattern: "按.*mode.*分流|两个.*发送分支.*同时|忽略.*early return"}

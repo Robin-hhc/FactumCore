@@ -1,0 +1,31 @@
+case_id: NL15
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["H2D TX and D2H completion event boundaries checked; independent review pending."]
+facts:
+  - id: NL15-F01
+    critical: true
+    subject: dpe_tx_send in RING_STATE_DEVICE
+    relation: EMITS_EVENT
+    object: HCC WLAN_DTX message carrying desc and copied frame to Device
+    target: chip8-wifi-host
+    side: cross
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/dpe_tx.c, line_start: 134, line_end: 160, symbol: dpe_tx_send}
+  - id: NL15-F02
+    critical: true
+    subject: dmac_tx_report_to_host
+    relation: EMITS_EVENT
+    object: WLAN_TX_COMP with ring_desc to Host
+    target: chip8-wifi-device
+    side: cross
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: device/wifi/chip8/dmac/dmac_tx.c, line_start: 99, line_end: 122, symbol: dmac_tx_report_to_host}
+forbidden_claims:
+  - {id: NL15-X01, critical: true, pattern: "dpe_tx_send.*CALLS.*dmac_tx_send|跨.*二进制.*CALLS|省略.*HCC"}

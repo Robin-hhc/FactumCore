@@ -1,0 +1,42 @@
+case_id: NL18
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["Host-to-Device switch command and Device completion event checked; independent review pending."]
+facts:
+  - id: NL18-F01
+    critical: true
+    subject: dpe_tx_ring_switch RING_SWITCH_TO_DEVICE
+    relation: EMITS_EVENT
+    object: HOST_CTX subtype 4 with pending context to Device
+    target: chip8-wifi-host
+    side: cross
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/dpe_tx.c, line_start: 340, line_end: 390, symbol: dpe_tx_ring_switch}
+  - id: NL18-F02
+    critical: true
+    subject: dmac_ring_switch_done
+    relation: EMITS_EVENT
+    object: RING_SWITCH_DONE direction and result to Host
+    target: chip8-wifi-device
+    side: cross
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: device/wifi/chip8/dmac/dmac_ring.c, line_start: 67, line_end: 87, symbol: dmac_ring_switch_done}
+  - id: NL18-F03
+    critical: true
+    subject: Host hcc_rx_process for RING_SWITCH_DONE
+    relation: CONTROLS
+    object: current source rewrites param.type to WLAN_TX_COMP before FRW dispatch
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: ["The current receiver prevents source-proven end-to-end switch confirmation"]
+    evidence:
+      - {file: host/wifi/dpe/hcc/hcc_core.c, line_start: 217, line_end: 237, symbol: hcc_rx_process}
+forbidden_claims:
+  - {id: NL18-X01, critical: true, pattern: "Host.*直接调用.*dmac_ring_switch|dpe_tx_ring_switch.*CALLS.*dmac_ring_switch|Device.*不.*回执|当前.*必然.*确认.*成功"}

@@ -1,0 +1,31 @@
+case_id: CF16
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["Counter update context, state/threshold direction and done reset checked."]
+facts:
+  - id: CF16-F01
+    critical: true
+    subject: dpe_tx_flow_check ring state and tx_count
+    relation: CONTROLS
+    object: high Device traffic switches to Host and low Host traffic switches to Device
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/dpe_tx.c, line_start: 30, line_end: 51, symbol: dpe_tx_flow_check}
+  - id: CF16-F02
+    critical: true
+    subject: successful dpe_tx_ring_switch_done_handler
+    relation: CONTROLS
+    object: tx_count reset closes the measurement window
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/dpe_tx.c, line_start: 258, line_end: 280, symbol: dpe_tx_ring_switch_done_handler}
+forbidden_claims:
+  - {id: CF16-X01, critical: true, pattern: "每次调用.*切换|低.*切.*Host|Device.*维护.*tx_count"}

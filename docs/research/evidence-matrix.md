@@ -1,109 +1,92 @@
-# 架构候选证据矩阵
+# 面向 Agent 的知识图谱方案证据矩阵
 
-核验日期：2026-08-14
+日期：2026-08-25
 
 ## 1. 读表规则
 
-本矩阵只压缩 `source-ledger.md`、`solution-inventory.md` 和 `code-domain-linkage.md` 已登记的证据，不把“组件公开提供某项功能”外推为“该功能已在 WiFiDemo 上有效”。组件级事实与项目角色继续以 `solution-inventory.md` 为准；本文件比较由当前证据构造的 A/B 两个可归因、可证伪的主实验骨架，以及可附着其上的 0/1 查询模式。
+本矩阵比较市面方案采用了什么知识建立策略，以及它们怎样支持：
 
-A/B 不是候选空间穷尽声明。B01–B15 若发现新的独立决策轴、共享混杂或硬失败，可以要求下一轮拆分、增加或重定义实验臂；矩阵只描述当前预注册前的初始比较对象。
+- **Q1：自然语言/领域问题 → 具体代码片段**；
+- **Q2：具体代码片段 → 流程与领域解释**。
 
-每个结论单元格只允许以下四种状态：
+能力标记：`●` 表示官方材料明确提供；`◐` 表示部分覆盖或必须外接组件；`—` 表示不是该方案主线；`?` 表示公开材料不足。标记说明功能范围，不代表效果优越。
 
-- `supported by evidence`：已有登记证据直接支持该范围内的陈述；仍须同时读取 Agent evidence 与 Evidence provenance，不能把第一方材料冒充独立实验。
-- `architecturally accommodated`：架构已给出承载该能力的层、接口、事实权限和失效边界，但尚未证明 WiFiDemo 效果。
-- `unknown / benchmark required`：现有材料不足以裁决，必须由后续 Benchmark 回答。
-- `not satisfied`：当前设计没有满足该能力或硬门槛。
+证据等级：
 
-方括号内的 `Sxxx` 指向 `source-ledger.md`。架构状态、Agent evidence 和 Evidence provenance 是三条独立轴：
+- **独立实验**：研究者可复现的跨方案或跨 Agent 评估。
+- **作者评估**：论文作者或项目团队对自己方法的实验。
+- **第一方功能**：官方 README/文档证明接口存在，但不证明效果。
 
-- **Agent evidence**：A 受控实验；B 正式工作流/真实案例；C 社区包装；D 仅理论可接入。
-- **Evidence provenance**：independent / peer-reviewed / company-first-party / project-first-party。
+## 2. 核心矩阵
 
-两轴不得折叠。MCP 可调用、产品功能说明或开源协议只能证明接口或组件可用，不自动证明 Agent 效果。所有 WiFiDemo 候选工具实验在本轮仍未运行。
+| 方案/策略 | 代码知识 | 文档/领域知识 | 代码—文档链接 | Q1 领域→代码 | Q2 代码→解释 | 新鲜度机制 | Agent 接入 | 当前证据 | WiFi MAC 关键未知项 |
+|---|---:|---:|---:|---|---|---|---|---|---|
+| 词法检索（rg 等） | ◐ | ◐ | — | 精确词命中后读源码 | 从锚点继续搜索 | 直接读当前文件 | shell/内建工具 | 独立检索基线 [S001–S003] | 术语不匹配、关系扩展和 Target 隔离 |
+| 向量检索 | ◐ | ● | ◐ | 语义召回候选 chunk | 召回相似说明 | 需重切块/重嵌入 | 通用 RAG | 独立检索研究 [S001–S003] | 无答案拒答、错误 Target、相似不等于关系 |
+| Aider RepoMap | ● | — | — | 以符号/文件摘要召回 | 用依赖排序提供仓库概览 | 当前仓映射重建 | Aider 内建 | 第一方功能；独立基准含同类方法 [S001][S004] | C 宏和跨文件关系精度 |
+| Codebase-Memory | ● | — | — | MCP 符号/关系查询 | 沿图组织局部结构 | 增量索引 | MCP | 作者论文与第一方 Benchmark [S005][S006] | 预处理、Target 与 C 行为事实 |
+| CodeGraph | ● | — | ◐ | 自然语言/符号→explore→源码 | 调用/依赖/社区→局部解释 | 增量同步 | MCP/CLI | 第一方 7 仓 Agent Benchmark [S007] | 小样本；无 WiFi C、领域链接和独立复现 |
+| GitNexus | ● | ◐ | ◐ | context/explore 找符号与文件 | impact/社区形成模块视图 | 仓库重新分析 | MCP/浏览器 | 第一方功能 [S008] | C 解析、Target、领域解释准确率 |
+| Serena | ● | — | — | Agent 转为 symbol/definition/reference | 沿引用读取局部代码 | 语言服务器实时索引 | MCP | 第一方约 20 任务自评 [S037] | LSP 对宏、指针和跨 Target 的边界 |
+| Sourcegraph MCP / SCIP | ● | ◐ | ◐ | search + definition/reference | 符号引用与历史辅助解释 | 索引按提交更新 | MCP/开放索引协议 | 第一方功能 [S038] | 不含 CFG/DDG；产品与协议边界不同 |
+| RIG | ● | ◐ | ● | 构建/组件问题→目标、文件、测试 | 文件→组件依赖与测试架构 | 由构建工件重建 | 图接口给 Agent | 作者 8 仓×30 问×3 Agent [S042] | 只覆盖构建/测试架构；WiFi Target 仍需实测 |
+| Joern | ● | — | ◐ | 上层将问题转为 CPG 查询 | CFG/DDG/dataflow/slice→行为路径 | CPG 按 revision/Target 重建 | 脚本/server；需封装 | CPG 经典论文与第一方功能 [S014][S015] | 宏、函数指针、Target occurrence 与查询成本 |
+| codebadger | ● | — | ◐ | 自然语言→高层 MCP→Joern | 高层 slice/taint/dataflow→解释 | 依赖 Joern CPG | MCP | 作者 3 个真实案例 [S039] | 无受控 WiFi C 实验；案例不能当普遍效果 |
+| CodeQL | ● | — | ◐ | 专家/Agent 查询定位路径 | source-to-sink 与查询结果解释 | 数据库重建/增量能力依配置 | CLI/API；需工具封装 | 官方功能 [S013] | 许可、真实构建、C 问答成本与准确率 |
+| QLCoder | ● | ◐ | ◐ | 漏洞描述→查询合成→执行反馈 | 查询路径形成解释 | 重跑查询/数据库 | Agent + LSP + MCP | 作者 176 CVE/111 Java 项目对照 [S040] | 结果是 Java CVE 查询，不可外推 WiFi C |
+| Fraunhofer AISEC CPG | ● | — | ◐ | 需上层自然语言适配 | CPG pass/关系查询 | 重建图与 pass | 需自建接口 | 第一方功能 [S016] | Agent 工作流与 C/Target 效果数据不足 |
+| SVF / PhASAR / Frama-C | ● | — | — | 先找到代码锚点再专项分析 | 指针、值流、切片或证明 | 由 IR/分析输入重建 | 需自建高层工具 | 第一方功能 [S017][S018][S020] | 适用问题、资源成本与 Agent 封装收益 |
+| Graphify | ● | ● | ● | 文档/概念→query/path/explain→代码 | 代码社区/路径→report/wiki | 增量/重新生成；细节待测 | Skill/CLI/MCP | 第一方功能 [S021] | 链接 precision、Target、stale detection；memory 数字不适用 |
+| Understand Anything | ● | ● | ● | domain/flow 问答→结构实体 | 文件/函数→domain/flow/step | fingerprint 增量更新 | 内建 Agent/查询 | 第一方功能 [S009] | 无公开结构边、领域映射和 WiFi C 效果数据 |
+| RepoDoc | ● | ● | ● | 模块文档/交叉引用→API/代码 | RepoKG→模块文档/Mermaid | 双向影响传播与定向重生成 | 多 Agent 写作 | 作者 24 仓、8 语言评估 [S041] | 文档事实准确率、嵌入式 C、Target 与独立复现 |
+| LLM-Wiki | — | ● | ◐ | Wiki 解析概念；需外接代码锚点 | 探索结果编译为主题页 | 自演化 Wiki | Agent-native retrieval | 作者论文 [S022] | 不负责可靠 C 解析或源码链接 |
+| WiCER | — | ● | ◐ | Wiki-memory 检索；需外接代码锚点 | compile/evaluate/refine 维护解释 | 评测驱动精炼 | Agent 工作流 | 作者论文 [S023] | 不是代码图；代码与版本证据需另建 |
 
-## 2. 固定维度矩阵
+## 3. 按建立策略而不是产品名比较
 
-原矩阵的固定维度全部保留，但当前评估对象改为两个主实验骨架。这里的状态描述架构是否容纳该职责，不是产品得分或完备性证明；凡涉及实际准确率、资源、Agent 效果或采用性，均保守留给 Benchmark。
-
-| 候选 | Target/宏 | 直接调用 | 间接调用 | CFG | dataflow | Host/Device Event | 源码证据 | 代码—领域链接类型 | 链接 provenance | 双向导航 | Target/revision 绑定 | 链接失效/修复 | 歧义/abstention | 索引 | 增量 | 查询 | Agent 效果 | 领域知识 | 离线 | 许可证 | 维护 | 复现 |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| A Agent 原生的联邦语义服务骨架 | architecturally accommodated | architecturally accommodated | architecturally accommodated | architecturally accommodated | architecturally accommodated | architecturally accommodated | architecturally accommodated | architecturally accommodated | architecturally accommodated | architecturally accommodated | architecturally accommodated | architecturally accommodated | architecturally accommodated | architecturally accommodated | architecturally accommodated | architecturally accommodated | unknown / benchmark required | architecturally accommodated | architecturally accommodated | unknown / benchmark required | unknown / benchmark required | unknown / benchmark required |
-| B Target-specific CPG 主骨架 | architecturally accommodated | architecturally accommodated | architecturally accommodated | architecturally accommodated | architecturally accommodated | architecturally accommodated | architecturally accommodated | architecturally accommodated | architecturally accommodated | architecturally accommodated | architecturally accommodated | architecturally accommodated | architecturally accommodated | architecturally accommodated | architecturally accommodated | architecturally accommodated | unknown / benchmark required | architecturally accommodated | architecturally accommodated | unknown / benchmark required | unknown / benchmark required | unknown / benchmark required |
-
-### 2.1 八层覆盖、事实权限与证据边界
-
-| 候选 | 主责骨架层 | Agent evidence | Evidence provenance | source/revision/Target 绑定 | 事实权限 | 是否需要核验 | 当前结论状态 |
-|---|---|---|---|---|---|---|---|
-| A Agent 原生的联邦语义服务骨架 | 主责第 2 层身份 spine 与第 3 层联邦语义 provider；共享第 1、4–8 层合同，第 7 层实现为 federation planner | D | project-first-party；底层检索、索引、分析与 Agent 组件另有 independent、peer-reviewed、company-first-party 证据 [S001–S020][S024–S028] | 所有 provider 请求必须携带 `repository_id`、`repository_revision`、Target/build profile 与输入 digest；`CodeEvidence` 绑定代码 revision/occurrence/artifact/span，`DomainEvidence` 才绑定 `source_revision_id`/`SourceLocation` [S011][S012][S029] | provider 只能在其生成器与输入范围内产生 `EXTRACTED`/`RULE_DERIVED`；`EXTRACTED code_fact` 只需 code evidence，不得被强制填领域 citation；编排层不新造事实；Agent 只能交付证据包或明确拒答 | 是；B01–B07、B10–B12、B14–B15 | unknown / benchmark required |
-| B Target-specific CPG 主骨架 | 主责第 2 层 Target occurrence/CPG 导入与第 3 层 Target-local CPG；共享第 1、4–8 层合同，第 7 层实现为 scoped CPG gateway | D | project-first-party；CPG 与深分析能力由 project-first-party 材料支持，WiFiDemo 正确性无直接实验 [S014–S018] | 每个 CPG snapshot 必须绑定 `repository_id`、`repository_revision`、Target/build profile、frontend/config digest；代码证据只用 `CodeEvidence`，领域来源独立用 `DomainEvidence.source_revision_id` [S015][S016][S029] | CPG/parser/analyzer 只产生其输入范围内的 `EXTRACTED`/`RULE_DERIVED`；跨域链接按 predicate/status 同时要求 code/domain evidence；Agent 不得把 traversal 结果越权升级 | 是；B01–B06、B10–B12、B14–B15 | unknown / benchmark required |
-
-### 2.2 八层组件映射
-
-第 6 层 assertion layer 是共同基础设施，不是 A/B 的差异：两族都必须使用 `code-domain-linkage.md` 定义的身份、四级 machine status、provenance、冲突、失效和重验证合同。物理上同库或分库不是架构族定义。
-
-| 层 | A Agent 原生的联邦语义服务骨架 | B Target-specific CPG 主骨架 | 共同约束 |
+| 建立策略 | 代表方案 | 主要收益假设 | 可证伪问题 |
 |---|---|---|---|
-| 1 输入与快照 | snapshot registry 为各语义 provider 冻结输入 | snapshot registry 为每个 Target CPG 冻结输入 | repository、`repository_revision`、Target Profile、构建命令、生成物和 digest 一致 |
-| 2 身份与基础索引 | Clang/SCIP/Kythe 类 occurrence、符号、引用索引作为跨 provider identity spine | CPG 导入前建立 Target-qualified occurrence 与跨图 identity 映射 | 共享源码在不同 Target 下是不同 occurrence；源码证据可定位 [S010–S012] |
-| 3 语义分析提供者 | Agent 编排 compiler/index/CPG/LLVM/deep provider；按问题选择，不预设统一物化表示 | Target-local CPG 是常用程序事实主干；LLVM/deep provider 按缺口补充 | 分析事实携带 generator/version/config；函数指针、宏和数据流效果均待测 [S014–S020] |
-| 4 领域原始来源 | 规范、设计文档、issue、commit、ADR 与人工资料原样注册 | 同 A | 原始来源只证明自身内容，不自动证明代码关系 |
-| 5 版本化来源注册 | 独立 source registry | 同 A | `SourceRevision`/`SourceLocation`/license/accessed_at 与代码 `RepositoryRevision` 分离 [S029] |
-| 6 断言与链接层 | 共同 assertion service | 同 A | Assertion 使用 `evidence[]` 判别联合：代码事实需 `CodeEvidence`，领域声明需 `DomainEvidence`，代码—领域链接需两者；四级权限、Agent 写入边界与 lifecycle 不因主干而改变 |
-| 7 查询编排与证据装配 | federation planner 选择 provider、交叉核验并装配 evidence bundle | scoped CPG gateway 先查询 Target 图，必要时调用外部 provider，再装配 evidence bundle | 编排不得新造事实；预算、截断、拒答和 raw DSL fallback 必须可观测 |
-| 8 Agent 交付 | 高层语义工具是主入口 | 同一高层语义合同映射到 CPG 查询；raw traversal 仅受控回退 | 最终答案必须引用正确 `repository_revision`、Target、`file:line`/原始来源，或明确拒答 |
+| 普通文本/符号导航 | rg、Serena、SCIP | 成本最低，精确符号和字面量足够解决大量任务 | 加图后是否真的提高 gold evidence recall 或最终答案正确率？ |
+| 轻量结构图 | CodeGraph、Codebase-Memory、GitNexus | 用 AST/调用/依赖减少 Agent 盲目探索 | C 宏、Target 和函数指针造成多少错误边？ |
+| 深度程序图/专项分析 | Joern、codebadger、CodeQL、SVF 等 | 对 dataflow、slice、间接调用等复杂问题提供可验证路径 | 正确率收益是否覆盖建图、查询和外部语义成本？ |
+| 生成式领域/文档知识 | UA、Graphify、RepoDoc、LLM-Wiki/WiCER | 把跨文件结构组织为可理解的领域与流程资产 | 生成主张有多少无证据、遗漏或过期？ |
+| 显式/推断链接 | Graphify、UA、RepoDoc | 让领域→代码和代码→解释形成闭环 | 链接 precision/recall、新鲜度和版本/Target 正确率如何？ |
+| 构建工件锚定 | RIG、Clang compdb | 用实际编译事实隔离 Target、组件和测试 | 能否覆盖 WiFiDemo 的四个 Target，且不泄漏未编译源码？ |
 
-## 3. 当前两个主实验骨架
+## 4. 公开数据能够说明什么
 
-### A — Agent 原生的联邦语义服务骨架
+| 数据 | 能说明 | 不能说明 |
+|---|---|---|
+| Agent Retrieval Bench：427 样本、25 仓、308 快照；Agent 轨迹在 27%–35% 样本未命中任何 gold file [S001] | 代码检索仍是独立瓶颈，多种检索互补 | 任一知识图谱在 WiFi C 上一定胜出 |
+| ContextBench：1,136 任务、66 仓、8 语言、4 模型、5 Agent [S003] | explored context 与 utilized context 要分开测 | 图关系或领域链接正确率 |
+| CodeGraph 第一方：7 仓、每臂 4 次的架构问答，工具调用 -88%、时间 -53%、Token -62%、成本 -44% [S007] | 轻量结构图可能显著减少探索成本 | 独立效果、复杂 C 行为、领域问答与多 Target 正确性 |
+| RepoDoc 作者评估：24 仓、8 语言，报告 coverage/completeness 与生成/更新成本改善 [S041] | 图驱动交叉引用文档及增量更新值得纳入实验 | WiFi MAC 领域事实、链接精度或独立优越性 |
+| RIG 作者评估：8 仓、每仓 30 问、3 Agent，平均准确率 +12.2%、时间 -53.9% [S042] | 构建工件产生的证据图可能帮助 Agent 回答架构问题 | 数据流、协议流程和生成文档质量 |
+| QLCoder 作者评估：176 CVE、111 Java 项目，正确查询 53.4% vs 10% [S040] | 查询合成结合执行反馈可显著优于纯 Agent 生成 | C/WiFi 问答效果，或 CodeQL 比 Joern 更优 |
 
-- **Agent 高层接口**：`resolve_target_context`、`find_code_evidence`、`compare_targets`、`explain_relation`、`trace_event`、`get_assertions`、`verify_candidate`、`request_deep_analysis`。每次调用输入范围、预算和所需证据类型；输出有界 evidence bundle、截断标记、验证状态和拒答理由。
-- **优势**：可按任务选择 compiler/index/CPG/deep provider；保持 provider 可替换；能把昂贵分析推迟到问题出现时；高层接口直接面向 Agent 任务而非某个 DSL。
-- **风险**：跨 provider identity、结果语义和 snapshot 对齐复杂；多次调用可能增加延迟、Token 与失败面；若 planner 选错工具或未执行核验，联邦能力不会自动转化为正确答案。
-- **适用任务**：跨 Target 比较、按需深分析、需要组合代码事实与领域来源、任务类型变化大的诊断与影响分析。
-- **不可直接声称的能力**：不能声称联邦方式比 CPG 更准确、更快或更易运维；不能因 provider 可接入就声称函数指针、CFG/dataflow 或 Event 路径正确；不能把共同 assertion layer 的治理能力计为 A 独有优势。
-- **可证伪条件**：若 B01–B06/B11 的事实正确性低于 B，或 B10/B14 显示工具选择、跨 provider join、调用与延迟成本抵消模块化收益，则 A 的主张被削弱；若无法稳定绑定同一 snapshot/Target，则该主实验臂硬失败，并可触发后续拆分或重定义。
-- **当前结论状态**：`unknown / benchmark required`。
+这些数字的任务、模型、分母和指标不同，不能合并成总分或直接排名。
 
-### B — Target-specific CPG 主骨架
+## 5. 当前收敛结果
 
-- **Agent 高层接口**：与 A 使用同一合同；实现首先将 `resolve_target_context`、`find_code_evidence`、`compare_targets`、`explain_relation` 和 `trace_event` 映射到指定 Target CPG，缺口再交给 assertion、compiler 或 LLVM/deep provider；原始 traversal DSL 只作为有审计的回退。
-- **优势**：常用代码关系位于统一可遍历表示中；多跳调用、CFG/dataflow 与 source location 可用同一查询面表达；查询与路径裁剪可以集中治理。
-- **风险**：C frontend 是否忠实接收真实宏/include/生成物尚未验证；每 Target 分图的资源和跨图身份成本未知；overlay/custom semantics 可能混合推断与确定性事实；DSL/JVM 运维和结果截断可能影响 Agent。
-- **适用任务**：Target-local 多跳结构查询、调用/数据流路径、需要稳定重复查询的代码关系分析，以及可通过 CPG 表达的 Event 候选路径。
-- **不可直接声称的能力**：不能因名称为 CPG 就声称真实编译视角、函数指针精度、完整 dataflow 或低成本；不能把 assertion lifecycle、领域知识与来源注册计为 B 独有能力。
-- **可证伪条件**：若 B01–B06/B11 显示 Target 泄漏、宏/occurrence/边错误，或 B10/B14 显示预构图成本、查询截断和运维负担高于其任务收益，则 B 的主张被削弱；若无法回到正确 revision/Target/file:line，则该主实验臂硬失败，并可触发后续拆分或重定义。
-- **当前结论状态**：`unknown / benchmark required`。
+### 5.1 后续实验应保留的条件
 
-## 4. 0/1 查询模式矩阵
+1. **普通导航**：词法 + 符号工具，作为最低成本基线。
+2. **轻量代码图**：以 CodeGraph 为代表，检验结构图的额外收益。
+3. **深度程序分析**：以 Joern + codebadger 式高层工具为代表，检验复杂行为问题收益。
+4. **代码图 + 文档/领域知识 + 链接**：借鉴 Graphify、UA、RepoDoc 的策略，检验完整双向问答。
+5. **构建事实补强**：所有涉及 Target 的条件都使用真实编译工件；这是公平性约束，不是独立答案系统。
 
-0/1 是附着在 A 或 B 上的查询模式，不是第三个程序事实主干。模式 1 的轻量发现结果只能生成候选、排序或压缩上下文；任何强语义结论都必须回到对应主骨架核验，并沿用共同 assertion layer 的事实权限。
+具体产品可以替换，实验条件名称不预设最终实现。
 
-| 变体 | 程序事实主干 | 查询路径 | 轻量发现组件 | 强事实核验点 | 成立条件 | 主要失败方式 | 当前结论状态 |
-|---|---|---|---|---|---|---|---|
-| A0 联邦骨架 + 直接查询 | A | Agent 高层接口直接路由到一个或多个语义 provider，并装配证据 | 无前置轻量发现；词法/no-graph 只作 Benchmark 基线或显式回退 | 返回结果的实际 provider 与 snapshot/Target scope | 直接工具选择与 provider join 在正确性和成本上可接受 | 无效工具调用、provider fan-out、跨 provider identity 错配 | unknown / benchmark required |
-| A1 联邦骨架 + 轻量发现后核验 | A | 词法/向量/RepoMap/轻量结构先产候选，再由联邦 provider 核验 | 可替换的 discovery/rerank 组件 | A 的 compiler/index/CPG/LLVM/deep provider | Token、调用和延迟的净减少大于错误候选、漏召回、核验与一致性成本 | 发现层漏掉 gold、错误 Target、核验次数抵消收益、stale discovery | unknown / benchmark required |
-| B0 CPG 骨架 + 直接查询 | B | Agent 高层接口直接查询指定 Target CPG，缺口才调用外部 provider | 无前置轻量发现；词法/no-graph 只作 Benchmark 基线或显式回退 | Target-specific CPG 与必要的外部 deep provider | CPG 查询可控且预物化成本能被重复任务摊薄 | traversal 扩张、结果截断、错误 frontend fact、跨 Target 误查 | unknown / benchmark required |
-| B1 CPG 骨架 + 轻量发现后核验 | B | 轻量组件定位文件/符号/子图，再在指定 Target CPG 中核验 | 可替换的 discovery/rerank 组件 | Target-specific CPG 与必要的外部 deep provider | Token、调用和延迟的净减少大于错误候选、漏召回、核验与双索引一致性成本 | discovery/CPG snapshot 不一致、候选裁剪破坏路径、维护双系统无净收益 | unknown / benchmark required |
+### 5.2 不能跨过的门槛
 
-模式 1 只有在 B07、B10、B14 的分层指标共同显示净收益时才成立；不得仅凭 Recall@k、单次 Token 或单次查询时延宣布胜出。模式 0 也不是“无检索”：它可以使用主骨架自身索引和有范围查询，只是不增加独立轻量发现前置层。
+- 答案必须定位到正确 revision、Target 和 `file:line`。
+- 未编译分支不能作为当前 Target 的确定事实。
+- Host/Device 交互必须表示为 Event/Message，不能伪造跨二进制 `CALLS`。
+- LLM/embedding 关系必须标为候选或推断，不能覆盖编译器/源码证据。
+- 代码或文档变化后，过期链接必须可检测、可审计。
+- 事实准确性、检索效率和最终 Agent 正确率分别报告，不用单一 aggregate score 掩盖失败。
 
-## 5. 共同硬门槛与不可混淆项
+## 6. 当前结论
 
-当前两个主实验骨架都必须满足：
-
-1. **Target-specific compilation view**：代码实体绑定真实编译命令、宏集、`repository_revision` 和 Target；共享源码在不同 Target 下形成不同 occurrence [S010–S012]。
-2. **typed 可定位证据**：代码事实通过 `CodeEvidence` 回到 `repository_revision`、TargetOccurrence、SourceArtifact、文件 span 与生成器，不要求 `SourceRevision`；领域声明通过 `DomainEvidence` 回到 `source_revision_id` 与 `SourceLocation`；跨域链接按 predicate/status 同时携带两者 [S025][S029]。
-3. **不确定性治理**：规则、Agent、LLM、embedding 或聚类产生的软链接不能覆盖确定性代码事实，且必须保存 provenance、冲突、失效与重新验证 [S021–S025][S029]。
-
-共同 assertion layer、source registry、snapshot consistency、许可证审计与 Agent evidence 双轴是共享条件，不能作为 A/B 胜负项。对当前初始 arms，A/B 的核心差异只在程序事实主干，0/1 的核心差异只在是否增加轻量发现后核验；这不排除 Benchmark 依据新证据拆分、增加或重定义 arms。
-
-## 6. 明确保留的待测问题
-
-1. 四个 WiFiDemo Target 的 compilation database 是否完整、可重复并能驱动 A/B；
-2. 联邦 provider 与 CPG frontend 对宏分支、函数指针、ops 表、CFG/dataflow 和 Event 路径的实际 precision/recall；
-3. A 的 planner/tool selection 与跨 provider identity join 是否稳定，B 的 Target 分图与 traversal 是否稳定；
-4. 模式 1 对 Recall@k、MRR、context yield、最终答案、Token、调用、延迟和一致性成本的净影响；
-5. 代码稳定 ID 跨 revision 的保留率，以及领域链接在改名、移动、宏变化和 Target 删除后的失效/修复质量；
-6. 高层接口的工具选择正确率、无效调用、raw DSL fallback、截断、拒答和最终 Agent 正确性；
-7. 各具体组合的全量/增量资源、故障隔离、离线复现、许可证与替代路径。
+现有证据足以说明成熟方案正在收敛于三类互补能力，但不足以宣布某个现成产品同时、准确地覆盖 WiFi MAC 的代码知识、领域知识和双向链接。开源优先是效果接近后的 tie-break，而不是在 Benchmark 前替代准确性判断。

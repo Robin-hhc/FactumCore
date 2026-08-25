@@ -1,0 +1,20 @@
+case_id: NL03
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["Core source anchors checked at 8102322; coverage and independent review pending."]
+facts:
+  - id: NL03-F01
+    critical: true
+    subject: hcc_device_rx_handler hdr.channel and hdr.msg_type
+    relation: CONTROLS
+    object: whole TX message versus ordinary event payload passed to FRW
+    target: chip8-wifi-device
+    side: device
+    confidence: certain
+    aliases: ["HCC_MSG_TYPE_TX preserves desc and frame; ordinary events pass payload"]
+    evidence:
+      - {file: device/wifi/chip8/hcc/hcc_device.c, line_start: 89, line_end: 112, symbol: hcc_device_rx_handler}
+forbidden_claims:
+  - {id: NL03-X01, critical: true, pattern: "VAP_ADD.*HCC_MSG_TYPE_TX|两类消息.*完全.*同一.*payload"}

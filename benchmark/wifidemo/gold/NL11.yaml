@@ -1,0 +1,32 @@
+case_id: NL11
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["HAL ops indirection and concrete wrapper targets checked; independent review pending."]
+facts:
+  - id: NL11-F01
+    critical: true
+    subject: g_hal_common_ops.hal_ring_push
+    relation: MAY_CALL
+    object: hal_common_ring_push then wifi_ring_put
+    target: chip8-wifi-host
+    side: host
+    confidence: candidate
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/hal/hal_main.c, line_start: 21, line_end: 29, symbol: hal_common_ring_push}
+      - {file: host/wifi/dpe/hal/hal_main.c, line_start: 56, line_end: 81, symbol: g_hal_common_ops}
+  - id: NL11-F02
+    critical: true
+    subject: g_hal_common_ops.hal_ring_pop
+    relation: MAY_CALL
+    object: hal_common_ring_pop then wifi_ring_get
+    target: chip8-wifi-host
+    side: host
+    confidence: candidate
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/hal/hal_main.c, line_start: 31, line_end: 38, symbol: hal_common_ring_pop}
+forbidden_claims:
+  - {id: NL11-X01, critical: true, pattern: "dpe_tx_send.*直接调用.*wifi_ring_put|不存在.*函数指针"}

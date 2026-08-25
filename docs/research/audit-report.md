@@ -1,102 +1,142 @@
-# 架构研究证据终审报告
+# 知识图谱建立策略研究终审报告
 
-审计日期：2026-08-14
+审计日期：2026-08-25
 
-最终修复基线：`6f4422c62252392d9e6a27c9095f9f6fbfb3879d`
+审计内容基线：`931909f`（论文正文提交；本报告提交前）
 
 ## 1. 审计结论
 
-本轮终审把当前公开证据操作化为 A Agent 原生联邦语义服务与 B Target-specific CPG 两个可归因、可证伪的主实验骨架，以及 A0、A1、B0、B1 四个初始变体。它们不是候选空间穷尽或唯一产品选型；B01–B15 可以因新决策轴、混杂或硬失败要求拆分、增加或重定义实验臂。
+现行研究已经从内部实现层和预设完整方案，重组为三个面向 Agent 的知识建立类别：
 
-本轮关闭了此前的范围措辞、证据 schema、WiFiDemo 浮动 checkout、S024 示例百分比和外部短 hash 问题。没有运行 WiFiDemo 构建、A0/A1/B0/B1、候选工具或性能实验，也没有新增本地测量。源码/配置观察与 compiler-artifact ground truth 已明确分开。
+1. 代码知识；
+2. 文档与领域知识；
+3. 代码—文档双向链接。
+
+正文首先以代码检索、程序分析、文档/Wiki 和跨项目链接证据论证三项能力，再分别比较市面方案。CodeGraph、Serena/SCIP、Joern/codebadger 位于同一个代码知识类别，只区分导航与程序分析深度；Graphify、Understand Anything、RepoDoc 按实际能力跨类别出现；LLM-Wiki/WiCER 只作为文档知识管理方法。
+
+本轮没有运行 WiFiDemo 构建、候选工具或 Agent 效果实验，也没有宣布最终赢家。C0–C4 和 B01–B15 只是后续可证伪的实验条件与问题。效果相近时才以开放许可证、离线复现和适配成本作为 tie-break。
 
 ## 2. 独立重算结果
 
+以下数字均从当前文件重新计算，没有沿用上一版报告：
+
 | 项目 | 实际数量 | 重算口径 |
 |---|---:|---|
-| 来源记录 | 40 | `source-ledger.md` 中 `### S001` 至 `### S040`，编号连续 |
-| `claim-verified` | 14 | 只计来源记录内精确的 `- 状态：claim-verified` |
-| `primary-read` | 26 | 只计来源记录内精确的 `- 状态：primary-read` |
-| 论文材料 | 15 | 按来源记录的非互斥类型和原始材料逐条复核 |
-| AI 公司官方材料 | 5 | 按 `公司官方实践`/`AI 公司官方实践` 的来源记录复核 |
-| 开源项目材料 | 30 | 按官方仓库、项目文档、公开实验代码/Benchmark 伴随材料逐条复核 |
-| 标准记录 | 1 | S029；一个记录组包含 SWHID、PROV-O 与 SARIF |
-| 正文数字扫描命中行 | 9 | `wifi-mac-knowledge-architecture-paper.md` 第 90、92、94、96、116、130、133、135、137 行 |
-| 含效果或对照数字的行 | 8 | 上述 9 行中第 92 行只报告样本/标注规模；S024 的第 132 行不在数字扫描内 |
-| 逐项目档案 | 28 | R01–R09 共 9、A01–A12 共 12、H01–H07 共 7 |
-| 当前主实验骨架 | 2 | A 与 B；是初始实验设计，不是完备候选数 |
-| 当前待测变体 | 4 | A0、A1、B0、B1；0/1 是查询模式 |
-| Benchmark | 15 | B01–B15 连续，共 15 项 |
+| 来源记录 | 42 | `source-ledger.md` 中 `### S001` 至 `### S042`；连续性检查为 `True` |
+| `claim-verified` | 16 | 精确匹配 `状态：claim-verified` |
+| `primary-read` | 26 | 精确匹配 `状态：primary-read` |
+| 论文材料 | 17 | 来源记录中的非互斥类型统计 |
+| AI 公司官方材料 | 5 | 来源记录中的非互斥类型统计 |
+| 开源项目材料 | 31 | 来源记录中的非互斥类型统计 |
+| Benchmark 问题 | 15 | `benchmark-backlog.md` 中恰好 15 行 `B01`–`B15` |
+| 本地 Markdown 链接 | 10 | 对 `docs/research/*.md` 的相对链接逐项解析 |
+| 本地链接缺失 | 0 | `Test-Path -LiteralPath` 检查 |
 
-来源类型是非互斥分布，不能相加为 40。带论文和官方仓库的同一 S 记录可以同时进入论文与开源项目材料分组，但来源总数仍只计一次。
+来源类型非互斥，不能把 17、5、31 相加为 42。一个来源记录可能同时包含论文与官方开源仓库。
 
-## 3. 数字、样本、基线与限制审计
+## 3. “2+1”能力桥接论证审计
 
-正文数字扫描共命中 9 行。每行均有 S 编号和直接原始 URL；相关 ledger 记录保存样本、模型/Agent、对照、指标、数字语境和外推限制。
+正文第 2 章具备计划要求的完整推导链：
 
-| `wifi-mac-knowledge-architecture-paper.md` 行 | 来源 | 审计判断 |
-|---:|---|---|
-| 90 | S001 | 427 样本与 27%–35% 漏检均限定为文件检索，不外推程序语义或 WiFi Target |
-| 92 | S002、S003 | 只报告查询、标注、任务、仓库、语言和 Agent 样本规模；不计效果数字行 |
-| 94 | S005、S006 | 83%/92%、Token/调用倍数保留 31 仓第一方语境；当前 README 能力不与论文快照混写 |
-| 96 | S007 | 88%/53%/62%/44%/80% 保留 7 仓、每臂 4 次、第一方架构问答语境；不解释为调用边准确率 |
-| 116 | S039、S040 | 8,000 是单案例规模；53.4% 对 10% 限定为 176 CVE、111 个 Java 项目的作者对照 |
-| 130 | S022、S023 | Wiki 数字保留多跳问答、LLM-as-judge 和非代码任务限制 |
-| 133 | S025 | 未公开样本量的 GitHub 第一方 A/B；不外推产品效果 |
-| 135 | S026、S027 | 5G/Skill 结果保留任务类型、版本与负收益语境，不外推 WiFiDemo |
-| 137 | S028、S030 | RepoMem 限定 Python bug localization；108,000 行/283 sessions 只是观察性案例规模 |
-
-S024 保持 `primary-read`，其台账不再记录精确示例百分比或把示例 token 算术当指标；这不改变 40 来源、14 `claim-verified` 或正文数字行计数。其余效果/对照数字均由相应 `claim-verified` 记录支撑。
-
-## 4. typed evidence、权限与生命周期合同
-
-`code-domain-linkage.md` 及正文现行合同为：
-
-1. 代码主体按 `Repository`、`RepositoryRevision`、`SourceArtifact`、`CodeEntity`、`TargetProfile`、`TargetOccurrence`、TU 和 code source span 分离；领域来源另用 `SourceRevision`/`source_revision_id` 与 `SourceLocation`。
-2. `Evidence` 是判别联合。`kind: code` 引用代码 `RepositoryRevision`、`TargetOccurrence`、`SourceArtifact` 和 code source span；`kind: domain` 才引用领域 `SourceRevision`、`SourceLocation` 与 quoted digest。
-3. Assertion 使用 `evidence[]`，最低 evidence kind 由 `predicate_class × machine_status` 决定：`code_fact` 需 code，`domain_statement` 需 domain，`code_domain_link` 需两者；纯代码 `EXTRACTED` 不要求也不得伪造领域 citation。
-4. `EXTRACTED`、`RULE_DERIVED`、`INFERRED_CANDIDATE`、`CURATED` 仍是唯一四种 `machine_status`。Agent 只能创建 `INFERRED_CANDIDATE`，不能自行升级权限。
-5. `active`、`stale`、`contradicted`、`invalid`、`superseded` 仍是 lifecycle 而非第五种权限；代码、Target、规则、领域来源或模型变化按实际 evidence dependency 有界失效。
-6. Host 与 Device 保持独立编译视角，只通过 `Event`/`Message` 断言及分段 code/domain evidence 连接；禁止制造跨二进制 `CALLS` edge。
-
-## 5. WiFiDemo 可复现范围
-
-| 字段 | 核验值 |
-|---|---|
-| 只读仓路径 | `E:/WiFiDemo/WiFiDemo` |
-| canonical origin | `https://github.com/Robin-hhc/WiFiDemo.git` |
-| full HEAD / `repository_revision` | `8102322afbe5f81ecf6a35601ac4731ed14feb2d` |
-| 核验时 branch | `main`；仅描述 checkout，不作为快照身份 |
-| dirty 状态 | `clean`；tracked unstaged、tracked staged、untracked 均为空 |
-| tracked patch SHA-256 | `not applicable`；clean snapshot 没有 tracked patch |
-| untracked manifest SHA-256 / 范围 | `not applicable`；0 path，空范围 |
-
-只读命令为 `git remote get-url origin`、`git rev-parse HEAD`、`git status --porcelain=v1 --untracked-files=all`、`git diff --quiet HEAD --`、`git diff --cached --quiet HEAD --` 和 `git ls-files --others --exclude-standard`；两个 diff 命令退出 0，status/untracked 输出为空。W01–W08 的 CMake/Python/C 路径与行号只是该 revision 的源码/配置观察。未来 B01/B02 ground truth 必须来自成功构建后的 compiler argv、`flags.make`/compilation database、`-dM`/`-E`、对象/符号和生成物；本轮未运行这些步骤。
-
-## 6. 候选范围与现行设计文档
-
-`wifi-mac-knowledge-architecture-paper.md`、`evidence-matrix.md`、`benchmark-backlog.md` 和 2026-08-14 design spec 均将 A/B 表述为当前证据构造的初始实验 arms，明确不是候选空间穷尽，且允许 Benchmark 拆分、增加或重定义 arms。现行决策文档不再出现旧三族的标识符。
-
-`docs/superpowers/specs/2026-08-13-wifi-mac-knowledge-architecture-research-design.md` 是未修改的历史设计文档；它不属于现行决策扫描范围，也没有被改写成当前结论。
-
-## 7. 外部案例不可变 revision
-
-2026-08-14 对三个官方 GitHub 仓执行 `git ls-remote --tags`，结果为：
-
-| 仓库/ref | ref 类型与 object | 固定 commit |
+| 论证步骤 | 正文证据 | 审计判断 |
 |---|---|---|
-| Zephyr `refs/tags/v4.4.0` | annotated tag object `4f50f0ba8905f27b2f60123d0ee0934fda6fe134` | dereferenced `684c9e8f32e4373a21098559f748f06915f950c9` |
-| RIOT `refs/tags/2026.04.01` | annotated tag object `56ab5471996e422657d7fac81bd76da3b07378df` | dereferenced `4a70282b1f1ac6e004138b4ada684a4dc4639653` |
-| Contiki-NG `refs/tags/release/v5.1` | lightweight tag；虽含 `/`，不是 branch | direct commit `2b87baf3ebdde3c8e37ca791d2bc84bfd76c49a4` |
+| 检索证据 → 代码知识 | Agent Retrieval Bench、CORE-Bench、ContextBench | 明确区分候选召回、实际使用上下文和程序事实 |
+| 结构图/程序分析 → 行为边界 | CodeGraph、Codebase-Memory、Joern、codebadger、QLCoder、RIG | 轻量导航与深度分析属于同一连续谱；均不自动产生领域意图 |
+| 文档/Wiki → 领域解释与信息损失 | UA、Graphify、RepoDoc、LLM-Wiki、WiCER | 原始文档、生成资产和 Wiki 分开；生成文本不替代代码证据 |
+| 跨项目证据 → 双向链接 | Graphify、UA、RepoDoc、RIG | 显式引用、语义映射、影响传播和构建锚定被分别说明 |
+| 结论性质 | 正文第 2.4 节 | 明确标为本文的跨来源研究综合，不写成单篇论文的充分必要定理 |
 
-`source-ledger.md` 同时记录 annotated tag object 与 dereferenced commit；`wifi-mac-knowledge-architecture-paper.md` 和 `benchmark-backlog.md` 使用完整 commit object ID，不再只写短 hash。
+因此“三项能力是必要能力集合”在措辞上有证据边界；“三项能力存在就一定准确”仍被明确否定。
 
-## 8. URL、本地交叉引用与有效性边界
+## 4. 跨类别项目与排除项审计
 
-`wifi-mac-knowledge-architecture-paper.md` 的本地研究附录链接指向 source ledger、solution inventory、WiFiDemo workload casebook、code-domain linkage、evidence matrix 和 benchmark backlog；提交前对六个目标逐项复核。新增外部 revision 只来自官方 GitHub remote，不使用搜索页或二手转述。
+### 4.1 代表项目覆盖
 
-本终审不等于候选实验通过。B01–B15 仍须裁决 Target frontend、宏/active source、函数指针/ops、alias/dataflow/slice、稳定 ID、断言失效/修复、最终 Agent 正确性、资源、离线复现与逐组件许可。Sourcegraph MCP 产品许可、自托管和部署边界仍为 `unknown`；开放 SCIP 协议不能替代产品许可审计。
+| 项目 | 代码知识 | 文档/领域知识 | 链接 | 两类问答过程 | 审计结果 |
+|---|---:|---:|---:|---:|---|
+| CodeGraph | 是 | 否 | 源码/结构回链 | 是 | 轻量代码图代表，不被包装成完整方案 |
+| Joern/codebadger | 是 | 否 | 分析路径回源码 | 是 | 深度程序分析代表，不被预设为赢家 |
+| Graphify | 是 | 是 | 是 | 是 | 在各适用类别重复分析 |
+| Understand Anything | 是 | 是 | 是 | 是 | 在各适用类别重复分析 |
+| RepoDoc | 是 | 是 | 是 | 是 | 在各适用类别重复分析 |
+| GitNexus | 是 | 部分 | 部分 | 是 | 代码 context/impact 为主，领域能力不夸大 |
+| LLM-Wiki/WiCER | 否 | 是 | 必须外接 | 是 | 只作为文档知识组织方法 |
+| RIG | 构建/测试知识 | 部分架构说明 | 构建证据 | 是 | 只补强 Target/组件事实 |
 
-## 9. 最终检查记录
+### 4.2 现行分类中已移除的内容
 
-提交前和暂存后均须复跑：typed evidence 定向扫描、WiFiDemo snapshot/只读状态、非穷尽措辞、S024 精确示例百分比、三外部 full SHA、40/14/15 计数、现行文档旧标识符、本地链接、`git diff --check`、staged name list，以及主工作区/WiFiDemo 与初始基线对比。实际命令、退出码和最终 commit 记录在 `.superpowers/sdd/2026-08-14-research-synthesis-and-candidate-reassessment/final-fix-report.md`。
+主论文、方案清单、证据矩阵和 Benchmark 不再使用旧的实现层、双主干或四变体作为市场方案分类。通用上下文装载、提示模板和对话记忆没有被列为独立知识图谱产品；只有它们与代码/文档实体建立可核验链接时，相关机制才可能作为局部接口或实验控制。
+
+历史 design specs 和 plans 保持原样，不纳入现行分类术语扫描。
+
+## 5. 数字、来源所有权与限制审计
+
+正文共有 9 个包含样本或效果数字的实质性段落：
+
+| 正文当前行 | 来源 | 所有权与审计边界 |
+|---:|---|---|
+| 46 | S001 | 独立检索实验；427 样本、25 仓、308 快照和 27%–35% 漏检只适用于文件检索 |
+| 48 | S002、S003 | 独立基准；报告查询/标注/任务/仓库/语言/模型/Agent 样本规模，不外推 WiFi C |
+| 56 | S022、S023 | 作者文档 QA 实验；F1、dangling links、catastrophic rate 和恢复质量不作为代码效果 |
+| 62 | S041 | RepoDoc 作者评估；24 仓、8 语言及覆盖/完整性/成本数字不证明 Target 或领域事实正确 |
+| 90 | S007 | CodeGraph 第一方 7 仓、每臂 4 次架构问答；效率变化不等于调用边准确率 |
+| 92 | S005 | Codebase-Memory 作者 31 仓实验；83% vs 92% 与 Token/调用权衡不外推 WiFi C |
+| 98 | S039 | codebadger 作者三案例；8,000 methods 是单案例规模，不是 aggregate accuracy |
+| 102 | S040 | QLCoder 作者 176 CVE、111 Java 项目对照；53.4% vs 10% 只限查询合成 |
+| 108 | S042 | RIG 作者 8 仓、每仓 30 问、3 Agent 对照；只覆盖构建/测试架构 |
+
+上述 S 记录均为 `claim-verified`，并保存样本、模型/Agent、基线、指标、数字语境、第一方/独立属性和限制。不同任务和指标没有合并为总分，也没有直接形成产品排名。
+
+## 6. 链接与新鲜度审计
+
+`code-domain-linkage.md` 已从完整 schema 设计缩减为可观察策略比较，但仍保留可靠答案必需的最小合同：
+
+- 关系含义；
+- code revision、Target、symbol 和 `file:line`；
+- document revision、具体位置和原始来源；
+- parser/compiler、固定规则、人工或模型产生方式；
+- active、candidate、stale、contradicted 或 superseded 状态。
+
+领域到代码和代码到解释均有步骤化链路。显式引用、结构图驱动生成、模型语义映射、影响传播和构建工件锚定分别记录优势、失效方式与代表项目。LLM/embedding 只能产生候选，不能自行升级为确定性事实。
+
+## 7. WiFi MAC 约束与实验边界
+
+现行文档一致保留以下硬门槛：
+
+1. repository revision、Target 和 `file:line` 可定位；
+2. 生效宏、active branch 和 source occurrence 以真实编译工件为准；
+3. direct/indirect call 分开，未解析候选不隐藏；
+4. Host/Device 以 Event/Message 和两侧证据连接，不制造跨二进制 `CALLS`；
+5. 代码/文档变化能触发 stale detection 与重新验证；
+6. 事实准确性、检索效率与最终 Agent 正确率分别报告。
+
+C0–C4 比较普通导航、轻量图、深度分析、图+原始文档、图+生成文档+双向链接。B01–B15 连续且每个 ID 只对应一项预注册问题。外部案例允许 Zephyr、RIOT、Contiki-NG 及其他结构相邻的开放 C 项目。
+
+## 8. 历史注意事项完整性
+
+历史原始文件与现行归档文件的 Git blob identity 一致：
+
+```text
+3015105de36e55e8fc7041e0a256f98476964382:目标代码仓注意事项.md
+  -> d01d7cb0a9145a71db8be073aabe6e84e68c05f5
+
+HEAD:docs/research/wifi-mac-repository-design-considerations.md
+  -> d01d7cb0a9145a71db8be073aabe6e84e68c05f5
+```
+
+因此本轮没有改写历史注意事项的内容，只调整和新增现行研究文档。
+
+## 9. 终审命令与结果
+
+| 检查 | 结果 |
+|---|---|
+| 来源计数与连续性 | 42；S001–S042 连续 |
+| `claim-verified` / `primary-read` | 16 / 26 |
+| Benchmark 行数 | 15 |
+| 现行四文档旧分类术语 | 0 命中 |
+| `research.md` / 旧中文路径引用 | 0 命中 |
+| 本地 Markdown 链接 | 10 个已检查，0 缺失 |
+| 历史注意事项 blob | 两端同为 `d01d7cb0...c05f5` |
+| `git diff --check` | 本报告提交前复跑；应为 0 error |
+
+本终审证明文档结构、来源边界、链接与历史材料完整性符合本轮要求，不证明任何候选已经通过 WiFiDemo 实验。最终选型仍为 `unknown / Benchmark required`。

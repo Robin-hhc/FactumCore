@@ -1,0 +1,33 @@
+case_id: CF18
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["Subtype registration, direction decode, Device operation and completion emission checked."]
+facts:
+  - id: CF18-F01
+    critical: true
+    subject: HOST_CTX subtype 4 or 5
+    relation: CONTROLS
+    object: dmac_ring_switch_handler table dispatch and direction decode
+    target: chip8-wifi-device
+    side: device
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: device/wifi/chip8/dmac/dmac_config.c, line_start: 120, line_end: 151, symbol: dmac_ring_switch_handler}
+      - {file: device/wifi/chip8/dmac/dmac_config.c, line_start: 202, line_end: 226, symbol: dmac_ring_switch_handler}
+  - id: CF18-F02
+    critical: true
+    subject: dmac_ring_switch_handler
+    relation: EMITS_EVENT
+    object: RING_SWITCH_DONE result to Host through dmac_ring_switch_done
+    target: chip8-wifi-device
+    side: cross
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: device/wifi/chip8/dmac/dmac_config.c, line_start: 219, line_end: 225, symbol: dmac_ring_switch_handler}
+      - {file: device/wifi/chip8/dmac/dmac_ring.c, line_start: 67, line_end: 87, symbol: dmac_ring_switch_done}
+forbidden_claims:
+  - {id: CF18-X01, critical: true, pattern: "Host.*直接调用.*dmac_ring_switch_handler|完成消息.*Device.*本地消费"}

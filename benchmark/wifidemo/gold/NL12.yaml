@@ -1,0 +1,31 @@
+case_id: NL12
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["HOST_RING interrupt and descriptor reclaim path checked; hardware-origin boundary pending review."]
+facts:
+  - id: NL12-F01
+    critical: true
+    subject: hal_irq_tx_comp_isr
+    relation: CALLS
+    object: dpe_tx_complete for each Host completion descriptor
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/hal/hal_interrupt.c, line_start: 10, line_end: 30, symbol: hal_irq_tx_comp_isr}
+  - id: NL12-F02
+    critical: true
+    subject: dpe_tx_complete
+    relation: MAY_CALL
+    object: g_hal_common_ops.hal_ring_pop advances the TID ring tail
+    target: chip8-wifi-host
+    side: host
+    confidence: candidate
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/dpe_tx.c, line_start: 176, line_end: 204, symbol: dpe_tx_complete}
+forbidden_claims:
+  - {id: NL12-X01, critical: true, pattern: "HOST_RING.*WLAN_TX_COMP.*Device|完成处理.*不.*tail"}

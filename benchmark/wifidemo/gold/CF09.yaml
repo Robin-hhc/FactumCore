@@ -1,0 +1,20 @@
+case_id: CF09
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["Device event table index, subtable and null-slot behavior checked."]
+facts:
+  - id: CF09-F01
+    critical: true
+    subject: frw_event_lookup_process_entry
+    relation: MAY_CALL
+    object: subtable subtype p_func chosen by event type and pipeline
+    target: chip8-wifi-device
+    side: device
+    confidence: candidate
+    aliases: []
+    evidence:
+      - {file: device/wifi/chip8/frw/frw_event_main.c, line_start: 198, line_end: 235, symbol: frw_event_lookup_process_entry}
+forbidden_claims:
+  - {id: CF09-X01, critical: true, pattern: "逐项.*if.?else|空槽.*默认.*handler|Host.*Device.*共享.*同一.*运行时表"}

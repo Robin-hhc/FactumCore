@@ -1,0 +1,42 @@
+case_id: CF13
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["State and mode enum domains plus actual send control checked separately."]
+facts:
+  - id: CF13-F01
+    critical: true
+    subject: wifi_ring.mode
+    relation: DEFINES
+    object: Host or Device ownership without a switching value
+    target: chip8-wifi-host
+    side: shared
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: shared/include/wifi_ring.h, line_start: 16, line_end: 20, symbol: ring_mode}
+  - id: CF13-F02
+    critical: true
+    subject: wifi_ring.state
+    relation: DEFINES
+    object: HOST, DEVICE and SWITCHING operational states
+    target: chip8-wifi-host
+    side: shared
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: shared/include/wifi_ring.h, line_start: 22, line_end: 27, symbol: ring_state}
+  - id: CF13-F03
+    critical: true
+    subject: wifi_ring.state
+    relation: CONTROLS
+    object: dpe_tx_send branch and switching pause
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/dpe_tx.c, line_start: 93, line_end: 170, symbol: dpe_tx_send}
+forbidden_claims:
+  - {id: CF13-X01, critical: true, pattern: "state.*mode.*同义|mode.*SWITCHING|dpe_tx_send.*按.*mode"}

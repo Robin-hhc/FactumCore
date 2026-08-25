@@ -1,0 +1,280 @@
+- id: NL01
+  direction: natural_language_to_code
+  priority: P0
+  prompt: "Host创建虚拟接口后，Device为什么也会出现对应VAP？请定位完整通知过程。"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host, chip2-wifi-device, chip8-wifi-device]
+  allowed_sides: [host, device]
+  tags: [vap, event, cross-side]
+- id: NL02
+  direction: natural_language_to_code
+  priority: P1
+  prompt: "Device收到一条普通HCC事件后，怎样根据事件类型和子类型找到处理函数？"
+  allowed_targets: [chip2-wifi-device, chip8-wifi-device]
+  allowed_sides: [device]
+  tags: [hcc, dispatch, event]
+- id: NL03
+  direction: natural_language_to_code
+  priority: P1
+  prompt: "HCC怎样区分普通配置事件和携带帧体的TX消息？两类消息分别进入什么处理路径？"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host, chip2-wifi-device, chip8-wifi-device]
+  allowed_sides: [host, device]
+  tags: [hcc, tx, dispatch]
+- id: NL04
+  direction: natural_language_to_code
+  priority: P1
+  prompt: "Host TX offload打开时，DPA在下发过程中做了什么；关闭时路径怎样变化？"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host]
+  allowed_sides: [host]
+  tags: [tx, offload, target-diff]
+- id: NL05
+  direction: natural_language_to_code
+  priority: P0
+  prompt: "chip2和chip8的Device能力宏有哪些共有项和差异项？这些结论来自哪里？"
+  allowed_targets: [chip2-wifi-device, chip8-wifi-device]
+  allowed_sides: [device]
+  tags: [macros, target-diff, provenance]
+- id: NL06
+  direction: natural_language_to_code
+  priority: P0
+  prompt: "哪个Host Target启用了TX offload？这个差异如何改变实际代码路径？"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host]
+  allowed_sides: [host]
+  tags: [macros, offload, target-diff]
+- id: NL07
+  direction: natural_language_to_code
+  priority: P0
+  prompt: "Host共代码情况下，chip2和chip8的实现与规格差异究竟怎样选择？"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host]
+  allowed_sides: [host]
+  tags: [runtime-selection, ops, target-diff]
+- id: NL08
+  direction: natural_language_to_code
+  priority: P0
+  prompt: "同一TX请求在chip2 Host和chip8 Host上的帧准备与下发路径有何不同？"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host]
+  allowed_sides: [host]
+  tags: [tx, offload, target-diff]
+- id: NL09
+  direction: natural_language_to_code
+  priority: P1
+  prompt: "Block Ack能力在Host与Device分别由什么条件控制，建立后怎样影响聚合发送？"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host, chip2-wifi-device, chip8-wifi-device]
+  allowed_sides: [host, device]
+  tags: [block-ack, aggregation, cross-side]
+- id: NL10
+  direction: natural_language_to_code
+  priority: P1
+  prompt: "项目所说的“四套Ring”分别是什么；每个User×TID实际持有什么？"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host, chip2-wifi-device, chip8-wifi-device]
+  allowed_sides: [host, device]
+  tags: [ring, resource, ownership]
+- id: NL11
+  direction: natural_language_to_code
+  priority: P1
+  prompt: "Host为何可以用统一接口操作不同芯片的Ring；实际入队出队会到哪些实现？"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host]
+  allowed_sides: [host]
+  tags: [ring, function-pointer, runtime-selection]
+- id: NL12
+  direction: natural_language_to_code
+  priority: P1
+  prompt: "HOST_RING发送完成后，从芯片完成通知到Host回收描述符经历哪些步骤？"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host]
+  allowed_sides: [host]
+  tags: [tx-completion, ring, interrupt]
+- id: NL13
+  direction: natural_language_to_code
+  priority: P0
+  prompt: "从Host业务发送入口开始，数据到达Host ring或Host→Device边界前经历什么完整流程？"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host]
+  allowed_sides: [host]
+  tags: [tx, call-path, boundary]
+- id: NL14
+  direction: natural_language_to_code
+  priority: P0
+  prompt: "TX究竟依据哪个字段决定走Host ring还是Device ring？切换期间又怎样处理？"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host]
+  allowed_sides: [host]
+  tags: [state, control, correction]
+- id: NL15
+  direction: natural_language_to_code
+  priority: P0
+  prompt: "DEVICE_RING模式下一帧怎样从Host到Device发送，并把完成结果返回Host？"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host, chip2-wifi-device, chip8-wifi-device]
+  allowed_sides: [host, device]
+  tags: [tx, event, cross-side]
+- id: NL16
+  direction: natural_language_to_code
+  priority: P1
+  prompt: "聚合帧从请求建立BA到最终被Device放行，Host和Device如何协同？"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host, chip2-wifi-device, chip8-wifi-device]
+  allowed_sides: [host, device]
+  tags: [block-ack, aggregation, cross-side]
+- id: NL17
+  direction: natural_language_to_code
+  priority: P1
+  prompt: "什么流量条件触发TX ring迁移；统计存在哪里，完成后怎样重置？"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host]
+  allowed_sides: [host]
+  tags: [ring-switch, threshold, state]
+- id: NL18
+  direction: natural_language_to_code
+  priority: P0
+  prompt: "低流量时如何把TX ring迁到Device，并确认迁移成功？"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host, chip2-wifi-device, chip8-wifi-device]
+  allowed_sides: [host, device]
+  tags: [ring-switch, event, cross-side]
+- id: NL19
+  direction: natural_language_to_code
+  priority: P0
+  prompt: "高流量时如何把TX ring迁回Host；失败时状态怎样恢复？"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host, chip2-wifi-device, chip8-wifi-device]
+  allowed_sides: [host, device]
+  tags: [ring-switch, rollback, cross-side]
+- id: NL20
+  direction: natural_language_to_code
+  priority: P0
+  prompt: "Host是否会直接调用Device的VAP、TX或Ring处理函数？如果不会，两侧流程依据什么连接？"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host, chip2-wifi-device, chip8-wifi-device]
+  allowed_sides: [host, device]
+  tags: [boundary, event, negative-fact]
+- id: CF01
+  direction: code_to_flow
+  priority: P1
+  prompt: "从 `hmac_config_add_vap` 出发，解释本地资源创建和Device同步流程。"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host, chip2-wifi-device, chip8-wifi-device]
+  allowed_sides: [host, device]
+  tags: [vap, event, cross-side]
+- id: CF02
+  direction: code_to_flow
+  priority: P1
+  prompt: "从 `hmac_user_add` 出发，解释User、TID、Ring初始化及Device通知。"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host, chip2-wifi-device, chip8-wifi-device]
+  allowed_sides: [host, device]
+  tags: [user, tid, ring]
+- id: CF03
+  direction: code_to_flow
+  priority: P1
+  prompt: "从 `hmac_ring_tx_init` 出发，解释每个TID对象如何形成并绑定Ring。"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host]
+  allowed_sides: [host]
+  tags: [tid, ring, initialization]
+- id: CF04
+  direction: code_to_flow
+  priority: P0
+  prompt: "从 `platform_init`/`chip_init` 出发，比较chip2与chip8 Host初始化出的运行时能力。"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host]
+  allowed_sides: [host]
+  tags: [initialization, runtime-selection, target-diff]
+- id: CF05
+  direction: code_to_flow
+  priority: P1
+  prompt: "从 `g_wlan_chip_ops` 出发，找到赋值点、候选表、调用点和芯片专属实现。"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host]
+  allowed_sides: [host]
+  tags: [function-pointer, runtime-selection, target-diff]
+- id: CF06
+  direction: code_to_flow
+  priority: P0
+  prompt: "从 `g_hal_common_ops.hal_ring_push` 出发，反查它的输入、运行时实现候选及返回值影响。"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host]
+  allowed_sides: [host]
+  tags: [function-pointer, ring, dataflow]
+- id: CF07
+  direction: code_to_flow
+  priority: P1
+  prompt: "从 `g_wlan_spec_cfg.support_sw_timer` 出发，比较两个芯片如何选择该值及它控制的行为。"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host]
+  allowed_sides: [host]
+  tags: [configuration, timer, target-diff]
+- id: CF08
+  direction: code_to_flow
+  priority: P1
+  prompt: "从 `hcc_device_rx_handler` 出发，解释不同HCC消息怎样继续进入Device处理。"
+  allowed_targets: [chip2-wifi-device, chip8-wifi-device]
+  allowed_sides: [device]
+  tags: [hcc, dispatch, device]
+- id: CF09
+  direction: code_to_flow
+  priority: P1
+  prompt: "从 `frw_event_lookup_process_entry` 出发，解释主表、子表和subtype如何决定最终handler。"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host, chip2-wifi-device, chip8-wifi-device]
+  allowed_sides: [host, device]
+  tags: [event, dispatch, function-pointer]
+- id: CF10
+  direction: code_to_flow
+  priority: P0
+  prompt: "从 `dpe_tx_send` 出发，解释所有主要退出条件和两条成功发送分支。"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host]
+  allowed_sides: [host]
+  tags: [tx, control-flow, state]
+- id: CF11
+  direction: code_to_flow
+  priority: P0
+  prompt: "从 `dpe_tx_send` 参数 `buf` 出发，追踪它在两个分支中的数据去向和边界。"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host]
+  allowed_sides: [host]
+  tags: [tx, dataflow, boundary]
+- id: CF12
+  direction: code_to_flow
+  priority: P0
+  prompt: "从 `TX_FLAG_DPA_PROCESSED` 出发，解释定义、写入、跨侧传递和消费条件。"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host, chip2-wifi-device, chip8-wifi-device]
+  allowed_sides: [host, device]
+  tags: [flag, dataflow, target-diff]
+- id: CF13
+  direction: code_to_flow
+  priority: P0
+  prompt: "从 `wifi_ring.state` 和 `wifi_ring.mode` 出发，解释两字段生命周期及各自影响。"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host, chip2-wifi-device, chip8-wifi-device]
+  allowed_sides: [host, device]
+  tags: [ring, state, lifecycle]
+- id: CF14
+  direction: code_to_flow
+  priority: P1
+  prompt: "从 `dmac_tx_send` 出发，解释Device ring未就绪、BA校验和成功入队行为。"
+  allowed_targets: [chip2-wifi-device, chip8-wifi-device]
+  allowed_sides: [device]
+  tags: [tx, block-ack, ring]
+- id: CF15
+  direction: code_to_flow
+  priority: P1
+  prompt: "从 `hcc_tx_msg_stru` 出发，解释header、event、desc和frame怎样跨两侧被生产与消费。"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host, chip2-wifi-device, chip8-wifi-device]
+  allowed_sides: [host, device]
+  tags: [hcc, message, cross-side]
+- id: CF16
+  direction: code_to_flow
+  priority: P1
+  prompt: "从 `dpe_tx_flow_check` 和 `tx_count` 出发，解释触发条件、迁移方向和统计窗口。"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host]
+  allowed_sides: [host]
+  tags: [ring-switch, threshold, state]
+- id: CF17
+  direction: code_to_flow
+  priority: P0
+  prompt: "从 `dpe_tx_ring_switch` 出发，解释合法性检查、pending上下文、下发和失败回滚。"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host, chip2-wifi-device, chip8-wifi-device]
+  allowed_sides: [host, device]
+  tags: [ring-switch, rollback, boundary]
+- id: CF18
+  direction: code_to_flow
+  priority: P0
+  prompt: "从 `dmac_ring_switch_handler` 出发，解释subtype到方向、Device ring操作和完成通知。"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host, chip2-wifi-device, chip8-wifi-device]
+  allowed_sides: [host, device]
+  tags: [ring-switch, event, device]
+- id: CF19
+  direction: code_to_flow
+  priority: P0
+  prompt: "从 `FRW_EVENT_TYPE_RING_SWITCH_DONE`/`dmac_ring_switch_done` 出发，追踪回Host及最终状态提交。"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host, chip2-wifi-device, chip8-wifi-device]
+  allowed_sides: [host, device]
+  tags: [ring-switch, event, cross-side]
+- id: CF20
+  direction: code_to_flow
+  priority: P1
+  prompt: "从 `frw_timer_tick` 出发，解释超时判定、TIMEOUT事件、注册表和最终回调。"
+  allowed_targets: [chip2-wifi-host, chip8-wifi-host]
+  allowed_sides: [host]
+  tags: [timer, event, callback]

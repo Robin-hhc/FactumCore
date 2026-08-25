@@ -1,0 +1,31 @@
+case_id: CF07
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["chip2/chip8 spec values, runtime copy and timer use checked."]
+facts:
+  - id: CF07-F01
+    critical: true
+    subject: chip8 feature_sw_timer_is_open
+    relation: PRESENT_IN
+    object: chip8 runtime specification with value 1
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/hal/product/chip8/hal_ops_chip8.c, line_start: 68, line_end: 81, symbol: feature_sw_timer_is_open}
+  - id: CF07-F02
+    critical: true
+    subject: g_wlan_spec_cfg.support_sw_timer
+    relation: CONTROLS
+    object: TX timeout timer start
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/dpe_tx.c, line_start: 123, line_end: 130, symbol: dpe_tx_send}
+forbidden_claims:
+  - {id: CF07-X01, critical: true, pattern: "Device.*宏.*support_sw_timer|chip2.*chip8.*值相同"}

@@ -1,0 +1,31 @@
+case_id: CF02
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["User allocation, DPE/TID initialization and USER_ADD boundary checked."]
+facts:
+  - id: CF02-F01
+    critical: true
+    subject: hmac_user_add
+    relation: CALLS
+    object: dpe_wlan_user_add initializes per-user TID resources
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/hmac/hmac_user.c, line_start: 76, line_end: 113, symbol: hmac_user_add}
+  - id: CF02-F02
+    critical: true
+    subject: hmac_user_add
+    relation: EMITS_EVENT
+    object: USER_ADD subtype 2 to Device
+    target: chip8-wifi-host
+    side: cross
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/hmac/hmac_user.c, line_start: 115, line_end: 125, symbol: hmac_user_add}
+forbidden_claims:
+  - {id: CF02-X01, critical: true, pattern: "全局.*ring|hmac_user_add.*CALLS.*dmac.*user"}

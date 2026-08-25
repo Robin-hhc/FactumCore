@@ -1,0 +1,31 @@
+case_id: NL04
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["Compiler manifest and guarded source checked; independent review pending."]
+facts:
+  - id: NL04-F01
+    critical: true
+    subject: _PRE_WLAN_FEATURE_HOST_TX_OFFLOAD
+    relation: PRESENT_IN
+    object: chip8 Host compiler defines
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: build_chip8_host/host/CMakeFiles/wal.dir/flags.make, line_start: 4, line_end: 5, symbol: _PRE_WLAN_FEATURE_HOST_TX_OFFLOAD}
+  - id: NL04-F02
+    critical: true
+    subject: dpa_forward_to_device for WLAN_DTX
+    relation: CONTROLS
+    object: TX_FLAG_DPA_PROCESSED is set before H2D queue insertion
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: ["DPA marks processed frames then forwards them"]
+    evidence:
+      - {file: host/wifi/dpe/hcc/hcc_core.c, line_start: 247, line_end: 260, symbol: dpa_forward_to_device}
+forbidden_claims:
+  - {id: NL04-X01, critical: true, pattern: "chip2.*执行.*DPA|宏.*关闭.*仍.*dpa_forward_to_device"}

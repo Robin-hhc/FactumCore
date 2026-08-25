@@ -1,0 +1,31 @@
+case_id: NL09
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["Host BA request and aggregation gate checked; Device state-machine coverage pending."]
+facts:
+  - id: NL09-F01
+    critical: true
+    subject: hmac_tx_ba_start
+    relation: EMITS_EVENT
+    object: HOST_CTX BA_SYNC message to Device
+    target: chip8-wifi-host
+    side: cross
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/hmac/hmac_tid.c, line_start: 69, line_end: 107, symbol: hmac_tx_ba_start}
+  - id: NL09-F02
+    critical: true
+    subject: ba_established and support_tx_ba
+    relation: CONTROLS
+    object: TX_FLAG_AMPDU on the transmitted descriptor
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/dpe_tx.c, line_start: 104, line_end: 116, symbol: dpe_tx_send}
+forbidden_claims:
+  - {id: NL09-X01, critical: true, pattern: "Host.*TX_BA.*编译宏.*直接门控|未建立.*BA.*无条件.*聚合"}

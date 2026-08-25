@@ -1,0 +1,32 @@
+case_id: NL13
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["Host entry chain and state-controlled terminals checked; independent review pending."]
+facts:
+  - id: NL13-F01
+    critical: true
+    subject: hmac_xmit_from_cpu
+    relation: CALLS
+    object: hmac_tx_data then wal_send_data then dpe_tx_send
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/hmac/tx/hmac_tx_data.c, line_start: 40, line_end: 82, symbol: hmac_xmit_from_cpu}
+      - {file: host/wifi/wal/wal_send.c, line_start: 7, line_end: 15, symbol: wal_send_data}
+  - id: NL13-F02
+    critical: true
+    subject: dpe_tx_send ring->state
+    relation: CONTROLS
+    object: Host HAL ring push or Device-bound HCC event
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/dpe_tx.c, line_start: 99, line_end: 170, symbol: dpe_tx_send}
+forbidden_claims:
+  - {id: NL13-X01, critical: true, pattern: "按.*mode.*分流|Host.*Device.*两个分支.*同时"}

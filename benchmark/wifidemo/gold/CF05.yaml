@@ -1,0 +1,32 @@
+case_id: CF05
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["Global ops assignment and both table candidates checked; consumer coverage pending."]
+facts:
+  - id: CF05-F01
+    critical: true
+    subject: chip_ops_select chip_type
+    relation: CONTROLS
+    object: g_wlan_chip_ops assignment from chip2 or chip8 table
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/chip/chip_common.c, line_start: 5, line_end: 25, symbol: g_wlan_chip_ops}
+  - id: CF05-F02
+    critical: true
+    subject: g_wlan_chip_ops function fields
+    relation: MAY_CALL
+    object: chip2 or chip8 table implementations selected at runtime
+    target: chip8-wifi-host
+    side: host
+    confidence: candidate
+    aliases: []
+    evidence:
+      - {file: host/wifi/chip/chip_chip2.c, line_start: 41, line_end: 48, symbol: g_wlan_chip_ops_chip2}
+      - {file: host/wifi/chip/chip_chip8.c, line_start: 41, line_end: 48, symbol: g_wlan_chip_ops_chip8}
+forbidden_claims:
+  - {id: CF05-X01, critical: true, pattern: "只有.*一个.*静态实现|所有.*同签名.*确定.*callee"}

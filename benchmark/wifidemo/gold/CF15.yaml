@@ -1,0 +1,32 @@
+case_id: CF15
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["Shared message layout, Host copy and paired H2D queue endpoints checked; transport implementation remains a boundary."]
+facts:
+  - id: CF15-F01
+    critical: true
+    subject: hcc_tx_msg_stru
+    relation: DEFINES
+    object: shared header, event, descriptor and bounded frame array
+    target: chip8-wifi-host
+    side: shared
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: shared/include/wifi_hcc.h, line_start: 21, line_end: 38, symbol: hcc_tx_msg_stru}
+  - id: CF15-F02
+    critical: true
+    subject: Host hcc_tx_queue_put message value
+    relation: EMITS_EVENT
+    object: H2D queue item later read by the Device-side HCC endpoint
+    target: chip8-wifi-host
+    side: cross
+    confidence: candidate
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/hcc/hcc_core.c, line_start: 158, line_end: 183, symbol: hcc_tx_queue_put}
+      - {file: device/wifi/chip8/hcc/hcc_device.c, line_start: 130, line_end: 166, symbol: hcc_tx_queue_get}
+forbidden_claims:
+  - {id: CF15-X01, critical: true, pattern: "Host.*Device.*重复定义|只有.*指针.*跨侧|无需.*frame.*复制"}

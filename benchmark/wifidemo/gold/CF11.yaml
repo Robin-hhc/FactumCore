@@ -1,0 +1,31 @@
+case_id: CF11
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["Separate Host-state and Device-state buf flows checked; external HCC transport boundary remains explicit."]
+facts:
+  - id: CF11-F01
+    critical: true
+    subject: dpe_tx_send buf in RING_STATE_HOST branch
+    relation: DATA_FLOWS_TO
+    object: desc.buf then g_hal_common_ops.hal_ring_push
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/dpe_tx.c, line_start: 104, line_end: 121, symbol: dpe_tx_send}
+  - id: CF11-F02
+    critical: true
+    subject: dpe_tx_send buf in RING_STATE_DEVICE branch
+    relation: DATA_FLOWS_TO
+    object: memcpy into hcc_tx_msg_stru.frame then HCC send boundary
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/dpe_tx.c, line_start: 134, line_end: 160, symbol: dpe_tx_send}
+forbidden_claims:
+  - {id: CF11-X01, critical: true, pattern: "buf.*只.*日志|同一.*执行.*同时.*两条.*数据路径"}

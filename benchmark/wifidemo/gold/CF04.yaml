@@ -1,0 +1,32 @@
+case_id: CF04
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["Platform runtime selector sequence and compiler offload complement checked."]
+facts:
+  - id: CF04-F01
+    critical: true
+    subject: platform_init chip_type
+    relation: CALLS
+    object: chip_init then hal_ops_select then spec_select before subsystem initialization
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/platform/main/platform_main.c, line_start: 27, line_end: 56, symbol: platform_init}
+  - id: CF04-F02
+    critical: true
+    subject: _PRE_WLAN_FEATURE_HOST_TX_OFFLOAD
+    relation: PRESENT_IN
+    object: chip8 Host compiler defines only
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: build_chip8_host/host/CMakeFiles/wal.dir/flags.make, line_start: 4, line_end: 5, symbol: _PRE_WLAN_FEATURE_HOST_TX_OFFLOAD}
+      - {file: build_chip2_host/host/CMakeFiles/wal.dir/flags.make, line_start: 4, line_end: 5}
+forbidden_claims:
+  - {id: CF04-X01, critical: true, pattern: "运行时选择.*跨Target.*CALLS|全部.*编译期宏"}

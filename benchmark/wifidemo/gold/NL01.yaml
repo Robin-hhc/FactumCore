@@ -1,0 +1,20 @@
+case_id: NL01
+review: &draft_review
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["Core source anchors checked at 8102322; coverage and independent review pending."]
+facts:
+  - id: NL01-F01
+    critical: true
+    subject: hmac_vap_init
+    relation: EMITS_EVENT
+    object: VAP_ADD configuration event to Device
+    target: chip8-wifi-host
+    side: cross
+    confidence: certain
+    aliases: ["Host VAP initialization posts VAP_ADD"]
+    evidence:
+      - {file: host/wifi/hmac/hmac_vap.c, line_start: 112, line_end: 120, symbol: hmac_vap_init}
+forbidden_claims:
+  - {id: NL01-X01, critical: true, pattern: "hmac_config_add_vap.*CALLS.*dmac_config_add_vap|Host.*直接调用.*Device"}

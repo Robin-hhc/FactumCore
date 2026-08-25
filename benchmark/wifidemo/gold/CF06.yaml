@@ -1,0 +1,32 @@
+case_id: CF06
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["Indirect callsite, descriptor source and failure branch checked."]
+facts:
+  - id: CF06-F01
+    critical: true
+    subject: dpe_tx_send local ring and desc
+    relation: DATA_FLOWS_TO
+    object: g_hal_common_ops.hal_ring_push arguments
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/dpe_tx.c, line_start: 104, line_end: 121, symbol: dpe_tx_send}
+  - id: CF06-F02
+    critical: true
+    subject: g_hal_common_ops.hal_ring_push
+    relation: MAY_CALL
+    object: hal_common_ring_push then wifi_ring_put
+    target: chip8-wifi-host
+    side: host
+    confidence: candidate
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/hal/hal_main.c, line_start: 21, line_end: 29, symbol: hal_common_ring_push}
+      - {file: host/wifi/dpe/hal/hal_main.c, line_start: 56, line_end: 81, symbol: g_hal_common_ops}
+forbidden_claims:
+  - {id: CF06-X01, critical: true, pattern: "唯一.*direct callee|等同.*wifi_ring_put.*文本调用|返回值.*不影响"}

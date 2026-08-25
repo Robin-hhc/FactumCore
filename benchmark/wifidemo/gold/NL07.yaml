@@ -1,0 +1,42 @@
+case_id: NL07
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["Three runtime selectors checked; table-value completeness pending second review."]
+facts:
+  - id: NL07-F01
+    critical: true
+    subject: chip_type
+    relation: CONTROLS
+    object: g_wlan_chip_ops receives the chip2 or chip8 table
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/chip/chip_common.c, line_start: 11, line_end: 25, symbol: chip_ops_select}
+  - id: NL07-F02
+    critical: true
+    subject: chip_type
+    relation: CONTROLS
+    object: g_hal_common_ops receives the chip2 or chip8 table
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/hal/hal_main.c, line_start: 83, line_end: 94, symbol: hal_ops_select}
+  - id: NL07-F03
+    critical: true
+    subject: chip_type
+    relation: CONTROLS
+    object: g_wlan_spec_cfg is copied from the chip-specific specification
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/common/wlan_spec.c, line_start: 13, line_end: 42, symbol: spec_select}
+forbidden_claims:
+  - {id: NL07-X01, critical: true, pattern: "全部差异.*CHIP_TYPE.*编译期|两.*芯片.*共享.*同一张表"}

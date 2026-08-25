@@ -1,6 +1,6 @@
 # 来源与证据台账
 
-访问截止日期：2026-08-14
+访问截止日期：2026-08-25
 
 ## 1. 用途
 
@@ -72,12 +72,24 @@
 |---|---:|
 | discovered | 0 |
 | primary-read | 26 |
-| claim-verified | 14 |
+| claim-verified | 16 |
 | rejected | 0 |
 
-按来源记录的非互斥类型统计如下：论文 15；AI 公司官方材料 5；开源项目材料 30。带论文和官方仓库的同一记录只计为一个来源编号，样本与数字不跨材料重复累计。
+按来源记录的非互斥类型统计如下：论文 17；AI 公司官方材料 5；开源项目材料 31。带论文和官方仓库的同一记录只计为一个来源编号，样本与数字不跨材料重复累计。
 
-## 8. 已登记来源
+## 8. “代码知识 + 文档/领域知识 + 双向链接”的证据索引
+
+本轮的“2+1”能力模型是对多类一手证据的综合，不是任何单篇论文或项目直接宣布的统一架构：
+
+| 待论证能力 | 直接证据 | 能支持的结论 | 不能外推的结论 |
+|---|---|---|---|
+| 代码知识 | S001、S002、S003；S007、S015、S039、S042 | Agent 需要候选召回、结构/行为关系扩展和当前源码证据；轻量索引与深度分析解决不同深度的问题 | 单一检索器或单一代码图已经足够；公开数据已证明 WiFi MAC 精度 |
+| 文档与领域知识 | S009、S021、S022、S023、S041 | 原始文档、生成式领域/流程资产和 Wiki 能提供代码关系本身不包含的术语、解释与跨文件综合 | LLM 生成文档可替代原始来源或程序事实 |
+| 代码—文档双向链接 | S009、S021、S041 | 代码图驱动的领域/文档生成、交叉引用和影响传播使“领域到代码”与“代码到流程说明”能够形成闭环 | 把代码和文档放进同一数据库就自动获得准确链接 |
+
+因此，正文可以把三项能力作为成熟 Agent 知识图谱的必要能力集合，但必须把该判断标注为本文的研究综合。是否存在同时满足三项能力且适合多 Target WiFi MAC 的现成产品，仍为 `unknown / Benchmark required`。
+
+## 9. 已登记来源
 
 ### S001 — Agent Retrieval Bench: Evaluating Repository Context Retrieval for Coding Agents
 
@@ -202,18 +214,19 @@
 ### S007 — CodeGraph 官方 README、Benchmark、Release 与 License
 
 - 状态：claim-verified
-- 发布日期：Benchmark 重测于 2026-08-05；访问快照 2026-08-13
-- 访问日期：2026-08-13
+- 发布日期：Benchmark 重测于 2026-08-05；访问快照 2026-08-25
+- 访问日期：2026-08-25
 - 来源类型：项目第一方 Benchmark、项目官方功能说明
 - 发布者/作者：colbymchenry/codegraph
 - 原始 URL：https://github.com/colbymchenry/codegraph；https://github.com/colbymchenry/codegraph/releases；https://github.com/colbymchenry/codegraph/blob/main/LICENSE
 - 独立属性：first-party
 - 研究对象：本地 Tree-sitter/SQLite 代码图、跨文件解析、增量同步和 MCP 查询
+- 项目版本：官方仓库 `HEAD` 固定为 commit `44e1812d3b1c88cf8193732608345a5cf6941e30`
 - 样本与语言：Agent Benchmark 为 7 个开源仓库、7 种语言、每库 1 个架构问题、每个实验臂 4 次；另有 C/Redis 与 C++/LevelDB 的依赖覆盖测量
 - 模型/Agent：Claude Code headless、Claude Opus 4.8；WITH/ WITHOUT CodeGraph
 - 对照基线：保留 Read/Grep/Bash、禁用 CodeGraph CLI 的空 MCP 控制组
 - 指标：工具调用、时间、文件读取、处理 Token、成本、会话末残留上下文；另有 resolved cross-file dependent coverage
-- 可引用声明：CodeGraph 使用 Tree-sitter 抽取节点/调用/导入/继承边，SQLite+FTS5 持久化并增量同步；第一方实验显示结构图可显著降低单次架构问答探索开销，但会增加会话末残留上下文。
+- 可引用声明：CodeGraph 使用 Tree-sitter 抽取节点/调用/导入/继承边，SQLite+FTS5 持久化并增量同步；Agent 的自然语言或符号请求通过 `codegraph_explore` 返回相关源码及符号间调用路径。第一方实验显示结构图可显著降低单次架构问答探索开销，但会增加会话末残留上下文。
 - 数字与语境：2026-08-05 的 7 仓、每臂 4 次中位数实验报告工具调用减少 88%、时间减少 53%、处理 Token 减少 62%、成本减少 44%；同一材料报告会话末残留检索上下文约增加 80%。C/Redis 的跨文件 dependent coverage 为 92.2%，C++/LevelDB 为 94.8%；coverage 分母是“含符号且至少有一个已解析跨文件依赖的源文件”，不是调用边 precision 或 recall。
 - 限制：所有数字均为第一方；每库只有 1 个架构问题，且无 WiFi MAC、预处理配置或领域知识问答；动态分派和框架规则可能合成边，需保留边来源；许可证为 MIT。
 - WiFi MAC 相关性：间接
@@ -242,18 +255,19 @@
 ### S009 — Understand Anything 官方 README、Release 与 License
 
 - 状态：primary-read
-- 发布日期：v2.9.0 发布于 2026-07-10；访问快照 2026-08-13
-- 访问日期：2026-08-13
+- 发布日期：v2.9.0 发布于 2026-07-10；访问快照 2026-08-25
+- 访问日期：2026-08-25
 - 来源类型：项目官方功能说明
 - 发布者/作者：Egonex-AI/Understand-Anything
 - 原始 URL：https://github.com/Egonex-AI/Understand-Anything/blob/main/README.md；https://github.com/Egonex-AI/Understand-Anything/releases
 - 独立属性：first-party
 - 研究对象：Tree-sitter 确定性结构图与 LLM 语义/领域图的混合分析
+- 项目版本：官方仓库 `HEAD` 固定为 commit `32944829e7a63a9fa9c55d811d7f98a9530c6a6a`
 - 样本与语言：官方 README 未给出可用于本文排序的 C/C++ 精度样本；v2.1.0 引入 business domain graph，v2.3.1 扩展知识实体、claim、source 和语义边
 - 模型/Agent：5 个结构/架构 Agent，`understand-domain` 增加领域分析 Agent；支持云端或本地模型
 - 对照基线：none
 - 指标：none
-- 可引用声明：项目明确把 Tree-sitter 产生的可复现结构事实与 LLM 产生的摘要、标签、架构层和业务领域映射分层；结构变化使用 fingerprint 做增量更新，领域映射由 LLM 推断。
+- 可引用声明：项目明确把 Tree-sitter 产生的可复现结构事实与 LLM 产生的摘要、标签、架构层和业务领域映射分层；Agent 可从自然语言询问 payment flow、从文件/函数执行 explain，并生成 domain、flow、step 与 onboarding 资产。结构变化使用 fingerprint 做增量更新，领域映射由 LLM 推断。
 - 数字与语境：项目提醒首次全仓分析可能消耗大量 Token，后续默认仅重分析变化文件；这不是量化性能结论。
 - 限制：没有公开的结构边或领域映射准确率 Benchmark；领域知识主要由 LLM 从代码生成，未见外部领域文档、Target/revision、claim provenance、confidence 和冲突生命周期的完整治理；许可证为 MIT。
 - WiFi MAC 相关性：间接
@@ -363,12 +377,13 @@
 
 - 状态：primary-read
 - 发布日期：Joern v4 系列持续发布；检索到 v4.0.548（2026-05-27）
-- 访问日期：2026-08-14
+- 访问日期：2026-08-25
 - 来源类型：项目官方功能说明
 - 发布者/作者：Joern/Qwiet AI 开源项目
 - 原始 URL：https://github.com/joernio/joern；https://docs.joern.io/code-property-graph/；https://docs.joern.io/frontends/；https://docs.joern.io/cpg-slicing/；https://docs.joern.io/dataflow-semantics/；https://cpg.joern.io/
 - 独立属性：first-party
 - 研究对象：多语言 CPG、Scala DSL、dataflow、custom semantics 与 JSON slicing
+- 项目版本：官方仓库 `HEAD` 固定为 commit `66877d6518fe1da39e621acf16c268d508a6b8b6`
 - 样本与语言：官方支持 C/C++ 等多种 source/binary frontend；未发现宏密集多 Target C 的公开准确率数据
 - 模型/Agent：not-applicable；可通过 server/脚本由 Agent 封装
 - 对照基线：none
@@ -482,18 +497,19 @@
 ### S021 — Graphify 官方仓库与概念文档
 
 - 状态：primary-read
-- 发布日期：概念文档更新于 2026-07-01；访问快照 2026-08-14
-- 访问日期：2026-08-14
+- 发布日期：持续更新；访问快照 2026-08-25
+- 访问日期：2026-08-25
 - 来源类型：开源项目官方功能说明、项目第一方 Benchmark
 - 发布者/作者：Graphify Labs
 - 原始 URL：https://github.com/Graphify-Labs/graphify；https://graphify.com/concepts
 - 独立属性：first-party
 - 研究对象：以 Tree-sitter 解析代码、以 LLM 连接文档/媒体的混合知识图和 Agent Skill/MCP 接口
+- 项目版本：官方仓库 `HEAD` 固定为 commit `282976b2f4066b55cf2fa346c3d5568f7ac044e2`
 - 样本与语言：官方声明 36 种代码语言；README 的 memory Benchmark 不是代码—领域链接准确率实验
 - 模型/Agent：文档语义阶段使用用户配置的模型；代码阶段不使用 LLM
 - 对照基线：官方 LOCOMO/LongMemEval 对照，不用于 WiFi MAC 排序
 - 指标：官方报告 memory recall/QA 指标，但没有 Target-aware C、领域边 precision 或失效修复指标
-- 可引用声明：Graphify 将 AST 产生的代码边标为 `EXTRACTED`，模型产生的文档/语义边标为 `INFERRED`，不能完全消歧的边标为 `AMBIGUOUS`；`# WHY:`/ADR/RFC 引用可成为一等节点，结果可通过 Skill、CLI 或 MCP 查询。
+- 可引用声明：Graphify 先以本地 Tree-sitter 抽取代码符号和跨文件关系，再对文档/PDF/媒体执行可选语义抽取；输出持久 `graph.json`、社区结构、`GRAPH_REPORT.md` 和可选 Wiki。AST 代码边标为 `EXTRACTED`，模型产生的文档/语义边标为 `INFERRED`，不能完全消歧的边标为 `AMBIGUOUS`；`# WHY:`/ADR/RFC 引用可成为一等节点，结果可通过 Skill、CLI 或 MCP 的 query/path/explain 操作查询。
 - 数字与语境：README 中的 LOCOMO 与 LongMemEval 是通用 memory 数据集，不能证明 C 调用图或 WiFi 领域链接质量。
 - 限制：Tree-sitter 代码边不等于真实 Target 编译事实；公开材料没有 stable semantic ID、revision/Target occurrence、人工审核优先级或源码重命名后的领域边修复准确率。
 - WiFi MAC 相关性：间接
@@ -825,7 +841,7 @@
 
 - 状态：claim-verified
 - 发布日期：2026-03-25（arXiv v1；仓库说明论文已被 ICSE 2026 Software Vulnerability Management Workshop 接收）
-- 访问日期：2026-08-14
+- 访问日期：2026-08-25
 - 来源类型：论文、开源项目官方功能说明
 - 发布者/作者：Ahmed Lekssays；Lekssays/codebadger
 - 原始 URL：https://arxiv.org/abs/2603.24837；https://github.com/lekssays/codebadger
@@ -866,3 +882,49 @@
 - 适用骨架层：Agent 查询合成与确定性验证闭环；不作为 WiFi C 代码事实层
 - Agent 证据等级：作者论文的受控对照；结果仅限 CVE/Java/CodeQL 查询合成任务
 - 正文位置：第 7 章 Agent+分析工具闭环、第 9 章外部有效性边界
+
+### S041 — RepoDoc: Repo-Level Code Documentation Generation with Multi-Agent Collaboration
+
+- 状态：claim-verified
+- 发布日期：2026-04-29（arXiv v1）
+- 访问日期：2026-08-25
+- 来源类型：论文、开源项目官方功能说明
+- 发布者/作者：Dong Xu、Mingwei Liu、Xiwen Wang、Jianfeng Zhong、Zibin Zheng；SYSUSELab/RepoDoc
+- 原始 URL：https://arxiv.org/abs/2604.26523；https://github.com/SYSUSELab/RepoDoc
+- 独立属性：author-evaluation；开源材料为 first-party
+- 研究对象：以仓库知识图谱、模块聚类和多 Agent 协作为代码仓生成交叉引用文档，并按代码变更增量更新文档
+- 项目/论文版本：arXiv:2604.26523v1；RepoDoc GitHub 访问时 `main` HEAD 为不可变 commit `306becd0f143211c0dde2bdbd480578356280e28`
+- 样本与语言：24 个开源仓库、8 种编程语言；摘要未声明含多 Target WiFi MAC C 项目
+- 模型/Agent：论文提出负责知识图谱构建、模块组织、文档写作与更新的多 Agent 流程；本台账不使用未在摘要中完整披露的模型配置做跨工具排名
+- 对照基线：论文定义的现有仓库级文档生成方法；因不同论文指标与设置不一致，不据此与其他候选直接排名
+- 指标：API coverage、documentation completeness、生成时间、Token 消耗、增量更新时间、增量更新 Token、update recall
+- 可引用声明：RepoDoc 先构建仓库级知识图谱并聚类模块，再由多 Agent 生成带代码交叉引用和 Mermaid 图的文档；代码变更后使用双向语义影响传播定位并重新生成受影响文档。
+- 数字与语境：在作者对 24 个仓库、8 种语言的实验中，相对论文基线报告 API coverage 提升 32.5%、completeness 提升 10.4%、生成速度约 3 倍、Token 减少 85%；增量更新时间减少 73%、Token 减少 77%、update recall 提升 10.2%。这些数字是作者评估，指标定义和基线以论文为准。
+- 限制：作者、系统与评估来自同一团队；仓库与语言混合结果不能外推为嵌入式 C、宏条件、多 Target 或领域事实准确率。文档完整性和交叉引用不证明底层程序分析已经正确，生成内容仍需源码证据与版本锚点。
+- WiFi MAC 相关性：间接但重要；提供“代码图生成文档、文档回链代码、代码变化驱动文档更新”的可测策略
+- 适用骨架层：代码—文档链接与增量文档生成；不是独立的 C 程序语义证明层
+- Agent 证据等级：作者论文的多仓受控评估；需要在冻结版本和统一预算下复现
+- 正文位置：第 4 章文档与领域知识、第 5 章代码—文档双向链接、第 9 章增量更新 Benchmark
+
+### S042 — RIG: Repository Intelligence Graphs for AI Software Engineering Agents
+
+- 状态：claim-verified
+- 发布日期：2026-01-15（arXiv v1）
+- 访问日期：2026-08-25
+- 来源类型：论文、开源项目方法说明
+- 发布者/作者：Tsvi Cherny-Shahar、Amiram Yehudai
+- 原始 URL：https://arxiv.org/abs/2601.10112
+- 独立属性：author-evaluation
+- 研究对象：从实际构建与测试工件确定性抽取仓库架构关系，向软件工程 Agent 提供带证据的 repository intelligence graph
+- 项目/论文版本：arXiv:2601.10112v1；论文原型使用 SPADE extractor、CMake File API 与 CTest 生成架构事实
+- 样本与语言：8 个开源仓库，每仓 30 个结构化问题；论文按单语言与多语言仓库分组
+- 模型/Agent：Claude Code、Cursor、Codex 三个商业编码 Agent；模型与产品版本以论文实验快照为准
+- 对照基线：同一批 Agent 在不提供 RIG 与提供 RIG 两种条件下回答同一组仓库问题
+- 指标：回答准确率、总耗时、每个正确答案耗时；另报告单语言和多语言子集
+- 可引用声明：RIG 从构建/测试系统产生可追溯的组件、依赖与测试关系，再以图接口提供给 Agent；其核心贡献是让架构回答绑定确定性构建证据，而不是让 LLM 从源码目录结构猜测关系。
+- 数字与语境：作者在 8 个仓库、每仓 30 问、3 个 Agent 的实验中报告平均准确率提升 12.2%、时间减少 53.9%、每个正确答案耗时减少 57.8%；多语言仓库子集准确率提升 17.7%、效率提升 69.5%，单语言子集分别为 6.6% 与 46.1%。均为作者实验中的相对变化。
+- 限制：评估问题集中于构建、组件依赖和测试架构；不证明 C 数据流、宏分支、WiFi 协议状态机或领域文档质量。样本仅 8 个仓库，商业 Agent 和提示协议会漂移，结果尚非独立复现。
+- WiFi MAC 相关性：间接但方法学相关；支持用真实编译/构建工件锚定 Target、组件与测试关系
+- 适用骨架层：代码知识中的构建/依赖事实与可追溯证据；不作为完整代码—领域图谱
+- Agent 证据等级：作者论文的受控 Agent 对照；需要在 WiFiDemo 的多 Target 条件下另测
+- 正文位置：第 3 章代码知识、第 7 章 Agent 双向问答过程、第 9 章构建证据 Benchmark

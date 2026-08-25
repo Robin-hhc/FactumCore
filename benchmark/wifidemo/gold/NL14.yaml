@@ -1,0 +1,43 @@
+case_id: NL14
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["Corrected state-versus-mode control facts checked against executable statements."]
+facts:
+  - id: NL14-F01
+    critical: true
+    subject: ring->state == RING_STATE_HOST
+    relation: CONTROLS
+    object: g_hal_common_ops.hal_ring_push
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: ["RING_STATE_HOST selects host ring enqueue"]
+    evidence:
+      - {file: host/wifi/dpe/dpe_tx.c, line_start: 104, line_end: 131, symbol: dpe_tx_send}
+  - id: NL14-F02
+    critical: true
+    subject: ring->state == RING_STATE_DEVICE
+    relation: CONTROLS
+    object: hcc_tx_event_send_to_device
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: ["RING_STATE_DEVICE selects the Device-bound TX message"]
+    evidence:
+      - {file: host/wifi/dpe/dpe_tx.c, line_start: 134, line_end: 170, symbol: dpe_tx_send}
+  - id: NL14-F03
+    critical: true
+    subject: ring->state == RING_STATE_SWITCHING
+    relation: CONTROLS
+    object: early failure before either send branch
+    target: chip8-wifi-host
+    side: host
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/dpe_tx.c, line_start: 93, line_end: 102, symbol: dpe_tx_send}
+forbidden_claims:
+  - {id: NL14-X01, critical: true, pattern: "按.*ring->mode.*分流|mode.*决定.*Host.*Device"}
+  - {id: NL14-X02, critical: true, pattern: "SWITCHING.*继续.*排队|切换期间.*继续.*发送"}

@@ -1,0 +1,42 @@
+case_id: NL20
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["Representative VAP, TX and ring-switch message boundaries checked; negative-call proof review pending."]
+facts:
+  - id: NL20-F01
+    critical: true
+    subject: hmac_vap_init
+    relation: EMITS_EVENT
+    object: VAP_ADD configuration event consumed by Device dispatch
+    target: chip8-wifi-host
+    side: cross
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/hmac/hmac_vap.c, line_start: 112, line_end: 120, symbol: hmac_vap_init}
+  - id: NL20-F02
+    critical: true
+    subject: dpe_tx_send in Device state
+    relation: EMITS_EVENT
+    object: WLAN_DTX HCC message consumed by Device dispatch
+    target: chip8-wifi-host
+    side: cross
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: host/wifi/dpe/dpe_tx.c, line_start: 134, line_end: 160, symbol: dpe_tx_send}
+  - id: NL20-F03
+    critical: true
+    subject: dmac_ring_switch_done
+    relation: EMITS_EVENT
+    object: RING_SWITCH_DONE consumed by Host FRW dispatch
+    target: chip8-wifi-device
+    side: cross
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: device/wifi/chip8/dmac/dmac_ring.c, line_start: 67, line_end: 87, symbol: dmac_ring_switch_done}
+forbidden_claims:
+  - {id: NL20-X01, critical: true, pattern: "Host.*CALLS.*Device|Host.*直接调用.*Device|无.*直接.*call.*流程不存在"}

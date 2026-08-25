@@ -1,0 +1,20 @@
+case_id: CF08
+review:
+  reviewer_a: codex-source-audit-20260825
+  reviewer_b: unassigned
+  status: draft
+  history: ["Device HCC channel and TX/ordinary event split checked."]
+facts:
+  - id: CF08-F01
+    critical: true
+    subject: hcc_device_rx_handler hdr.channel and hdr.msg_type
+    relation: CONTROLS
+    object: TX whole-message or ordinary payload FRW dispatch
+    target: chip8-wifi-device
+    side: device
+    confidence: certain
+    aliases: []
+    evidence:
+      - {file: device/wifi/chip8/hcc/hcc_device.c, line_start: 79, line_end: 125, symbol: hcc_device_rx_handler}
+forbidden_claims:
+  - {id: CF08-X01, critical: true, pattern: "所有.*消息.*同一.*处理函数|Host.*直接调用.*hcc_device_rx_handler"}

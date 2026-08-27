@@ -340,42 +340,38 @@ SVF、PhASAR、Frama-C、CodeQL 等保留为专项组件或方法学对照，不
 
 ## 9. 后续 Benchmark 与有效性威胁
 
-### 9.1 六个实验臂：逐项测量工具或先验的增量价值
+### 9.1 两阶段实验：先选代码工具，再比较完整方案
 
-后续不再只比较抽象的“有图/无图”，而预注册六个实验臂；它们只有在 Benchmark Backlog、适配器和评分器同步后才成为可执行协议：
+实验不能把“基础架构 Skill”单独叠加在 grep 上与完整工具比较。更合理的顺序是先选出代码知识效果较好的工具，再测试它与少量稳定架构事实组合后，能否达到 Understand Anything 或 Graphify 的端到端效果。
 
-| 条件 | Agent 获得的额外能力 | 明确不包含 | 要裁决的问题 |
-|---|---|---|---|
-| C0 基础 grep | 当前源码、`rg`/grep、文件读取 | 预解析符号图、架构 Skill、生成文档 | 最低成本 Agent 能做到什么 |
-| C1 CodeGraph 轻量代码图 | C0 + CodeGraph 的符号、显式调用、依赖和局部图查询 | CFG/DDG、领域文档和人工架构先验 | 轻量图是否提高召回或减少探索成本 |
-| C2 Joern 深度分析代码图 | C0 + Joern Target-specific CPG、CFG、dataflow、slice 和受限高层分析工具 | 生成领域文档；未证明的跨二进制调用边 | 深分析是否只在间接调用、路径和生命周期题上产生净收益 |
-| C3 基础架构事实 Skill | C0 + 一份人工整理、版本固定的简短 Skill | 函数流程、函数归属、调用链、领域解释和自动代码图 | 少量稳定仓库先验能否以很低成本取得主要收益 |
-| C4 Understand Anything 混合候选 | UA 的确定性结构图、summary、domain/flow/step、explain 和增量更新 | 额外人工补写答案；官方材料未证明的持久双向链接或 Target 能力不能私下补齐 | 结构事实与生成式架构/领域资产的组合是否改善 Agent 正确率和理解成本 |
-| C5 Graphify 完整候选 | Graphify 的代码图、原始/生成文档、领域对象和 query/path/explain | 额外人工补写答案；未实现的 Target 能力不能私下补齐 | 一体化三能力产品是否优于分层工具 |
+**阶段 A：代码知识工具选型。** 在 WiFiDemo 的选型题集上固定 repository/commit、Target、Agent、模型、prompt、预算和重复次数，比较：
 
-C3 的 Skill 只允许写入事实性基础信息：哪些目录属于 Host、Device 或 shared，支持哪些芯片版本与 Target，构建入口和 Target 命名是什么。它不允许写入“某函数实现某流程”“某调用链属于某 Feature”或问题答案，否则会把人工 gold 泄漏给 Agent。Skill 按 repository revision 版本化，单独统计编写和维护成本。
+| 条件 | Agent 获得的能力 | 要裁决的问题 |
+|---|---|---|
+| K0 基础 grep | 当前源码、`rg`/grep、文件读取 | 最低成本 Agent 能做到什么 |
+| K1 CodeGraph | K0 + 符号、显式调用、依赖和局部图查询 | 轻量图是否提高召回并减少探索成本 |
+| K2 Joern | K0 + Target-specific CPG、CFG、dataflow、slice 和受限高层分析工具 | 深分析是否在间接调用、路径和生命周期题上产生净收益 |
 
-所有条件固定 repository/commit、问题 Target、Agent、模型、prompt、工具总预算和重复次数。索引器可使用实验指定的编译输入建立 Target 视角，但 Agent 是否能正确找到并使用这些事实仍是被测内容；评分 gold 始终来自真实编译/预处理工件、源码位置、可运行 probe 和人工复核。Understand Anything 或 Graphify 如果不能表达 Target occurrence、Event/Message、持久链接或 provenance，应把缺口记录为实验结果，不能用实验外脚本静默补成完整方案。
+K0 是固定下限；K1/K2 先通过 Target、宏、源码位置、Event/Message 和 provenance 硬门槛，再按事实正确率、最终 Agent 正确率、时间、Token、索引成本和查询失败率选出 `K*`。如果两者都不能超过 grep 或通过硬门槛，则停止把代码图包装成成熟底座，而不是强行选择赢家。
 
-不同实验臂有意提供不同能力，因此能力专项题必须预注册适用范围，`N/A` 不计作失败：
+**阶段 B：完整方案 PK。** 冻结 `K*` 的工具版本和配置，在与选型题集隔离的 WiFiDemo 保留题、开源项目和公司内部项目上比较：
 
-| 任务/指标 | C0 grep | C1 CodeGraph | C2 Joern | C3 架构 Skill | C4 UA | C5 Graphify |
-|---|---:|---:|---:|---:|---:|---:|
-| 领域到代码、代码到流程的端到端答案 | 测 | 测 | 测 | 测 | 测 | 测 |
-| Target/宏/源码位置正确性 | 测 | 测 | 测 | 测 | 测 | 测 |
-| direct/indirect call 与 dataflow 任务正确性 | 测 | 测 | 测 | 测 | 测 | 测 |
-| 文档链接 precision 与 evidence coverage | N/A | N/A | N/A | N/A | 测 | 测 |
-| stale detection、链接修复与误更新 | N/A | N/A | N/A | N/A | 测 | 测 |
-| 索引构建/增量资源 | N/A | 测 | 测 | N/A | 测 | 测 |
-| Skill 编写/审计/更新成本 | N/A | N/A | N/A | 测 | N/A | N/A |
+| 条件 | Agent 获得的能力 | 要裁决的问题 |
+|---|---|---|
+| P0 最佳代码工具 | `K*` 的原生代码知识能力 | 完整方案比较的代码能力对照 |
+| P1 最佳代码工具 + 基础架构 Skill | P0 + 一份人工整理、版本固定的基础事实 Skill | 少量稳定仓库先验能否以低成本接近或超过完整工具 |
+| P2 Understand Anything | UA 的结构图、summary、domain/flow/step、explain 和增量更新 | 结构事实与生成式架构/领域资产是否改善端到端效果 |
+| P3 Graphify | Graphify 的代码图、原始/生成文档、领域对象和 query/path/explain | 一体化代码、文档和链接能力是否产生额外净收益 |
 
-C0/C1/C2/C3 即使没有文档链接机制，仍要参加统一的端到端问答，检验代码能力或少量先验能否直接完成任务；但它们不参加 link precision 和 stale-link 专项排名。反过来，C4/C5 不能因提供完整产品形态而豁免代码事实硬门槛。UA 的已公开材料没有证明持久双向链接与 stale repair，因此相应专项若无法执行，应记为产品能力缺口而不是 `N/A`；RepoDoc 的 update recall 和选择性重生成实验只用于帮助定义该专项的 gold、指标与预期失败模式。
+P1 的 Skill 只允许写入事实性基础信息：哪些目录属于 Host、Device 或 shared，支持哪些芯片版本与 Target，构建入口和 Target 命名是什么。它不允许写入“某函数实现某流程”“某调用链属于某 Feature”或问题答案，否则会把人工 gold 泄漏给 Agent。Skill 按 repository revision 版本化，单独统计编写和维护成本。
+
+所有方案的评分 gold 始终来自真实编译/预处理工件、源码位置、可运行 probe 和人工复核。Understand Anything 或 Graphify 如果不能表达 Target occurrence、Event/Message、持久链接或 provenance，应把缺口记录为实验结果，不能用实验外脚本静默补成完整方案。能力专项题必须预注册适用范围：P0/P1 不参加产品原生 link precision 和 stale-link 排名；P2/P3 若宣称相关能力则必须接受该专项，缺少能力记为缺口而不是 `N/A`。RepoDoc 的 update recall 和选择性重生成实验只用于定义该专项的 gold、指标与预期失败模式。
 
 ### 9.2 三类项目逐级验证并选定方向
 
 验证按“Demo 淘汰硬错误—开源项目验证泛化—内部真实项目完成选型”推进；后一阶段不覆盖前一阶段的失败。
 
-**阶段一：WiFiDemo。** 冻结 WiFiDemo commit、四个 chip/host/device Target 和工具版本，所有实验臂先跑 Target occurrence、宏、直接/间接调用、Host/Device Event、领域到代码和代码到流程；只有 C4/C5 运行链接 precision、失效和修复专项。该阶段的目标是建立可执行 gold、快速发现 Target leakage 和伪造跨二进制 `CALLS`。任何实验臂不能返回正确 revision/Target/`file:line`，或把 inactive branch 当确定事实，即停止其“成熟方案”排名，但保留失败数据。
+**阶段一：WiFiDemo。** 冻结 WiFiDemo commit、四个 chip/host/device Target 和工具版本，先用选型题集完成 K0/K1/K2 代码工具比较并冻结 `K*`，再用隔离的保留题运行 P0–P3。任务覆盖 Target occurrence、宏、直接/间接调用、Host/Device Event、领域到代码和代码到流程；P2/P3 另运行链接 precision、失效和修复专项。该阶段的目标是建立可执行 gold、快速发现 Target leakage 和伪造跨二进制 `CALLS`。任何方案不能返回正确 revision/Target/`file:line`，或把 inactive branch 当确定事实，即停止其“成熟方案”排名，但保留失败数据。
 
 **阶段二：开源真实项目。** 对通过或部分通过 Demo 的方向，在 Zephyr、RIOT、Contiki-NG 及至少一个不同构建结构的 C/C++ 项目上重复核心任务。每个项目冻结 commit、toolchain、构建 Target、submodule 和问题集；问题同时覆盖通用符号导航、构建/配置、函数指针、跨模块流程和项目文档。该阶段裁决收益是否只来自 WiFiDemo 文件布局或预先熟悉的问题，并记录安装成功率、索引时间、增量更新时间、语言/构建适配量和失败模式。
 
@@ -387,7 +383,7 @@ C0/C1/C2/C3 即使没有文档链接机制，仍要参加统一的端到端问�
 2. **任务净收益**：分别比较 RQ1、RQ2 及复杂行为题的 Agent 正确率、证据完整率、时间和 Token；不以简单题优势掩盖复杂题失败。
 3. **工程采用性**：在效果置信区间接近时，再比较离线运行、许可证、索引/增量成本、可审计性和适配维护量，选定单一主方向或“轻量默认 + 深分析按需”的组合。
 
-预注册问题定义覆盖 Target occurrence、宏、直接/间接调用、Host/Device Event、领域到代码、代码到流程、链接失效、端到端 Agent、外部 C 泛化、资源和许可证，详见 [Benchmark Backlog](benchmark-backlog.md)。正式运行前应把该 Backlog 的旧条件映射同步为本节 C0–C5，避免评分问题与实验臂定义漂移。
+预注册问题定义覆盖 Target occurrence、宏、直接/间接调用、Host/Device Event、领域到代码、代码到流程、链接失效、端到端 Agent、外部 C 泛化、资源和许可证，详见 [Benchmark Backlog](benchmark-backlog.md)。正式运行前应把该 Backlog 的旧条件映射同步为本节 K0–K2 与 P0–P3，并冻结选型题/保留题划分，避免评分问题、实验条件或数据边界漂移。
 
 ### 9.3 指标必须分层
 
@@ -406,7 +402,7 @@ C0/C1/C2/C3 即使没有文档链接机制，仍要参加统一的端到端问�
 4. **Ground truth 风险**：复杂指针、宏和事件路径需要编译器、静态分析、运行 probe 与双人复核交叉建立 gold。
 5. **生成知识污染**：高可读性不等于高真实性；必须测无证据主张、错误链接与 stale 内容。
 6. **外部有效性**：WiFiDemo 是结构化 Demo，不代表总体；开源项目可能缺少公司的宏规模、历史文档和保密约束，内部单项目又可能带组织特例，因此三类项目结果必须分别报告。
-7. **Skill 泄漏**：C3 若包含函数流程、问题答案或由 gold 反推的归属，会人为抬高效果；必须在运行前冻结允许字段并审计内容。
+7. **Skill 泄漏**：P1 若包含函数流程、问题答案或由 gold 反推的归属，会人为抬高效果；必须在运行前冻结允许字段并审计内容。
 8. **完整工具公平性**：Understand Anything 与 Graphify 的原生能力边界不同；统一输入和预算不代表等价实现，任何外接补强都必须作为新实验臂公开，而不能隐藏在适配器中。
 
 ## 10. 结论
@@ -418,6 +414,6 @@ C0/C1/C2/C3 即使没有文档链接机制，仍要参加统一的端到端问�
 3. CodeGraph、Serena/SCIP 与 Joern/codebadger 都属于代码知识方案，区别是导航和程序分析深度，不应被割裂讨论。
 4. Graphify 与 Understand Anything 同时跨越多个类别，应在首轮分别评估其代码图、生成文档和链接策略；RepoDoc 保留为文档覆盖、影响传播与增量更新的方法参考，LLM-Wiki/WiCER 只代表文档知识管理。
 5. 对 WiFi MAC，最关键的额外约束是 Target-specific 构建事实、宏/间接调用以及 Host/Device Event 边界。
-6. 当前最合理的收敛是比较基础 grep、CodeGraph 轻量图、Joern 深度图、基础架构事实 Skill，以及 Understand Anything/Graphify 两个完整能力候选；按 WiFiDemo、开源项目、内部真实项目三阶段验证后，再选定主方向或按需组合。
+6. 当前最合理的收敛是先以 grep 为下限比较 CodeGraph 与 Joern，冻结最佳代码工具，再比较“最佳代码工具”“最佳代码工具 + 基础架构事实 Skill”、Understand Anything 和 Graphify；按 WiFiDemo、开源项目、内部真实项目三阶段验证后，再选定主方向或按需组合。
 
 如果后续结果显示多个方案效果接近，应优先以开放许可证和可离线复现的开源组件构建最终方案；在此之前，不把任何候选写成赢家。

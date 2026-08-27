@@ -215,7 +215,7 @@
 
 - 状态：claim-verified
 - 发布日期：Benchmark 重测于 2026-08-05；访问快照 2026-08-25
-- 访问日期：2026-08-25
+- 访问日期：2026-08-27
 - 来源类型：项目第一方 Benchmark、项目官方功能说明
 - 发布者/作者：colbymchenry/codegraph
 - 原始 URL：https://github.com/colbymchenry/codegraph；https://github.com/colbymchenry/codegraph/releases；https://github.com/colbymchenry/codegraph/blob/main/LICENSE
@@ -256,10 +256,10 @@
 
 - 状态：primary-read
 - 发布日期：v2.9.0 发布于 2026-07-10；访问快照 2026-08-25
-- 访问日期：2026-08-25
+- 访问日期：2026-08-27
 - 来源类型：项目官方功能说明
 - 发布者/作者：Egonex-AI/Understand-Anything
-- 原始 URL：https://github.com/Egonex-AI/Understand-Anything/blob/main/README.md；https://github.com/Egonex-AI/Understand-Anything/releases
+- 原始 URL：https://github.com/Egonex-AI/Understand-Anything；https://github.com/Egonex-AI/Understand-Anything/blob/main/README.md；https://github.com/Egonex-AI/Understand-Anything/releases；https://github.com/Egonex-AI/Understand-Anything/commits/main
 - 独立属性：first-party
 - 研究对象：Tree-sitter 确定性结构图与 LLM 语义/领域图的混合分析
 - 项目版本：官方仓库 `HEAD` 固定为 commit `32944829e7a63a9fa9c55d811d7f98a9530c6a6a`
@@ -268,7 +268,7 @@
 - 对照基线：none
 - 指标：none
 - 可引用声明：项目明确把 Tree-sitter 产生的可复现结构事实与 LLM 产生的摘要、标签、架构层和业务领域映射分层；Agent 可从自然语言询问 payment flow、从文件/函数执行 explain，并生成 domain、flow、step 与 onboarding 资产。结构变化使用 fingerprint 做增量更新，领域映射由 LLM 推断。
-- 数字与语境：项目提醒首次全仓分析可能消耗大量 Token，后续默认仅重分析变化文件；这不是量化性能结论。
+- 数字与语境：项目提醒首次全仓分析可能消耗大量 Token，后续默认仅重分析变化文件；这不是量化性能结论。2026-08-27 仓库页面快照约 80.7k Stars、6.8k Forks、771 commits，且 2026-08-26 仍有提交；这些只作为维护活跃度和生态采用信号，不作为 WiFi C 效果指标。
 - 限制：没有公开的结构边或领域映射准确率 Benchmark；领域知识主要由 LLM 从代码生成，未见外部领域文档、Target/revision、claim provenance、confidence 和冲突生命周期的完整治理；许可证为 MIT。
 - WiFi MAC 相关性：间接
 - 正文位置：第 5 章代码—领域链接路线、第 7 章待验证问题
@@ -497,11 +497,11 @@
 ### S021 — Graphify 官方仓库与概念文档
 
 - 状态：primary-read
-- 发布日期：持续更新；访问快照 2026-08-25
-- 访问日期：2026-08-25
+- 发布日期：持续更新；访问快照 2026-08-27
+- 访问日期：2026-08-27
 - 来源类型：开源项目官方功能说明、项目第一方 Benchmark
 - 发布者/作者：Graphify Labs
-- 原始 URL：https://github.com/Graphify-Labs/graphify；https://graphify.com/concepts
+- 原始 URL：https://github.com/Graphify-Labs/graphify；https://github.com/Graphify-Labs/graphify/commits/v8；https://graphify.com/concepts
 - 独立属性：first-party
 - 研究对象：以 Tree-sitter 解析代码、以 LLM 连接文档/媒体的混合知识图和 Agent Skill/MCP 接口
 - 项目版本：官方仓库 `HEAD` 固定为 commit `282976b2f4066b55cf2fa346c3d5568f7ac044e2`
@@ -510,7 +510,7 @@
 - 对照基线：官方 LOCOMO/LongMemEval 对照，不用于 WiFi MAC 排序
 - 指标：官方报告 memory recall/QA 指标，但没有 Target-aware C、领域边 precision 或失效修复指标
 - 可引用声明：Graphify 先以本地 Tree-sitter 抽取代码符号和跨文件关系，再对文档/PDF/媒体执行可选语义抽取；输出持久 `graph.json`、社区结构、`GRAPH_REPORT.md` 和可选 Wiki。AST 代码边标为 `EXTRACTED`，模型产生的文档/语义边标为 `INFERRED`，不能完全消歧的边标为 `AMBIGUOUS`；`# WHY:`/ADR/RFC 引用可成为一等节点，结果可通过 Skill、CLI 或 MCP 的 query/path/explain 操作查询。
-- 数字与语境：README 中的 LOCOMO 与 LongMemEval 是通用 memory 数据集，不能证明 C 调用图或 WiFi 领域链接质量。
+- 数字与语境：README 中的 LOCOMO 与 LongMemEval 是通用 memory 数据集，不能证明 C 调用图或 WiFi 领域链接质量。2026-08-27 仓库页面快照约 111.4k Stars、10.8k Forks、1,568 commits，且 2026-08-25 仍有提交；这些只作为维护活跃度和生态采用信号。
 - 限制：Tree-sitter 代码边不等于真实 Target 编译事实；公开材料没有 stable semantic ID、revision/Target occurrence、人工审核优先级或源码重命名后的领域边修复准确率。
 - WiFi MAC 相关性：间接
 - 正文位置：混合图方案、软硬边分层和 provenance 标签
@@ -887,21 +887,21 @@
 
 - 状态：claim-verified
 - 发布日期：2026-04-29（arXiv v1）
-- 访问日期：2026-08-25
+- 访问日期：2026-08-27
 - 来源类型：论文、开源项目官方功能说明
 - 发布者/作者：Dong Xu、Mingwei Liu、Xiwen Wang、Jianfeng Zhong、Zibin Zheng；SYSUSELab/RepoDoc
-- 原始 URL：https://arxiv.org/abs/2604.26523；https://github.com/SYSUSELab/RepoDoc
+- 原始 URL：https://arxiv.org/abs/2604.26523；https://github.com/SYSUSELab/RepoDoc；https://github.com/SYSUSELab/RepoDoc/commits/main；https://raw.githubusercontent.com/SYSUSELab/RepoDoc/main/pyproject.toml
 - 独立属性：author-evaluation；开源材料为 first-party
 - 研究对象：以仓库知识图谱、模块聚类和多 Agent 协作为代码仓生成交叉引用文档，并按代码变更增量更新文档
 - 项目/论文版本：arXiv:2604.26523v1；RepoDoc GitHub 访问时 `main` HEAD 为不可变 commit `306becd0f143211c0dde2bdbd480578356280e28`
-- 样本与语言：24 个开源仓库、8 种编程语言；摘要未声明含多 Target WiFi MAC C 项目
-- 模型/Agent：论文提出负责知识图谱构建、模块组织、文档写作与更新的多 Agent 流程；本台账不使用未在摘要中完整披露的模型配置做跨工具排名
-- 对照基线：论文定义的现有仓库级文档生成方法；因不同论文指标与设置不一致，不据此与其他候选直接排名
+- 样本与语言：文档完整性 RQ1 使用 24 个开源仓库、8 种编程语言；效率 RQ3 使用三种工具共同支持的 Python 仓库；增量更新 RQ4 仅使用 Python 仓库，每仓 20 个真实 commit 场景。样本未包含多 Target WiFi MAC C 项目
+- 模型/Agent：DeepSeek V3.2 作为 RepoDoc 与基线的统一生成模型；GPT-5.2 和 Claude-Sonnet-4.6 用于文档质量评判；RepoDoc 采用知识图构建、模块组织、文档写作与更新的多 Agent 流程
+- 对照基线：初始文档生成以 CodeWiki 为跨语言基线，RepoAgent 只参加共同支持的 Python 对照；增量更新以 RepoAgent 和同一系统的完整重生成为对照。不据此与其他论文候选直接排名
 - 指标：API coverage、documentation completeness、生成时间、Token 消耗、增量更新时间、增量更新 Token、update recall
 - 可引用声明：RepoDoc 先构建仓库级知识图谱并聚类模块，再由多 Agent 生成带代码交叉引用和 Mermaid 图的文档；代码变更后使用双向语义影响传播定位并重新生成受影响文档。
-- 数字与语境：在作者对 24 个仓库、8 种语言的实验中，相对论文基线报告 API coverage 提升 32.5%、completeness 提升 10.4%、生成速度约 3 倍、Token 减少 85%；增量更新时间减少 73%、Token 减少 77%、update recall 提升 10.2%。这些数字是作者评估，指标定义和基线以论文为准。
-- 限制：作者、系统与评估来自同一团队；仓库与语言混合结果不能外推为嵌入式 C、宏条件、多 Target 或领域事实准确率。文档完整性和交叉引用不证明底层程序分析已经正确，生成内容仍需源码证据与版本锚点。
-- WiFi MAC 相关性：间接但重要；提供“代码图生成文档、文档回链代码、代码变化驱动文档更新”的可测策略
+- 数字与语境：24 仓、8 语言的 RepoDoc/CodeWiki 对照中，API coverage 从平均 40.09% 到 53.13%（相对 +32.5%），Completeness@10 从 67.16% 到 74.12%（相对 +10.4%）。在 Python 仓库上，RepoDoc 相对 CodeWiki 生成时间约为 1/3、Token 减少 85%。Python 增量实验中，RepoKG 双向影响传播和选择性重生成相对完整重生成使时间减少 73%、Token 减少 77%，update recall 从 88.0% 到 97.0%（相对 +10.2%）；每仓使用 20 个真实 commit 场景。不同样本范围的数字不能合并成跨语言增量结论。2026-08-27 GitHub 页面快照约 15 Stars、5 Forks、4 commits；这些仓库热度数字只用于评估工程采用和持续维护风险。
+- 限制：作者、系统与评估来自同一团队；效率和增量数字只来自 Python 共同样本，增量实验不是 24 仓/8 语言结果。仓库混合结果不能外推为嵌入式 C、宏条件、多 Target 或领域事实准确率。文档完整性和交叉引用不证明底层程序分析已经正确，生成内容仍需源码证据与版本锚点。访问快照中仓库根目录未见明确许可证文件，`pyproject.toml` 也未声明 license；提交规模和维护连续性有限，因此当前仅保留为方法与指标参考，不进入首轮工程实测。
+- WiFi MAC 相关性：间接但重要；提供“代码图生成文档、文档回链代码、代码变化驱动文档更新”的可测策略，暂不作为首轮可执行候选
 - 适用骨架层：代码—文档链接与增量文档生成；不是独立的 C 程序语义证明层
 - Agent 证据等级：作者论文的多仓受控评估；需要在冻结版本和统一预算下复现
 - 正文位置：第 4 章文档与领域知识、第 5 章代码—文档双向链接、第 9 章增量更新 Benchmark

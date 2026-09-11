@@ -1,12 +1,12 @@
 # 选型分析：开源工具分类、提及频次与本地部署建议
 
-> 数据源：内部技术社区（稼先社区）154 篇全文（12 案例 C1–C16 + T1–T130 剔除留档 + 工具横评帖等）
-> 目的：从调研案例中归纳方案类型，统计开源工具被提及/引用频次，结合 K0–K2/P0–P3 实验设计给出 1–3 个本地部署候选
+> 数据源：内部技术社区 154 篇全文（12 案例 C1–C16 + T1–T130 剔除留档 + 工具横评帖等）
+> 目的：从调研案例中归纳方案类型，统计开源工具被提及/引用频次，收敛出「代码索引（CodeGraph/codebase-memory-mcp/Graphify 三选一）+ 文档管理（LLM-Wiki 自建）」两条线，按评测方案（K0 grep 基线对照）给出本地部署候选
 > 日期：2026-09-04（基于 12 案例 + 标准放宽复审后的全量语料重算）
 >
-> **脱敏说明**：内部工具/系统专有名词改为类别描述（某深度代码知识库工具/某内部文档搜索引擎/某自研静态分析扫描器/某内部代码文档生成 SaaS/某安全组件），内部 URL 已删除。外部开源工具名（CodeGraph / Graphify / tree-sitter / SQLite / MCP / Obsidian / DeepWiki / GitNexus / Understand-Anything 等）未脱敏。
+> **脱敏说明**：内部工具/系统专有名词改为类别描述（某深度代码知识库工具/某内部文档搜索引擎/某自研静态分析扫描器/某内部代码文档生成 SaaS/代码索引 CLI/深度摄入技能），内部 URL 已删除，内部仓名用「host/device 多仓」等领域概念指代。外部开源工具名（CodeGraph / Graphify / codebase-memory-mcp / tree-sitter / SQLite / MCP / Obsidian / DeepWiki / GitNexus / Understand-Anything 等）未脱敏。
 >
-> **口径说明（本次重算 vs 初版）**：① 语料从 140+ 篇扩到 154 篇（新增 C13–C16 四案例 + 第五轮六篇）；② 统计口径统一为「大小写不敏感 + 含命令/包名/MCP 工具变体（如 `/graphify`、`graphifyy`、`codegraph_*`），排除跨工具误配（某内部代码文档生成 SaaS ≠ CodeGraph）」，因此 LLM Wiki/CodeGraph/Graphify 等高频工具数字较初版明显上升，属口径统一所致，非语料突变。
+> **口径说明（本次重算 vs 2026-09-02 初版）**：① 语料从 140+ 篇扩到 154 篇（新增 C13–C16 四案例 + 第五轮六篇）；② 统计口径统一为「大小写不敏感 + 含命令/包名/MCP 工具变体（如 `/graphify`、`graphifyy`、`codegraph_*`），排除跨工具误配（某内部代码文档生成 SaaS ≠ CodeGraph）」，因此 LLM Wiki/CodeGraph/Graphify 等高频工具数字较初版明显上升，属口径统一所致，非语料突变。
 
 ## 一、开源工具提及频次（154 篇全文 grep 统计）
 
@@ -16,7 +16,7 @@
 | **CodeGraph（colbymchenry）** | 330 | 38 | 代码事实图谱 | **MIT** |
 | **Graphify（safishamsi）** | 302 | 17 | 双图一体（代码+文档+多模态） | MIT |
 | **某内部代码文档生成 SaaS** | 173 | 28 | 代码→文档自动生成 | 内部（不进开源比对） |
-| codebase（codebase-memory-mcp / CodeBase 仓级索引 / codebase-cli） | 83 | 16 | 代码事实图谱 | MIT |
+| **codebase（codebase-memory-mcp / CodeBase 仓级索引 / codebase-cli）** | 83 | 16 | 代码事实图谱 | MIT |
 | tree-sitter（底层解析技术，非独立工具） | 64 | 22 | 解析层 | MIT |
 | Understand-Anything（UA） | 62 | 11 | 代码图谱+可视化 | MIT |
 | **某深度代码知识库工具（内源）** | 61 | 17 | 深度代码知识库（4+1 视图+六件套+跨仓契约） | 内源（C14 案例工具） |
@@ -29,70 +29,170 @@
 | gortex | 10 | 4 | 代码图谱（跨仓） | 待核 |
 | agentmemory | 8 | 5 | Agent 记忆 | 待核 |
 | 某自研静态分析扫描器（C11） | 7 | 2 | 代码静态分析（类继承/模块依赖/接口实现图） | 自研（C11 案例工具） |
-| Joern | 0 | 0 | CPG 深分析 | Apache-2.0（我们 K2 已用，社区帖未提） |
 
 **结论**：LLM Wiki（639/48，概念生态热度，含 Obsidian 载体 + 各开源实现 + 内源封装）和 CodeGraph（330/38）仍是社区里被引用最多的两个；Graphify（302/17）在新增 C13/C16 两个真实 Graphify 部署案例后跃居第三，是「双图一体」路线里唯一有真实代码仓落地 + 明确「为何不全量 Graphify」论证的工具。codebase（83/16）排第四，在 C1 和实战对比帖里作为 CodeGraph 的降级替补出现。
 
-**新案例带出的内部工具**（C14 选型对比帖「深度代码知识库 vs 文档搜索引擎 vs 代码文档生成 SaaS」+ C11 自研）：某深度代码知识库工具（内源）、某内部代码文档生成 SaaS、某内部文档搜索引擎、某自研静态分析扫描器——均为内部/内源工具，**不进本地开源部署比对**，但深度代码知识库工具的「4+1 视图+六件套+跨仓契约」是代码知识库侧最结构化的参照（见 C14）。
+**新案例带出的内部工具**（C14 选型对比帖「某深度代码知识库工具 vs 某内部文档搜索引擎 vs 某内部代码文档生成 SaaS」+ C11 自研）：某深度代码知识库工具（内源）、某内部代码文档生成 SaaS（code→doc）、某内部文档搜索引擎、某自研静态分析扫描器——均为内部/内源工具，**不进本地开源部署比对**，但某深度代码知识库工具的「4+1 视图+六件套+跨仓契约」是代码知识库侧最结构化的参照（见 C14）。
 
-## 二、工具分类（按提供的能力）
+## 二、方案收敛：代码图谱索引（三工具比对）+ 文档管理（LLM-Wiki 自建）
 
-我们最终方案**既需要代码侧、也需要文档侧**，但多数工具只提供其中一侧——要么组合工具，要么自己管理文档搭配代码工具用。所以按「该工具提供什么能力」分三类，每类内按社区提及热度排：
+从调研案例归纳后，我们的方案收敛为**两条线**：**代码图谱索引**在三个开源工具里三选一（CodeGraph / codebase-memory-mcp / Graphify）；**文档管理**几乎只有一个成熟路径——**LLM-Wiki 理念的自建图谱仓**（某内部代码文档生成 SaaS/DeepWiki 是闭源 SaaS 不可用、某内部文档搜索引擎/某深度代码知识库工具是内部工具，开源可本地部署且被验证的只有 LLM-Wiki）。原「自带代码 + 文档图谱管理」分类（Graphify/UA 双图一体）**已砍**：Graphify 归入代码索引比对，文档侧统一走 LLM-Wiki 自建（其余候选退出理由见 A 节 blockquote）。
 
-### A. 纯代码图（只提供代码事实图谱/索引，无文档侧）
+### A. 代码图谱索引：三工具比对（本阶段先做）
 
-| 工具 | 提及（次/篇） | 许可证 | 原理（一句话） |
-|------|---------|--------|----------------|
-| **CodeGraph** | 330 / 38 | MIT | tree-sitter 解析 AST → 符号/调用图 → SQLite+FTS5 本地存储；预索引 + 文件监听自动同步（2s 防抖）；MCP 暴露 8 个查询工具（explore/callers/callees/impact/node/files…），20+ 语言、17 框架路由识别，自带 Node 运行时零依赖 |
-| **codebase-memory-mcp** | 83 / 16 | MIT | tree-sitter + SQLite + MCP，支持多仓；实战（10 仓 7450 文件）中作 CodeGraph 降级替补，多仓误匹配 3 个无关仓（注：该对比出自 CodeGraph 宣传帖，需自测复核） |
-| GitNexus | 49 / 9 | **PolyForm ❌ 禁商用** | tree-sitter+Wasm 浏览器端运行（零服务器、代码不出本地）；Leiden 社区发现聚类 + 预计算爆炸半径；LadybugDB 嵌入式图数据库；~4 万文件 OOM 上限 |
-| CodeGraphContext | 19 / 2 | 待核 | 代码索引 → 图数据库（内嵌 FalkorDB/KuzuDB 或外接 Neo4j）；23 语言、13+ 客户端、原生自然语言查询；需 Python 3.10+ |
-| CocoIndex | 18 / 1 | 待核 | tree-sitter 切块 → 向量化 → Postgres+pgvector；语义 RAG 底座（非调用图），与结构图互补 |
-| code-graph-mcp | 16 / 1 | 待核 | tree-sitter AST 图 + 混合检索；npx 零依赖；Claude Code 插件（/understand /trace /impact）；BLAKE3 Merkle 增量 |
-| gortex | 10 / 4 | 待核 | 跨仓「N repos in one graph」 |
-| 某自研静态分析扫描器（C11） | 7 / 2 | 自研 | tree-sitter+CodeGraph 静态分析（完全不用 LLM），生成类继承图/模块依赖图/接口实现图三张图，输出 JSON+Mermaid 双格式；C11 案例工具，内部不可直接部署 |
-| Joern | 0 / 0 | Apache-2.0 | 编译器级 CPG（AST/CFG/数据依赖/调用图），深语义；社区帖未提及但我们已部署（K2，cpg.bin 已建） |
-| **某深度代码知识库工具（内源，LLM Wiki 概念的内源产品化）** | 61 / 17 | 内源 | 深度代码知识库：417 仓 ingest、4+1 视图（用例/逻辑/实现/运行/契约）+ 流程六件套（调用树/主干流程/分支/跨边界数据流/数据结构/自查报告）+ 跨仓契约/领域/用例；比纯代码图「重」（生成结构化知识页），C14 案例工具，内源不可直接部署。层级见 B 类「LLM Wiki 层级关系」 |
+| 工具 | 提及（次/篇） | 许可证 | 原理（一句话） | 索引能力 | 查询能力 | 实测注意 |
+|------|---------|--------|----------------|---------|---------|---------|
+| **CodeGraph** | 330 / 38 | MIT | tree-sitter 解析 AST → 符号/调用图 → SQLite+FTS5 本地存储；预索引 + 文件监听自动同步（2s 防抖）；自带 Node 运行时零依赖 | 20+ 语言、17 框架路由识别；索引快（v1.5.0 较 1.4.1 平均提速 89%，C++ 最慢）；无硬上限（实测 10k+ 文件稳定） | MCP 暴露 8 个查询工具（explore/callers/callees/impact/node/files…）；Token 消耗最低 | 本机已装 v1.5.0；C 侧宏/函数指针/ops 表断链待实测 |
+| **codebase-memory-mcp** | 83 / 16 | MIT | tree-sitter + SQLite + MCP，支持多仓 | 多仓；实战（10 仓 7450 文件） | MCP 查询 | 实战中作 CodeGraph 降级替补，多仓误匹配 3 个无关仓（该对比出自 CodeGraph 宣传帖，需自测复核） |
+| **Graphify** | 302 / 17 | MIT | **双图一体**：代码 tree-sitter AST（硬连线）+ 文档/PDF/图片 LLM 抽取，两次提取+聚类+分析进同一张图；关系标注 EXTRACTED/INFERRED/AMBIGUOUS 区分事实与推测 | 代码侧 tree-sitter；多模态（文档/PDF/图片）；~10k 节点内存受限 | 图谱遍历 + 交互式 HTML+JSON；Token 消耗极低 | 索引慢（多模态）；结构化内容（代码）优异、零散文档平平；C13/C16 真实部署案例（均 Java） |
 
-> 补充：内核级三引擎融合（基础软件院创意帖，概念方案未落地）= tree-sitter 语法引擎 + Clang 语义引擎 + 文本引擎（注释/commit/邮件列表），位置锚点对齐；内核特化 container_of 反向依赖边、ops 表函数指针间接调用边——**与我们 CPG 函数指针/ops 表边界问题（直接 caller 为 0）完全同题**，值得跟踪作者。
+> **其余候选不进入本轮比对**：GitNexus（PolyForm 禁商用 + ~4 万文件 OOM 上限）；UA（~2700 节点上限、按需解析无持久化索引、文档侧是代码单向投影而非独立文档管理）；CodeGraphContext / CocoIndex / code-graph-mcp / gortex（提及量低、许可证待核）；某深度代码知识库工具 / 某自研静态分析扫描器（内源/自研，不可本地部署——某深度代码知识库工具的 4+1 视图 + 流程六件套 + 跨仓契约作为代码知识库侧的**设计参照**，C11 的某自研静态分析扫描器思路见下补充）。
+>
+> 补充：「内核级三引擎融合」（基础软件院创意帖，概念方案未落地）= tree-sitter 语法引擎 + Clang 语义引擎 + 文本引擎（注释/commit/邮件列表），内核特化 container_of 反向依赖边、ops 表函数指针间接调用边——**与我们函数指针/ops 表边界问题（直接 caller 为 0）完全同题**，值得跟踪作者。
 
-### B. 纯文档管理（只提供文档/知识图谱，无代码侧）
+### B. 文档管理：LLM-Wiki 理念的自建图谱仓（唯一成熟路径，后续搭建）
 
-| 工具 | 提及（次/篇） | 许可证 | 原理（一句话） |
-|------|---------|--------|----------------|
-| **LLM Wiki（Karpathy 概念，Obsidian 为载体）** | 639 / 48 | MIT 系 | LLM 当「知识编译器」：文档放 raw/，ingest 编译成实体/概念页 + [[双向链接]] + 全局索引；query/lint 三指令；替代 RAG「每次大海捞针」。实测（内网模型+真实业务文档）：准确率 8/10 优于 GraphRAG、lint 能抓孤立页/失效链接，但单 query 2–5 分钟、Token 成本高、依赖首次 ingest 质量（切分过细会乱） |
-| **某内部代码文档生成 SaaS** | 173 / 28 | 内部 | 在线代码仓文档生成器（SaaS）：批量拉取 spec.md/design.md，自动生成项目概述/模块详解/API 说明/架构图；文档侧是代码投影，闭源 SaaS 代码不出本地要求下不可用，C14 案例对比工具 |
-| DeepWiki | 60 / 7 | 闭源 SaaS | 从代码自动生成 wiki（文档侧是代码投影）；闭源 SaaS，代码不出本地要求下不可用 |
-| 某内部文档搜索引擎 | 23 / 17 | 内部 | 通用文档搜索引擎（BM25 全文+向量语义+正则+多模态），SQLite 索引，支持 PDF/DOCX/PPTX/XLSX/HTML/Markdown/代码；无语义分析（代码作纯文本索引）、无 git 集成、无跨仓关联；C14 案例对比工具 |
+**为什么是它**：文档侧候选里某内部代码文档生成 SaaS/DeepWiki 是闭源 SaaS（代码不出本地要求下不可用）、某内部文档搜索引擎/某深度代码知识库工具是内部工具，**开源可本地部署且理念被验证的只有一个——Karpathy 的 LLM-Wiki**（639 次提及 / 48 篇，社区热度第一）。
 
-> **LLM Wiki 层级关系**（639/48 是概念生态热度，非单一工具）：
-> - **概念**：LLM Wiki（Karpathy 方法论/gist）——「LLM 当知识编译器」的思想，不是工具
-> - **载体**：Obsidian（markdown + `[[wikilink]]` 双向链接）——最流行的存储/展示层，社区里「LLM Wiki」和「Obsidian」几乎同义
-> - **开源实现**（skill/prompt，跑在 Obsidian 上）：bootstrap-skill、karpathy-llm-wiki、graphify（LLM Wiki 模式）等
-> - **内源产品化**：某深度代码知识库工具（Obsidian Knowledge Library）——在概念+Obsidian 之上加 4+1 视图/六件套/跨仓契约/git 集成，从个人知识库方法论升级为团队级深度代码知识库（见 A 类）
+**这是个啥**：LLM 当「知识编译器」的方法论。传统知识管理是非结构化文档网盘（写完即过期）；传统 RAG 每次查询都从头大海捞针；LLM-Wiki 是**预先整合**——原始文档放 `raw/`，LLM 读后拆解成**页面类型**：实体页（entity：组件/子系统/人物/工具）、概念页（concept：技术概念/机制/方法论）、源摘要页（source summary）、综合页（synthesis：跨源分析）、对比页（comparison）、时间线页（timeline）、矛盾页（contradiction：来源冲突与待验证问题）（七种页面类型），用 `[[wikilink]]` 互链成网，增量维护在 `wiki/`（「你和原始来源之间」）。三层架构：**Schema 层**（CLAUDE.md/AGENTS.md，人 + LLM 共同维护的目录结构/命名/frontmatter/工作流契约）→ **Wiki 层**（LLM 全权维护）→ **原始来源层**（raw/，人策划、LLM 只读）。核心工作流：**ingest → query → lint**（lint 检查孤岛页/重复概念/缺失引用/过期结论/冲突未处理/索引漂移/日志缺失）。**知识随每个来源和每个问题越用越丰富**——高价值问答写回 wiki（Karpathy 原话：Wiki 是持久的复合产物，交叉引用已在那里、矛盾已被标记）。
 
-### C. 自带代码 + 文档图谱管理（两侧都提供，内部实现有区别）
+**跟 Obsidian 啥关系**：LLM-Wiki 是**方法论/概念**，Obsidian 是**载体**——社区里两者几乎同义，因为最流行的实现就跑在 Obsidian Vault 上（Markdown + `[[wikilink]]` 双向链接天然契合）。分工：LLM Agent（CodeAgent CLI + llm-wiki 技能）是编译引擎，Obsidian 只是**可视化展示层**（看知识页面、浏览双向链接关系图谱、Web Clipper 抓网页）。实现链：概念（Karpathy gist）→ 载体（Obsidian）→ 开源实现（bootstrap-skill / karpathy-llm-wiki / graphify 等）→ 内源产品化（某深度代码知识库工具，加了 4+1 视图/六件套/跨仓契约/git 集成）。
 
-| 工具 | 提及（次/篇） | 许可证 | 原理（一句话） | 实现区别 |
-|------|---------|--------|----------------|-----------|
-| **Graphify** | 302 / 17 | MIT | **双图一体**：代码 tree-sitter AST（硬连线关系）+ 文档/PDF/图片 LLM 抽取，两次提取+聚类+分析进同一张图；关系标注 EXTRACTED/INFERRED/AMBIGUOUS 区分事实与推测；输出交互式 HTML+JSON | 两侧都是**同一张图里的一等节点**、双向链接；实测：结构化内容（代码）优异、零散文档平平（文档缺天然引用协议，LLM 只能猜关联）。**C13/C16 两个真实部署案例**（某安全组件 + 某迭代评估系统，均 Java）验证了代码侧，C13 明确论证「为何不全量 Graphify」 |
-| **Understand-Anything（UA）** | 62 / 11 | MIT | **代码图为主 + 文档生成层**：代码图（文件/函数/类 + contains/imports/calls 边）+ 5-Agent 流水线（扫描/分析/架构/导览/审核）；/understand-chat/-diff/-onboard + Web 可视化仪表盘 | 文档侧是**代码的单向投影**（onboard 学习路线/tour 导览/可视化从代码生成），非独立文档管理；~2700 节点上限、按需解析无持久化索引 |
+**原理：它到底怎么做到与代码链接的**：引擎本身**不读代码**——raw/ 放的是文档，LLM 只做「文档↔文档」的知识编译（上述页面类型互链 + INDEX/Glossary/LOG 枢纽），代码侧由代码索引工具（CodeGraph 等）管，**两张图之间没有引擎预建的边**。链接的「胶水」是**命名/路径对齐 + Agent 消费时编排**，三种动作：
+1. **生成时锚点**：写 wiki 文档时，引用代码一律带 `[函数/类名](相对路径:行号)`（C5 锚点密度 ≥80%、C11 file:line）——把文档钉在源码的具体行上；
+2. **消费时路由**：Agent 提问那一刻，靠「实体页名=仓名/模块名」（C1）、「三层目录按架构元素名对齐 + config.yml 记录映射」（C9）、「AGENTS.md 关键词→去哪查」（C1/C11）定位到对应代码索引再查；
+3. **设计时查询**：设计/需求澄清先查知识库（KB-First，C14），能答的自动答、答不了才问人。
+> 为什么这样可行：代码事实（谁调谁）由确定性的代码图保证 100% 准确，文档负责「为什么/业务背景」（LLM 生成），锚点和路由负责在消费时把两者拼起来——**任一侧改动不破坏另一侧**（C1 核心原则：代码仓是唯一真源，Wiki 只是辅助）。
 
-> agentmemory（8/5，待核）是 Agent 记忆系统，非典型代码+文档双图，不列入比对。
+**raw/ 的边界：为什么不直接放代码仓 / spec 文件**：
+- **代码仓不进 raw**：引擎是「文档编译器」不是代码解析器。代码事实（谁调谁、符号、调用边）是 tree-sitter/CodeGraph 这类**确定性分析器**的领域——100% 准确、零 Token、增量快；让 LLM 把代码编译进 wiki 会幻觉、过时（代码每次 commit 都在变）、成本爆炸。C1 就是三条平行摄入线：代码索引 CLI 管代码（9,817 文件/52,031 符号）、spec→entities、raw→sources+concepts，**代码根本不进 wiki**。代码与文档的对接发生在「消费时」（实体页名=仓名、行号锚点、AGENTS.md 路由），不在摄入时——这正是 A 类「不预建统一图」的核心。
+- **spec 可以进 wiki，但不进 raw**：C1 的实际做法是某内部代码文档生成 SaaS 的 spec.md/design.md **直接映射 entities**（组件职责/接口/配置），raw/ 放的是更原始的服务 Wiki 文档 → sources+concepts，两条摄入线平行。原因有二：① **spec 是产物不是证据**——spec/design 本身是 LLM/某内部代码文档生成 SaaS 生成的，可能有幻觉/过时（C5 门禁防的正是「文档声称代码里没有的东西」），若只从 spec 摄入，「产物的产物」的错误会固化且无从发现；raw 的原始文档（协议/历史资料/评审记录）提供第三方证据，C9 双轨互证正是拿「代码实际」对「知识库」，冲突如实报告。② **职责分离**——spec 仓是活的（SDD 持续迭代、review、版本），raw 是稳的摄入基线（人策展、LLM 只读）；直接连 spec 仓，每次 spec 变更都触发 wiki 重编译，中间隔 raw 做缓冲后只需重 ingest 受影响页（C14 增量更新的 git diff 映射思路）。
+- 一句话：**代码图管「怎么连」（确定性）、spec 仓管「应当怎样」（人维护 SSOT）、raw 管「原始证据」（存档）、wiki 管「知识合成」（LLM 维护）**——每层一个所有者、一种变更频率、一种验证方式，互不污染。
 
-## 三、内部项目比对方案
+**5 个精选案例重新检视**：它们不止链接机制不同，**wiki/文档知识库的内部组织也不一样**——分四种组织维度：
 
-每类取最热的 1–2 个**开源可部署**工具，全部在真实 C 驱动仓（host/device 多仓，函数指针/ops 表边界问题）跑**同一套基准题**（NL→代码 / 代码→业务流程 + gold），同模型/同 prompt/同预算，按事实正确率/Agent 正确率/时间/Token/索引成本/查询失败率比——不信任何厂商或帖子的自报数字。
+| 案例 | 文档知识库怎么组织 | 目录依据 | 特点 |
+|------|-------------------|---------|------|
+| C1 | knowledge-base/wiki/：entities/（13 个组件页，驱动适配器/网卡芯片/各子系统…）+ concepts/（6 个，**concept-flow-\* 横切流程 + concept-rule-\* 规则**）+ sources/（28 源摘要）+ purpose.md/schema.md/index.md/log.md | 按知识类型 | 概念页内部分「流程」与「规则」两类 |
+| C5 | raw/（代码实证）→ requirement/（需求理解）→ design/（架构还原）**三层递进、禁止跳层** + GAP 四色标注 | 按「事实→需求→设计」递进 | 层级即可信度，文档是代码的投影 |
+| C9 | knowledge/<架构元素名>/，与 code/、design/ 三层**同名对齐**，config.yml 记录「哪个元素对应哪些仓 + 哪个知识库」 | 按架构元素 | 目录名=业务对象名，两侧对上 |
+| C11 | 五类语义文档：ARCHITECTURE.md + domain-models/ + design-decisions/ + api-contracts/ + data-models/ | 按文档类别 | 从 Karpathy 的 concepts/entities 转制 |
+| C14 | knowledge/global/（**contracts/** 26 份跨仓契约 + domains/ 15 业务领域 + use-cases/ 5 端到端用例）+ repos/{repo}/（overview/architecture/api-surface/data-models/constraints/specifications/candidate-flow + **flows/ 六件套**：调用树/主干流程/分支/跨边界数据流/数据结构/自查报告 + submodules/） | 按「跨仓 + 仓库 + 流程」 | 最结构化，代码知识库侧参照 |
 
-| 工具 | 类别 | 理由 |
+链接机制（三动作在 5 案例的分布）：
+
+| 案例 | 生成时锚点 | 消费时路由 | 设计时查询 |
+|------|-----------|-----------|-----------|
+| C1 | — | 实体页名=仓名 + Auto-Trigger 关键词路由 + P0–P3 加载优先级 | — |
+| C5 | `[类名](路径:行号)` 密度 ≥80% + code_evidence_verifier 门禁 | — | — |
+| C9 | — | code/knowledge/design 同名对齐 + config.yml + 双轨问答（wiki Agent 答 Why + 代码 Agent 答 How + 主 Agent 互证） | — |
+| C11 | 二层文档引一层代码位置（file:line） | AGENTS.md 指针导航「改 X 先读 Y 再查 Z」 | — |
+| C14 | — | — | KB-First 查询（query skill，4/6 澄清问题 KB 自动答） |
+
+**wiki 内部组织方式怎么选**（按 flow / entities / feature 还是别的）：社区 + 案例里出现的组织维度有四种，各有适用场景：
+1. **按知识类型**（entity/concept/source/synthesis/comparison/timeline/contradiction）——Karpathy 原版（社区多篇实战一致），适合**文档型知识**：页面类型语义清晰、lint 规则好写；
+2. **按流程**（flows 六件套）——C14 某深度代码知识库工具，适合**流程分析密集型**场景（我们的 RQ2 代码→流程解释正属此类）；
+3. **按需求/模块/决策**（features/modules/decisions，request+spec+implementation+verification 四件套）——C4 园区知识库，适合**SDD 需求流**、贴合上库记录维护；
+4. **按架构元素对齐**（code/knowledge/design 同名 + config.yml）——C9，适合**多仓两侧对齐**。
+
+> **我们的取舍**：文档侧知识库**以「按知识类型」为骨架**（entities/concepts/sources + 枢纽文件），但 **concepts/ 内部分 concept-flow-\*（横切流程：TX/RX 通路、Event-Message 机制、函数指针/ops 表分发）与 concept-rule-\*（设计规则）**（C1 的做法）——我们的核心知识就是流程，flow 是最高频的提问对象；同时**吸收 C14 的 global/ 跨仓契约目录**（host↔device 的接口/Event-Message 调用链就是我们的「跨仓契约」）、**C4 的 decisions/**（长期取舍，如 ring 大小、ops 表 vs if-else）、**outputs/**（查询产出回流，知识复利）。不采用 C5 的递进层次组织 wiki 内部（那套更适合代码→文档的逆向工程产物，我们的文档侧是领域知识，不是代码投影）。
+
+**结合我们的项目：文件夹怎么分配**。三仓 workspace（C1 结构与我们的场景最贴——同为多仓网卡驱动）：
+
+```
+wifi-kb-workspace/
+├── AGENTS.md            # 入口指南：Schema（目录/命名/frontmatter/工作流契约）+ 指针导航 + 关键词路由
+├── codebase/            # 代码侧：host/device 多仓 git submodule 只读挂载 + .codegraph/ 代码索引（C1）
+├── codespec/            # spec 仓：SDD 流程维护的 spec.md/design.md（SSOT，后续搭建，C1）
+├── knowledge/           # 文档侧：LLM-Wiki 图谱仓
+│   ├── raw/             # 原始文档：协议/设计/历史资料（人策划、LLM 只读）
+│   └── wiki/
+│       ├── entities/    # 实体页：模块/子系统（wal/hmac/dma → wal.md/hmac.md/dma.md）＝命名路由
+│       ├── concepts/    # 概念页：concept-flow-*（TX/RX 通路、Event-Message、ops 表分发）+ concept-rule-*（规则）
+│       ├── sources/     # 源摘要页：每篇原文留一页
+│       ├── global/      # 跨仓知识（C14）：contracts/（host↔device 接口与 Event-Message 契约）+ use-cases/（端到端链路）
+│       ├── decisions/   # 长期取舍（C4/C11）：ring 大小、ops 表 vs if-else、芯片差异
+│       ├── outputs/     # 查询产出回流：问答综合/对比，越用越丰富
+│       ├── index.md     # 全局索引（带一句话摘要，供 LLM 快速纵览）
+│       ├── glossary.md  # 术语表（802.11/WiFi MAC 术语中英对照，双链枢纽）
+│       ├── log.md       # 操作日志（只追加，grep 可解析）
+│       ├── purpose.md   # 知识库目标与关键问题（C1）
+│       └── schema.md    # Wiki 结构规则 + YAML frontmatter 规范（C1）
+├── .skills/             # 工具链：代码查询 / LLM-Wiki / SDD 流程技能（C1）
+└── config.yml           # 代码仓 ↔ 架构元素 ↔ wiki 实体映射（C9，两侧对齐的前提）
+```
+
+**消费时：模型怎么从 wiki 找到代码（不止命名对齐）**。文档侧不需要「每个函数都标注链接」——链接发生在「文档给出符号/语义 → 代码索引确定性解析」这层，四条通道：
+1. **符号精确解析（代替 grep）**：文档写的函数名/符号名，消费时走代码索引的**符号表查询**，不是 grep 字符串匹配——C1 的代码索引 CLI 预建 52,031 个符号（每仓精确计数），`代码索引 repo query <仓名> --query <符号> --kind hybrid --format json`；CodeGraph 对应 node/search。符号表由 AST 解析预建，**区分同名、返回文件:行 + 签名 + 调用边**，查询是索引查找（毫秒级）。「实体页名=仓名」的作用正在于此：**把符号查询限定到正确仓库**，而不是为了 grep 命中。
+2. **语义→符号映射层**（C11 domain-models/）：业务术语 ↔ 代码包/符号的映射表沉淀在文档里（「订单」→ com.example.order；「结算服务对应哪个包」），消费时 LLM 先读映射拿到**正确的符号名**再走通道 1——解决「知道业务、不知道代码叫啥」的盲搜。这是文档侧真正核心的链接资产：**不是链接到具体行，而是链接到「正确的符号名」**。
+3. **确定性调用图遍历**：文档给「入口符号 + 意图」，代码图沿 callers/callees/impact 确定性走（CodeGraph 8 个查询工具、C11 用代码图符号查询对账 scan 产物查漏补缺）——链接发生在**查询链**上：从文档给的入口出发，图自己把上下游串起来，不需要每个函数都标注。
+4. **消费时双 Agent 对账**（C9）：wiki Agent 答 Why（文档语义）、代码 Agent 答 How（代码实际）、主 Agent 交叉印证——文档标注可能过时/写错，但代码 Agent 的查询结果是**对账基准**，冲突如实报告，而不是将错就错。
+> 效率对比（C1 自报）：跨仓分析 240→15min、问题定位 180→20min——快在「符号表索引查找 + 限定仓库 + 沿图走」，不是靠 grep 全仓扫。
+
+**链接约定怎么落地**（对应上面的三种动作）：
+- **生成时锚点**：wiki 文档里引用函数一律写 `[函数名](codebase/.../src.c:234)`；代码 merge 触发 git diff → 锚点校验门禁（C5 code_evidence_verifier 思路，声称的符号必须在源码里真实存在），失效即重跑受影响子域（C5 实测省 50–80%）；
+- **消费时路由**：实体页名 = 模块/仓名（wal.md ↔ codebase 里 wal 仓）；AGENTS.md 写死路由表（TX/RX 通路 → concepts/concept-flow-tx-rx.md，代码/实现 → codegraph 查询，设计/规范 → codespec/specs/）；查询走双轨——wiki Agent 答 Why + 代码 Agent 答 How + 主 Agent 交叉印证（C9）；
+- **设计时查询**：SDD 澄清先查 wiki（KB-First），能答的自动答、答不了才问人（C14）；
+- **spec 与 raw 两条摄入线**：codespec/ 的 spec.md/design.md 直接映射 wiki 实体页（C1：spec/design → entities/\*，组件职责/接口/配置），knowledge/raw/ 的原始文档映射 sources+concepts——spec 变更 → 只重 ingest 受影响实体页（C14 增量更新的 git diff 映射思路）并做冲突检测；codespec/ 是 SSOT、wiki 只是辅助（C1 原则）。
+
+**怎么用**：工具链 = CodeAgent CLI + llm-wiki 技能（开源基础能力）+ 深度摄入技能（可选增强）+ Obsidian（可选）。四个操作：
+- `/wiki-init`：初始化 knowledge/ 目录（raw/ 只读 + wiki/ 骨架 + index.md/glossary.md/log.md/purpose.md/schema.md），Schema 写进 AGENTS.md；
+- `/wiki-ingest`（基础）/ 深度摄入技能（3 轮反思递进提取 + 自动健康检查）：文档放 raw/ → LLM 提取实体概念 → 建/更新页面 → 维护双向链接 → 更新索引日志，一个源文件可能产出 10-15 个页面；
+- `/wiki-query`：语义检索，给出带引用的答案；
+- `/wiki-lint`：机械检查（孤立页面/失效链接）+ 语义检查（矛盾/过期/索引漂移），保持知识库健康。
+Wiki 可暴露为 MCP 服务（关键词搜索/语义搜索/笔记读取），供 Agent 直接调用。
+
+**实测注意（内网模型 + 真实业务文档）**：准确率 8/10 优于 GraphRAG、lint 能抓孤立页/失效链接；但**单 query 2–5 分钟、Token 成本高、依赖首次 ingest 质量**（hex 文件切分过细出 6 万 md 翻车）——自建时切分粒度要控制。
+
+## 三、评测方案：先完成代码三工具比对
+
+### 阶段划分（两条线错峰推进）
+
+| 阶段 | 内容 | 状态 |
 |------|------|------|
-| grep/rg（K0） | 基线 | 固定下限 |
-| **CodeGraph**（K1） | A 纯代码图 | A 类提及第一（330/38），MIT，本机已装 |
-| **codebase-memory-mcp**（K1'） | A 纯代码图 | A 类提及第二（83/16），MIT，与 CodeGraph 同类对照 |
-| **Graphify**（P3） | C 代码+文档 | C 类提及第一（302/17），MIT，双图一体实现；C13/C16 两个真实部署案例背书 |
+| **本阶段（先做）** | 代码图谱索引三工具比对：CodeGraph / codebase-memory-mcp / Graphify | **进行中**（题目征集中） |
+| 后续搭建 1 | **LLM-Wiki 自建图谱仓**（文档管理，二·B 节） | 独立搭建，无需比对 |
+| 后续搭建 2 | **spec 仓**（SDD 流程维护的规格文档仓） | 后续搭建，与 LLM-Wiki 配套 |
 
-> **UA 不参与比对**：社区无「真实代码仓部署 + 有具体结果」的 UA 案例（找到的都是装插件跑一下、无具体仓无结果数据），且 UA 文档侧是代码单向投影（非独立文档管理），与 Graphify 的「文档进同一张图」实现区别在 C 类已说明；为控制实验规模，C 类只取 Graphify 一个代表。
->
-> **纯文档类不比**：LLM Wiki（639/48）是唯一可落地的开源实现（某内部代码文档生成 SaaS/DeepWiki 闭源 SaaS、某内部文档搜索引擎内部），直接搭配代码工具用（或自己管理文档）。
->
-> **内部工具不进本地部署比对**：某深度代码知识库工具（内源，C14）、某内部代码文档生成 SaaS、某内部文档搜索引擎、某自研静态分析扫描器（C11）均为内部/内源工具，无法在开源基准上部署实测；但深度代码知识库工具的「4+1 视图+六件套+跨仓契约」是代码知识库侧最结构化的参照，C13 的「LLM Wiki+Graphify 异构混合」是开源工具落地双图的参照，两者作为**设计参照**而非部署候选。
+> **为什么只有三工具**：文档侧 LLM-Wiki 是唯一可落地的开源方案（二·B 节，某内部代码文档生成 SaaS/DeepWiki 闭源 SaaS、某内部文档搜索引擎/某深度代码知识库工具内部），**不存在工具比选**，直接按 B 节路径搭建即可；spec 仓是代码知识库的配套工作区（A 类案例三仓 workspace 结构的组成部分），与代码图谱工具无关，随 SDD 流程一起建。所以本轮**只比三个代码工具**。
+
+### 基准题（沿用评测方案）
+
+按以下口径出题与评分（详见评测集「出题表」与模板文档）：
+
+- **两类题**（从应用场景出发，不按工具能力分）：**NL→代码**（自然语言描述需求/改动意图 → 定位相关代码 file:line/调用链）、**代码→业务**（给一段代码 → 讲清业务流程/设计意图/上下游）
+- **难度**：易（单文件内定位）/ 中（跨 2–3 文件/模块）/ 难（跨仓/函数指针/宏/ops 表/隐式调用）
+- **目标 22 题**：NL→代码 11 + 代码→业务 11（易 6 / 中 10 / 难 6）
+- **征集状态**：**已开始**，全组每人 3–5 题、从迭代开发真实场景出发，**预计超过 20 题真实问答**用于测试；收齐后把「正确答案要点」拆成结构化 gold——`key_facts`（必须命中，每条 1 分）/ `nice_facts`（加分，每条 0.5 分）/ `forbidden_claims`（幻觉，每条 -2 分），并逐题标注「纯代码可答 / 纯文档可答 / 需两侧协同」，用于区分 A 线（代码生成文档）与 B 线（人工领域知识）下的预期差异
+
+### 三工具比较设计
+
+跑法：三个工具各自在 **三个真实仓**（host/device 多仓，C 驱动，函数指针/ops 表边界问题）上索引，再跑**同一套基准题**（同模型/同 prompt/同预算），按四个维度记分：
+
+**① 索引能力**（一次性成本，决定能否跑起来）
+- 索引时间：全仓首次索引耗时（实测：CodeGraph 预构建快、v1.5.0 较 1.4.1 平均提速 89%；Graphify 多模态抽取慢；codebase-memory-mcp 待测）
+- 资源占用：内存/磁盘（实测：Graphify ~10k 节点内存受限；CodeGraph 无硬上限、实测 10k+ 文件稳定）
+- **C 语言覆盖**：tree-sitter C 能否正确建**宏/函数指针表/ops 表**的符号与调用边——我们的核心难点（函数指针直接 caller=0）
+- 增量同步：文件监听自动增量（CodeGraph 2s 防抖）vs 手动重索引
+
+**② 查询能力**（每次问答的成本与可达性）
+- MCP 工具集：CodeGraph 8 个查询工具（explore/callers/callees/impact/node/files…）；codebase-memory-mcp 多仓查询；Graphify 图谱遍历+交互式 HTML/JSON
+- 跨仓：host/device 多仓各自索引 vs 合并索引，跨仓调用链能否串起来（C1 适配点）
+- **函数指针/ops 表**：caller=0 时 callers/impact 能否给出间接调用链——**三工具差异的主要暴露点**
+- 查询失败率：同一题在三个工具上答不出来的次数
+
+**③ 资源成本**
+- 时间：单题响应时间；Token：单题消耗（实测：CodeGraph Token 最低）
+
+**④ 事实正确率**（最终胜负手）
+- 按 gold 打分：key_facts 命中率 / nice_facts 加分 / forbidden_claims 幻觉数
+- Agent 正确率：完整问答链（NL→代码定位→代码→业务解释）的整体正确
+
+**输出**：三工具得分表（每维度 + 总分）→ 能力画像（谁快 / 谁全 / 谁省 Token / 谁断链少）→ 推荐结论（含降级替补关系）。
+
+### 原则与已知注意
+
+- **基线对照**：保留 grep/rg（K0）作固定下限，区分「工具增益」与「题本身 grep 就能答」
+- **案例和厂商自称数据仅做参考**：对比帖均出自厂商/社区，只作方向参考，最终以本地实测为准
+- **函数指针/ops 表断链**：好题示例专门留了这类题（ops 表/函数指针表设计意图），是三工具差异最可能暴露的地方
+- **内部工具不进本地部署比对**：某深度代码知识库工具（内源，C14）、某内部代码文档生成 SaaS、某内部文档搜索引擎、某自研静态分析扫描器（C11）无法在开源基准上部署实测；某深度代码知识库工具的「4+1 视图+六件套+跨仓契约」与 C13 的「LLM Wiki+Graphify 异构混合」作为**设计参照**而非部署候选

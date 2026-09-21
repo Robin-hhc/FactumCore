@@ -1,0 +1,432 @@
+# WiFi MAC 驱动双图谱知识库 · 总架构设计
+
+> **定位**：本文件是项目**主设计文档**——只讲整体架构（workspace 结构、双图谱如何结合、工具选型），不展开各模块的实现细节。
+> **阅读对象**：先讨论并确定本文件，再逐项细化。
+> **状态**：v0.1 讨论稿（本地，未脱敏，未进仓）。细节见各编号说明书（01-代码图谱部署 / 02-LLM-Wiki构建 / 03-治理机制 / 04-消费与问答 / 05-落地路线与评测）。
+> **版本**：2026-09-21 v1.0——总设计**面向完整未来蓝图**（不限定当前三仓等初期限范围，落地细节见各编号说明书）；删 §5 实现步骤 / §6 说明书索引 / §7 开放问题（与总架构本文无关）。2026-09-21 v0.9——§2 重构为两节各一整套图：§2.1 **消费视角**（静态分层图 + 动态走查图）；§2.2 **治理视角**（同款样式的治理架构图 + 动态走查图，体现代码/文档增量进来时两侧图谱与 Schema 契约如何同步）。2026-09-21 v0.7——§2.3 llmwiki 目录去内层 wiki/（知识卡直接放根下）+ 三类起步（entities/concepts/runbooks），其余按需再引入。2026-09-21 v0.5——§3 新增 3.2 AGENTS.md 入口路由与工作流契约（AGENTS.md=流程 vs config.yml=数据）。2026-09-21 v0.4——§2.1 新增动态走查图（消费流转）。2026-09-21 v0.3——§2.3 codebase 改为 ut_agent/main 真实结构镜像，docs 本质即 LLM-Wiki 图谱仓。2026-09-21 v0.2——§2.3 嵌入部门 AIoTBot 工作区，仅新增 AGENTS.md、config.yml。2026-09-20 v0.1——基于合稿提取。
+
+---
+
+## 0. 一句话架构
+
+**双图谱、三环节、一个卡契约**：代码侧用确定性代码图（CodeGraph / codebase-memory-mcp 等价二选一）管"怎么连"，文档侧用 LLM-Wiki 自建图谱仓管"为什么/业务背景"，两侧以"卡契约 + 链接四通道 + 双轨问答"在消费时对接；知识生产（ingest）→ 治理（lint）→ 消费（query）三环节闭环，长期以生命周期、增量更新、健康度看护维持可用性。
+
+---
+
+## 1. 目标与边界
+
+### 1.1 目标
+
+为 WiFi MAC 驱动迭代开发中的 Agent 提供受治理的知识底座：
+
+1. **代码事实图谱**：WiFi 各代码仓（device 侧 mp1x/mp12/… + host 侧 drivers/wifi）符号、调用关系、跨仓链路的确定性索引，回答"谁调用谁、入口到哪、改动影响什么"；
+2. **知识文档图谱**：把协议、设计、调试经验编译为可检索、可引用、可验证的知识卡，回答"为什么这么设计、这个流程怎么走、这个报错怎么解"；
+3. **两线消费时对接**：Agent 提问时先定位知识节点，再沿卡契约、sources 与链接通道逐层展开，减少无差别读取原始材料，把 Token 集中在与决策直接相关的证据上。
+
+### 1.2 范围
+
+- **代码侧**：WiFi 全部代码仓（device 侧 mp1x/mp12/mp12c/alg/features/… + host 侧 drivers/wifi，chip2/chip8 的 wifi-host / wifi-device）；具体纳入哪些仓、冻结哪个 revision 属落地细节，见 01-代码图谱部署；
+- **文档侧**：协议文档、设计文档、SDD 产出（spec.md/design.md）、调试轨迹提炼；
+- **评测**：沿用 w5 两类题（NL→代码 / 代码→业务）+ 关键点评分制，出题范围随代码侧范围走。
+
+### 1.3 四条边界纪律（先立规矩再建库）
+
+| 边界 | 规则 | 依据 |
+|------|------|------|
+| **Skill vs 知识** | Skill 保存"如何完成任务"（流程/工具/小型参考）；可复用的领域事实（API 语义、通路流程、调试经验）必须进知识库。多个 Skill 消费同一份知识 | 62.8% Skill 附带 reference、无治理即失控（cannbot 统计） |
+| **raw 边界** | 代码仓不进 raw；spec 进 wiki 不进 raw；raw/ 只放第三方原始文档（协议/历史资料/评审记录），人策展、LLM 只读 | "产物 vs 证据/真源在哪"两问 |
+| **来源纪律** | 知识卡正文不复制原始材料；sources 指向固定可核验位置（文档归档 / 固定 commit 源码）；related 关系经审查才写入、不进检索语料 | 防幻觉固化、防关键词共现误当关系 |
+| **人机分工** | 人负责策展来源、引导分析、问好问题；LLM 负责全部簿记（总结/交叉引用/归档/维护）。wiki 是 LLM 写、人读的产物，人不直接编辑正文 | 维护负担近零才有人长期用（LLM-Wiki 核心理念） |
+
+---
+
+## 2. 总体架构
+
+### 2.1 消费视角：双图谱 × 三环节（静态分层图 + 动态走查图）
+
+> 按「原始来源 → 图谱抽象 → 消费检索 → Agent → 用户」五层表达（对齐 w3 C11 三层递进、C6 L1-L6 六层架构的分层思路）。核心：**底层是代码 + raw 原始文档，中间经两套引擎抽象成「调用图谱 + 知识卡片」两个图谱，上层 Agent 在消费时双轨检索、交叉印证后服务用户**。
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│  用户层       开发者 / 测试 / 评审（提自然语言问题，得可验证结论）            │
+└──────────────────────────┬─────────────────────────────────────┘
+                           │ 提问 / 采纳结论
+┌──────────────────────────▼─────────────────────────────────────┐
+│  Agent 层      主 Agent（双轨编排·交叉印证·如实报告冲突）                  │
+│                ├── wiki Agent  查「为什么/业务背景」（文档图谱）              │
+│                └── 代码 Agent  查「怎么连/调用链」（代码图谱，codegraph CLI）  │
+└───────┬──────────────────────────────┬─────────────────────────┘
+        │ 链接四通道（消费时拼接）        │
+┌───────▼──────────┐          ┌──────────────▼───────────────────┐
+│  消费检索层        │          │                                  │
+│  Query 五步 → 候选  │          │  符号查询 / callers / impact      │
+│  → 正文 → 核 sources│          │  （确定性，毫秒级）                 │
+│  → 沿 related 展开  │          │                                  │
+└───────┬──────────┘          └──────────────┬───────────────────┘
+        │ 知识文档图谱（LLM-Wiki）              │ 代码事实图谱（CodeGraph）
+┌───────▼──────────┐          ┌──────────────▼───────────────────┐
+│  图谱层           │          │                                  │
+│  wiki/ 知识卡      │          │  符号表 + 调用图                   │
+│  entities/concepts│          │  （.codegraph/ SQLite+FTS5）      │
+│  /runbooks 三类    │          │                                  │
+└───────┬──────────┘          └──────────────┬───────────────────┘
+        │ Ingest 编译（LLM，draft→stable）     │ 索引器（tree-sitter，确定性）
+┌───────▼──────────────────────────────────────▼─────────────────┐
+│  原始来源层   docs/raw0+raw1（协议/芯片/设计/轨迹） + codebase 代码仓        │
+│             （人策展、LLM 只读）                  （mp1x/mp12/drivers-wifi） │
+└────────────────────────────────────────────────────────────────┘
+```
+
+- **原始来源层**：代码（`codebase/` 三仓源码）与原始文档（`docs/raw0/` pdf/docx + `docs/raw1/` md）是知识底座，人策展、LLM 只读；
+- **图谱层**：代码被 tree-sitter 索引器抽象成**确定性调用图谱**（.codegraph/ 符号表+调用图）；原始文档经 Ingest 编译成 **LLM-Wiki 知识卡片**（draft→stable 生命周期）；
+- **消费检索层**：Agent 提问时**双轨并行**——wiki 侧走 Query 五步检索知识卡，代码侧走 codegraph CLI 查符号/调用链/影响面；
+- **Agent 层**：主 Agent 编排 wiki Agent（答 Why）+ 代码 Agent（答 How），交叉印证、冲突如实报告（以代码为准）；
+- **用户层**：开发者/测试/评审以自然语言提问，获得**可验证**（可回溯到 sources 与代码锚点）的结论。
+
+三环节分工（生产→治理→消费）：
+
+- **生产**：把原始材料编译成候选知识卡（默认 draft），路由到对应 producer；
+- **治理**：保证知识可检索、无矛盾、不过期（lint / 门禁 / 增量 / 看护）；
+- **消费**：让 Agent 按边界条件精准检索、按需展开、形成可验证结论。
+
+#### 动态走查图（消费视角）：一次提问在各层间的流转
+
+> 静态分层图只能看到"层"，看不到"流"。下面用**编号步骤 + 跨层箭头**走查一次真实提问（问题：「TX 通路里多播帧是怎么处理的？改动它会影响哪些调用链？」，即 §3.3 链接四通道的完整消费走查），把消费时「读知识卡 → 回代码图查代码 → 双轨对账」的路径画出来。画法借鉴部门问题定位流程图（编号框 + 分支 + 回流）。
+
+```
+【输入】用户层
+   开发者 / 测试 / 评审：问题单 / 自然语言提问 / 直接日志输入
+   （例：「TX 通路里多播帧是怎么处理的？改动它会影响哪些调用链？」）
+   │
+   ▼
+【1 路由与检索】                    ←─ 主 Agent 双轨编排（AGENTS.md 关键词 + config.yml）
+   ① 路由：按问题关键词/模块名 → 双轨分派
+      ├─→ wiki Agent（答 Why）：按 config.yml wiki_entities 定位实体页 / index.md 定位候选卡
+      └─→ 代码 Agent（答 How）：按 config.yml architecture 定位仓+目录，准备 codegraph 查询
+   ② wiki Agent 读知识卡（docs/llmwiki/）：concept-flow-tx-path 卡正文（结论/适用条件/失效边界）
+      └─ 卡内 sources 指向：codebase/drivers/wifi/hmac/tx/hmac_tx_data.c + raw1 协议文档
+   │
+   ▼
+【2 知识 → 代码符号翻译】           ←─ 链接通道 2（语义→符号映射）
+   ③ 业务词"多播帧" → config.yml symbol_aliases → hmac_tx_data_mcast_process_ap
+      （concept-rule 卡维护术语表；找不到映射则回卡内锚点取符号）
+   │
+   ▼
+【3 代码图谱查询】                  ←─ 链接通道 1+3（符号精确解析 + 确定性调用图遍历）
+   ④ 代码 Agent：codegraph query -p codebase/drivers/wifi hmac_tx_data_mcast_process_ap
+      → file:line 1756 / 签名 / callers（沿 TX 主链展开）
+   ⑤ 改影响面：codegraph impact -p codebase/drivers/wifi <符号> → 受影响调用链
+      （跨仓时：host（drivers/wifi）↔ device（device/wifi/mp1x|mp12）靠 config.yml repos 串链）
+   │
+   ▼
+【4 双 Agent 对账】                  ←─ 链接通道 4（wiki 答 Why / 代码答 How / 主 Agent 互证）
+   ⑥ 代码图实际调用链 vs 卡内描述互证：一致 → 采信；冲突 → 如实报告，以代码为准
+   │
+   ▼
+【5 结论 + 回填】                   ←─ 知识复利（04-消费与问答 §6）
+   ⑦ 可验证结论：结论 + 影响面 + 需真机验证项
+   ⑧ 可复用结论写回 docs/llmwiki/ 对应 concept/entity 卡（越用越丰富）
+   ⑨ 锚点失效 / 发现卡过期 → 走治理（lint / 锚点校验门禁，见 03-治理机制）
+```
+
+> **这张图回答的问题**：知识库不是"每次从原始材料重新拼凑"——消费时 Agent **先按路由定位知识卡**（第 1 步），**读了文档理解背景后提取关键函数/术语**（第 2 步），**再回代码图做确定性分析**（第 3 步），最后**互证收口**（第 4–5 步）。知识卡只承担"为什么/怎么连"的指引，代码事实一律以 codegraph 索引查询结果为准；两侧图谱**不预建统一图**，靠 §3 的三层约定（命名路由 / config.yml / 卡内锚点）在消费时拼接。
+>
+> 与 §2.1 静态分层图的对应：第 1–2 步发生在 Agent 层 → 消费检索层（wiki 侧）；第 3 步是消费检索层（代码侧）→ 图谱层（代码图）；第 4–5 步回到 Agent 层收口。生产/治理环节（ingest / lint / 增量 / 看护）不在这张消费图里，见 §2.2 治理视角与 03-治理机制。
+
+### 2.2 治理视角：知识怎么被生产、治理、维持可用
+
+> §2.1 讲"读"（消费：一次提问怎么流经五层）；本节约讲"建和养"（治理：知识怎么从原始材料编译成卡、随代码演进被校验/更新/废弃）。同样用**静态架构图 + 动态走查图**，但换成治理语义——重点是**代码/文档增量进来时，两侧图谱与 Schema 契约如何同步**。
+
+#### 治理架构图（增量视角的静态分层）
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│  治理看护层    lint 门禁 / check.sh / 锚点校验门禁 / 检索回归 / 健康度看板      │
+└───────┬──────────────────────────────┬─────────────────────────┘
+        │ draft→stable 门禁校验          │ 代码 merge 触发锚点校验
+┌───────▼──────────┐          ┌──────────────▼───────────────────┐
+│  图谱层（wiki 侧） │          │                                  │
+│  知识卡  draft    │          │  符号表 + 调用图                   │
+│  → stable/deprecated│        │  （.codegraph/ 随代码增量同步）    │
+└───────┬──────────┘          └──────────────┬───────────────────┘
+        │ Ingest 编译（LLM）                   │ 索引器（tree-sitter 增量）
+┌───────▼──────────────────────────────────────▼─────────────────┐
+│  原始来源层   新增 raw 文档（人策展） + 代码变更（git merge）             │
+│             （增量进来源层，向上编译）                    │
+└────────────────────────────────────────────────────────────────┘
+        ▲                                                      ▲
+        │ Schema 层契约（AGENTS.md / config.yml / 卡契约 / check.sh）│
+        └────────────────────── 约束两侧 ────────────────────────┘
+```
+
+> **治理视角的分层**：与消费视角同一张图，但语义换成"增量从哪进、经过什么校验、落到哪"。原始来源层是**增量的入口**（新 raw 文档 / 代码 merge）；图谱层是**增量被编译的地方**（文档经 Ingest 成卡、代码经索引器同步）；治理看护层是**校验门禁**（卡进 stable 前过 lint，代码变更触发锚点校验）。Schema 层契约横跨底部，约束两侧如何编译、如何校验。
+
+#### 治理动态走查图：一条知识从原始材料到可用、再到随演进被维护
+
+```
+【输入】增量
+   ① 代码 merge（git diff：符号增删改/行号漂移）
+   ② 新 raw 文档（人策展入库） / 新调试会话轨迹
+   │
+   ▼
+【1 编译两侧】                        ←─ 生产（对应消费视角图谱层）
+   ③ 代码侧：codegraph sync <index> 增量同步索引（host / device 各仓）
+   ④ 文档侧：LLM 读源 → 与提问者过要点 → 写候选卡（draft）
+      ├─→ entities/ 或 concepts/（文档类+通路类）
+      └─→ runbooks/（轨迹类，六要素）
+   ⑤ 卡 frontmatter 登记 sources（指向 raw0/raw1 + 代码锚点）；新术语 → 同步登记 config.yml symbol_aliases
+   │
+   ▼
+【2 治理校验】                        ←─ 治理看护层（Schema 层驱动）
+   ⑥ check.sh：全库 lint（frontmatter 完整性 / 正文四要素 / 链接一致）
+   ⑦ 锚点校验门禁（代码 merge 触发）：抽检文档声称符号/行号仍存在
+      → 失效定位 → 增量重跑受影响子域（实测省 50–80%，C5）
+   ⑧ 门禁过 → draft → stable（检索默认可见）；冲突未裁决 / 来源不足 → 保持 draft / deprecate
+   │
+   ▼
+【3 维持可用（持续）】                ←─ 生命周期
+   ⑨ 代码再变更 → 重复 ③⑦（锚点失效 → 更新卡 / 标记 deprecated）
+   ⑩ 结论被推翻 → 卡标 deprecated（保留解释历史，排检索）
+   ⑪ 健康度看护：检索回归集 / 拒答题集持续盯；随摄入与问题增长增量补卡
+```
+
+> **与 §2.1 消费视角的关系**：治理是消费的前提——卡只有过门禁进 stable 才被检索到，锚点失效的卡会误导消费。两侧图谱**不预建统一图**，靠 Schema 层（命名路由 / config.yml / 卡内锚点）在消费时拼接，也在治理时校验（lint 保证两侧引用一致）。
+
+### 2.3 落地骨架（嵌入部门 AIoTBot 工作区）
+
+> **对齐**：本设计不另起 workspace，而是**嵌入部门已确定的 AIoTBot 工作区**（《AIoTBot 嵌入式开发平台架构设计》v0.1「AIoTBot目录架构」）。部门规划的外层目录**全部保留**（skills / workflows / hook / agent / docs / scripts + 顶层规范文件），我们只在对应位置放入自己的技能、文档与治理脚本；整个 workspace **只新增两个文件：AGENTS.md、config.yml**。
+>
+> **codebase 形态（依据 Z:/ut_agent/main 实测 + wifi-structure / wifi-codegraph skill）**：初期落地**只取我们实际用的三个代码仓**——device 侧 `main/device/wifi/mp1x`（1108）、`main/device/wifi/mp12`（1112），host 侧 `main/drivers/wifi`（1112/1108 共用 host 代码）。但目录树按**真实代码仓架构**画（不是抽象三仓）：`ut_agent/main/` 本身就是多仓 workspace（`build / device / drivers / host / …` 多文件夹并列，`main/device/wifi/` 下含 mp1x / mp12 / mp12c / alg / features 等**多个独立 git 代码仓**）。CodeGraph 索引**按 wifi-codegraph skill 的规则建在各代码仓内**：device 侧每个代码仓一个索引（`main/device/wifi/<project>/.codegraph/`，mp1x / mp12 / alg / features…各建一个），host 侧固定一个索引覆盖全部 host（`main/drivers/wifi/.codegraph/`）；查询一律用 `codegraph` CLI 的 `-p <索引路径>`（MCP 的 workspace root 指向 codebase 根无索引，无法指定子目录，故不用 MCP）。
+
+```
+AIoTBot workspace/                              # 部门已确定的未来 workspace
+├── AGENTS.md            # [新增] 入口：Schema + 卡契约 + 指针导航 + 关键词路由 + config.yml 说明
+├── config.yml           # [新增] 代码仓 ↔ 架构元素 ↔ wiki 实体映射（两侧对齐前提）
+├── codebase/            # [我们] 代码侧：ut_agent/main 的镜像（初期只取三仓，目录按真实架构画）
+│   ├── build/           #   ut_agent/main 真实结构：构建系统（build.sh/build.py/…）
+│   ├── device/          #   设备侧源码根
+│   │   └── wifi/        #   WiFi 代码仓根（多独立 git 仓并列）
+│   │       ├── mp1x/    #     仓 1：1108 芯片（旗舰主干，mp1x 即 mp18，当前开发中）
+│   │       │   ├── .codegraph/    #      [索引] device 侧按代码仓各建一个（mp1x）
+│   │       │   ├── chip/  dmac/  hal/  frw/  main/  oam/  inc/  alg/  features/  cali/
+│   │       ├── mp12/     #     仓 2：1112 芯片（性价比芯片）
+│   │       │   ├── .codegraph/    #      [索引] device 侧 mp12 索引
+│   │       │   ├── chip/  dmac/  hal/  frw/  main/  oam/  inc/  alg/  features/  cali/
+│   │       ├── mp12c/    #     仓 3：1112c 芯片（mp12 下半代演进）
+│   │       │   ├── .codegraph/    #      [索引] device 侧 mp12c 索引（按需建）
+│   │       │   ├── chip/  dmac/  hal/  frw/  main/  oam/  inc/  alg/  features/  cali/
+│   │       ├── alg/      #     仓 4：收发算法（多项目共享）
+│   │       │   └── .codegraph/    #      [索引] device 侧 alg 索引（按需建）
+│   │       ├── features/ #     仓 5：特性功能（多项目共享）
+│   │       │   └── .codegraph/    #      [索引] device 侧 features 索引（按需建）
+│   │       └── (1102a/ 1103/ 110x/ bisheng/ common/ fe … 其它仓不纳入，省略内部)
+│   ├── drivers/          #   驱动源码根
+│   │   └── wifi/         #   host 侧 WiFi 驱动（1112/1108 共用 host 代码）
+│   │       ├── .codegraph/        #      [索引] host 侧固定一个索引（覆盖全部 host 代码）
+│   │       ├── hmac/  wal/  hwal/  dpe/  oam/  chip/  inc/  main/  customize/
+│   ├── host/             #   host 侧（手机 CPU 端，bootloader/openharmony 等，非 WiFi 代码不入索引）
+│   ├── drivers_1102a/  llt/  test/  …   #   ut_agent/main 其它文件夹（不涉及，省略内部）
+│   └── CMakeLists.txt / build.sh / …    #   ut_agent/main 根构建文件
+├── skills/              # 部门已有：技能库
+│   ├── third-party/     #   三方技能
+│   ├── common/          #   通用技能（requirements/design/fulldesign/development/testing/cicd/troubleshooting/codesize/rom）
+│   └── domain/          #   领域技能
+│       ├── wifi/        #     [我们] WiFi 领域技能落点：wifi-codegraph / wifi-structure / llm-wiki / sdd-*（按部门命名空间规范）
+│       └── ...          #     platform/bgle/gnss/slp/radar/kernel（不涉及，省略内部）
+├── workflows/           # 部门已有：工作流定义
+│   ├── common/          #   公共工作流（sdd / test-design）
+│   └── domain/
+│       ├── wifi/        #     [我们] 双轨问答编排等落点（按需补充）
+│       └── ...          #     其它子系统（省略内部）
+├── hook/                # 部门已有：钩子定义（common/domain，本设计暂不涉及，省略内部）
+├── agent/               # 部门已有：agent 定义（common/domain，本设计暂不涉及，省略内部）
+├── docs/                # ★[我们] 文档侧：本质就是 LLM-Wiki 图谱仓（raw 层 + wiki 层 + schema）
+│   ├── raw0/            #   [raw] 原始文档存放（pdf/docx 等原始格式，人策展、LLM 只读）
+│   │   ├── 802.11协议/          #     协议类：802.11 系列协议、WiFi MAC 规范
+│   │   ├── 芯片规格/            #     芯片类：1108/1112 芯片规格书、寄存器手册
+│   │   ├── 设计文档/            #     设计类：历史设计文档、评审记录
+│   │   └── 调试轨迹/            #     轨迹类：调试会话原始记录、日志归档
+│   ├── raw1/            #   [raw] 原始文档初步加工（md 格式，人策展、LLM 只读）
+│   │   ├── 802.11协议/          #     协议类：转 md 后的协议要点（与 raw0 同名分层）
+│   │   ├── 芯片规格/            #     芯片类：规格要点转 md
+│   │   ├── 设计文档/            #     设计类：设计文档转 md
+│   │   └── 调试轨迹/            #     轨迹类：调试记录初步提炼
+│   ├── llmwiki/         #   [wiki+schema] LLM-Wiki 知识图谱（LLM 编译维护，知识卡直接放根下，不再套 wiki/ 层）
+│   │   ├── entities/     #     实体页＝命名路由：模块/子系统一个文件（wal/hmac/dma → wal.md/hmac.md/dma.md）；config.yml wiki_entities 指向这里
+│   │   ├── concepts/     #     概念页（知识主体）：concept-flow-*（TX/RX 通路、Event-Message、ops 表分发）+ concept-rule-*（规则）+ concept-timeline-*（演进）
+│   │   ├── runbooks/     #     调试轨迹提炼：现象/信号/根因/解法/边界/验证（六要素卡）
+│   │   ├── index.md      #     全局索引（查询第一步）
+│   │   ├── glossary.md   #     术语表（802.11/WiFi MAC 中英对照）
+│   │   ├── log.md        #     操作日志（只追加）
+│   │   ├── purpose.md    #     知识库目标与关键问题
+│   │   └── schema/       #     [schema] Schema 层：卡契约 schema.md（Frontmatter 字段表 + 正文四要素 + 生命周期）
+│   │                     #     起步只建这三类；sources/global/decisions/comparisons/synthesis/outputs 不建目录、按需再引入（触发场景与卡形态举例见 02 说明书）
+│   ├── spec/            #   ★[我们] = 原 codespec 仓（spec 仓 SSOT 落点：spec.md/design.md，SDD 流程维护，阶段 3 搭建）
+│   │   ├── changes/     #     ★ 变更目录：每个变更一个子目录（proposal/spec/design/… 全量交付件）
+│   │   └── specs/       #     ★ 已归档 spec 库（组件级 design.md/spec.md，SSOT）
+│   ├── dts/             #   部门已有：问题单文档
+│   ├── issue/           #   部门已有：总结文档
+│   └── graphify/        #   Graphify 对照文档（B 类基线产物）
+├── scripts/             # 部门已有：公共管理脚本（[我们] check.sh、锚点校验、检索回归等治理脚本落点）
+├── LICENSE              # 部门文件
+├── README.md            # 部门文件
+└── aiot-skills-namespace-and-placement-spec.md  # 部门规范：Skills 命名空间与目录放置规范，入库前必须遵守（我们的技能/文档命名遵循它）
+```
+
+> **codebase/ 与 docs/ 的摆放规则**：
+> - **codebase/ = 当前WiFi所有多个代码仓main目录**：目录树按真实代码仓架构画（build/device/drivers/host 等并列）
+> - `.codegraph/`（含 `codegraph.db` + `.gitignore`）**建在每个代码仓内**：device 侧每个代码仓一个（`codebase/device/wifi/<project>/.codegraph/`，mp1x / mp12 / alg / features…各建一个），host 侧固定一个（`codebase/drivers/wifi/.codegraph/`，覆盖全部 host 代码）——依据 wifi-codegraph skill 索引位置表；
+> - **代码仓内不设 .md 文档目录**——协议/设计/调试文档全部走 `docs/` 侧（raw0/raw1 归档 → llmwiki 编译 → spec/ SSOT），代码仓保持纯源码 + 索引；代码仓结构说明（冻结 revision / 构建目标对应）由 AGENTS.md / config.yml 承接；
+> - **docs/ 本质就是 LLM-Wiki 图谱仓**：raw0/（原始 pdf/docx）+ raw1/（初步加工 md）构成**原始来源层**（人策展、LLM 只读，按 802.11协议 / 芯片规格 / 设计文档 / 调试轨迹 四类分层，raw1 与 raw0 同名分层一一对应）；`llmwiki/` 内三类知识卡目录（entities/concepts/runbooks）+ 支撑文件 + schema/（卡契约）构成 **Wiki 层与 Schema 层**（从简起步，sources/global/decisions/comparisons/synthesis/outputs 不建目录、按需再引入，触发场景见 02-LLM-Wiki构建）；`spec/`（★=原 codespec 仓）单独存放 spec/design SSOT；
+> - **查询方式**：`codegraph` CLI + `-p <代码仓索引路径>`（host 固定一个、device 按代码仓）；config.yml 的 `repos` 登记代码仓路径与索引路径，供消费时定位（见 §3.1）。
+
+---
+
+## 3. 双图谱如何结合
+
+> **总机制**：两侧**不共享引擎、不预建统一图**——代码图（索引库）与文档图（wiki 页）各自独立，靠**三层约定**在消费时拼接：① 命名路由（实体页名 = 模块名）→ ② config.yml 映射（仓 ↔ 架构元素 ↔ wiki 实体）→ ③ 知识卡内锚点（函数名 + 路径:行号）。所有约定由 workflow / 门禁维护，不靠手工（对齐 w3 案例：C1 命名路由 + C9 config.yml 按架构路径路由 + C5 行号锚点门禁）。
+
+> 下文例子均取自 ut_agent 实测（host: `drivers/wifi/hmac/...`，device: `device/wifi/mp1x/...`），可对照代码仓验证。
+
+### 3.1 config.yml：两侧对齐的"三方映射表"
+
+config.yml 是双图谱结合的**唯一对齐真源**，定义四类内容：
+
+```yaml
+# AIoTBot workspace/config.yml
+repos:                          # ① 代码仓注册：codebase 内代码仓路径 + 固定 revision + CodeGraph 索引路径
+  host:        { path: codebase/drivers/wifi,   revision: a1e0f45, index: codebase/drivers/wifi }
+  device_mp1x: { path: codebase/device/wifi/mp1x, revision: 9deb0a8, index: codebase/device/wifi/mp1x }
+  device_mp12: { path: codebase/device/wifi/mp12, revision: 8c8fe9c, index: codebase/device/wifi/mp12 }
+  # device_mp12c / device_alg / device_features … 按需登记（每个 device 代码仓一个索引）
+
+architecture:                   # ② 架构元素：模块 → 仓内目录（Agent 理解代码仓架构的路由表）
+  host:
+    hmac:      drivers/wifi/hmac            # 细分：hmac/tx、hmac/rx、hmac/frame、hmac/vsp……
+    wal:       drivers/wifi/wal
+    dpe:       drivers/wifi/dpe
+    oam:       drivers/wifi/oam
+  device_mp1x:
+    dmac:      device/wifi/mp1x/dmac
+    frw:       device/wifi/mp1x/frw         # 事件转发层（Event-Message）
+    hal:       device/wifi/mp1x/hal
+    chip_mp18: device/wifi/mp1x/chip/mp18
+  device_mp12:
+    dmac:      device/wifi/mp12/dmac
+    frw:       device/wifi/mp12/frw
+
+wiki_entities:                  # ③ 架构元素 ↔ wiki 实体页（命名路由，两侧对账锚点）
+  hmac:        docs/llmwiki/entities/hmac.md
+  hmac_tx:     docs/llmwiki/entities/hmac-tx.md
+  wal:         docs/llmwiki/entities/wal.md
+  mp1x_frw:    docs/llmwiki/entities/mp1x-frw.md
+
+symbol_aliases:                 # ④ 语义 → 符号映射（业务术语 ↔ 代码符号，随建库逐步沉淀）
+  "DHCP加速":    hmac_tx_data_set_dhcp_cb          # host drivers/wifi/hmac/tx/hmac_tx_data.c:369
+  "多播帧":      hmac_tx_data_mcast_process_ap      # host drivers/wifi/hmac/tx/hmac_tx_data.c:1756
+  "vdec/vsp":    g_default_vdec_ops                 # host drivers/wifi/hmac/vsp/hmac_vsp.c:28（ops 表，C 断链点）
+```
+
+> 索引路径与 wifi-codegraph skill 一致：host 固定一个索引（`codebase/drivers/wifi`），device 每个代码仓各一个（`codebase/device/wifi/<project>`，mp1x / mp12 / alg / features…）。消费时 `codegraph` CLI 一律 `-p <index>` 查询，不依赖 MCP 子目录。
+
+- **消费时用途**：Agent 拿到问题 → 按 `architecture` 把业务词/模块名解析为仓 + 目录 → 按 `wiki_entities` 定位实体页 → 按 `symbol_aliases` 把业务术语翻译成代码符号 → 走代码图查询。
+- **维护规则**：config.yml 的增改由 workflow 在加仓/加模块/加文档时自动维护，不手工改；lint 校验两侧引用一致（进 check.sh）。
+- **断链说明**：ops 表（`g_default_vdec_ops`）这类函数指针在代码图里 caller = 0，`symbol_aliases` 只解决"术语→符号"定位，**分发语义**要靠 concept-flow-ops-dispatch 卡补（见 3.3 通道 2）。
+
+### 3.2 AGENTS.md：入口路由与工作流契约（"怎么走"，区别于 config.yml 的"往哪走"）
+
+> config.yml 是**数据**（四张静态映射表，LLM 直接查）；AGENTS.md 是**流程**（怎么干活的规则，LLM 按它执行）。两者一个"往哪走"、一个"怎么走"：AGENTS.md 定义"问题进来先干什么、按什么路由分派、数据去哪查、新知识怎么落库"。
+
+AGENTS.md 是 workspace 根的**唯一入口文件**（全 workspace 仅新增 AGENTS.md + config.yml 两个文件），内容四块：
+
+**① 指针导航**——数据在哪（对应 §3.1 四张表与文档图谱仓位置）：
+
+```markdown
+## 数据在哪
+- config.yml        → 仓 / 模块 / wiki 实体 / 业务术语 四张映射表（双图谱对齐真源）
+- docs/llmwiki/     → 知识卡（LLM 维护；先读 index.md 定位候选，再读正文；entities/concepts/runbooks 三类）
+- docs/raw0/ raw1/  → 原始来源（人策展、LLM 只读）
+- docs/spec/        → spec/design SSOT（SDD 维护）
+- codebase/         → 源码 + 各仓 .codegraph 索引（索引路径查 config.yml repos）
+```
+
+**② 提问路由**——问题进来怎么分派（对应 §2.1 动态走查图·消费视角第 1 步）：
+
+```markdown
+## 提问路由
+- 「为什么 / 业务背景 / 设计取舍」→ wiki Agent：查 docs/llmwiki/
+  （先 index.md 定位候选卡，再读正文；证据不够 → sources 核原始来源）
+- 「谁调用 / 在哪定义 / 影响面」→ 代码 Agent：codegraph CLI -p <index> 查询
+  （索引路径查 config.yml repos；命令见 wifi-codegraph skill）
+- 业务术语翻译：查 config.yml symbol_aliases → 找不到 → 查 concept-rule 卡 → 再无 grep
+- 模块归属：查 config.yml architecture（模块 → 仓 + 目录）
+```
+
+**③ 工作流契约**——建卡/变更/沉淀的操作步骤（对应 §3.4 生命周期维护）：
+
+```markdown
+## 工作流
+- 摄入：读 raw → 与提问者过要点 → 建卡（draft）→ lint → 门禁过 → stable（schema 见 llmwiki/schema/）
+- 新术语沉淀：建 concept-rule 卡时顺带登记 config.yml symbol_aliases（不手工改，workflow 代写）
+- 代码变更：merge 触发 check.sh → 锚点校验门禁 → 失效定位 → 增量重跑受影响子域
+```
+
+**④ 卡契约摘要**——知识卡 Frontmatter/四要素/生命周期速查（详细规则在 llmwiki/schema/schema.md，AGENTS.md 只放摘要指针，不放全量，避免两处维护）。
+
+- **与 skill 的分工**：AGENTS.md 不重复技能内容——wifi-structure（目录结构怎么用 PowerShell 看、有哪些项目）、wifi-codegraph（codegraph 命令怎么敲）都是**工具说明书**，留在 skills/；AGENTS.md 只放"本 workspace 的规则与数据位置"。环境级配置（SSH 主机/盘符/密钥）属个人环境信息，也不进 AGENTS.md。
+
+### 3.3 链接四通道怎么玩起来
+
+**通道 1 · 符号精确解析**（文档写函数名 → 消费时查代码图符号表，非 grep）
+
+- 知识卡 `sources` 里写死锚点：`函数名 + codebase 相对路径:行号 + revision`：
+  `codebase/drivers/wifi/hmac/tx/hmac_tx_data.c:369@a1e0f45`
+- 消费时：代码 Agent 拿函数名 → `codegraph query -p codebase/drivers/wifi hmac_tx_data_set_dhcp_cb`（或 node/callers）→ 返回 file:line / 签名 / callers → 沿调用链展开。
+- 例子：concept-flow-tx-path 卡写"DHCP 报文在 TX 数据路径上打标" + 锚点 hmac_tx_data.c:369。问"DHCP 加速在哪做的？"→ wiki 卡定位 → 代码图查符号 + callers 找上下游，不靠全文 grep。
+
+**通道 2 · 语义 → 符号映射**（业务术语 ↔ 代码符号，concept-rule 卡 + config.yml `symbol_aliases`）
+
+- concept-rule 卡维护术语表："多播帧"→`hmac_tx_data_mcast_process_ap`、"VSP 编解码"→`hmac_vsp.c` 的三个 ops 表。
+- 消费时：问题带业务词 → config.yml `symbol_aliases` 翻译成符号 → 走通道 1。
+- 例子：问"vdec 的 ops 表在哪注册、怎么分发？"→ 术语 vdec → `g_default_vdec_ops` → 代码图查该符号 → **发现 caller = 0（断链）** → 改走 concept-flow-ops-dispatch 卡读分发语义（注册点/触发时机/谁调用），代码图管静态定义、文档卡管动态分发——这就是"断链互补"的落地动作。
+
+**通道 3 · 确定性调用图遍历**（文档给入口符号 + 意图 → 代码图沿 callers/callees/impact 自动串）
+
+- 知识卡只写入口与意图，不逐函数标注："RX 通路入口：device 侧 RX 数据流（device/wifi/mp1x 的 dmac/frw 层）→ host 侧 `hmac_rx_process_data_filter`（drivers/wifi/hmac/rx/hmac_rx_data.c:1206）；意图：报文从空口到上层的完整处理链"。
+- 消费时：代码 Agent 从入口符号 → `codegraph callees / impact -p <index>` 深度展开 → 自动串出链路 → 与卡内描述对账。
+- 跨仓：host（drivers/wifi）↔device（device/wifi/mp1x|mp12）的链路靠 config.yml `repos` 映射串起来（host↔device 跨仓串链是验收点）。
+
+**通道 4 · 双 Agent 对账**（wiki 答 Why / 代码答 How / 主 Agent 互证）
+
+- 问"为什么 DHCP 加速放在 TX 数据路径而不是别处？"
+- wiki Agent：查 concept-rule-dhcp-offload 卡 → 答设计动机（Why）；
+- 代码 Agent：查 `hmac_tx_data_set_dhcp_cb` 实际代码 + 调用位置 → 答实现细节（How）；
+- 主 Agent：互证——一致则采信；不一致如实报告，**以代码为准**（文档标注"可能过时"，待 lint 处理）。
+
+### 3.4 链接的生命周期维护（workflow 化，不靠人）
+
+- **生成时（建库）**：建卡强制走命名路由（实体页名 = 模块名）+ sources 锚点格式（lint 校验，进 check.sh）；
+- **消费时（问答）**：四通道按需触发（即 3.3 链接四通道 + §2.1 走查图流程）；
+- **治理时（代码变更）**：代码 merge → git diff → **锚点校验门禁**抽检文档声称的符号/行号是否仍存在 → 失效定位 → 增量重跑受影响子域（实测省 50–80%，C5）；
+- **断链互补原则**（不变）：代码图保证静态事实 100% 准确；动态跳转（ops 表/宏/中断回调）、设计意图由文档图谱补，不强让代码图做做不到的推断。
+
+---
+
+## 4. 工具选型概要
+
+### 4.1 代码事实图谱（怎么连）
+
+| 候选 | 定位 | 状态 |
+|------|------|------|
+| **CodeGraph** | 首选部署：tree-sitter AST → 符号/调用图 → SQLite+FTS5，MCP 暴露查询工具，文件监听增量 | 先按它落地 |
+| **codebase-memory-mcp** | 等价备选：功能覆盖同类需求，可随时替换 | 备选 |
+| **Graphify** | 对照基线：验证 B 类方案在"复杂业务 + 多仓 + C 语言"上效果不佳，不承担主链路 | 对照 |
+
+> **选型策略（2026-09-20 调整）**：两个代码图谱工具功能等价、支持同类需求，可随时替换（安装部署即可），不再为选型投入完整评测（评测征集难产）。先按 CodeGraph 能力部署；后续如索引/查询不满足需求，换装等价工具即可，架构不变。C 语言断链（函数指针/ops 表/宏/隐式调用）改为落地期验证（见 01-代码图谱部署 §3）。
+
+### 4.2 知识文档图谱（为什么/业务背景）
+
+- **本体无引擎**：纯 Markdown + Agent skill（配置 + 提示词 + 辅助脚本）构成，无运行时组件；"编译"由 LLM Agent 按 Schema 规则完成，辅助脚本只干杂活（扫链接、查重复）；
+- **目录分层**：raw0/raw1（人策展、LLM 只读）+ llmwiki 知识卡（LLM 编译维护，entities/concepts/runbooks 三类起步）+ schema（卡契约）；
+- **生命周期**：draft → stable → deprecated，检索默认只返回 stable；
+- **可选工具层**（不装不影响工作）：Obsidian（可视化展示/双链图）、本地搜索（qmd 或自建脚本，规模增长后引入）。

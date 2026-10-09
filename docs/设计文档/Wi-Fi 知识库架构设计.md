@@ -229,67 +229,76 @@ AIoTBot workspace/
 │   ├── llt/             # 测试树——repos 未登记（D4）
 │   └── test/            # 测试树——repos 未登记（D4）
 ├── aiot-skills/              # 技能库
-└── aiot-knowledge/                  # 独立知识仓，对齐 cannbot-knowledge 的核心结构
-    ├── AGENTS.md                    # 知识边界、规则指针与技能入口
-    ├── README.md                    # 定位、实际能力、资料导航
-    ├── CONTRIBUTING.md              # 生产、核验和贡献流程
-    ├── check.py / check.sh          # 结构、来源完整性及历史导入快照检查
-    ├── knowledge/                   # 唯一知识正文根；不直接索引研究稿和工程原件
-    │   ├── AGENTS.md                # 正文规则支持文件，不作为知识卡
-    │   ├── index.md                 # Bundle 与全域导航
-    │   ├── wifi/
-    │   │   ├── AGENTS.md            # WiFi 领域规则，不虚构实际模块与 Target
-    │   │   ├── index.md             # 当前仅入口，无技术卡；以下 Profile 随真实建卡创建
-    │   │   ├── concepts/entities/   # 原实体页：wal、hmac、dma 等，使用 Concept 类型
-    │   │   ├── concepts/flows/      # 流程卡，文件用 snake_case
-    │   │   ├── runbooks/            # 现象、信号、根因、解法、边界与验证闭环
-    │   │   └── glossaries/          # 正式术语知识卡
-    │   └── platform/
-    │       ├── AGENTS.md            # Platform 规则，内部不展开
-    │       ├── index.md             # Platform 仅保留入口，内部省略
-    │       └── ...                  # Platform 仅保留入口，内部省略
-    ├── aiot-docs-raw/               # ignored 来源缓存，按来源资料集/组件原布局组织；当前为空
-    │   └── <登记的来源资料集或组件>/… # 获取后物化；不与 knowledge 分类强制一一对应
-    ├── .build/                      # ignored 转换、规范化、候选暂存，按需产生
-    │   └── <producer>/<批次>/…
-    ├── governance/
-    │   ├── AGENTS.md / index.md      # 共享治理维护规则与任务导航
-    │   ├── templates/               # 9类 draft 卡、目录导航、复核和维护记录模板
-    │   ├── sources.lock.yaml        # source → 声明版本/落点/hash/bytes/恢复说明；当前空锁
-    │   ├── schemas/
-    │   │   ├── frontmatter.schema.json
-    │   │   ├── sources.schema.json   # 来源锁字段形状
-    │   │   ├── profiles.yaml
-    │   │   └── registries.yaml       # 本地来源根等注册项
-    │   ├── contracts/               # knowledge、source_resources 与共享 validation
-    │   └── specs/                   # 共享契约及编写、复核、生命周期规范
-    ├── .agents/skills/
-    │   ├── index.md                 # 查询/摄入/检查技能选择
-    │   ├── knowledge-query/         # 初版 SQLite 词面检索与索引工具
-    │   ├── knowledge-ingest/        # Agent 建卡、融合和统一收尾流程
-    │   └── knowledge-lint/          # 结构、来源检查与语义复核流程
-    ├── docs/
-    │   ├── AGENTS.md / index.md      # 系统资料规则与导航
-    │   ├── intranet/                # 内网接入方案；workspace AGENTS/config待填模板
-    │   ├── 架构设计.md              # 当前总体设计
-    │   ├── design_principles.md      # 知识仓当前分层与边界
-    │   ├── installation_and_usage.md
-    │   ├── research/                # 导入的研究资料，保留原状态
-    │   ├── workflows/               # 现行消费/治理入口；2份历史 Laya 稿保留原字节
-    │   ├── engineering/             # 历史研究原件与新知识系统计划，index分别导航；不是量产 SSOT
-    │   ├── reviews/                 # 本设计的多视角审阅与修订记录
-    │   └── archives/                # v1.3 主设计及根目录旧材料原件
-    ├── recipes/                     # index + 首次建库/证据回答/贡献维护指南
-    ├── evals/
-    │   ├── protocols/               # 原实验设计，不代表已经执行的成绩
-    │   ├── wifidemo/                # 公开问题与基线定义
-    │   ├── hi1105/                  # 文档来源清单
-    │   ├── restricted-review/       # gold/判分草案；受测 Agent 仍须外部 allowlist 隔离
-    │   └── test_knowledge_contract.py # 初版契约/索引回归
-    ├── logs/                        # 按日期记录已发生的导入与维护
-    └── artifacts/                   # 本地派生索引、验证报告，Git 忽略
-        ├── indexes/knowledge.sqlite3
-        └── …
+└── aiot-knowledge/           # 知识库
+    ├── aiot-platform-knowledge/        # Platform 领域知识仓（v1.13；结构同构，不展开）
+    ├── aiot-bgle-knowledge/            # BGLE 领域知识仓（v1.13；结构同构，不展开）
+    ├── aiot-gnss-knowledge/            # GNSS 领域知识仓（v1.13；结构同构，不展开）
+    ├── aiot-slp-knowledge/             # SLP 领域知识仓（v1.13；结构同构，不展开）
+    ├── aiot-radar-knowledge/           # Radar 领域知识仓（v1.13；结构同构，不展开）
+    └── aiot-wifi-knowledge/            # WiFi 领域知识仓；以下展开内部结构
+        ├── AGENTS.md                    # 知识边界、规则指针与技能入口
+        ├── README.md                    # 定位、实际能力、资料导航
+        ├── CONTRIBUTING.md              # 生产、核验和贡献流程
+        ├── check.py / check.sh          # 结构、来源完整性及历史导入快照检查
+        ├── knowledge/                   # 唯一知识正文根；v1.13 起卡不上库（gitignore），各用户本地维护
+        │   ├── AGENTS.md                # 正文规则支持文件，不作为知识卡
+        │   ├── index.md                 # Bundle 与全域导航
+        │   ├── wifi/
+        │   │   ├── AGENTS.md            # WiFi 领域规则，不虚构实际模块与 Target
+        │   │   ├── index.md             # 当前仅入口，无技术卡；以下 Profile 随真实建卡创建
+        │   │   ├── concepts/entities/   # 原实体页：wal、hmac、dma 等，使用 Concept 类型
+        │   │   ├── concepts/flows/      # 流程卡，文件用 snake_case
+        │   │   ├── runbooks/            # 现象、信号、根因、解法、边界与验证闭环
+        │   │   └── glossaries/          # 正式术语知识卡
+        │   └── platform/
+        │       ├── AGENTS.md            # Platform 规则，内部不展开
+        │       ├── index.md             # Platform 仅保留入口，内部省略
+        │       └── ...                  # Platform 仅保留入口，内部省略
+        ├── aiot-docs-raw/               # ignored 来源缓存，按来源资料集/组件原布局组织；当前为空
+        │   ├── designs                  # 软链接到dbox
+        │   ├── specs                    # 软链接到dbox/统一上库管理
+        │   ├── wiki                     # 软链接到wiki/统一上库管理
+        │   └── <登记的来源资料集或组件>/… # 获取后物化；不与 knowledge 分类强制一一对应
+        ├── .build/                      # ignored 转换、规范化、候选暂存，按需产生
+        │   └── <producer>/<批次>/…
+        ├── governance/
+        │   ├── AGENTS.md / index.md      # 共享治理维护规则与任务导航
+        │   ├── templates/               # 9类 draft 卡、目录导航、复核和维护记录模板
+        │   ├── sources.lock.yaml        # source → 声明版本/落点/hash/bytes/恢复说明；当前空锁
+        │   ├── schemas/
+        │   │   ├── frontmatter.schema.json
+        │   │   ├── sources.schema.json   # 来源锁字段形状
+        │   │   ├── profiles.yaml
+        │   │   └── registries.yaml       # 本地来源根等注册项
+        │   ├── contracts/               # knowledge、source_resources 与共享 validation
+        │   └── specs/                   # 共享契约及编写、复核、生命周期规范
+        ├── .agents/skills/
+        │   ├── index.md                 # 查询/摄入/检查技能选择
+        │   ├── knowledge-query/         # 初版 SQLite 词面检索与索引工具
+        │   ├── knowledge-ingest/        # Agent 建卡、融合和统一收尾流程
+        │   └── knowledge-lint/          # 结构、来源检查与语义复核流程
+        ├── docs/
+        │   ├── AGENTS.md / index.md      # 系统资料规则与导航
+        │   ├── intranet/                # 内网接入方案；workspace AGENTS/config待填模板
+        │   ├── 架构设计.md              # 当前总体设计
+        │   ├── design_principles.md      # 知识仓当前分层与边界
+        │   ├── installation_and_usage.md
+        │   ├── research/                # 导入的研究资料，保留原状态
+        │   ├── workflows/               # 现行消费/治理入口；2份历史 Laya 稿保留原字节
+        │   ├── engineering/             # 历史研究原件与新知识系统计划，index分别导航；不是量产 SSOT
+        │   ├── reviews/                 # 本设计的多视角审阅与修订记录
+        │   └── archives/                # v1.3 主设计及根目录旧材料原件
+        ├── recipes/                     # index + 首次建库/证据回答/贡献维护指南
+        ├── evals/
+        │   ├── protocols/               # 原实验设计，不代表已经执行的成绩
+        │   ├── wifidemo/                # 公开问题与基线定义
+        │   ├── hi1105/                  # 文档来源清单
+        │   ├── restricted-review/       # gold/判分草案；受测 Agent 仍须外部 allowlist 隔离
+        │   └── test_knowledge_contract.py # 初版契约/索引回归
+        ├── logs/                        # 按日期记录已发生的导入与维护
+        └── artifacts/                   # 本地派生索引、验证报告，Git 忽略
+            ├── indexes/knowledge.sqlite3
+            └── …
 ```
 
 #### 真实 workspace 差异点（2026-10-09 核对）

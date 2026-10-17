@@ -2,7 +2,7 @@
 
 > **定位**：本文件是项目**主设计文档**——只讲整体架构（workspace 结构、双图谱如何结合、工具选型），不展开各模块的实现细节。
 > **阅读对象**：读者先看 §0–§2 的职责与流程；开发者重点看 §2.4、§3 的契约和路由；方案审核者重点看 §1.4–§1.6 的交付、责任与待决定项。
-> **状态**：v1.12，2026-10-09。知识仓已有来源锁/离线核验、词面检索，并已搭建规则导航、分层 AGENTS、九类 draft 卡与记录模板、编写及复核流程；技术卡和来源锁条目仍为 0。涉及真实 main/模块/Target 的接入只交付内网方案与非激活模板，整体 workspace 未接入实际产品；自动恢复和工程适用性仍未实现。
+> **状态**：v1.12，2026-10-09。知识仓已有来源锁/离线核验、词面检索，并已搭建规则导航、分层 AGENTS、九类 draft 卡与记录模板、编写及复核流程；技术卡和来源锁条目仍为 0。涉及真实 main/模块/Target 的接入只交付内网方案与非激活模板，整体 workspace 未接入实际产品；自动恢复和工程适用性仍未实现
 > **现行入口**：[安装与使用](https://github.com/Robin-hhc/aiot-knowledge/blob/main/docs/installation_and_usage.md)、[治理与消费流程](https://github.com/Robin-hhc/aiot-knowledge/blob/main/docs/workflows/governance-and-consumption.md)、[知识契约](https://github.com/Robin-hhc/aiot-knowledge/blob/main/governance/specs/okf.md)。发布前同步 FactumCore 远端后，已取得 [01–04 旧版细化稿](https://github.com/Robin-hhc/FactumCore/tree/main/docs/设计文档)；它们仍包含旧目录/字段与未核验工具承诺，现行实现以本文和知识仓契约为准。05（落地路线与评测）已于 2026-10-09 自设计文档归档目录并入本目录。
 > **审阅记录**：[三视角意见与处理结果](https://github.com/Robin-hhc/aiot-knowledge/blob/main/docs/reviews/architecture-review-2026-10-07.md)。
 > **文档版本**：知识仓内 `docs/架构设计.md` 作为后续团队发布版本，FactumCore 的同名文件保留同步阅读副本；当前修改后人工校验两者字节一致，自动同步尚未实现。历史版本摘要移至文末。

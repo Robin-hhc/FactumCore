@@ -11,6 +11,7 @@ AIoTBot架构横向包含两个大层，分别是Skills层和knowledge层；纵�
 | 层 | 核心组件 | 定位 |
 |----|----------|------|
 | Skills层 | Atomic Skill | 解决一个明确能力点的最小能力单元 | 
+| Skills层 | aiot-project-context | 全局入口 Skill：按代码路径发现知识仓并加载项目路由 |
 | Skills层 | Workflow Skill | 串联多个 atomic skill，定义阶段、输入输出、失败回退、验收证据 |
 | Skills层 | SubAgent | 专注特定领域或复杂任务的专业执行者 | 
 | Skills层 | Team | 协调多个 Skill 与 SubAgent 的协同作战单元 | 
@@ -25,6 +26,7 @@ AIoTBot架构横向包含两个大层，分别是Skills层和knowledge层；纵�
 Skills层当前阶段采用 Atomic Skills + Workflow Skills + SubAgent + Team 四层架构方式，配合 Hook 实现 harness 工程控制，组件由 aiotbot-skills 仓承载。
 
 - **Atomic skill** 解决一个明确能力点的最小能力单元。一段能被多个 agent 工具复用的能力放在一个目录里，核心是 `SKILL.md`，再配上可选的使用指导和辅助文件。
+- **aiot-project-context** 是用户级安装的全局入口 Atomic Skill。用户只需给出目标代码仓、目录或文件路径，Agent 即可自动发现已登记的知识入口、加载适用规则，再进入业务分析，无需用户手动初始化。
 - **Workflow skill** 串联多个 atomic skill，定义阶段、输入输出、失败回退、验收证据，将分散的能力点编排为完整流程。公共工作流（sdd 规格驱动开发、test-design 测试设计）和领域工作流分别在 `workflows/common/` 和 `workflows/domain/` 下管理。
 - **SubAgent** 专注特定领域或复杂任务的专业执行者。它封装了垂直场景下的深度能力，如代码生成、数据分析或特定硬件调试，通过接收高层指令并返回高质量结果，实现能力的专业化分工与复用。SubAgent 和 Team 统一存放在 `agent/` 目录下。
 - **Team** 协调多个Skill与SubAgent的协同作战单元。它模拟人类团队协作模式，负责任务拆解、角色分配、状态同步及冲突解决，将复杂问题转化为多智能体并行或串行工作流，确保最终交付物的完整性与一致性。
@@ -54,7 +56,7 @@ Knowledge层采用知识卡片的方式管理 AIoT业务 相关知识库，给�
 
 Tool 工具层由 aiotbot-tools 承载，包含以下功能，未来可以进行功能扩展：
 
-- **Skills 资源管理**：负责 skill 的中心库与货架分离、挂载与分发、开关与分组机制，实现"资产即 skill"的准入、分发和迭代闭环。
+- **Skills 资源管理**：负责 skill 的中心库与货架分离、挂载与分发、开关与分组机制，实现"资产即 skill"的准入、分发和迭代闭环；负责全局入口 Skill 的用户级安装与工作区登记。
 - **版本管理**：负责 skills 仓、tools 仓的导入、升级和版本一致性管理，保证多 agent、多宿主下技能版本可追溯、可回退。
 - **harness 工程管理**：负责 harness 工程（hooks、agent、workflow 等）的资源组织与工程控制，为 Skills 资源提供运行期支撑。
 
@@ -144,8 +146,8 @@ aiot-skills-namespace-and-placement-spec.md # aiot Skills 命名空间与目录�
 
 aiotbot-knowledge知识库仓目录结构如下所示。
 
-- skills/common/knowledge/：存放知识库相关 Skills
-- AGENTS.md：会话入口，消费路由契约
+- skills/common/knowledge/：存放全局入口 Skill 与三个知识流程 Skill
+- AGENTS.md：项目绑定后的消费路由契约
 - config.yml：四张映射表，把代码仓、架构元素、领域知识实体、符号别名集中登记为一份配置事实
 - main/：真实代码工作区
 - aiot-knowledge/：领域知识仓根，下一级是 domain，一领域一仓，内部目录完全同构
@@ -158,6 +160,7 @@ aiotbot-knowledge知识库仓目录结构如下所示。
 skills/
 └── common/
     └── knowledge/
+        ├── aiot-project-context/    # 全局入口：按代码路径发现、绑定知识入口
         ├── knowledge-ingest/        # Agent 建卡、融合和统一收尾流程
         ├── knowledge-lint/          # 结构、来源检查与语义复核流程
         └── knowledge-query/         # 初版 SQLite 词面检索与索引工具
@@ -267,10 +270,11 @@ AIoT 业务横跨 WiFi、BGLE、定位、雷达、SLP、NFC、NPU、MCU 等十�
 
 ```mermaid
 flowchart TB
-    U["用户 / AI Agent 提问"]
+    U["用户 / AI Agent 提问与代码路径"]
 
     subgraph S1["① 入口路由层 · 知识库前台"]
         direction LR
+        A0["aiot-project-context<br />全局 Skill · 自动发现与绑定"]
         A1["AGENTS.md<br />消费路由契约"]
         A2["config.yml<br />四张映射表"]
         A3["领域仓根四件套<br />README · CONTRIBUTING · check.py/check.sh"]
@@ -297,7 +301,7 @@ flowchart TB
     subgraph S4["④ 治理与工具层"]
         direction LR
         D1["governance/<br />templates · schemas · contracts · specs · sources.lock.yaml"]
-        D2["skills/comm/knowledge<br />knowledge-ingest · knowledge-lint · knowledge-query"]
+        D2["skills/common/knowledge<br />knowledge-ingest · knowledge-lint · knowledge-query"]
     end
 
     subgraph S5["⑤ 配套支撑层"]
@@ -309,7 +313,8 @@ flowchart TB
         E5["docs-llm-wiki/<br />系统说明"]
     end
 
-    U --> S1 --> S2
+    U --> A0 --> A1 --> A2
+    A2 --> S2
     S2 -->|"ingest 蒸馏建卡"| S3
     S4 -.->|"契约约束 · 流程执行"| S3
     S5 -.->|"质量保障"| S3
@@ -319,7 +324,7 @@ flowchart TB
 
 | 层 | 一句话职责 | 承载目录/文件 |
 |---|---|---|
-| ① 入口路由层 | 会话入口，先路由再消费 | `AGENTS.md` · `config.yml` · 领域仓根四件套（`README.md` · `CONTRIBUTING.md` · `check.py/check.sh`） |
+| ① 入口路由层 | 自动绑定项目，先路由再消费 | `aiot-project-context` · `AGENTS.md` · `config.yml` · 领域仓根四件套（`README.md` · `CONTRIBUTING.md` · `check.py/check.sh`） |
 | ② 源事实层 | 证据底座：代码事实 + 原始材料，喂知识层 | `main/` · `docs-raw/` |
 | ③ 知识资产层 | 唯一检索对象：治理后的知识卡 | `knowledge/` |
 | ④ 治理与工具层 | 契约约束知识层，三流程执行体 | `governance/` · `.skills/` |
@@ -332,6 +337,8 @@ flowchart TB
 #### AGENTS.md —— 消费路由契约
 
 Agent 会话入口。作用是"先路由，再消费"：代码静态事实走 CodeGraph CLI，设计意图/动态语义走知识卡，历史原始材料走 raw，禁止全库扫描。没有这个入口，Agent 每次都要猜路径；有了它，一次会话的上下文预算花在刀刃上。
+
+仓外启动时先由全局 `aiot-project-context` 按目标代码路径定位 `config.yml` 与知识仓，再读取适用 `AGENTS.md`；不假定提示词中出现路径就已自动加载项目规则。
 
 参与链路：消费链路（前置路由）。生产、治理链路不经过它——ingest / lint 是显式触发，不走会话路由。
 
@@ -347,19 +354,20 @@ device 侧 + host 侧真实代码。`.codegraph/` 是代码图谱索引，**本�
 
 参与链路：生产链路（代码事实作为来源材料之一）+ 消费链路（codegraph 交叉印证）。
 
-#### `skills/common/knowledge`/ —— 三个流程技能
+#### `skills/common/knowledge`/ —— 全局入口与三个流程技能
 
 知识库的"操作说明书"，不装任何领域事实：
 
 | 技能 | 职责 | 一句话 |
 |------|------|--------|
+| `aiot-project-context/` | 全局发现与绑定项目、加载知识入口 | 先接入 |
 | `knowledge-ingest/` | Agent 建卡、融合和统一收尾流程 | 怎么进 |
 | `knowledge-lint/` | 结构、来源检查与语义复核流程 | 怎么验 |
 | `knowledge-query/` | 初版 SQLite 词面检索与索引工具 | 怎么找 |
 
 技能与知识分仓的理由：技能是"流程"，知识是"事实"，升级节奏不同；同一套技能可跨领域知识仓复用。
 
-参与链路：**三条链路各由一个技能执行**——knowledge-ingest 跑生产、knowledge-lint 跑治理、knowledge-query 跑消费。
+参与链路：`aiot-project-context` 做前置发现与绑定；**三条链路仍各由一个流程技能执行**——knowledge-ingest 跑生产、knowledge-lint 跑治理、knowledge-query 跑消费。
 
 #### aiot-knowledge/ —— 领域知识仓
 
@@ -410,7 +418,7 @@ flowchart LR
 
 两套存放形态：
 
-- **登记制（`sources/`）**：不好落到本地的文件（dbox、3ms、wiki），按公司三个文档管理工具分类登记"链接 + 版本 + hash + 密级"，原件仍由源系统持有，与薪火平台共管理；`governance/sources.lock.yaml` 锁声明版本与恢复说明。
+- **登记制（`sources/`）**：按文档工具登记"链接 + 版本 + hash + 密级"；dbox 由人下载后按配置本机路径读取，wiki 经授权网页获取，3ms 暂不支持访问；原文仍由源系统持有，获取快照按授权保存，`governance/sources.lock.yaml` 锁已采用快照与恢复说明。
 - **落库制（conventions / chips / storys / specs / protocols）**：内部公开、上库 Git 仓的文件，按 WiFi 组可能用到的材料类型分五类。
 
 ##### 分类对知识卡生成的影响
@@ -492,7 +500,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    M["① 来源材料<br />docs-raw/ 六类"] --> R1["sources/ 链接类<br />dbox / 3ms / wiki<br />仅链接上库 · agent 联网读取更新"]
+    M["① 来源材料<br />docs-raw/ 六类"] --> R1["sources/ 登记类<br />dbox 本机导入 · wiki 网页获取<br />3ms 暂不支持"]
     M --> R2["conventions/<br />编码规范，上库"]
     M --> R3["chips/<br />芯片文档，上库"]
     M --> R4["storys/<br />迭代设计文档，上库"]
@@ -504,12 +512,14 @@ flowchart LR
     I -->|"多张卡讲同一件事"| C3["ingest-merge<br />合并 + 保留链"]
     I -->|"一张卡混装多个主题"| C4["ingest-split<br />拆分 + 互链"]
     I -->|"结论错误 / 不再推荐"| C5["ingest-deprecate<br />置 deprecated + 指替代品"]
-    I -->|"来源不可核验 / 材料未上库"| C6["ingest-defer<br />不建卡，登记 backlog"]
+    I -->|"来源不可获取 / 证据不足"| C6["ingest-defer<br />不建卡，登记 backlog"]
     C1 & C2 & C3 & C4 --> B["③ 候选卡 draft 暂存 .build/"]
     C5 --> K["knowledge/ 卡状态变更"]
 ```
 
 ### 链路二：治理上库 —— lint 门禁
+
+以下两道门禁适用于代码相关卡。纯文档知识卡走“获取文档 → Agent 更新候选 → 人工确认 → stable 落入 `knowledge/` → 普通评审合入”，不要求本地或 CI 门禁；具体获取、配置与确认流程见[详设 §7.5](知识库详细设计.md#75-文档卡人工更新dbox-本机导入wiki-网页获取)。
 
 输入是 `.build/` 里的候选卡，输出是**合入 Git 的 stable 卡**。`knowledge-lint` 技能定义流程，`governance/` 提供契约，`check.py / check.sh` 是执行入口。两道门禁、一套契约——本地门禁查 `.build/` 候选卡，CI 门禁在上库合入时全库重校验：
 
@@ -533,11 +543,12 @@ flowchart LR
 
 ### 链路三：消费 —— query 五步法
 
-输入是提问，输出是带证据的回答。Agent 收到问题先读 `AGENTS.md` 路由契约，按**问题类型**三选一：
+输入是提问与目标代码路径，输出是带证据的回答。全局 `aiot-project-context` 自动绑定已登记的项目与知识仓，加载 `AGENTS.md` 和配置后按**问题类型**选择入口，支持组合核验：
 
 ```mermaid
 flowchart TB
-    Q["用户提问"] --> R{"Agent 读 AGENTS.md 路由契约<br />按问题类型三选一"}
+    Q["用户提问 / 目标代码路径"] --> CTX["aiot-project-context（全局）<br />自动发现知识仓 · 加载入口"]
+    CTX --> R{"AGENTS.md + config.yml<br />按问题类型路由"}
 
     R -->|"代码静态事实"| CODE["CodeGraph CLI<br />main/ 符号 / 调用图查询"]
     R -->|"历史原始材料"| RAW["docs-raw/ 直读原件<br />（问题本身要的就是原件，不经卡）"]
@@ -553,10 +564,13 @@ flowchart TB
     R -->|"设计意图 / 动态语义"| C
 ```
 
+入口 Skill 不装领域事实；全局薄规则提醒首次接入、换仓及绑定失效时自动重载，触发与加载以回执和评测确认，不能把安装成功视为必然触发。具体设计见 [知识库详细设计 §3.3](知识库详细设计.md#33-全局入口-skill-与自动项目发现)。
+
 #### 目录 × 链路参与矩阵
 
 | 目录/文件 | 生产（材料 → 候选卡） | 治理上库（候选卡 → 合入） | 消费（卡 → 答案） |
 |---|---|---|---|
+| `aiot-project-context` | 显式流程可复用项目绑定 | 同一绑定上下文 | 前置：自动发现与加载 |
 | `AGENTS.md` | 不参与 | 不参与 | 前置：路由 |
 | `config.yml` | — | — | 前置：路由依据 |
 | `main/` | 来源之一（代码事实） | — | ④ 交叉印证 |

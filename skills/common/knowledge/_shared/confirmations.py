@@ -162,7 +162,9 @@ def confirm_document(
     }
 
 
-def validate_review(knowledge_root, operation_id, review_ref, *, allowed_decisions=None):
+def validate_review(
+    knowledge_root, operation_id, review_ref, *, allowed_decisions=None, record_bytes=None
+):
     root = Path(knowledge_root).resolve(strict=True)
     if (
         not isinstance(review_ref, str)
@@ -171,7 +173,12 @@ def validate_review(knowledge_root, operation_id, review_ref, *, allowed_decisio
         or len(Path(review_ref).parts) != 3
     ):
         changes.fail("REVIEW_STALE", "Expected a persistent manual review reference")
-    record = changes.read_json(root, review_ref)
+    data = (
+        changes.safe_path(root, review_ref).read_bytes() if record_bytes is None else record_bytes
+    )
+    if not isinstance(data, bytes):
+        changes.fail("REVIEW_STALE", "Expected fixed review bytes")
+    record = contracts.load_document_bytes(data, review_ref)
     if (
         contracts.validate_document("record", record, root)
         or record.get("record_kind") != "manual_review"
@@ -216,6 +223,8 @@ def validate_review(knowledge_root, operation_id, review_ref, *, allowed_decisio
         {"claim_id": cid, "decision": record["decision"]} for cid in view["claim_ids"]
     ]:
         changes.fail("REVIEW_STALE", "Accepted decision must cover the entire exact view")
+    if changes.safe_path(root, review_ref).read_bytes() != data:
+        changes.fail("REVIEW_STALE", "Review file changed while verifying the captured bytes")
     return record
 
 

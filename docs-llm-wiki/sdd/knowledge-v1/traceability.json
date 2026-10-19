@@ -617,7 +617,8 @@
       ],
       "status": "partial",
       "record_refs": [
-        "records/T06-verification.md"
+        "records/T06-verification.md",
+        "records/T07-verification.md"
       ]
     },
     {
@@ -638,7 +639,10 @@
         "T27",
         "T28"
       ],
-      "status": "planned"
+      "status": "partial",
+      "record_refs": [
+        "records/T07-verification.md"
+      ]
     },
     {
       "id": "E15",
@@ -696,7 +700,10 @@
         "T27",
         "T28"
       ],
-      "status": "planned"
+      "status": "partial",
+      "record_refs": [
+        "records/T07-verification.md"
+      ]
     },
     {
       "id": "E18",
@@ -4710,7 +4717,9 @@
         "T09",
         "T13",
         "T18"
-      ]
+      ],
+      "design_path": "aiot-wifi-knowledge/.build/<operation_id>/transaction/journal.json",
+      "implementation_path": "aiot-wifi-knowledge/logs/operations/<operation_id>/journal.json"
     },
     {
       "path": "aiot-wifi-knowledge/.build/<operation_id>/transaction/backup-manifest.json",
@@ -4741,7 +4750,9 @@
         "T09",
         "T13",
         "T18"
-      ]
+      ],
+      "design_path": "aiot-wifi-knowledge/.build/<operation_id>/transaction/backup-manifest.json",
+      "implementation_path": "aiot-wifi-knowledge/logs/operations/<operation_id>/backup-manifest.json"
     },
     {
       "path": "aiot-wifi-knowledge/.build/<operation_id>/candidates/<card-id>.md",
@@ -4834,7 +4845,9 @@
         "T09",
         "T13",
         "T18"
-      ]
+      ],
+      "design_path": "aiot-wifi-knowledge/.build/<operation_id>/transaction/backups/<file-key>.bin",
+      "implementation_path": "aiot-wifi-knowledge/logs/operations/<operation_id>/backups/<target-path-sha>.bin"
     },
     {
       "path": "aiot-wifi-knowledge/logs/operations/<operation_id>.json",
@@ -4869,7 +4882,9 @@
         "T13",
         "T16",
         "T18"
-      ]
+      ],
+      "design_path": "aiot-wifi-knowledge/logs/operations/<operation_id>.json",
+      "implementation_path": "aiot-wifi-knowledge/logs/operations/<operation_id>/result.json"
     },
     {
       "path": "aiot-wifi-knowledge/logs/workflows/<workflow_run_id>.json",
@@ -6366,12 +6381,16 @@
         "E17"
       ],
       "external_validation": false,
-      "status": "ready",
+      "status": "verified",
       "modules": [
         "M05"
       ],
       "ticket_path": "tickets/T07.md",
-      "record_refs": []
+      "record_refs": [
+        "records/T07-verification.md"
+      ],
+      "acceptance_scope": "synthetic_document_slice",
+      "closes_full_acceptance": false
     },
     {
       "id": "T08",
@@ -6388,7 +6407,7 @@
         "E19"
       ],
       "external_validation": false,
-      "status": "planned",
+      "status": "ready",
       "modules": [
         "M05"
       ],
@@ -6414,7 +6433,7 @@
         "E17"
       ],
       "external_validation": false,
-      "status": "planned",
+      "status": "ready",
       "modules": [
         "M04",
         "M05"
@@ -6438,7 +6457,7 @@
         "E22"
       ],
       "external_validation": false,
-      "status": "planned",
+      "status": "ready",
       "modules": [
         "M07"
       ],
@@ -7284,5 +7303,27 @@
     ],
     "whole_release_complete": false,
     "test_cases": 69
-  }
+  },
+  "implementation_decisions": [
+    {
+      "id": "M05-durable-transaction-records",
+      "module": "M05",
+      "implementation_task": "T07",
+      "decision": "Keep the sole journal, backup manifest, old-byte backups and applied result under K/logs/operations/<operation_id>/, outside disposable .build candidates.",
+      "rationale": "Cleaning .build must not discard transaction recovery material. Persistent logs are the current program source of truth; no duplicate journal is generated at the original design path.",
+      "implementation_helpers": [
+        "skills/common/knowledge/_shared/confirmations.py",
+        "skills/common/knowledge/_shared/transactions.py"
+      ],
+      "mapped_design_paths": [
+        "aiot-wifi-knowledge/.build/<operation_id>/transaction/journal.json",
+        "aiot-wifi-knowledge/.build/<operation_id>/transaction/backup-manifest.json",
+        "aiot-wifi-knowledge/.build/<operation_id>/transaction/backups/<file-key>.bin",
+        "aiot-wifi-knowledge/logs/operations/<operation_id>.json"
+      ],
+      "backup_key": "SHA-256 of the UTF-8 target-relative path",
+      "boundaries": "Internal storage mapping only; frozen source designs, business flow, 149 design paths and task statuses are unchanged. Complete recovery remains T08; this is not a verification or publication claim.",
+      "verification_record": "records/T07-verification.md"
+    }
+  ]
 }

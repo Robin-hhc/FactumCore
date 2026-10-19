@@ -63,10 +63,10 @@ flowchart TD
 | [T04](tickets/T04.md) | Git、dirty 与无 Git 代码快照纵向捕获 | M03 | T01 | ready |
 | [T05](tickets/T05.md) | 从原件到七 Profile 候选及明确六决策计划 | M04 | T03 | verified |
 | [T06](tickets/T06.md) | 人工文档确认与部分接受重确认 | M05 | T05 | verified |
-| [T07](tickets/T07.md) | 文档 stable 事务落位与全域唯一性 | M05 | T06 | ready |
-| [T08](tickets/T08.md) | apply 中断、后续编辑与阶段恢复 | M05 | T07 | planned |
-| [T09](tickets/T09.md) | 文档更新与跨卡 merge/split/deprecate 完整闭环 | M04, M05 | T07 | planned |
-| [T10](tickets/T10.md) | local 不可变索引、正文包与条件激活 | M07 | T07 | planned |
+| [T07](tickets/T07.md) | 文档 stable 事务落位与全域唯一性 | M05 | T06 | verified |
+| [T08](tickets/T08.md) | apply 中断、后续编辑与阶段恢复 | M05 | T07 | ready |
+| [T09](tickets/T09.md) | 文档更新与跨卡 merge/split/deprecate 完整闭环 | M04, M05 | T07 | ready |
+| [T10](tickets/T10.md) | local 不可变索引、正文包与条件激活 | M07 | T07 | ready |
 | [T11](tickets/T11.md) | 逐断言硬过滤、词项与确定性召回排序 | M07 | T10 | planned |
 | [T12](tickets/T12.md) | 同代精读、回源与诚实 SearchReceipt | M01, M03, M07 | T11 | planned |
 | [T13](tickets/T13.md) | 代码本地证据义务到 stable/local 的闭环 | M05, M06 | T04, T05, T08, T09, T10 | planned |

@@ -28,7 +28,7 @@ def confirm_fixture(root, *, decision="accepted", operation_id="fixture-op", cla
     """Only test files call this helper; production CLI has no bypass flag."""
     view = changes.checked_view(root, operation_id)
     terminal = FixtureTerminal(f"{decision} {view['final_view_digest'][:12]}\n")
-    return changes.confirm_document(
+    result = changes.confirm_document(
         root,
         operation_id,
         decision=decision,
@@ -37,6 +37,12 @@ def confirm_fixture(root, *, decision="accepted", operation_id="fixture-op", cla
         output_stream=io.StringIO(),
         claim_ids=claim_ids,
     )
+    # Label persisted fixture records explicitly; never copy these into the real domain.
+    record = changes.read_json(root, result["review_ref"])
+    record["extensions"]["synthetic"] = True
+    changes.atomic_write(root, result["review_ref"], changes.json_bytes(record))
+    result["review_digest"] = receipts.digest_json(record)
+    return result
 
 
 def prepared(domain):

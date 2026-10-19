@@ -38,17 +38,17 @@ source_id 是逻辑资料身份，snapshot_id 是特定字节/附件集合的版
 
 ### 3.1 函数和 CLI
 
-拟定共享函数：
+本批共享函数：
 
 ```python
-capture_document(knowledge_root, path, source_id, declared_version="unknown", attachments=())
+capture_document(knowledge_root, path, *, source_id, declared_version="unknown", attachments=None)
 # -> {bundle_ref, manifest_digest, resources, snapshots, text, ...}
 
 load_capture(knowledge_root, bundle_ref, manifest_digest)
 # -> 按持久包恢复并验证后的同一逻辑捕获结果
 ```
 
-拟定 CLI：`document capture --knowledge-root K --path RAW_RELATIVE_PATH --source-id ID [--declared-version VERSION] [--attachment RAW_RELATIVE_PATH ...]`。公开恢复入口可为 `document load-capture --knowledge-root K --bundle-ref REF --manifest-digest DIGEST`；如本批只开放函数恢复，必须明确说明 CLI 的完成范围，测试仍要覆盖持久恢复。
+公开 CLI：`document capture --knowledge-root K --path RAW_RELATIVE_PATH --source-id ID [--declared-version VERSION] [--attachment RAW_RELATIVE_PATH ...]`；恢复入口为 `document load-capture --knowledge-root K --bundle-ref REF --manifest-digest DIGEST`。
 
 ### 3.2 捕获要求
 
@@ -68,7 +68,7 @@ manifest 应覆盖主件与附件的相对位置、真实字节摘要/长度、k
 
 ### 4.1 内容与决策接口
 
-拟定函数边界：`cards.parse_card(raw_bytes, knowledge_root)` 解析一份确切字节、frontmatter、原正文、稳定 ID、text_ref/span 和技术引用；`changes.plan_ingest(...)` 形成显式决策计划；`changes.materialize(...)` 固定候选与拟写视图。CLI 可用 `ingest plan` / `ingest materialize` 或细化 `document update-plan`，但不同入口只能复用同一引擎。
+实际函数边界：`cards.parse_card(raw_bytes, knowledge_root, source_snapshots=...)` 解析一份确切字节、frontmatter、原正文、稳定 ID、text_ref/span 和技术引用；`changes.create_plan(...)` 形成显式决策计划；`changes.materialize(...)` 固定候选与拟写视图。CLI 为 `ingest plan` / `ingest materialize`。changes.py 保留公共入口，内部 confirmations.py 负责终端人动作与记录，transactions.py 负责锁、技术视图和事务；它们是共享程序内部拆分，不增加领域事实真源。
 
 输入必须包含 Agent 已结合固定原件生成的完整 Markdown/body、明确 Profile、结论和限制。程序负责安全解析、身份与摘要、模板/路径组织和差异包；不能在没有 Agent 业务内容时把首段摘录加上“摘要”标签当作生成知识卡。材料中的指令是材料，不成为运行命令。
 

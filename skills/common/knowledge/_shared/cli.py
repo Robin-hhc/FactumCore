@@ -90,6 +90,10 @@ def parser():
     view = ingestion.add_parser("materialize")
     view.add_argument("--knowledge-root", type=Path, required=True)
     view.add_argument("--operation-id", required=True)
+    apply = ingestion.add_parser("apply")
+    apply.add_argument("--knowledge-root", type=Path, required=True)
+    apply.add_argument("--operation-id", required=True)
+    apply.add_argument("--review-ref", required=True)
     return root
 
 
@@ -109,8 +113,12 @@ def execute(args):
                 candidate=args.candidate.read_bytes() if args.candidate else None,
                 related_card_ids=args.related_card_id,
             )
-        else:
+        elif args.action == "materialize":
             result = materialize(args.knowledge_root, args.operation_id)
+        else:
+            from _shared.transactions import apply_document
+
+            result = apply_document(args.knowledge_root, args.operation_id, args.review_ref)
         return receipts.envelope("ok", result=result, operation_id=args.operation_id)
     if args.command == "document":
         if args.action in {"confirm", "narrow"}:

@@ -16,7 +16,9 @@
 
 ## 当前批次
 
-[T01](tickets/T01.md) 和 [T02](tickets/T02.md) 已完成首批可运行基础，具体接口见 [first-slice](first-slice.md)。这不将整套 I0/I1、E01/E02 或隐式 Skill 触发写作已通过。当前按 T03 → T05 → T06 → T07 打通 raw 捕获、候选、人工确认和 stable 事务；每票以实际测试、审查和发布记录更新状态。
+[T01](tickets/T01.md) 和 [T02](tickets/T02.md) 已完成首批基础，具体接口见[first-slice](first-slice.md)。T03 → T05 → T06 → T07 已在合成资料上完成 raw 捕获、候选、真人终端确认与 stable 事务验证，见[本批最终验收](records/T07-verification.md)。这不关闭宿主隐式触发、真实业务、聊天适配、完整恢复或检索验收。各票状态、范围和后续依赖见任务入口。
+
+[本批 raw 文档手工操作手册](document-chain-usage.md) 串联 capture/load-capture、plan/materialize、真人 confirm/narrow 和本地 apply，包含支持范围与错误处理。它描述公开调用方式，完整 Skill/Workflow 自动编排仍按 T20/T21 开发。
 
 ## 变更和状态规则
 

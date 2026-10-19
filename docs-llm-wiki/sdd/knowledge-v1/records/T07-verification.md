@@ -28,4 +28,4 @@ Standards 与 Spec 独立审查固定 `0674f98328cc76575fbb36323545dfe50120b00d`
 
 T03/T05/T06/T07 在合成机制范围 verified，E09/E10/E15/E03/E11/E12/E13/E14/E17 保留相应 partial 边界。未导入真实 raw、未生成真实知识卡，未验证真实六 Target 工程、宿主隐式 Skill、聊天确认 adapter 或权限部署。T20/T21 完整自动工作流仍计划中。
 
-本票按已有发布授权单独提交推送 main；逐模块实际提交与远端核对结果另见发布回执。业务摄入的 apply 本身不包含这些 Git 动作。
+本票已单独提交推送 main `8ee6a95fa5e841e354ae76cc77f482de8975de7b` 并核对远端；逐模块实际身份见[发布回执](publication.json)。业务摄入的 apply 本身不包含这些 Git 动作。

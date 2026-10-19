@@ -72,5 +72,7 @@
     "cross-card apply",
     "indexes/query",
     "power-loss storage consistency"
-  ]
+  ],
+  "published_code_commit": "8ee6a95fa5e841e354ae76cc77f482de8975de7b",
+  "format_check_context": "primary worktree; exact code bytes verified against the frozen snapshot"
 }

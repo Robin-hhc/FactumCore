@@ -1,0 +1,56 @@
+{
+  "schema_version": "module-publication/1",
+  "recorded_at": "2026-10-19T16:36:40.087000+00:00",
+  "repository": "https://github.com/Robin-hhc/FactumCore",
+  "branch": "main",
+  "publication_mode": "separate scoped main commits; each immediately pushed and remote SHA checked",
+  "modules": [
+    {
+      "task_id": "T03",
+      "commit": "e88bbc333d2027cc137c94d50d085cc3ee3d936e",
+      "post_push_remote_main": "e88bbc333d2027cc137c94d50d085cc3ee3d936e",
+      "record_ref": "T03-verification.md",
+      "review": "standards_and_spec_closed",
+      "validation_scope": "synthetic document mechanisms; cumulative clean checkout regression",
+      "tests": 116
+    },
+    {
+      "task_id": "T05",
+      "commit": "7a0a34af2e2ad68b58c6b8e8d16cc1080378916d",
+      "post_push_remote_main": "7a0a34af2e2ad68b58c6b8e8d16cc1080378916d",
+      "record_ref": "T05-verification.md",
+      "review": "standards_and_spec_closed",
+      "validation_scope": "synthetic document mechanisms; cumulative clean checkout regression",
+      "tests": 168
+    },
+    {
+      "task_id": "T06",
+      "commit": "270fe6c7c32e8e7da6bc361fea96215e2dff4c99",
+      "post_push_remote_main": "270fe6c7c32e8e7da6bc361fea96215e2dff4c99",
+      "record_ref": "T06-verification.md",
+      "review": "standards_and_spec_closed",
+      "validation_scope": "synthetic document mechanisms; cumulative clean checkout regression",
+      "tests": 181
+    },
+    {
+      "task_id": "T07",
+      "commit": "8ee6a95fa5e841e354ae76cc77f482de8975de7b",
+      "post_push_remote_main": "8ee6a95fa5e841e354ae76cc77f482de8975de7b",
+      "record_ref": "T07-verification.md",
+      "review": "standards_and_spec_closed",
+      "validation_scope": "synthetic document mechanisms; cumulative clean checkout regression",
+      "tests": 230
+    }
+  ],
+  "remote_main_before_receipt_commit": "8ee6a95fa5e841e354ae76cc77f482de8975de7b",
+  "receipt_commit_note": "This receipt is a subsequent documentation-only commit; it does not change the verified module code.",
+  "production_knowledge_imported": false,
+  "pending": [
+    "T08 complete recovery",
+    "T09 cross-card operations",
+    "T10 index activation",
+    "T20/T21 automatic workflows",
+    "trusted chat confirmation adapter",
+    "real targets/host/ACL validation"
+  ]
+}

@@ -594,7 +594,10 @@
         "T27",
         "T28"
       ],
-      "status": "planned"
+      "status": "partial",
+      "record_refs": [
+        "records/T06-verification.md"
+      ]
     },
     {
       "id": "E13",
@@ -612,7 +615,10 @@
         "T27",
         "T28"
       ],
-      "status": "planned"
+      "status": "partial",
+      "record_refs": [
+        "records/T06-verification.md"
+      ]
     },
     {
       "id": "E14",
@@ -6332,12 +6338,16 @@
         "E13"
       ],
       "external_validation": false,
-      "status": "ready",
+      "status": "verified",
       "modules": [
         "M05"
       ],
       "ticket_path": "tickets/T06.md",
-      "record_refs": []
+      "record_refs": [
+        "records/T06-verification.md"
+      ],
+      "acceptance_scope": "synthetic_document_slice",
+      "closes_full_acceptance": false
     },
     {
       "id": "T07",
@@ -6356,7 +6366,7 @@
         "E17"
       ],
       "external_validation": false,
-      "status": "planned",
+      "status": "ready",
       "modules": [
         "M05"
       ],

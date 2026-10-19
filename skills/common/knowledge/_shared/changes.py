@@ -492,3 +492,21 @@ def checked_view(root, operation_id):
     ):
         fail("REVIEW_STALE", "Card identity, lifecycle, source or scope binding differs")
     return value
+
+
+def confirm_document(*args, **kwargs):
+    from .confirmations import confirm_document as confirm
+
+    return confirm(*args, **kwargs)
+
+
+def validate_review(*args, **kwargs):
+    from .confirmations import validate_review as validate
+
+    return validate(*args, **kwargs)
+
+
+def narrow_document(*args, **kwargs):
+    from .confirmations import narrow_document as narrow
+
+    return narrow(*args, **kwargs)

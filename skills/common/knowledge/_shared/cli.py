@@ -48,6 +48,29 @@ def parser():
     restore.add_argument("--knowledge-root", type=Path, required=True)
     restore.add_argument("--bundle-ref", required=True)
     restore.add_argument("--manifest-digest", required=True)
+    confirm = documents.add_parser("confirm")
+    confirm.add_argument("--knowledge-root", type=Path, required=True)
+    confirm.add_argument("--operation-id", required=True)
+    confirm.add_argument(
+        "--decision",
+        required=True,
+        choices=[
+            "accepted",
+            "confirmed_no_impact",
+            "partially_accepted",
+            "returned",
+            "deferred",
+            "deprecated",
+        ],
+    )
+    confirm.add_argument("--confirmed-by", required=True)
+    confirm.add_argument("--claim-id", action="append")
+    narrow = documents.add_parser("narrow")
+    narrow.add_argument("--knowledge-root", type=Path, required=True)
+    narrow.add_argument("--operation-id", required=True)
+    narrow.add_argument("--review-ref", required=True)
+    narrow.add_argument("--new-operation-id", required=True)
+    narrow.add_argument("--candidate", type=Path, required=True)
     ingest = commands.add_parser("ingest")
     ingestion = ingest.add_subparsers(dest="action", required=True, parser_class=Parser)
     plan = ingestion.add_parser("plan")
@@ -90,6 +113,26 @@ def execute(args):
             result = materialize(args.knowledge_root, args.operation_id)
         return receipts.envelope("ok", result=result, operation_id=args.operation_id)
     if args.command == "document":
+        if args.action in {"confirm", "narrow"}:
+            from _shared import changes
+
+            if args.action == "confirm":
+                result = changes.confirm_document(
+                    args.knowledge_root,
+                    args.operation_id,
+                    decision=args.decision,
+                    confirmed_by=args.confirmed_by,
+                    claim_ids=args.claim_id,
+                )
+            else:
+                result = changes.narrow_document(
+                    args.knowledge_root,
+                    args.operation_id,
+                    review_ref=args.review_ref,
+                    new_operation_id=args.new_operation_id,
+                    candidate=args.candidate.read_bytes(),
+                )
+            return receipts.envelope("ok", result=result, operation_id=result["operation_id"])
         from _shared.sources import capture_document, load_capture
 
         if args.action == "capture":
@@ -141,12 +184,15 @@ def main(argv=None):
     # Pipes on Windows can inherit a legacy code page even for UTF-8 input files.
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
+    args = None
     try:
-        output = execute(parser().parse_args(argv))
+        args = parser().parse_args(argv)
+        output = execute(args)
         code = 0 if output["status"] == "ok" else 2
     except ValueError as exc:
         output = receipts.envelope(
             "invalid",
+            operation_id=getattr(args, "operation_id", None),
             diagnostics=[
                 {
                     "code": getattr(exc, "code", "INVALID_INPUT"),
@@ -159,6 +205,7 @@ def main(argv=None):
     except (OSError, UnicodeError, KeyError, TypeError, RecursionError) as exc:
         output = receipts.envelope(
             "error",
+            operation_id=getattr(args, "operation_id", None),
             diagnostics=[
                 {
                     "code": "TOOL_ERROR",

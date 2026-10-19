@@ -7,4 +7,3 @@
 | {{card_id}} | {{title}} | {{scope_summary}} | [{{title}}]({{relative_path}}) |
 
 条目与正文的变更应进入同一 ChangeSet 和 final-view；不得仅凭导航条目宣称已验证或已共享发布。
-

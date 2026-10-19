@@ -1,0 +1,7 @@
+{
+  "template_only": true,
+  "record_kind": "manual_review",
+  "instruction": "Do not fill this template to manufacture approval. Run document confirm in a human-controlled terminal; it creates the real locked record after the exact-view action.",
+  "decisions": ["accepted", "confirmed_no_impact", "partially_accepted", "returned", "deferred", "deprecated"],
+  "waiting_state": "No ManualReviewRecord exists until a real supported human action is received."
+}

@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "captured_on": "2026-10-19",
+  "factum_base_commit": "27c1fba94ab928abf3c190ef6f72c304a913eeb4",
+  "legacy_knowledge_commit": "c6fb993e5a2cae14d25559f8e2bfc7fe706b85f1",
+  "source_state": "user-approved working files; explicit user decision consolidates deployment into FactumCore; digests define this design",
+  "implementation": "independent; no CANNBot source copied",
+  "sources": [
+    {
+      "path": "docs-llm-wiki/设计文档/aibot.md",
+      "sha256": "ded647cd7d1ffc437b42b864d130418c3eba2e73cf5e9232c36d713afb44165d"
+    },
+    {
+      "path": "docs-llm-wiki/设计文档/知识库详细设计.md",
+      "sha256": "d520a2aeb6ef69f813fe7b3e1e862516bf74169a23a984bdba2131ed1ff9a4be"
+    }
+  ],
+  "deployment_decision": {
+    "repository": "https://github.com/Robin-hhc/FactumCore",
+    "layout": "single_repository",
+    "workspace": ".",
+    "documentation_root": "docs-llm-wiki",
+    "knowledge_root": "aiot-wifi-knowledge",
+    "record": "records/single-repo-migration.md",
+    "previous_sources": [
+      {
+        "path": "docs-llm-wiki/设计文档/aibot.md",
+        "sha256": "ded647cd7d1ffc437b42b864d130418c3eba2e73cf5e9232c36d713afb44165d"
+      },
+      {
+        "path": "docs-llm-wiki/设计文档/知识库详细设计.md",
+        "sha256": "d520a2aeb6ef69f813fe7b3e1e862516bf74169a23a984bdba2131ed1ff9a4be"
+      }
+    ]
+  }
+}

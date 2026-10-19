@@ -1,0 +1,328 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AIoT WiFi Card/Claim v1",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "profile": {
+      "enum": [
+        "entity",
+        "flow",
+        "protocol",
+        "rule",
+        "command",
+        "runbook",
+        "glossary"
+      ]
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lifecycle": {
+      "enum": [
+        "draft",
+        "stable",
+        "deprecated"
+      ]
+    },
+    "review_mode": {
+      "enum": [
+        "code_gate",
+        "manual_document"
+      ]
+    },
+    "owner": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scope": {
+      "$ref": "#/$defs/scope"
+    },
+    "aliases": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "claims": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/claim"
+      }
+    },
+    "relations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/relation"
+      }
+    },
+    "replacement": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "deprecation_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "id",
+    "profile",
+    "title",
+    "summary",
+    "lifecycle",
+    "review_mode",
+    "owner",
+    "scope",
+    "aliases",
+    "sources",
+    "claims",
+    "relations"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "context": {
+      "type": "object",
+      "properties": {
+        "context_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "chip": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "chip12",
+            "chip08",
+            "chip07c",
+            null
+          ]
+        },
+        "side": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "host",
+            "device",
+            null
+          ]
+        },
+        "build_profile": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "features_all": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "features_none": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "protocol_versions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "revision_policy": {
+          "enum": [
+            "pinned",
+            "revalidate",
+            "not_applicable"
+          ]
+        }
+      },
+      "required": [
+        "context_id",
+        "target_id",
+        "chip",
+        "side",
+        "build_profile",
+        "features_all",
+        "features_none",
+        "protocol_versions",
+        "revision_policy"
+      ],
+      "additionalProperties": false
+    },
+    "scope": {
+      "type": "object",
+      "properties": {
+        "applicability": {
+          "enum": [
+            "constrained",
+            "universal",
+            "unknown"
+          ]
+        },
+        "contexts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/context"
+          }
+        }
+      },
+      "required": [
+        "applicability",
+        "contexts"
+      ],
+      "additionalProperties": false
+    },
+    "claim": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "text_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_kind": {
+          "enum": [
+            "normative",
+            "design",
+            "implementation",
+            "measurement",
+            "recommendation"
+          ]
+        },
+        "source_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "context_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "usage": {
+          "enum": [
+            "current",
+            "historical",
+            "guidance"
+          ]
+        },
+        "verification_requirements": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "search_terms": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "id",
+        "text_ref",
+        "evidence_kind",
+        "source_ids",
+        "context_ids",
+        "usage",
+        "verification_requirements"
+      ],
+      "additionalProperties": false
+    },
+    "relation": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "enum": [
+            "requires",
+            "derived_from",
+            "related_to",
+            "replacement"
+          ]
+        },
+        "target_card_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_claim_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "context_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "type",
+        "target_card_id",
+        "context_ids"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

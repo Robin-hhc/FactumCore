@@ -1,0 +1,144 @@
+{
+  "schema_version": "1.0",
+  "batch": "knowledge-v1-T01-T02",
+  "status": "verified",
+  "recorded_at": "2026-10-19T15:48:57.069194+00:00",
+  "scope": "first-slice.md; standalone mechanisms only; no whole I0/I1 or E01/E02 closure",
+  "environment": {
+    "python": "3.12.14 (main, Aug 25 2026, 14:01:42) [MSC v.1944 64 bit (AMD64)]",
+    "git": "git version 2.53.0.windows.1",
+    "packages": {
+      "PyYAML": "6.0.2",
+      "jsonschema": "4.23.0",
+      "pytest": "8.4.2",
+      "ruff": "0.11.13"
+    }
+  },
+  "tests": {
+    "command": ".venv/Scripts/python -m pytest -q --basetemp=artifacts/test-tmp/final-batch-20261019 --junitxml=docs/sdd/knowledge-v1/records/first-batch-junit.xml",
+    "tests": 69,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "by_ticket": {
+      "T01": 29,
+      "T02": 40
+    },
+    "junit": "records/first-batch-junit.xml"
+  },
+  "checks": [
+    {
+      "command": [
+        "E:\\FactumCore\\.worktrees\\aiotbot-knowledge-v1\\.venv\\Scripts\\ruff.exe",
+        "check",
+        "skills/common/knowledge/_shared",
+        "tools"
+      ],
+      "exit_code": 0,
+      "output": "All checks passed!"
+    },
+    {
+      "command": [
+        "E:\\FactumCore\\.worktrees\\aiotbot-knowledge-v1\\.venv\\Scripts\\ruff.exe",
+        "format",
+        "--check",
+        "skills/common/knowledge/_shared",
+        "tools"
+      ],
+      "exit_code": 0,
+      "output": "10 files already formatted"
+    },
+    {
+      "command": [
+        "E:\\FactumCore\\.worktrees\\aiotbot-knowledge-v1\\.venv\\Scripts\\python.exe",
+        "-m",
+        "compileall",
+        "-q",
+        "skills/common/knowledge/_shared",
+        "tools"
+      ],
+      "exit_code": 0,
+      "output": ""
+    },
+    {
+      "command": [
+        "E:\\FactumCore\\.worktrees\\aiotbot-knowledge-v1\\.venv\\Scripts\\python.exe",
+        "tools/validate_sdd.py"
+      ],
+      "exit_code": 0,
+      "output": "{\"status\": \"ok\", \"requirements\": 18, \"modules\": 9, \"tasks\": 28, \"files\": 149, \"acceptance\": 34, \"dag_edges\": 49, \"future_paths\": 3}"
+    }
+  ],
+  "reviews": {
+    "standards": "closed after independent fixed-snapshot recheck",
+    "spec": "closed after independent fixed-snapshot recheck",
+    "initial_framework_snapshot": "ddd94b36916cb30eb427500330f374e37fd3c9d6",
+    "fixed_framework_snapshot": "9d42b0fec8638b2c269f468afc900c40a8b87005",
+    "record": "records/review.md"
+  },
+  "knowledge_commit": "898ece0a3a1721a77910aed3518e0fa189f50860",
+  "fresh_knowledge_checkout": {
+    "source": "898ece0a3a1721a77910aed3518e0fa189f50860",
+    "validation": {
+      "schema_version": "1.0",
+      "status": "ok",
+      "operation_id": "b8581be9-13ae-4a97-aa5f-cce388c88c65",
+      "input_digests": {
+        "config.yml": "eecb376e3c8f02d1c17831a3bc5750cf949513a725248042bc5f7244ee8bb6d0"
+      },
+      "output_refs": [],
+      "diagnostics": [],
+      "retryability": "not_needed",
+      "result": {
+        "validation": "shape_and_configuration",
+        "business_ready": false,
+        "unknown_targets": [
+          "chip07c-device",
+          "chip07c-host",
+          "chip08-device",
+          "chip08-host",
+          "chip12-device",
+          "chip12-host"
+        ]
+      }
+    },
+    "meaning": "actual Git checkout bytes satisfy the same digest lock"
+  },
+  "implementation_file_digests": {
+    "AGENTS.md": "abb5788869746246aa1a884116c6e842d94087672b6f2d27b678e0854a6d3083",
+    "config.yml": "eecb376e3c8f02d1c17831a3bc5750cf949513a725248042bc5f7244ee8bb6d0",
+    "skills/common/knowledge/_shared/__init__.py": "ac2d96ba72c9abd09859dfcff622273f195a782f6f8927f57a6570f94e42ea79",
+    "skills/common/knowledge/_shared/cli.py": "bfd02335b702c0d8511297db946d829dff55e004432413f113ff9901badd3746",
+    "skills/common/knowledge/_shared/workspace.py": "9cb2ae032e2bff429edc116524f21070d83eda2f6ec3cff2cbaf9d493af44f7c",
+    "skills/common/knowledge/_shared/contracts.py": "d1e3c08082955590be08dc4ba340d09bcf5991509a43fb6a262f54bd71cb911b",
+    "skills/common/knowledge/_shared/scope.py": "c26f4c5b697221713dd0051fd63d2231a365aed0dcf6484e3c4eaf4b2a0ab2c2",
+    "skills/common/knowledge/_shared/receipts.py": "13983abab6b04c02407ef4faa8fd98b2b61a2572ced14bb8909b139f5c4f5189",
+    "skills/common/knowledge/_shared/tests/test_workspace.py": "f062fc25cb1a1966ea1826de7b1f9aea64907994062ddbdd055c33f6b6459f63",
+    "aiot-wifi-knowledge/AGENTS.md": "e1808c7100908c72b4684a974118d42567c925812c1ff65e0774af377b02123e",
+    "aiot-wifi-knowledge/README.md": "01397a8d747d17f9727394ed4162ad91b8a5b094c596baa906477bab3337dfd7",
+    "aiot-wifi-knowledge/.gitignore": "d1a3b34fb0d29ccf1139dc918fcb63f5a5c8c8ffcaccc67adf3a3ffedbbb6983",
+    "aiot-wifi-knowledge/governance/framework.lock.yaml": "b2b1f8ec8fd4ba7863c3349def71cd9a884952b4bce48040ae5b99ed6cfbbd2a",
+    "aiot-wifi-knowledge/governance/schemas/frontmatter.schema.json": "0bda0125bd99c604dcf7c16fc85964eb51de24020f460f08d7c501bcdbf70243",
+    "aiot-wifi-knowledge/governance/schemas/sources.schema.json": "181e8c5b3fee33880dc7a8bb148e5ad4eccb0483202f1c1de23f5dc7ce701681",
+    "aiot-wifi-knowledge/governance/schemas/records.schema.json": "864f5a6136376ffddf3ee5d107aa43d00fcb5650f02f33779d3bb2c1e56cde1a",
+    "aiot-wifi-knowledge/governance/schemas/workspace.schema.json": "66521da5892fde6b3b0e35fea42954c33f6215cd6c49b0f12821cba3ecfb8872",
+    "aiot-wifi-knowledge/governance/schemas/profiles.yaml": "a6a3d5d908d3d44f5241aded086db8023b8ad97d6ab556914b728871db3f98cc",
+    "aiot-wifi-knowledge/governance/schemas/registries.yaml": "b39d21a720268cfa3dc02b9cbca6a70ca9a9deaa4c383d218e9183a0da07b932",
+    "aiot-wifi-knowledge/knowledge/AGENTS.md": "1a061bf2259e4e38a637e632884b04fbf64f431e2d25329cf2f1702ba4e8a513"
+  },
+  "remaining": {
+    "tickets": "T03-T28",
+    "global_skill_installation": "not_performed",
+    "implicit_host_triggering": "not_tested",
+    "wifi_business_targets": "not_connected",
+    "external_acl": "not_deployed_or_tested",
+    "production_cards": 0,
+    "remote_publication": "not_performed"
+  },
+  "next": [
+    "T03 raw document capture",
+    "T05 plan/candidate",
+    "T06 human confirmation",
+    "T07 stable transaction"
+  ]
+}

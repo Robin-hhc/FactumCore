@@ -1,0 +1,296 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AIoT WiFi SourceResource/SourceSnapshot lock v1",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "resources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/resource"
+      }
+    },
+    "snapshots": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/snapshot"
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "resources",
+    "snapshots"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "resource": {
+      "type": "object",
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "code_git",
+            "code_dirty",
+            "code_export",
+            "raw_document",
+            "code_graph"
+          ]
+        },
+        "authority_domain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resolver": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resource_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "source_id",
+        "kind",
+        "authority_domain",
+        "resolver",
+        "resource_id"
+      ],
+      "additionalProperties": false
+    },
+    "snapshot": {
+      "type": "object",
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "snapshot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "declared_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "object_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mime": {
+          "type": "string",
+          "minLength": 1
+        },
+        "encoding": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "digest_kind": {
+          "enum": [
+            "original_bytes",
+            "export_object",
+            "normalized_text"
+          ]
+        },
+        "retrieval": {
+          "$ref": "#/$defs/retrieval"
+        },
+        "recovery": {
+          "$ref": "#/$defs/recovery"
+        },
+        "acquired_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "acquisition_tool": {
+          "type": "string",
+          "minLength": 1
+        },
+        "locator_policy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "extraction": {
+          "$ref": "#/$defs/extraction"
+        }
+      },
+      "required": [
+        "source_id",
+        "snapshot_id",
+        "declared_version",
+        "object_digest",
+        "bytes",
+        "mime",
+        "encoding",
+        "digest_kind",
+        "retrieval",
+        "recovery",
+        "acquired_at",
+        "acquisition_tool",
+        "locator_policy",
+        "extraction"
+      ],
+      "additionalProperties": false
+    },
+    "retrieval": {
+      "type": "object",
+      "properties": {
+        "method": {
+          "enum": [
+            "git_object",
+            "worktree_capture",
+            "export_capture",
+            "raw_file",
+            "graph_artifact"
+          ]
+        },
+        "location": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repo_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "commit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "observed_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "metadata": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "method",
+        "location"
+      ],
+      "additionalProperties": false
+    },
+    "recovery": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "enum": [
+            "available",
+            "unavailable",
+            "unknown"
+          ]
+        },
+        "method": {
+          "enum": [
+            "git_object",
+            "raw_versioned_file",
+            "evidence_bundle",
+            "retained_export",
+            "unavailable",
+            "unknown"
+          ]
+        },
+        "reference": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "retention_policy": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "method",
+        "reference",
+        "retention_policy"
+      ],
+      "additionalProperties": false
+    },
+    "extraction": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "enum": [
+            "not_required",
+            "complete",
+            "partial",
+            "failed",
+            "unknown"
+          ]
+        },
+        "tool": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tool_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "parameters": {
+          "type": "object"
+        },
+        "text_digest": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "locator_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "tool",
+        "tool_version",
+        "parameters",
+        "text_digest",
+        "locator_ref"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

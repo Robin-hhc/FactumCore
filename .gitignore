@@ -1,2 +1,14 @@
 .worktrees/
 .cac/
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.pyc
+config.local.yml
+artifacts/
+aiot-wifi-knowledge/.build/
+aiot-wifi-knowledge/artifacts/
+
+# Legacy independent checkout; the current domain root above remains versioned.
+aiot-knowledge/

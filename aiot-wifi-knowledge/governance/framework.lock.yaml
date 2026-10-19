@@ -1,0 +1,22 @@
+schema_version: '1.0'
+contract_family: aiot-wifi
+tool_version: 0.1.0
+files:
+  workspace:
+    path: governance/schemas/workspace.schema.json
+    sha256: 66521da5892fde6b3b0e35fea42954c33f6215cd6c49b0f12821cba3ecfb8872
+  card:
+    path: governance/schemas/frontmatter.schema.json
+    sha256: 0bda0125bd99c604dcf7c16fc85964eb51de24020f460f08d7c501bcdbf70243
+  sources:
+    path: governance/schemas/sources.schema.json
+    sha256: 181e8c5b3fee33880dc7a8bb148e5ad4eccb0483202f1c1de23f5dc7ce701681
+  record:
+    path: governance/schemas/records.schema.json
+    sha256: 864f5a6136376ffddf3ee5d107aa43d00fcb5650f02f33779d3bb2c1e56cde1a
+  profiles:
+    path: governance/schemas/profiles.yaml
+    sha256: a6a3d5d908d3d44f5241aded086db8023b8ad97d6ab556914b728871db3f98cc
+  registries:
+    path: governance/schemas/registries.yaml
+    sha256: b39d21a720268cfa3dc02b9cbca6a70ca9a9deaa4c383d218e9183a0da07b932

@@ -1,0 +1,85 @@
+# FactumCore single-repository deployment; paths are relative to this config file.
+schema_version: '1.0'
+workspace_id: aiotbot-wifi-v1
+knowledge_roots:
+  wifi: aiot-wifi-knowledge
+repos:
+- repo_id: wifi-code
+  kind: git
+  root: null
+  expected_identity: null
+architecture:
+- binding_id: wifi-main
+  repo_id: wifi-code
+  module_root: .
+  knowledge_domain: wifi
+  override_nested: false
+wiki_entities: {}
+symbol_aliases: {}
+targets:
+- target_id: chip12-host
+  chip: chip12
+  side: host
+  source_bindings: []
+  module_roots: []
+  build_profile: null
+  required_features: []
+  protocol_versions: []
+- target_id: chip12-device
+  chip: chip12
+  side: device
+  source_bindings: []
+  module_roots: []
+  build_profile: null
+  required_features: []
+  protocol_versions: []
+- target_id: chip08-host
+  chip: chip08
+  side: host
+  source_bindings: []
+  module_roots: []
+  build_profile: null
+  required_features: []
+  protocol_versions: []
+- target_id: chip08-device
+  chip: chip08
+  side: device
+  source_bindings: []
+  module_roots: []
+  build_profile: null
+  required_features: []
+  protocol_versions: []
+- target_id: chip07c-host
+  chip: chip07c
+  side: host
+  source_bindings: []
+  module_roots: []
+  build_profile: null
+  required_features: []
+  protocol_versions: []
+- target_id: chip07c-device
+  chip: chip07c
+  side: device
+  source_bindings: []
+  module_roots: []
+  build_profile: null
+  required_features: []
+  protocol_versions: []
+pairs:
+- pairing_id: chip12-host-device
+  host_target: chip12-host
+  device_target: chip12-device
+  compatibility_policy: unknown
+- pairing_id: chip08-host-device
+  host_target: chip08-host
+  device_target: chip08-device
+  compatibility_policy: unknown
+- pairing_id: chip07c-host-device
+  host_target: chip07c-host
+  device_target: chip07c-device
+  compatibility_policy: unknown
+query:
+  default_channel: local
+  allowed_channels:
+  - local
+  - shared

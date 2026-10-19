@@ -1,0 +1,59 @@
+schema_version: '1.0'
+profiles:
+  entity:
+    required_sections:
+    - 职责
+    - 边界
+    - 接口
+    - 依赖
+    - 证据
+  flow:
+    required_sections:
+    - 起终点
+    - 步骤
+    - 调用与消息
+    - 异常
+    - 条件
+    - 证据
+  protocol:
+    required_sections:
+    - 机制
+    - 字段与状态
+    - 约束
+    - 标准版本
+    - 产品支持边界
+    - 证据
+  rule:
+    required_sections:
+    - 规则对象
+    - 约束
+    - 例外
+    - 批准身份
+    - 检查办法
+    - 证据
+  command:
+    required_sections:
+    - 语法
+    - 参数
+    - 前置条件
+    - 输出判读
+    - 误用
+    - 验证
+    - 证据
+  runbook:
+    required_sections:
+    - 现象
+    - 信号
+    - 分支
+    - 步骤
+    - 根因状态
+    - 解法
+    - 验证
+    - 证据
+  glossary:
+    required_sections:
+    - 定义
+    - 别名
+    - 歧义
+    - 范围
+    - 证据

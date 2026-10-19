@@ -61,8 +61,8 @@ flowchart TD
 | [T02](tickets/T02.md) | 仓外路径 resolve_project 与显式入口读取首切片 | M01, M02 | T01 | verified |
 | [T03](tickets/T03.md) | raw 原件捕获、附件与可恢复提取 | M03 | T01 | verified |
 | [T04](tickets/T04.md) | Git、dirty 与无 Git 代码快照纵向捕获 | M03 | T01 | ready |
-| [T05](tickets/T05.md) | 从原件到七 Profile 候选及明确六决策计划 | M04 | T03 | ready |
-| [T06](tickets/T06.md) | 人工文档确认与部分接受重确认 | M05 | T05 | planned |
+| [T05](tickets/T05.md) | 从原件到七 Profile 候选及明确六决策计划 | M04 | T03 | verified |
+| [T06](tickets/T06.md) | 人工文档确认与部分接受重确认 | M05 | T05 | ready |
 | [T07](tickets/T07.md) | 文档 stable 事务落位与全域唯一性 | M05 | T06 | planned |
 | [T08](tickets/T08.md) | apply 中断、后续编辑与阶段恢复 | M05 | T07 | planned |
 | [T09](tickets/T09.md) | 文档更新与跨卡 merge/split/deprecate 完整闭环 | M04, M05 | T07 | planned |

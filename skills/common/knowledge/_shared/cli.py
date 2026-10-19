@@ -48,10 +48,47 @@ def parser():
     restore.add_argument("--knowledge-root", type=Path, required=True)
     restore.add_argument("--bundle-ref", required=True)
     restore.add_argument("--manifest-digest", required=True)
+    ingest = commands.add_parser("ingest")
+    ingestion = ingest.add_subparsers(dest="action", required=True, parser_class=Parser)
+    plan = ingestion.add_parser("plan")
+    plan.add_argument("--knowledge-root", type=Path, required=True)
+    plan.add_argument("--operation-id", required=True)
+    plan.add_argument("--bundle-ref", required=True)
+    plan.add_argument("--manifest-digest", required=True)
+    plan.add_argument(
+        "--decision",
+        choices=["create", "update", "merge", "split", "deprecate", "defer", "no_change"],
+        required=True,
+    )
+    plan.add_argument("--rationale", required=True)
+    plan.add_argument("--target-path")
+    plan.add_argument("--candidate", type=Path)
+    plan.add_argument("--related-card-id", action="append", default=[])
+    view = ingestion.add_parser("materialize")
+    view.add_argument("--knowledge-root", type=Path, required=True)
+    view.add_argument("--operation-id", required=True)
     return root
 
 
 def execute(args):
+    if args.command == "ingest":
+        from _shared.changes import create_plan, materialize
+
+        if args.action == "plan":
+            result = create_plan(
+                args.knowledge_root,
+                operation_id=args.operation_id,
+                bundle_ref=args.bundle_ref,
+                manifest_digest=args.manifest_digest,
+                decision=args.decision,
+                rationale=args.rationale,
+                target_path=args.target_path,
+                candidate=args.candidate.read_bytes() if args.candidate else None,
+                related_card_ids=args.related_card_id,
+            )
+        else:
+            result = materialize(args.knowledge_root, args.operation_id)
+        return receipts.envelope("ok", result=result, operation_id=args.operation_id)
     if args.command == "document":
         from _shared.sources import capture_document, load_capture
 

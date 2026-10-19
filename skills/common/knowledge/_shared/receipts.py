@@ -24,11 +24,11 @@ def digest_json(value) -> str:
     )
 
 
-def envelope(status, *, result=None, diagnostics=None, input_digests=None):
+def envelope(status, *, result=None, diagnostics=None, input_digests=None, operation_id=None):
     return {
         "schema_version": SCHEMA_VERSION,
         "status": status,
-        "operation_id": str(uuid.uuid4()),
+        "operation_id": operation_id or str(uuid.uuid4()),
         "input_digests": input_digests or {},
         "output_refs": [],
         "diagnostics": diagnostics or [],

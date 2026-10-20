@@ -1,6 +1,6 @@
 # WiFi 知识库
 
-这是 FactumCore 的 `aiotbot-knowledge/wifi/`，当前唯一包含领域资产的目录。`aiotbot-knowledge/` 下其余八个领域只有 `.gitkeep`。Git 操作统一在 FactumCore 根执行，整体布局遵循[总体设计 §5.3](docs-llm-wiki/AIoTBot知识库架构设计.md#53-aiotbot-knowledge目录架构)目录树。
+这是 FactumCore 根下的 `aiotbot-knowledge-wifi/`，本次唯一领域目录，无中间目录，不创建其他领域占位。Git 操作统一在 FactumCore 根执行，整体布局遵循[总体设计 §5.3](docs-llm-wiki/AIoTBot知识库架构设计.md#53-aiotbot-knowledge目录架构)目录树。
 
 | 目录 | 存放内容 |
 |---|---|

@@ -9,7 +9,7 @@
 | [知识库详细设计.md](知识库详细设计.md) | 目录展开、逐文件开发要求、阶段接口、三链路及验收 |
 | [sdd/knowledge-v1/](sdd/knowledge-v1/README.md) | 既有需求、模块、任务、追踪与历史验收记录；设计定稿后再重新对齐 |
 
-FactumCore 承载业务代码与领域知识，目录以主设计 §5.3 目录树为准：`main/` 保持空目录；领域容器为 `aiotbot-knowledge/`，WiFi 资产位于 `wifi/`，其余 platform、bgle、gnss、slp、radar、nfc、npu、mcu 八域只有 `.gitkeep`。本目录为 `aiotbot-knowledge/wifi/docs-llm-wiki/`，承载系统设计与既有 SDD，不存放正式业务知识卡。
+FactumCore 承载业务代码与 WiFi 知识，目录以主设计 §5.3 目录树为准：`main/` 保持空目录；唯一领域根为 `aiotbot-knowledge-wifi/`，直接位于仓根，无中间目录或其他领域目录。本目录为 `aiotbot-knowledge-wifi/docs-llm-wiki/`，承载系统设计与既有 SDD，不存放正式业务知识卡。
 
 四个共享 Skill 使用 `hs-workspace-explore`、`hs-knowledge-ingest`、`hs-knowledge-lint`、`hs-knowledge-query` 名称，与生产、治理 Workflow 在独立能力仓实现，保留其 `skills/common/knowledge/` 与 `workflows/common/knowledge/` 归属。FactumCore 已移除六个旧占位；能力仓根、URL、版本和安装状态尚未提供，不假定可以调用。
 

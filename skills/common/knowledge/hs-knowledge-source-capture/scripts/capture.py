@@ -248,7 +248,9 @@ def resolve_source(context, reference, bundle=None):
         locators = json.loads(locator_bytes)["locators"]
         gaps = list(retained.get("limitations", []))
     else:
-        text, locators, _, gaps = extract(data, suffix, primary=False)
+        text, locators, _, gaps = extract(
+            data, ".txt" if resource.get("kind") == "code" else suffix, primary=False
+        )
         if text is not None:
             gaps.append(
                 "This snapshot has no retained extraction; text was re-extracted by the current pinned resolver"
@@ -262,7 +264,7 @@ def resolve_source(context, reference, bundle=None):
     if text is not None and locator:
         kind = locator.get("kind")
         if kind in {"lines", "line"}:
-            if suffix not in {".md", ".txt"}:
+            if resource.get("kind") != "code" and suffix not in {".md", ".txt"}:
                 raise NodeError(
                     "INVALID_SOURCE_LOCATOR",
                     "This document format requires its native page/paragraph locator",
@@ -306,17 +308,32 @@ def resolve_source(context, reference, bundle=None):
                 blocked=True,
             )
     try:
-        current_hash = sha(fixed_bytes(context.root, resource["path"], ["docs-raw"]))
-        current_matches = current_hash == snapshot["sha256"]
+        if resource.get("kind") == "code":
+            from code_capture import current_code_hash
+
+            current_hash = current_code_hash(context, resource)
+        else:
+            current_hash = sha(
+                fixed_bytes(context.root, resource["path"], ["docs-raw"])
+            )
+        current_matches = (
+            current_hash == snapshot["sha256"] if current_hash is not None else None
+        )
     except OSError:
         current_hash, current_matches = None, None
         gaps.append(
-            "Current raw location is unavailable; only exact retained evidence was recovered"
+            "Current source location is unavailable; only exact retained evidence was recovered"
+        )
+    if current_matches is None and resource.get("kind") == "code":
+        gaps.append(
+            "Current registered code root is unavailable or unauthorized; fixed evidence is historical only"
         )
     if current_matches is False:
-        gaps.append("Current raw bytes differ from this fixed historical snapshot")
+        gaps.append("Current source bytes differ from this fixed historical snapshot")
     return {
         "source_ref": reference,
+        "source_kind": resource.get("kind"),
+        "resource": resource,
         "snapshot": snapshot,
         "snapshot_digest": digest(snapshot),
         "original_ref": original_ref,
@@ -380,6 +397,10 @@ def execute(context):
                     "SOURCE_INTEGRITY_ERROR", "Retained extraction differs from bundle"
                 )
         return {"bundle_ref": request["bundle_ref"], "bundle": bundle}, "resolved"
+    if request.get("kind") == "code":
+        from code_capture import capture_code
+
+        return capture_code(context)
     if request.get("kind", "raw") != "raw":
         raise NodeError(
             "CODE_CONTEXT_REQUIRED",

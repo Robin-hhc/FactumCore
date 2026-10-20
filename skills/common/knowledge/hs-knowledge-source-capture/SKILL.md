@@ -1,9 +1,9 @@
 ---
 name: hs-knowledge-source-capture
-description: Capture only landed five-class raw originals and explicit attachments; retain exact-byte recovery without network acquisition.
+description: Freeze landed raw documents or explicitly registered code bytes with immutable recovery and exact-source resolution.
 ---
 
-Capture only landed five-class raw originals and explicit attachments; retain exact-byte recovery without network acquisition.
+Capture landed five-class raw originals and explicit attachments, or selected registered code files. Retain exact-byte recovery without network acquisition or execution of repository programs.
 
 Use `scripts/cli.py --input REQUEST.json --output RESPONSE.json --knowledge-root K --rules-digest SHA256 --catalog CATALOG.json`. Inputs and relative references follow [the request contract](references/request.md). Consume the actual ResultEnvelope phase; exit 0 alone does not mean approved, applied, indexed, or merged.
 

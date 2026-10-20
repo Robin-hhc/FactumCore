@@ -249,7 +249,7 @@ def checked_view(ctx, request):
     return view
 
 
-def authenticated_event(ctx, display, event):
+def authenticated_event(ctx, display, event, allow_elapsed=False):
     adapter_id = event.get("adapter_id")
     trust = ctx.catalog.get("review_trust", {}).get("adapters", {}).get(adapter_id)
     if not trust:
@@ -277,7 +277,7 @@ def authenticated_event(ctx, display, event):
         raise Blocked("human decision absent")
     now = time.time()
     issued = payload.get("issued_at")
-    if not isinstance(issued, (int, float)) or isinstance(issued, bool) or not math.isfinite(issued) or issued < display["created_at"] - 1 or issued > now + 60 or now > display["expires_at"]:
+    if not isinstance(issued, (int, float)) or isinstance(issued, bool) or not math.isfinite(issued) or issued < display["created_at"] - 1 or issued > now + 60 or issued > display["expires_at"] or (not allow_elapsed and now > display["expires_at"]):
         raise Blocked("human event expired or predates display")
     return "synthetic_host" if trust.get("synthetic") else "authenticated_host"
 

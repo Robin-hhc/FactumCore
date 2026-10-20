@@ -1,0 +1,2 @@
+Exercise multi-file writes/deletes, complete CAS, cooperative locking, idempotence, interruption, resume and rollback. Recovery must reject external edits and altered backup/journal bytes. Confirm raw originals are outside the write set. Document approval does not require code lint; code proofs require signed positive evidence through the trusted public checker. Real-host and real-code acceptance remain pending when unavailable.
+

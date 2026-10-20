@@ -266,6 +266,29 @@ class Context:
             )
         return value
 
+    def publish(self, relative, content):
+        path = self.path(relative, (".build/operations", "logs"))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd, temporary = tempfile.mkstemp(prefix=".record-", dir=str(path.parent))
+        try:
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(content)
+                stream.flush()
+                os.fsync(stream.fileno())
+            self.path(relative, (".build/operations", "logs"))
+            try:
+                os.link(temporary, path)
+                sync_directory(path.parent)
+            except FileExistsError:
+                if path.read_bytes() != content:
+                    raise Blocked(
+                        "immutable artifact already exists with different bytes"
+                    )
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+        return relative
+
     def save(self, relative, record, immutable=True):
         path = self.path(relative, (".build/operations", "logs"))
         record = seal(record)
@@ -275,25 +298,7 @@ class Context:
             )
         content = canonical(record) + b"\n"
         if immutable:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            fd, temporary = tempfile.mkstemp(prefix=".record-", dir=str(path.parent))
-            try:
-                with os.fdopen(fd, "wb") as stream:
-                    stream.write(content)
-                    stream.flush()
-                    os.fsync(stream.fileno())
-                self.path(relative, (".build/operations", "logs"))
-                try:
-                    os.link(temporary, path)
-                    sync_directory(path.parent)
-                except FileExistsError:
-                    if path.read_bytes() != content:
-                        raise Blocked(
-                            "immutable record already exists with different bytes"
-                        )
-            finally:
-                if os.path.exists(temporary):
-                    os.unlink(temporary)
+            self.publish(relative, content)
         else:
             atomic_bytes(path, content)
         return relative
@@ -544,6 +549,43 @@ def load_context(args, package_root):
     return context
 
 
+def workflow_artifact(ctx, request, result):
+    workflow = request.get("workflow")
+    if not workflow:
+        return None
+    pieces = [workflow.get(key) for key in ("run_id", "node_id", "attempt_id")]
+    if any(
+        not isinstance(value, str)
+        or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}", value)
+        for value in pieces
+    ):
+        raise Invalid("workflow requires safe run/node/attempt identities")
+    prefix = "logs/workflows/" + pieces[0] + "/nodes/" + pieces[1] + "/" + pieces[2]
+    data = dict(result["data"])
+    references = {}
+    for key, value in data.items():
+        if key.endswith("_ref") and isinstance(value, str):
+            path = ctx.path(value, (".build/operations", "logs"))
+            if path.is_file():
+                references[value] = digest(path.read_bytes())
+    manifest = ctx.record(
+        "workflow_manifest",
+        ctx.operation(request),
+        workflow=workflow,
+        phase=result["phase"],
+        result=data,
+        request_digest=digest(request),
+        result_digest=digest(data),
+        artifact_digests=references,
+    )
+    ctx.save(prefix + "/result.json", manifest)
+    ctx.publish(
+        prefix + "/result.md",
+        b"# Node result\n\n```json\n" + canonical(manifest) + b"\n```\n",
+    )
+    return prefix + "/result.md"
+
+
 def run_cli(handler, package_root):
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True)
@@ -564,6 +606,9 @@ def run_cli(handler, package_root):
             "data": data,
             "diagnostics": [],
         }
+        artifact = workflow_artifact(ctx, request, result)
+        if artifact:
+            result["data"]["artifact_manifest_ref"] = artifact
         code = 0
     except Blocked as exc:
         result = {

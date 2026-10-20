@@ -32,7 +32,8 @@ def merge_check(ctx, request):
     nonce = secrets.token_hex(12)
     request_ref = f".build/operations/{op}/merge-engine-{nonce}-request.json"
     response_ref = f".build/operations/{op}/merge-engine-{nonce}-response.json"
-    atomic_bytes(ctx.path(request_ref), canonical(request))
+    child_request = {key: value for key, value in request.items() if key != "workflow"}
+    atomic_bytes(ctx.path(request_ref), canonical(child_request))
     before_view = ctx.path(request["view_ref"]).read_bytes()
     source_lock = ctx.path("governance/sources.lock.yaml")
     before_lock = source_lock.read_bytes()

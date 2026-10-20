@@ -134,7 +134,7 @@ class PublicGovernanceTests(unittest.TestCase):
         )
         return result
 
-    def prepare_and_approve(self, op, include_card=False):
+    def prepare_and_approve(self, op, include_card=False, workflow=None):
         old = self.root.joinpath("knowledge/index.md").read_bytes()
         row = {
             "path": "knowledge/index.md",
@@ -228,7 +228,12 @@ class PublicGovernanceTests(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(canonical(view))
         prepared = self.invoke(
-            "hs-knowledge-confirmation-prepare", {"operation_id": op, "view_ref": ref}
+            "hs-knowledge-confirmation-prepare",
+            {
+                "operation_id": op,
+                "view_ref": ref,
+                **({"workflow": workflow} if workflow else {}),
+            },
         )
         self.assertEqual(prepared["phase"], "awaiting_human")
         display_ref = prepared["data"]["display_ref"]
@@ -271,6 +276,27 @@ class PublicGovernanceTests(unittest.TestCase):
             "view_ref": ref,
             "proof_ref": reviewed["data"]["manual_review_ref"],
         }
+
+    def test_workflow_artifact_binds_actual_display_json_without_approving_it(self):
+        workflow = {
+            "run_id": "fixture-run",
+            "node_id": "prepare_confirmation",
+            "attempt_id": "first",
+        }
+        self.prepare_and_approve("workflow", workflow=workflow)
+        manifest_path = (
+            self.root
+            / "logs/workflows/fixture-run/nodes/prepare_confirmation/first/result.json"
+        )
+        self.assertTrue(manifest_path.is_file())
+        record = json.loads(manifest_path.read_text(encoding="utf-8"))
+        self.assertEqual(record["phase"], "awaiting_human")
+        display_ref = record["result"]["display_ref"]
+        self.assertEqual(
+            record["artifact_digests"][display_ref],
+            digest((self.root / display_ref).read_bytes()),
+        )
+        self.assertTrue(manifest_path.with_suffix(".md").is_file())
 
     def test_public_prepare_record_apply_verify_publish(self):
         request = self.prepare_and_approve("public")

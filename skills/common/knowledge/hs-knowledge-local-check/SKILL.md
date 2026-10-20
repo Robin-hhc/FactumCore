@@ -9,3 +9,5 @@ The protected catalog registers semantic reviewer keys and code authorization; t
 
 Use a fresh workflow attempt ID when retrying with new prerequisite evidence. A proof is exact-content evidence and does not prove real six-Target acceptance or an installed CI policy. See [artifact contract](artifacts/result.yaml).
 
+For final deprecated cards, a trusted reviewer may sign each Claim as `retired` with the exact deprecation reason and replacement mapping. Validate its original immutable evidence; do not require an obsolete assertion to remain supported by current code. Stable cards still require `supported` for every Claim. Retired cards never receive current-content eligibility.
+

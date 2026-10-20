@@ -418,8 +418,9 @@ def run_cli(handler, package_root):
     output = pathlib.Path(args.output).resolve()
     try:
         root = pathlib.Path(args.knowledge_root).resolve()
-        rel = output.relative_to(root).as_posix()
-        safe_path(root, rel, (".build/operations", "logs"))
+        if output.is_relative_to(root):
+            rel = output.relative_to(root).as_posix()
+            safe_path(root, rel, (".build/operations", "logs"))
         if output.exists() and output.read_bytes() != canonical(result) + b"\n":
             raise Invalid("response path already exists; use a new attempt output")
         atomic_bytes(output, canonical(result) + b"\n")

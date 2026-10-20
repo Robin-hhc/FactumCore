@@ -142,7 +142,7 @@ def claims_and_sources(ctx, view):
             key = (card["metadata"]["id"], claim["id"])
             if key in claims:
                 raise Invalid("duplicate Claim in code view")
-            claims[key] = claim
+            claims[key] = {**claim, "card_lifecycle": card["metadata"]["lifecycle"], "replacement": card["metadata"].get("replacement") or [], "deprecation_reason": card["metadata"].get("deprecation_reason")}
     if not claims:
         raise Incomplete("code view contains no verifiable Claims")
     return claims, source_lock, resources
@@ -178,6 +178,8 @@ def evaluate(ctx, request, view, mode, report_override=None, record_snapshots=Fa
     if not context_ref:
         raise Incomplete("fixed real code context is missing")
     ctx.path(context_ref, (f".build/operations/{view['operation_id']}", "logs/contexts"))
+    if not ctx.path(context_ref).is_file():
+        raise Incomplete("fixed real code context is unavailable")
     context = ctx.read(context_ref)
     if context.get("record_kind") != "project_context" or context.get("state") != "loaded" or pathlib.Path(context.get("knowledge_root", "")).resolve() != ctx.root:
         raise Incomplete("code context is not a project context")
@@ -200,9 +202,13 @@ def evaluate(ctx, request, view, mode, report_override=None, record_snapshots=Fa
             raise Failed("duplicate or unexpected semantic Claim")
         seen.add(key)
         knowledge = importlib.import_module(ctx.domain.__package__ + ".knowledge")
-        if not knowledge.match_scope(claims[key], context["target"], "implementation"):
+        retired = claims[key]["card_lifecycle"] == "deprecated"
+        if not retired and not knowledge.match_scope(claims[key], context["target"], "implementation"):
             raise Incomplete("Claim applicability is not supported by this fixed Target/build context")
-        if row.get("status") != "supported":
+        if retired:
+            if row.get("status") != "retired" or not isinstance(row.get("reason"), str) or not row["reason"].strip() or row["reason"] != claims[key]["deprecation_reason"] or row.get("replacement") != claims[key]["replacement"]:
+                raise Failed("retired Claim requires signed exact reason and replacement mapping")
+        elif row.get("status") != "supported":
             raise Failed("semantic reviewer did not support every Claim")
         evidence = row.get("evidence")
         if not isinstance(evidence, list) or not evidence:
@@ -219,6 +225,9 @@ def evaluate(ctx, request, view, mode, report_override=None, record_snapshots=Fa
                 raise Failed("signed evidence digest does not match immutable snapshot")
             resource = resource_map[ref["source_id"]]
             if resource["kind"] == "code":
+                if retired:
+                    code_support = True
+                    continue
                 for item in matching:
                     checked = item.get("checked_snapshot")
                     if checked is None:

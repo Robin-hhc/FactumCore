@@ -67,7 +67,7 @@ def validate_proof(ctx, request, view):
         if proof.get("record_kind") != "local_check" or proof.get("status") != "passed" or proof.get("mode") != "local":
             raise Blocked("code view requires a passing local code proof")
         claims = proof.get("claims")
-        if not claims or any(row.get("status") != "supported" or not row.get("evidence") for row in claims):
+        if not claims or any(row.get("status") not in ("supported", "retired") or not row.get("evidence") for row in claims):
             raise Blocked("every code Claim requires positive evidence")
         invoke_checker(ctx, request)
     else:
@@ -227,6 +227,8 @@ def execute(ctx, request, action="run"):
                 sources = importlib.import_module(ctx.domain.__package__ + ".source_resources")
                 card = knowledge.parse_card(ctx.path(row["path"]).read_bytes(), row["path"], ctx.rules)
                 knowledge.validate_card(card, None, ctx.rules)
+                if card["metadata"]["lifecycle"] != "stable":
+                    continue
                 source_lock = sources.read_source_lock(ctx.root)
                 for ref in card["metadata"]["sources"]:
                     snapshot = sources.validate_source_ref(ref, source_lock)

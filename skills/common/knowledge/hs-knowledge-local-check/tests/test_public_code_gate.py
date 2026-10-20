@@ -167,6 +167,47 @@ class PublicCodeGateTests(unittest.TestCase):
             self.assertEqual((self.root / ref).read_bytes(), raw)
         self.assertEqual((self.root / ("logs/evidence/checked-code/" + digest(newer) + ".bin")).read_bytes(), newer)
 
+    def test_signed_retirement_applies_without_claiming_obsolete_code_is_current(self):
+        checked = self.invoke()
+        self.invoke(skill="hs-knowledge-apply", request={"operation_id": "op", "view_ref": self.view_ref, "proof_ref": checked["data"]["local_check_ref"]})
+        card_path = "knowledge/flows/fixture-code-flow.md"
+        old_card = (self.root / card_path).read_bytes()
+        self.code.joinpath("src/wifi.c").write_bytes(b"int fixture_wifi_ready(void) { return 2; }\n")
+        self.git("add", "src/wifi.c")
+        self.git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "commit", "-qm", "obsolete fixture behavior")
+        latest = self.git("rev-parse", "HEAD").decode().strip()
+        context = json.loads((self.root / self.context_ref).read_text(encoding="utf-8"))
+        context["operation_id"] = "retire"
+        context["repos"]["wifi-code"].update(head=latest, files={"src/wifi.c": digest(self.code.joinpath("src/wifi.c").read_bytes())})
+        context["target"]["revision"] = latest
+        context["build_evidence"]["source_revision"] = latest
+        self.context_ref = ".build/operations/retire/context.json"
+        self.save(self.context_ref, seal(context))
+        _, front, body = old_card.decode().split("---", 2)
+        metadata = yaml.safe_load(front)
+        metadata.update(lifecycle="deprecated", replacement=[], deprecation_reason="Fixture implementation no longer returns one")
+        tombstone = ("---\n" + yaml.safe_dump(metadata, allow_unicode=True, sort_keys=False) + "---" + body).encode()
+        self.assertTrue(tombstone.endswith(body.encode()))
+        writes = [{"path": card_path, "expected_old_digest": digest(old_card), "final_digest": digest(tombstone), "bytes_b64": base64.b64encode(tombstone).decode()}]
+        view = dict(self.view)
+        view.update(operation_id="retire", writes=writes, context_ref=self.context_ref, baseline_digest=digest({"files": {card_path: digest(old_card)}}))
+        self.view = seal(view)
+        self.view_ref = ".build/operations/retire/view.json"
+        self.save(self.view_ref, self.view)
+        self.evidence[0].update(status="retired", reason=metadata["deprecation_reason"], replacement=[])
+        self.report_ref = ".build/operations/retire/semantic-report.json"
+        self.sign_report("local")
+        request = {"operation_id": "retire", "view_ref": self.view_ref, "semantic_report_ref": self.report_ref}
+        retired = self.invoke(request=request)
+        self.assertEqual(retired["data"]["check_status"], "passed")
+        proof_ref = retired["data"]["local_check_ref"]
+        proof = json.loads((self.root / proof_ref).read_text(encoding="utf-8"))
+        self.assertEqual(proof["claims"][0]["status"], "retired")
+        applied = self.invoke(skill="hs-knowledge-apply", request={"operation_id": "retire", "view_ref": self.view_ref, "proof_ref": proof_ref})
+        self.assertEqual((self.root / card_path).read_bytes(), tombstone)
+        qualified = self.invoke(skill="hs-knowledge-apply", action="verify-result", request={"operation_id": "retire", "apply_result_ref": applied["data"]["apply_result_ref"]})
+        self.assertEqual(qualified["data"]["eligible_files"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

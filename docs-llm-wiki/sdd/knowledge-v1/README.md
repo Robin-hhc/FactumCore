@@ -1,8 +1,8 @@
 # Knowledge v1 SDD 入口
 
-本 SDD 细化用户确认的主设计 §5.3 + 第 11 章及《知识库详细设计》v2.0；源文件实际摘要固定在 [baseline.json](baseline.json)。这些是用户批准的工作区设计文件，不能用较旧 Git HEAD 替代其内容。
+本 SDD 细化用户确认的[主设计《AIoTBot知识库架构》](../../AIoTBot知识库架构.md) §5.3 + 第 11 章及[《知识库详细设计》](../../知识库详细设计.md)v2.0；源文件实际摘要固定在 [baseline.json](baseline.json)。这些是用户批准的工作区设计文件，不能用较旧 Git HEAD 替代其内容。
 
-当前部署由用户指定为 FactumCore 单仓：仓根 skills/、workflows/、config.yml 与 aiot-wifi-knowledge/ 一并版本管理，原 docs/ 迁至 docs-llm-wiki/。迁移过程与历史证据边界见[单仓迁移记录](records/single-repo-migration.md)；本次布局调整不提升任何业务或宿主验收状态。用户级 AGENTS 由用户自行配置，不纳入开发、安装、升级或托管验收；全局 Skill 安装可见性、workspace-registry 定位、仓内 AGENTS 实际加载和仓外宿主实测仍按 T23/T24 交付。
+当前部署由用户指定为 FactumCore 单仓：仓根 skills/、workflows/、config.yml 与 aiot-wifi-knowledge/ 一并版本管理，原 docs/ 迁至 docs-llm-wiki/；当前文档根只保留平铺的主设计、详设、AGENTS/README 与本 SDD。旧研究、实验等材料移至仓外归档，不作为另一份活跃规格真源。迁移过程与历史证据边界见[单仓迁移记录](records/single-repo-migration.md)；本次布局调整不提升任何业务或宿主验收状态。用户级 AGENTS 由用户自行配置，不纳入开发、安装、升级或托管验收；全局 Skill 安装可见性、workspace-registry 定位、仓内 AGENTS 实际加载和仓外宿主实测仍按 T23/T24 交付。
 
 ## 阅读和执行顺序
 

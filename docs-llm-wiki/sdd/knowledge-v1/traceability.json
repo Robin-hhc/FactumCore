@@ -1,8 +1,8 @@
 {
   "schema_version": "sdd-traceability/1",
   "source": {
-    "path": "docs-llm-wiki/设计文档/知识库详细设计.md",
-    "sha256": "f71743e47acb460b6c94be5cef68a4a065347e643f3f8038ed4d8e3fd9c75753",
+    "path": "docs-llm-wiki/知识库详细设计.md",
+    "sha256": "60b3a73b71bc6f40713d048aede14dd0dfad42863efec5df7f060ab8cddec72d",
     "design_version": "v2.0",
     "scope": "展开148路径与E01–E34；用户部署决议统一FactumCore单仓，不增加产品能力"
   },
@@ -7233,11 +7233,7 @@
     },
     {
       "path": ".gitattributes",
-      "purpose": "框架实际文本字节LF策略"
-    },
-    {
-      "path": "aiot-wifi-knowledge/.gitattributes",
-      "purpose": "规则锁经Git checkout仍一致"
+      "purpose": "根属性统一维护框架/领域LF及当前两份设计原字节策略"
     },
     {
       "path": "tools/validate_sdd.py",
@@ -7248,12 +7244,12 @@
       "purpose": "本实现项目术语与边界"
     },
     {
-      "path": "docs-llm-wiki/agents/issue-tracker.md",
-      "purpose": "本地任务跟踪规则"
+      "path": "docs-llm-wiki/sdd/knowledge-v1/tasks.md",
+      "purpose": "当前本地任务跟踪与依赖 DAG；旧 agents 跟踪规则退出活跃依赖"
     },
     {
-      "path": "docs-llm-wiki/agents/domain.md",
-      "purpose": "开发SDD与知识事实分工"
+      "path": "docs-llm-wiki/sdd/knowledge-v1/design.md",
+      "purpose": "当前开发 SDD 与知识事实分工；旧 agents 说明退出活跃依赖"
     }
   ],
   "execution_summary": {

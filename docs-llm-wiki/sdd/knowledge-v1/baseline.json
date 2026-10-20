@@ -7,12 +7,12 @@
   "implementation": "independent; no CANNBot source copied",
   "sources": [
     {
-      "path": "docs-llm-wiki/设计文档/aibot.md",
+      "path": "docs-llm-wiki/AIoTBot知识库架构.md",
       "sha256": "b8ff5bf206f021538a2b8e64d7c43a50fcd4ec5bcd60b5fa4b44de464f6e25e0"
     },
     {
-      "path": "docs-llm-wiki/设计文档/知识库详细设计.md",
-      "sha256": "f71743e47acb460b6c94be5cef68a4a065347e643f3f8038ed4d8e3fd9c75753"
+      "path": "docs-llm-wiki/知识库详细设计.md",
+      "sha256": "60b3a73b71bc6f40713d048aede14dd0dfad42863efec5df7f060ab8cddec72d"
     }
   ],
   "deployment_decision": {
@@ -73,6 +73,39 @@
       "previous_sha256": "f8719d8c788ab4656e3082832498f23b3a409dea893ed72ad32b32ea24c93cff",
       "sha256": "f71743e47acb460b6c94be5cef68a4a065347e643f3f8038ed4d8e3fd9c75753",
       "scope": "User-owned AGENTS removed from product deliverables (149 to 148); check wrappers assigned to governance/tools; clarify per-Skill resources and shared execution package without moving runtime code"
+    },
+    {
+      "date": "2026-10-20",
+      "record": "records/docs-layout-20261020.md",
+      "previous_path": "docs-llm-wiki/设计文档/aibot.md",
+      "pulled_path": "docs-llm-wiki/设计文档/AIoTBot知识库架构.md",
+      "path": "docs-llm-wiki/AIoTBot知识库架构.md",
+      "previous_sha256": "b8ff5bf206f021538a2b8e64d7c43a50fcd4ec5bcd60b5fa4b44de464f6e25e0",
+      "sha256": "b8ff5bf206f021538a2b8e64d7c43a50fcd4ec5bcd60b5fa4b44de464f6e25e0",
+      "scope": "User-directed document flattening and archive; original diagrams retained, active links and design identity paths updated"
+    },
+    {
+      "date": "2026-10-20",
+      "record": "records/docs-layout-20261020.md",
+      "previous_path": "docs-llm-wiki/设计文档/知识库详细设计.md",
+      "pulled_path": "docs-llm-wiki/设计文档/知识库详细设计.md",
+      "path": "docs-llm-wiki/知识库详细设计.md",
+      "previous_sha256": "f71743e47acb460b6c94be5cef68a4a065347e643f3f8038ed4d8e3fd9c75753",
+      "sha256": "60b3a73b71bc6f40713d048aede14dd0dfad42863efec5df7f060ab8cddec72d",
+      "scope": "User-directed document flattening and archive; original diagrams retained, active links and design identity paths updated"
     }
-  ]
+  ],
+  "documentation_layout": {
+    "root": "docs-llm-wiki",
+    "root_files": [
+      "AGENTS.md",
+      "AIoTBot知识库架构.md",
+      "README.md",
+      "知识库详细设计.md"
+    ],
+    "active_sdd": "docs-llm-wiki/sdd/knowledge-v1",
+    "pulled_commit": "fde520c6a29488401a197e2bc414b4e31283d144",
+    "archive_id": "docs-cleanup-20261020-140445",
+    "record": "records/docs-layout-20261020.md"
+  }
 }

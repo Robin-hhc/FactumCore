@@ -1,8 +1,8 @@
 # 知识库首发 SDD 需求规格
 
-依据现行《知识库详细设计》v2.0；本规格将既有设计展开为可追踪需求，不增加产品范围。按用户后续部署决议，逻辑 workspace 为 FactumCore 单仓，`aiot-wifi-knowledge/` 是仓根普通目录，文档根为 `docs-llm-wiki/`；原有 `aiot-knowledge/` 不迁移、不纳入本轮交付。
+依据现行[《知识库详细设计》](../../知识库详细设计.md)v2.0；本规格将既有设计展开为可追踪需求，不增加产品范围。按用户后续部署决议，逻辑 workspace 为 FactumCore 单仓，`aiot-wifi-knowledge/` 是仓根普通目录，文档根为 `docs-llm-wiki/`；原有 `aiot-knowledge/` 不迁移、不纳入本轮交付。
 
-源文件 SHA-256：`f71743e47acb460b6c94be5cef68a4a065347e643f3f8038ed4d8e3fd9c75753`。共 18 项需求、148 条路径、34 项验收；未来来源 3 条单列 deferred。
+源文件 SHA-256：`60b3a73b71bc6f40713d048aede14dd0dfad42863efec5df7f060ab8cddec72d`。共 18 项需求、148 条路径、34 项验收；未来来源 3 条单列 deferred。
 
 ## 1. 需求基线
 

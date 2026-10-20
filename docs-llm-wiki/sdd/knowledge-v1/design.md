@@ -2,7 +2,7 @@
 
 ## 1. 交付根、分层和接口
 
-当前开发 workspace 是 FactumCore 仓根。按用户部署决议，框架、SDD 与 WiFi 领域资产统一在一个 Git 仓维护；SDD 真源为 `docs-llm-wiki/sdd/knowledge-v1/`，`aiot-wifi-knowledge/` 为直接子目录，不含嵌套 .git。既有 `E:\FactumCore\aiot-knowledge/` 保持原身份，不搬迁或覆盖。下面 `W` 表示 FactumCore 根，`S=W/skills/common/knowledge/_shared`，`K=W/aiot-wifi-knowledge`。历史隔离开发目录仅作已记录验证的来源，不再是发布根。所有目标路径的存在与完成状态分别验收。
+当前开发 workspace 是 FactumCore 仓根。按用户部署决议，框架、SDD 与 WiFi 领域资产统一在一个 Git 仓维护；SDD 真源为 `docs-llm-wiki/sdd/knowledge-v1/`，`aiot-wifi-knowledge/` 为直接子目录，不含嵌套 .git。既有 `E:\FactumCore\aiot-knowledge/` 保持原身份，不搬迁或覆盖。下面 `W` 表示 FactumCore 根，`S=W/skills/common/knowledge/_shared`，`K=W/aiot-wifi-knowledge`。历史隔离开发目录仅作已记录验证的来源，不再是发布根。所有目标路径的存在与完成状态分别验收。当前来源入口为[主设计](../../AIoTBot知识库架构.md)和[知识库详细设计](../../知识库详细设计.md)，由文档根平铺维护；本次文档整理不改变领域仓目标文件路径。
 
 固定边界：首发文档只取 `K/docs-raw/{conventions,chips,storys,specs,protocols}/` 的实际原件；排除控制文件、sources、URL、仓外映射及越界联接。manual_document 只需真实人工确认，不跑代码本地/合入门禁；代码本地通过即 stable、可供 local 消费，上库再按最新源码只读核验。六 Target/三 pair 先建逻辑登记，真实映射、宿主触发、ACL 分别验收。
 

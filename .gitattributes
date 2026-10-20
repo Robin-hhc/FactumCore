@@ -1,9 +1,7 @@
-# Preserve historical research/document bytes during the directory migration.
-/docs-llm-wiki/架构设计.md -text
-/docs-llm-wiki/设计文档/aibot.md -text
-/docs-llm-wiki/设计文档/知识库详细设计.md -text
+# Preserve the exact approved design bytes across checkouts.
+/docs-llm-wiki/AIoTBot知识库架构.md -text
+/docs-llm-wiki/知识库详细设计.md -text
 /docs-llm-wiki/sdd/** text eol=lf
-/docs-llm-wiki/agents/** text eol=lf
 
 # Shared execution and locked domain rules need stable bytes across checkouts.
 /skills/** text eol=lf

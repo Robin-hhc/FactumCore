@@ -1,17 +1,17 @@
 # FactumCore：AIoTBot 知识系统开发入口
 
-当前由用户指定在 FactumCore 单仓开发和发布：根目录 `skills/` 保存共享能力与程序，`workflows/` 保存生产和治理编排，`aiot-wifi-knowledge/` 保存 WiFi 领域资产，`docs-llm-wiki/` 保存总体设计、SDD、研究与实验文档。原 `docs/` 已整体迁移，不再建立第二份文档真源。
+当前由用户指定在 FactumCore 单仓开发和发布：根目录 `skills/` 保存共享能力与程序，`workflows/` 保存生产和治理编排，`aiot-wifi-knowledge/` 保存 WiFi 领域资产，`docs-llm-wiki/` 保存平铺的当前设计与 SDD 工件。原 `docs/` 已整体迁移，不再建立第二份文档真源。
 
 ## 任务入口
 
 | 任务 | 入口 |
 |---|---|
-| 总体架构与本轮约束 | `docs-llm-wiki/设计文档/README.md`、`aibot.md`、`知识库详细设计.md` |
+| 总体架构与本轮约束 | `docs-llm-wiki/README.md`、`AIoTBot知识库架构.md`、`知识库详细设计.md` |
 | 开发规格、模块、任务与验收 | `docs-llm-wiki/sdd/knowledge-v1/README.md`；先需求、设计、当前 ticket，再测试与实现 |
 | 共享程序、公开 CLI 与测试 | `skills/common/knowledge/_shared/` |
 | Agent 能力与编排 | `skills/common/knowledge/hs-common-*/`、`workflows/common/hs-common-*/`；按 SDD 实际完成状态使用 |
 | WiFi 原件、治理契约与正式知识 | `aiot-wifi-knowledge/AGENTS.md`；正文唯一根为其中 `knowledge/` |
-| 来源调研、历史资料、实验 | `docs-llm-wiki/research/`、`experiments/`、`superpowers/`；分别保持证据、方案、实际运行的身份 |
+| 历史资料 | 已移出 Git 工作区；归档身份见 `docs-llm-wiki/sdd/knowledge-v1/records/docs-layout-20261020.md`，不恢复为当前设计或另一份规格 |
 
 `aiot-wifi-knowledge/` 是本仓普通目录，不包含嵌套 `.git`。本次 Git 操作统一在 FactumCore 根执行。共享框架与领域知识仍按职责分层；单仓不等于 ACL，不将组内原件、卡片、锁、日志或索引自动分发为公共框架。旧 `aiot-knowledge/` 与开发用 `.worktrees/` 保留原身份，不是本轮知识正文根，不整体纳入提交。
 

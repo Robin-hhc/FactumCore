@@ -5,6 +5,7 @@ import argparse
 import base64
 import hashlib
 import importlib.util
+import importlib.abc
 import json
 import math
 import os
@@ -242,6 +243,8 @@ def checked_view(ctx, request):
     if view.get("record_kind") != "final_view" or view.get("operation_id") != op:
         raise Invalid("final view identity mismatch")
     paths = set()
+    if any(row.get("path") == "governance/sources.lock.yaml" for row in view.get("deletes", [])):
+        raise Invalid("source registry cannot be deleted by a knowledge transaction")
     for row in view.get("writes", []) + view.get("deletes", []):
         path = row.get("path")
         ctx.path(path, ("knowledge", "governance/sources.lock.yaml", "index.md"))
@@ -315,26 +318,58 @@ def load_context(args, package_root):
     UniqueLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, mapping)
     document = yaml.load(lock.read_bytes(), Loader=UniqueLoader)
     files = document.get("files", {})
+    verified = {}
     validation_path = None
     for item in files.values():
         if not isinstance(item, dict) or "path" not in item or "sha256" not in item:
             raise Invalid("invalid framework file manifest")
         target = safe_path(root, item["path"], ("governance",))
-        if digest(target.read_bytes()) != item["sha256"]:
+        raw = target.read_bytes()
+        if digest(raw) != item["sha256"]:
             raise Invalid("framework file digest mismatch")
+        if item["path"] in verified:
+            raise Invalid("duplicate framework file path")
+        verified[item["path"]] = raw
         if item["path"] == "governance/contracts/validation.py":
             validation_path = target
     if validation_path is None:
         raise Invalid("validation program is not pinned")
-    package_name = "_aiot_domain_" + args.rules_digest[:16]
-    package = types.ModuleType(package_name)
-    package.__path__ = [str(validation_path.parent)]
-    sys.modules[package_name] = package
-    spec = importlib.util.spec_from_file_location(package_name + ".validation", validation_path)
-    domain = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = domain
-    spec.loader.exec_module(domain)
+    package_name = "_aiot_domain_" + args.rules_digest
+    for name in ("__init__", "validation", "knowledge", "source_resources", "records"):
+        if "governance/contracts/" + name + ".py" not in verified:
+            raise Invalid("domain program is not pinned")
+    class PinnedLoader(importlib.abc.Loader):
+        def __init__(self, reference):
+            self.reference = reference
+        def create_module(self, spec):
+            return None
+        def exec_module(self, module):
+            if module.__name__ == package_name:
+                module.__path__ = []
+            module.__file__ = str(root / self.reference)
+            exec(compile(verified[self.reference], module.__file__, "exec"), module.__dict__)
+    class PinnedFinder(importlib.abc.MetaPathFinder):
+        def find_spec(self, fullname, path=None, target=None):
+            if fullname != package_name and not fullname.startswith(package_name + "."):
+                return None
+            name = "__init__" if fullname == package_name else fullname[len(package_name) + 1:]
+            reference = "governance/contracts/" + name.replace(".", "/") + ".py"
+            if reference not in verified:
+                raise ImportError("unlocked domain module: " + fullname)
+            return importlib.util.spec_from_loader(fullname, PinnedLoader(reference), is_package=fullname == package_name)
+    finder = PinnedFinder()
+    sys.meta_path.insert(0, finder)
+    try:
+        importlib.import_module(package_name)
+        for name in ("validation", "knowledge", "source_resources", "records"):
+            importlib.import_module(package_name + "." + name)
+    finally:
+        sys.meta_path.remove(finder)
+    domain = sys.modules[package_name + ".validation"]
     rules = domain.load_rules(root, args.rules_digest)
+    for reference, raw in verified.items():
+        if safe_path(root, reference).read_bytes() != raw:
+            raise Invalid("rules changed while loading")
     catalog = strict_json(pathlib.Path(args.catalog).read_text(encoding="utf-8")) if args.catalog else {}
     if catalog and catalog.get("schema_version") != "2.0":
         raise Invalid("invalid installed catalog version")

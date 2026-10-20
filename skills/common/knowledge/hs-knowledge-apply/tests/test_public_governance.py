@@ -5,10 +5,13 @@ cross-Skill imports, real source documents, gold or installed host are used.
 """
 import base64
 import json
+import importlib.util
+import marshal
 import os
 import pathlib
 import shutil
 import subprocess
+import struct
 import sys
 import tempfile
 import time
@@ -128,6 +131,15 @@ class PublicGovernanceTests(unittest.TestCase):
         self.assertEqual(verified["data"]["eligible_files"], [{"path": path, "sha256": card_digest}])
         self.root.joinpath("logs/evidence/fixture-original.bin").write_bytes(b"tampered")
         self.invoke("hs-knowledge-apply", verify, action="verify-result", expected=2)
+
+    def test_timestamp_valid_unpinned_pyc_is_never_executed(self):
+        source = self.root / "governance/contracts/validation.py"
+        cached = pathlib.Path(importlib.util.cache_from_source(str(source)))
+        cached.parent.mkdir(parents=True, exist_ok=True)
+        code = compile("raise RuntimeError('UNPINNED CACHE EXECUTED')", str(source), "exec")
+        metadata = source.stat()
+        cached.write_bytes(importlib.util.MAGIC_NUMBER + struct.pack("<III", 0, int(metadata.st_mtime), metadata.st_size) + marshal.dumps(code))
+        self.prepare_and_approve("hostile-cache")
 
 
 if __name__ == "__main__":

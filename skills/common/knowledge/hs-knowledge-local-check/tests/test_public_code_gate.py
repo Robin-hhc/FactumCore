@@ -53,7 +53,7 @@ class PublicCodeGateTests(unittest.TestCase):
         from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
         self.key = Ed25519PrivateKey.generate()
         self.catalog = {"schema_version": "2.0", "skills": {}, "code_policy": policy, "semantic_reviewers": {"fixture": {"synthetic": True, "fixture_root": str(self.root), "public_key_b64": base64.b64encode(self.key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)).decode()}}}
-        for name in ("hs-knowledge-local-check", "hs-knowledge-apply"):
+        for name in ("hs-knowledge-local-check", "hs-knowledge-apply", "hs-knowledge-merge-check"):
             package = SKILLS / name
             self.catalog["skills"][name] = {"root": str(package), "entry": "scripts/cli.py", "python": sys.executable, "package_digest": package_digest(package)}
         self.catalog_path = self.workspace / "trusted-catalog.json"
@@ -66,7 +66,7 @@ class PublicCodeGateTests(unittest.TestCase):
             path.write_bytes(data)
         locator = {"kind": "lines", "start": 1, "end": 1, "repo_id": "wifi-code", "path": "src/wifi.c"}
         source_lock = {"schema_version": "2.0", "resources": [{"source_id": "fixture-code", "kind": "code", "repo_id": "wifi-code", "path": "src/wifi.c"}], "snapshots": [{"source_id": "fixture-code", "snapshot_id": "fixture-code-snapshot", "sha256": digest(self.source), "bytes": len(self.source), "recovery": {"path": "logs/evidence/code.bin"}}]}
-        scope = {"context_id": "chip12-host-build", "target_id": "chip12-host", "chip": "chip12", "side": "host", "build_profile": "fixture-build", "features_all": ["WIFI_ON"], "features_none": [], "protocol_versions": ["fixture-v1"], "revision_policy": "pinned", "revision": self.head}
+        scope = {"context_id": "chip12-host-build", "target_id": "chip12-host", "chip": "chip12", "side": "host", "build_profile": "fixture-build", "features_all": ["WIFI_ON"], "features_none": [], "protocol_versions": ["fixture-v1"], "revision_policy": "revalidate", "revision": self.head}
         card_text = (self.root / "governance/templates/flow.md").read_text(encoding="utf-8")
         for key, value in {"card_id": "fixture-code-flow", "title": "Fixture code", "summary": "Synthetic code check", "owner": "fixture", "evidence_ref": "e1", "source_id": "fixture-code", "snapshot_id": "fixture-code-snapshot", "claim_id": "c1", "claim_text": "The fixture function returns one."}.items():
             card_text = card_text.replace("{{" + key + "}}", value)
@@ -76,7 +76,7 @@ class PublicCodeGateTests(unittest.TestCase):
         meta["sources"][0]["locator"] = locator
         meta["claims"][0].update(evidence_kind="implementation", usage="current", context_ids=[scope["context_id"]], verification_requirements=["semantic-support"])
         card = ("---\n" + yaml.safe_dump(meta, allow_unicode=True, sort_keys=False) + "---" + body).encode()
-        context = self.record("project_context", state="loaded", workspace_id=config["workspace_id"], knowledge_root=str(self.root), entries=[], config_digest=digest(config_raw), repos={"wifi-code": {"root": str(self.code), "identity": "synthetic-wifi-code", "head": self.head, "dirty": False, "files": {"src/wifi.c": digest(self.source)}}}, target={"target_id": "chip12-host", "chip": "chip12", "side": "host", "build_profile": "fixture-build", "features": ["WIFI_ON"], "protocol_versions": ["fixture-v1"], "revision": self.head}, build_evidence={"profile": "fixture-build", "macro_digest": digest(["WIFI_ON"]), "artifacts": [{"path": "logs/evidence/build.bin", "sha256": digest(b"synthetic fixture build only\n")}]})
+        context = self.record("project_context", state="loaded", workspace_id=config["workspace_id"], knowledge_root=str(self.root), entries=[], config_digest=digest(config_raw), repos={"wifi-code": {"root": str(self.code), "identity": "synthetic-wifi-code", "head": self.head, "dirty": False, "files": {"src/wifi.c": digest(self.source)}}}, target={"target_id": "chip12-host", "chip": "chip12", "side": "host", "build_profile": "fixture-build", "features": ["WIFI_ON"], "protocol_versions": ["fixture-v1"], "revision": self.head}, build_evidence={"profile": "fixture-build", "source_revision": self.head, "macro_digest": digest(["WIFI_ON"]), "artifacts": [{"path": "logs/evidence/build.bin", "sha256": digest(b"synthetic fixture build only\n")}]})
         self.context_ref = ".build/operations/op/context.json"
         self.save(self.context_ref, context)
         source_raw = canonical(source_lock)
@@ -146,6 +146,26 @@ class PublicCodeGateTests(unittest.TestCase):
         self.assertEqual(self.invoke(action="merge")["data"]["check_status"], "incomplete")
         self.assertEqual((self.root / self.view_ref).read_bytes(), view_before)
         self.assertEqual((self.root / "governance/sources.lock.yaml").read_bytes(), lock_before)
+
+    def test_changed_latest_code_can_pass_with_independent_signed_check_snapshot(self):
+        newer = b"/* a harmless fixture comment */\n" + self.source
+        self.code.joinpath("src/wifi.c").write_bytes(newer)
+        self.git("add", "src/wifi.c")
+        self.git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "commit", "-qm", "latest fixture comment")
+        latest = self.git("rev-parse", "HEAD").decode().strip()
+        context = json.loads((self.root / self.context_ref).read_text(encoding="utf-8"))
+        context["repos"]["wifi-code"].update(head=latest, files={"src/wifi.c": digest(newer)})
+        context["target"]["revision"] = latest
+        context["build_evidence"]["source_revision"] = latest
+        self.save(self.context_ref, seal(context))
+        self.evidence[0]["evidence"][0]["checked_snapshot"] = {"repo_id": "wifi-code", "path": "src/wifi.c", "sha256": digest(newer), "snapshot_id": "latest-check-snapshot", "locator": {"kind": "lines", "start": 2, "end": 2}, "commit": latest, "bytes": len(newer)}
+        self.sign_report("merge")
+        frozen = {ref: (self.root / ref).read_bytes() for ref in (self.view_ref, "governance/sources.lock.yaml", "logs/evidence/code.bin")}
+        result = self.invoke(skill="hs-knowledge-merge-check")
+        self.assertEqual(result["data"]["check_status"], "passed")
+        for ref, raw in frozen.items():
+            self.assertEqual((self.root / ref).read_bytes(), raw)
+        self.assertEqual((self.root / ("logs/evidence/checked-code/" + digest(newer) + ".bin")).read_bytes(), newer)
 
 
 if __name__ == "__main__":

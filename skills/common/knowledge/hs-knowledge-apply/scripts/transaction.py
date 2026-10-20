@@ -12,7 +12,7 @@ from support import (Blocked, Invalid, WriterLock, atomic_bytes, authenticated_e
 
 
 def current_digest(ctx, path):
-    target = ctx.path(path)
+    target = ctx.path(path, ("knowledge", "governance/sources.lock.yaml", "index.md"))
     if target.exists() and not target.is_file():
         raise Invalid("transaction target is not a file")
     return digest(target.read_bytes()) if target.is_file() else None
@@ -56,6 +56,7 @@ def validate_proof(ctx, request, view):
     if view.get("review_mode") == "manual_document":
         if proof.get("record_kind") != "manual_review" or proof.get("status") != "approved":
             raise Blocked("document view requires explicit real-human approval")
+        ctx.path(proof.get("display_ref"), (f".build/operations/{view['operation_id']}",))
         display = ctx.read(proof.get("display_ref"))
         if display.get("digest") != proof.get("display_digest") or display.get("view_digest") != view["digest"] or display.get("writes") != view.get("writes") or display.get("deletes") != view.get("deletes"):
             raise Invalid("manual proof display binding mismatch")
@@ -267,8 +268,11 @@ def execute(ctx, request, action="run"):
                         if digest(raw) != row["old_digest"]:
                             raise Invalid("recovery backup digest mismatch")
                 for row in reversed(journal["entries"]):
-                    if current_digest(ctx, row["path"]) == row["old_digest"]:
+                    current = current_digest(ctx, row["path"])
+                    if current == row["old_digest"]:
                         continue
+                    if current != row["new_digest"]:
+                        raise Blocked("external edit preserved during rollback: " + row["path"])
                     target = ctx.path(row["path"])
                     if row["old_digest"] is None:
                         target.unlink()

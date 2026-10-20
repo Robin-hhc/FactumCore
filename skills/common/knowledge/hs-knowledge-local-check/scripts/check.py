@@ -9,7 +9,7 @@ import subprocess
 import time
 
 from support import (Blocked, Invalid, canonical, checked_view, digest, safe_path,
-                     strict_json)
+                     strict_json, atomic_bytes)
 
 
 class Incomplete(Blocked):
@@ -71,7 +71,7 @@ def code_identity(ctx, context, config, policy, mode):
     if not set(declared_target["required_features"]).issubset(target["features"]) or not set(declared_target["protocol_versions"]).issubset(target["protocol_versions"]):
         raise Incomplete("Target required macros or protocols are not fixed")
     build = context.get("build_evidence")
-    if not isinstance(build, dict) or build.get("profile") != target["build_profile"] or not re.fullmatch(r"[0-9a-f]{64}", str(build.get("macro_digest", ""))) or not build.get("artifacts"):
+    if not isinstance(build, dict) or build.get("profile") != target["build_profile"] or build.get("source_revision") != target["revision"] or not re.fullmatch(r"[0-9a-f]{64}", str(build.get("macro_digest", ""))) or not build.get("artifacts"):
         raise Incomplete("build/macro evidence is missing")
     build_files = {}
     for item in build["artifacts"]:
@@ -173,12 +173,13 @@ def verify_report(ctx, report, view, context, mode):
     return payload, "synthetic_code_reviewer" if trust.get("synthetic") else "authenticated_code_reviewer"
 
 
-def evaluate(ctx, request, view, mode, report_override=None):
+def evaluate(ctx, request, view, mode, report_override=None, record_snapshots=False):
     context_ref = request.get("context_ref") or view.get("context_ref")
     if not context_ref:
         raise Incomplete("fixed real code context is missing")
+    ctx.path(context_ref, (f".build/operations/{view['operation_id']}", "logs/contexts"))
     context = ctx.read(context_ref)
-    if context.get("record_kind") != "project_context":
+    if context.get("record_kind") != "project_context" or context.get("state") != "loaded" or pathlib.Path(context.get("knowledge_root", "")).resolve() != ctx.root:
         raise Incomplete("code context is not a project context")
     config, policy, config_raw = read_configuration(ctx, context)
     before = code_identity(ctx, context, config, policy, mode)
@@ -191,7 +192,7 @@ def evaluate(ctx, request, view, mode, report_override=None):
     rows = payload.get("claims")
     if not isinstance(rows, list) or len(rows) != len(claims):
         raise Incomplete("semantic evidence does not cover every Claim exactly once")
-    seen, verified_claims = set(), []
+    seen, verified_claims, checked_snapshots = set(), [], {}
     resource_map = {item["source_id"]: item for item in source_lock["resources"]}
     for row in rows:
         key = (row.get("card_id"), row.get("claim_id"))
@@ -218,11 +219,36 @@ def evaluate(ctx, request, view, mode, report_override=None):
                 raise Failed("signed evidence digest does not match immutable snapshot")
             resource = resource_map[ref["source_id"]]
             if resource["kind"] == "code":
-                repo_id = ref["locator"].get("repo_id") or resource.get("repo_id")
-                relative = ref["locator"].get("path") or resource.get("path")
-                actual = before["repos"].get(repo_id, {}).get("files", {}).get(relative)
-                if actual != snapshot["sha256"]:
-                    raise Incomplete("code evidence is not the fixed authorized code bytes")
+                for item in matching:
+                    checked = item.get("checked_snapshot")
+                    if checked is None:
+                        repo_id = ref["locator"].get("repo_id") or resource.get("repo_id")
+                        relative = ref["locator"].get("path") or resource.get("path")
+                        actual = before["repos"].get(repo_id, {}).get("files", {}).get(relative)
+                        if actual != snapshot["sha256"]:
+                            raise Incomplete("latest code changed; independent signed checked_snapshot evidence is required")
+                        continue
+                    repo_id, relative = checked.get("repo_id"), checked.get("path")
+                    repo = before["repos"].get(repo_id)
+                    if not repo or repo["files"].get(relative) != checked.get("sha256") or checked.get("commit") != repo["head"] or not isinstance(checked.get("snapshot_id"), str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,159}", checked["snapshot_id"]):
+                        raise Incomplete("checked snapshot is not bound to the latest authorized context")
+                    source_path = safe_path(repo["root"], relative)
+                    current = git_read(repo["root"], ["cat-file", "blob", repo["head"] + ":" + relative]) if mode == "merge" else source_path.read_bytes()
+                    location = checked.get("locator")
+                    if not isinstance(location, dict) or location.get("kind") != "lines" or not isinstance(location.get("start"), int) or not isinstance(location.get("end"), int) or not 1 <= location["start"] <= location["end"] <= len(current.splitlines()) or checked.get("sha256") != digest(current) or checked.get("bytes") != len(current):
+                        raise Incomplete("checked code bytes or locator are not valid")
+                    recovery_ref = "logs/evidence/checked-code/" + checked["sha256"] + ".bin"
+                    recovery = ctx.path(recovery_ref)
+                    if recovery.exists() and recovery.read_bytes() != current:
+                        raise Invalid("checked evidence object was changed")
+                    if not recovery.exists():
+                        if not record_snapshots:
+                            raise Incomplete("checked code recovery object is missing")
+                        atomic_bytes(recovery, current)
+                    checked_record = {**checked, "recovery": {"path": recovery_ref}}
+                    if checked["snapshot_id"] in checked_snapshots and checked_snapshots[checked["snapshot_id"]] != checked_record:
+                        raise Failed("checked snapshot ID has conflicting byte identities")
+                    checked_snapshots[checked["snapshot_id"]] = checked_record
                 code_support = True
         if not code_support:
             raise Incomplete("code Claims require positive code-snapshot support")
@@ -230,7 +256,7 @@ def evaluate(ctx, request, view, mode, report_override=None):
     after = code_identity(ctx, context, config, policy, mode)
     if before != after or (ctx.root.parent / "config.yml").read_bytes() != config_raw or ctx.read(context_ref)["digest"] != context["digest"] or checked_view(ctx, request)["digest"] != view["digest"]:
         raise Incomplete("read-only gate inputs changed while checking")
-    return {"context_ref": context_ref, "context_digest": context["digest"], "code_identity": before, "claims": verified_claims, "semantic_report": report, "verification_tier": tier}
+    return {"context_ref": context_ref, "context_digest": context["digest"], "code_identity": before, "claims": verified_claims, "checked_snapshots": list(checked_snapshots.values()), "semantic_report": report, "verification_tier": tier}
 
 
 def local_check(ctx, request, action="run"):
@@ -241,17 +267,18 @@ def local_check(ctx, request, action="run"):
     if action not in ("run", "merge", "verify-proof"):
         raise Invalid("unsupported code-gate action")
     if action == "verify-proof":
+        ctx.path(request.get("proof_ref"), (f"logs/operations/{op}",))
         proof = ctx.read(request.get("proof_ref"))
         if proof.get("record_kind") != "local_check" or proof.get("status") != "passed" or proof.get("mode") != "local" or proof.get("view_digest") != view["digest"]:
             raise Blocked("proof is not a passing local check for this view")
         verified = evaluate(ctx, {**request, "context_ref": proof.get("context_ref")}, view, "local", proof.get("semantic_report"))
-        if verified["claims"] != proof.get("claims") or verified["context_digest"] != proof.get("context_digest") or verified["code_identity"] != proof.get("code_identity"):
+        if verified["claims"] != proof.get("claims") or verified["context_digest"] != proof.get("context_digest") or verified["code_identity"] != proof.get("code_identity") or verified["checked_snapshots"] != proof.get("checked_snapshots", []):
             raise Invalid("code proof differs from current authenticated evidence")
         return {"proof_verified": True, "mode": "local", "view_digest": view["digest"], "verification_tier": verified["verification_tier"], "phase": "verified"}
     mode = "merge" if action == "merge" else "local"
     details, gaps, status = {}, [], "passed"
     try:
-        details = evaluate(ctx, request, view, mode)
+        details = evaluate(ctx, request, view, mode, record_snapshots=True)
     except Incomplete as exc:
         status, gaps = "incomplete", [str(exc)]
     except Failed as exc:

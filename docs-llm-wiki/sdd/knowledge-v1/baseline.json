@@ -12,7 +12,7 @@
     },
     {
       "path": "docs-llm-wiki/设计文档/知识库详细设计.md",
-      "sha256": "d520a2aeb6ef69f813fe7b3e1e862516bf74169a23a984bdba2131ed1ff9a4be"
+      "sha256": "c8fec43bc434b7c14b8308f17180ca72fa6ecb1757d09c8424d73e9fce717588"
     }
   ],
   "deployment_decision": {
@@ -32,5 +32,15 @@
         "sha256": "d520a2aeb6ef69f813fe7b3e1e862516bf74169a23a984bdba2131ed1ff9a4be"
       }
     ]
-  }
+  },
+  "design_amendments": [
+    {
+      "date": "2026-10-20",
+      "record": "records/design-diagram-20261020.md",
+      "path": "docs-llm-wiki/设计文档/知识库详细设计.md",
+      "previous_sha256": "d520a2aeb6ef69f813fe7b3e1e862516bf74169a23a984bdba2131ed1ff9a4be",
+      "sha256": "c8fec43bc434b7c14b8308f17180ca72fa6ecb1757d09c8424d73e9fce717588",
+      "scope": "Only section 1.1 diagram and reading notes; no requirement, task, implementation or acceptance-status changes"
+    }
+  ]
 }

@@ -22,8 +22,9 @@ def validate():
     acceptance = {a["id"] for a in trace["acceptance"]}
     tasks = {t["id"]: t for t in trace["tasks"]}
     assert len(requirements) == 18 and len(modules) == 9 and len(acceptance) == 34
-    assert len(tasks) == 28 and len(trace["files"]) == 149
-    assert len({f["path"] for f in trace["files"]}) == 149
+    assert len(tasks) == 28 and len(trace["files"]) == 148
+    assert len({f["path"] for f in trace["files"]}) == 148
+    assert not any(f["path"] == "<user-agent-home>/AGENTS.md" for f in trace["files"])
     assert sum(f["kind"] == "P" for f in trace["files"]) == 3
     edges = set()
     for task in tasks.values():
@@ -62,7 +63,7 @@ def validate():
         "requirements": 18,
         "modules": 9,
         "tasks": 28,
-        "files": 149,
+        "files": 148,
         "acceptance": 34,
         "dag_edges": len(edges),
         "future_paths": 3,

@@ -2,7 +2,7 @@
 
 依据现行《知识库详细设计》v2.0；本规格将既有设计展开为可追踪需求，不增加产品范围。按用户后续部署决议，逻辑 workspace 为 FactumCore 单仓，`aiot-wifi-knowledge/` 是仓根普通目录，文档根为 `docs-llm-wiki/`；原有 `aiot-knowledge/` 不迁移、不纳入本轮交付。
 
-源文件 SHA-256：`c0ae815a7a48d2d3407c5f90e1a36e9beb73d8098322760093856b56b16c28d3`。共 18 项需求、149 条路径、34 项验收；未来来源 3 条单列 deferred。
+源文件 SHA-256：`f71743e47acb460b6c94be5cef68a4a065347e643f3f8038ed4d8e3fd9c75753`。共 18 项需求、148 条路径、34 项验收；未来来源 3 条单列 deferred。
 
 ## 1. 需求基线
 
@@ -136,7 +136,7 @@
 
 ### R17 受控发行与真实宿主部署
 
-作为部署者，我需要固定框架/契约/工具来源和兼容版本，在实际 Windows/Agent 宿主安装全局入口和受托管薄规则，并验证新会话选择、绑定、加载轨迹。
+作为部署者，我需要固定框架/契约/工具来源和兼容版本，在实际 Windows/Agent 宿主安装全局 Skill 入口，并验证新会话选择、绑定和仓内入口加载轨迹。用户级 AGENTS 由用户自行配置，不纳入产品开发、安装或托管范围。
 
 失败路径与边界：不自动安装/升级/追踪 master；有条件复用须满足许可/声明要求，否则独立实现；CLI 启动或目录存在不等于完整链路或稳定触发。
 
@@ -159,4 +159,4 @@
 
 ## 追踪方式
 
-`traceability.json` 逐项保存 R01–R18 → M01–M09 → 149 路径 → E01–E34 → T01–T28；每条验收保持 planned/partial/verified/external_validation_required 等实际状态。3 条未来 sources 路径为 deferred，X/D/R 类型通过登记或生成实现，不手工制造来源或业务事实。
+`traceability.json` 逐项保存 R01–R18 → M01–M09 → 148 路径 → E01–E34 → T01–T28；每条验收保持 planned/partial/verified/external_validation_required 等实际状态。3 条未来 sources 路径为 deferred，X/D/R 类型通过登记或生成实现，不手工制造来源或业务事实。

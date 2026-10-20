@@ -5,7 +5,7 @@ AIoTBot WiFi 知识系统的设计、共享实现与领域资产统一在本仓�
 | 路径 | 职责 |
 |---|---|
 | [总体设计入口](docs-llm-wiki/设计文档/README.md) | 当前主设计、详细设计和历史稿状态 |
-| [SDD 总入口](docs-llm-wiki/sdd/knowledge-v1/README.md) | 18 需求、9 模块、28 任务、149 路径与 34 验收 |
+| [SDD 总入口](docs-llm-wiki/sdd/knowledge-v1/README.md) | 18 需求、9 模块、28 任务、148 路径与 34 验收 |
 | `skills/common/knowledge/_shared/` | 公共 CLI、契约与执行程序；当前完成状态以 SDD 记录为准 |
 | `workflows/` | 生产与治理编排的实施落点 |
 | [WiFi 领域入口](aiot-wifi-knowledge/AGENTS.md) | raw 原件、治理契约、正式卡及域内记录 |

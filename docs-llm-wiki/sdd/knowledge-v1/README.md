@@ -2,7 +2,7 @@
 
 本 SDD 细化用户确认的主设计 §5.3 + 第 11 章及《知识库详细设计》v2.0；源文件实际摘要固定在 [baseline.json](baseline.json)。这些是用户批准的工作区设计文件，不能用较旧 Git HEAD 替代其内容。
 
-当前部署由用户指定为 FactumCore 单仓：仓根 skills/、workflows/、config.yml 与 aiot-wifi-knowledge/ 一并版本管理，原 docs/ 迁至 docs-llm-wiki/。迁移过程与历史证据边界见[单仓迁移记录](records/single-repo-migration.md)；本次布局调整不提升任何业务或宿主验收状态。
+当前部署由用户指定为 FactumCore 单仓：仓根 skills/、workflows/、config.yml 与 aiot-wifi-knowledge/ 一并版本管理，原 docs/ 迁至 docs-llm-wiki/。迁移过程与历史证据边界见[单仓迁移记录](records/single-repo-migration.md)；本次布局调整不提升任何业务或宿主验收状态。用户级 AGENTS 由用户自行配置，不纳入开发、安装、升级或托管验收；全局 Skill 安装可见性、workspace-registry 定位、仓内 AGENTS 实际加载和仓外宿主实测仍按 T23/T24 交付。
 
 ## 阅读和执行顺序
 
@@ -12,7 +12,7 @@
 4. [测试与验收计划](test-plan.md)：原设计 E01–E34、合成机制、宿主触发和真实业务分别验收。
 5. [开发记录](records/README.md)：red/green、环境、审查与验收事实；没有记录的能力不写已完成。
 
-[traceability.json](traceability.json) 逐项关联 **18 需求 → 9 模块 → 149 路径 → 34 验收 → 28 任务**。其中未来 sources 三项延期，运行产物、实例和外部源码按规则生成/登记，不能为了凑齐目录制造事实。
+[traceability.json](traceability.json) 逐项关联 **18 需求 → 9 模块 → 148 路径 → 34 验收 → 28 任务**。其中未来 sources 三项延期，运行产物、实例和外部源码按规则生成/登记，不能为了凑齐目录制造事实。
 
 ## 当前批次
 

@@ -18,7 +18,7 @@
 
 ## 当前开发入口
 
-知识库 v1 已进入 SDD 开发。按用户后续部署决议，现统一在 FactumCore 单仓维护：根目录 `skills/`、`workflows/`、`config.yml` 与 `aiot-wifi-knowledge/`，原 `docs/` 整体迁移为 `docs-llm-wiki/`。[SDD 实施入口](../sdd/knowledge-v1/README.md) 包含需求、九模块的 spec/design/tasks、28 张依赖任务及 149 路径与 E01–E34 追踪矩阵。WiFi 领域根是普通目录，不含嵌套 Git；原有 `aiot-knowledge/` 与历史隔离开发目录保持原身份，不搬迁或覆盖。
+知识库 v1 已进入 SDD 开发。按用户后续部署决议，现统一在 FactumCore 单仓维护：根目录 `skills/`、`workflows/`、`config.yml` 与 `aiot-wifi-knowledge/`，原 `docs/` 整体迁移为 `docs-llm-wiki/`。[SDD 实施入口](../sdd/knowledge-v1/README.md) 包含需求、九模块的 spec/design/tasks、28 张依赖任务及 148 路径与 E01–E34 追踪矩阵。WiFi 领域根是普通目录，不含嵌套 Git；原有 `aiot-knowledge/` 与历史隔离开发目录保持原身份，不搬迁或覆盖。
 
 首批 T01 声明契约与 CLI、T02 项目发现和入口实际读取已有验证记录；T03→T05→T06→T07 已完成 raw 文档到人工确认后 stable 的合成机制闭环，见[本批验收](../sdd/knowledge-v1/records/T07-verification.md)及[操作说明](../sdd/knowledge-v1/document-chain-usage.md)。各模块分别合入并推送 FactumCore；完整恢复、跨卡治理、代码双门禁、索引、维护与自动编排按后续任务推进。宿主隐式触发、真实六 Target/三 pair 和外部权限分别待验。
 

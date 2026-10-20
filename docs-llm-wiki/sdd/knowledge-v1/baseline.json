@@ -8,11 +8,11 @@
   "sources": [
     {
       "path": "docs-llm-wiki/设计文档/aibot.md",
-      "sha256": "cc4880b5cfb1a3646860a9d43a3e1dd9a8b0fcb08a718d1b9140a4f9ae381574"
+      "sha256": "b8ff5bf206f021538a2b8e64d7c43a50fcd4ec5bcd60b5fa4b44de464f6e25e0"
     },
     {
       "path": "docs-llm-wiki/设计文档/知识库详细设计.md",
-      "sha256": "f8719d8c788ab4656e3082832498f23b3a409dea893ed72ad32b32ea24c93cff"
+      "sha256": "f71743e47acb460b6c94be5cef68a4a065347e643f3f8038ed4d8e3fd9c75753"
     }
   ],
   "deployment_decision": {
@@ -57,6 +57,22 @@
       "previous_sha256": "c8fec43bc434b7c14b8308f17180ca72fa6ecb1757d09c8424d73e9fce717588",
       "sha256": "f8719d8c788ab4656e3082832498f23b3a409dea893ed72ad32b32ea24c93cff",
       "scope": "Reuse original 11.2/11.3 diagrams; additive file/branch/identity annotations only; original nodes and edges retained; no task or acceptance-state changes"
+    },
+    {
+      "date": "2026-10-20",
+      "record": "records/entry-scope-shared-20261020.md",
+      "path": "docs-llm-wiki/设计文档/aibot.md",
+      "previous_sha256": "cc4880b5cfb1a3646860a9d43a3e1dd9a8b0fcb08a718d1b9140a4f9ae381574",
+      "sha256": "b8ff5bf206f021538a2b8e64d7c43a50fcd4ec5bcd60b5fa4b44de464f6e25e0",
+      "scope": "User-owned AGENTS removed from product deliverables (149 to 148); check wrappers assigned to governance/tools; clarify per-Skill resources and shared execution package without moving runtime code"
+    },
+    {
+      "date": "2026-10-20",
+      "record": "records/entry-scope-shared-20261020.md",
+      "path": "docs-llm-wiki/设计文档/知识库详细设计.md",
+      "previous_sha256": "f8719d8c788ab4656e3082832498f23b3a409dea893ed72ad32b32ea24c93cff",
+      "sha256": "f71743e47acb460b6c94be5cef68a4a065347e643f3f8038ed4d8e3fd9c75753",
+      "scope": "User-owned AGENTS removed from product deliverables (149 to 148); check wrappers assigned to governance/tools; clarify per-Skill resources and shared execution package without moving runtime code"
     }
   ]
 }

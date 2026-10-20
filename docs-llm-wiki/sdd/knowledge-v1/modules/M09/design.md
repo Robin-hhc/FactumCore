@@ -4,14 +4,13 @@
 
 | 模块 | 文件 | 对外接口 | 依赖与边界 |
 |---|---|---|---|
-| M09 Skills/Workflow 与部署验收 | 四个 hs-common Skill、两个 Workflow、merge-stage；入口说明、使用/维护、evals | 生产 P1–P5、治理 G1–G9、消费 C1–C7 阶段日志/交接摘要；安装适配与 acceptance runner | 编排 M01–M08，不复制引擎。用户级可见 Skill+薄规则提高触发稳定性，不保证每个宿主必触发；部署与外部授权由真实环境验证 |
+| M09 Skills/Workflow 与部署验收 | 四个 hs-common Skill、两个 Workflow、merge-stage；入口说明、使用/维护、evals | 生产 P1–P5、治理 G1–G9、消费 C1–C7 阶段日志/交接摘要；安装适配与 acceptance runner | 编排 M01–M08，不复制引擎。全局可见 Skill 的选择与触发须在目标宿主实测，不保证每个宿主必触发；用户级 AGENTS 由用户自行配置，不属于产品托管范围；部署与外部授权由真实环境验证 |
 
 ## 本模块拥有的文件与生成规则
 
 | 路径 | 类别 | 开发动作 | 验收要求 |
 |---|---|---|---|
 | `AGENTS.md` | F | 写清目录归属、知识入口、代码/raw 来源边界、Skill/Workflow 完整标识、发布授权与局部 AGENTS 阅读顺序 | 仓内会话能找到唯一配置与领域入口；仓外发现后读取同一入口；不存在重复或相互冲突的路由规则 |
-| `<user-agent-home>/AGENTS.md` | L | 部署适配宿主实际用户级配置位置，在明确托管块中写调用 hs-common-workspace-explore 的最小规则并记录版本 | 新会话从仓外能证明薄规则被加载；更新只改托管块；用户自有内容保留；宿主不支持时如实报告 |
 | `skills/common/knowledge/hs-common-workspace-explore/SKILL.md` | F | 元数据围绕分析/排障/设计/审查/修改代码及路径触发；正文调用 `project resolve`，读取实际入口并形成两阶段绑定 | 仓外只给路径能隐式选择；换仓重绑；无知识关联不虚构成功，仍允许原任务的授权源码分析 |
 | `skills/common/knowledge/hs-common-workspace-explore/references/project-binding.md` | F | 列出确定性解析顺序、ProjectContextReceipt 字段、缓存键和所有失败分支；与 workspace.py 输出逐项对应 | 仅列文件或自报已读不能升级；配置/权限/入口变化使旧绑定失效；压缩恢复后可核验引用，否则重绑 |
 | `skills/common/knowledge/hs-common-knowledge-ingest/SKILL.md` | F | 按任务选择代码或 raw 文档 reference，调用 source/document/ingest 命令；解释 plan 与变更包后交治理 Workflow | 两种来源能生成确定 final-view；失败不触碰正式卡；重复 apply 幂等且不重复生产 |

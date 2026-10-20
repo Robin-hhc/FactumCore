@@ -10,4 +10,4 @@
 | M06 代码双门禁 | [spec](modules/M06/spec.md) | [design](modules/M06/design.md) | [tasks](modules/M06/tasks.md) | 6 |
 | M07 代次索引与消费 | [spec](modules/M07/spec.md) | [design](modules/M07/design.md) | [tasks](modules/M07/tasks.md) | 8 |
 | M08 持续治理 | [spec](modules/M08/spec.md) | [design](modules/M08/design.md) | [tasks](modules/M08/tasks.md) | 5 |
-| M09 Skills/Workflow与部署验收 | [spec](modules/M09/spec.md) | [design](modules/M09/design.md) | [tasks](modules/M09/tasks.md) | 36 |
+| M09 Skills/Workflow与部署验收 | [spec](modules/M09/spec.md) | [design](modules/M09/design.md) | [tasks](modules/M09/tasks.md) | 35 |

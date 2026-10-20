@@ -291,8 +291,8 @@ flowchart TB
         A0["hs-common-workspace-explore<br />全局 Skill · 自动发现与绑定"]
         A1["AGENTS.md<br />消费路由契约"]
         A2["config.yml<br />四张映射表<br />Target / pair / local-shared 渠道"]
-        A3["领域仓根四件套<br />README · CONTRIBUTING · check.py/check.sh"]
-        A4["用户级 AGENTS.md<br />workspace-registry.json<br />发现提示与有限路径登记（本机）"]
+        A3["领域仓阅读与贡献入口<br />README · CONTRIBUTING"]
+        A4["workspace-registry.json<br />有限路径登记（本机）"]
         A5["config.local.yml<br />可选本机位置覆盖（不提交）"]
     end
 
@@ -321,9 +321,11 @@ flowchart TB
         D2["skills/common/knowledge<br />hs-common-knowledge-ingest · hs-common-knowledge-lint · hs-common-knowledge-query"]
         D3["workflows/common/<br />hs-common-knowledge-ingest · hs-common-knowledge-lint"]
         D3 -->|"阶段编排"| D2
-        D4["skills/common/knowledge/_shared/<br />cli.py 与公共执行程序<br />发现 · 捕获 · 候选 · 确认 · 事务 · 查询/维护"]
+        D4["skills/common/knowledge/_shared/<br />cli.py 与公共执行程序<br />发现 · 捕获 · 候选 · 确认 · 事务 · 查询/维护<br />共用模型与分阶段模块"]
         D2 -->|"调用公共程序"| D4
         D1 -.->|"版本与契约约束"| D4
+        D5["check.py / check.sh<br />治理构建执行入口<br />本地 / CI 只读检查"]
+        D5 -->|"转发治理检查"| D4
     end
 
     subgraph S5["⑤ 配套支撑层"]
@@ -337,23 +339,23 @@ flowchart TB
 
     U --> A0 --> A1 --> A2
     A2 --> S2
-    A4 -.->|"发现提示 / 有限定位"| A0
+    A4 -.->|"有限定位"| A0
     A5 -.->|"受限覆盖"| A2
     B1 & B3 -->|"ingest 蒸馏建卡"| S3
     S4 -.->|"契约约束 · 流程执行"| S3
     S5 -.->|"质量保障"| S3
 ```
 
-图中保留原五层及七类知识卡，只补入口配置、共享程序、版本锁、人读导航和运行文件形态。它描述目标架构；用户级托管与 Skill/Workflow 自动编排、代码门禁、索引及维护仍按 SDD 后续任务验收，不能由文件名推断已部署。`_shared/confirmations.py`、`transactions.py` 是既有公共入口内部的实现拆分，具体补项见[详设 §1.1](知识库详细设计.md#11-要实现的闭环)。
+图中保留原五层及七类知识卡，只补入口配置、共享程序、版本锁、人读导航和运行文件形态。它描述目标架构；全局 Skill 挂载与 Skill/Workflow 自动编排、代码门禁、索引及维护仍按 SDD 后续任务验收，不能由文件名推断已部署。`_shared/confirmations.py`、`transactions.py` 是既有公共入口内部的实现拆分，具体补项见[详设 §1.1](知识库详细设计.md#11-要实现的闭环)。
 
 各层与目录的对应关系：
 
 | 层 | 一句话职责 | 承载目录/文件 |
 |---|---|---|
-| ① 入口路由层 | 自动绑定项目，先路由再消费 | `hs-common-workspace-explore` · `AGENTS.md` · `config.yml` · 领域仓根四件套（`README.md` · `CONTRIBUTING.md` · `check.py/check.sh`） |
+| ① 入口路由层 | 自动绑定项目，先路由再消费 | `hs-common-workspace-explore` · 仓内 `AGENTS.md` · `config.yml` · `workspace-registry.json` · `README.md` · `CONTRIBUTING.md` |
 | ② 源事实层 | 证据底座：代码事实 + 原始材料，喂知识层 | `main/` · `docs-raw/` |
 | ③ 知识资产层 | 唯一检索对象：治理后的知识卡 | `knowledge/` |
-| ④ 治理与工具层 | 契约、能力执行与生产/治理编排 | `governance/` · `skills/common/knowledge/` · `workflows/common/hs-common-knowledge-ingest/` · `workflows/common/hs-common-knowledge-lint/` |
+| ④ 治理与工具层 | 契约、能力执行与生产/治理编排 | `governance/` · `skills/common/knowledge/` · `check.py/check.sh` · `workflows/common/hs-common-knowledge-ingest/` · `workflows/common/hs-common-knowledge-lint/` |
 | ⑤ 配套支撑层 | 候选暂存 · 回归门禁 · 留痕 · 派生索引 | `.build/` · `evals/` · `logs/` · `artifacts/` · `docs-llm-wiki/` |
 
 递进一句话：证据层喂知识层，契约层束知识层，技能层跑知识层，配套层验知识层，入口层路由知识层。
@@ -395,6 +397,8 @@ device 侧 + host 侧真实代码。`.codegraph/` 是代码图谱索引，**本�
 
 技能与知识分仓的理由：技能是"流程"，知识是"事实"，升级节奏不同；同一套技能可跨领域知识仓复用。
 
+各 Skill 拥有自己的 `SKILL.md`、references 和必要的专属 scripts；`_shared/` 是统一知识执行包，共用来源/卡片模型、确切视图与确认绑定等规则，也按职责分模块供不同入口调用，不要求每个 Skill 使用全部模块。Skill 专属适配可以自带，共同规则不在各目录重复实现；分工见详设 §3.3。
+
 参与链路：`hs-common-workspace-explore` 做前置发现与绑定；生产、治理分别由同名 Workflow 编排并调用所需 Skill，消费仍由 hs-common-knowledge-query 执行。Workflow 定义阶段与交接，Skill 和共享工具提供能力，不各写一套契约；文档人工分支不调用 lint，CI 只执行治理的只读 merge 阶段。详见[详设 §3.4](知识库详细设计.md#34-生产与治理-workflow)。
 
 #### `aiot-<domain>-knowledge/` —— 领域知识仓
@@ -405,16 +409,16 @@ device 侧 + host 侧真实代码。`.codegraph/` 是代码图谱索引，**本�
 
 ### 11.2.2 各领域仓目录架构（以 wifi 为例）
 
-#### 领域仓根四件套
+#### 领域仓根文件：阅读入口与治理构建入口
 
 | 文件 | 职责 | 消费者 |
 |------|------|--------|
 | `AGENTS.md` | 知识边界、规则指针与技能入口 | Agent 会话第一步 |
 | `README.md` | 定位、实际能力、资料导航 | 人 |
 | `CONTRIBUTING.md` | 生产、核验和贡献流程 | 贡献者 |
-| `check.py / check.sh` | 结构、来源完整性及历史导入快照检查 | 本地门禁 + CI 门禁共用入口 |
+| `check.py / check.sh` | 治理构建执行入口：结构、来源完整性及历史导入快照检查 | ④治理与工具层；本地门禁 + CI 门禁共用入口 |
 
-四个文件都是"入口与门禁"，不承载知识内容——它们把消费路由到 `knowledge/`，把贡献路由到 `governance/`。
+`AGENTS.md`、`README.md`、`CONTRIBUTING.md` 承担规则、阅读与贡献入口；`check.py / check.sh` 属于④治理与工具层，在治理构建的本地/CI 阶段调用公共检查程序。脚本物理上仍位于领域根，不另造一套检查规则。
 
 参与链路：`README.md` / `CONTRIBUTING.md` 生产链路贡献者入口；`check.py / check.sh` 治理链路本地门禁 + CI 门禁共用入口；`AGENTS.md` 消费路由。
 
@@ -616,7 +620,7 @@ flowchart TB
 
 新增节点只补查询身份与失败出口：local 可以引用本地未合入 stable；shared 必须绑定确切合入身份和相符证明/确认。正文固定在同一代次，当前维护阻断在召回和交付前都要核对；无命中不自动转生产。
 
-入口 Skill 不装领域事实；全局薄规则提醒首次接入、换仓及绑定失效时自动重载，触发与加载以回执和评测确认，不能把安装成功视为必然触发。具体设计见 [知识库详细设计 §3.2](知识库详细设计.md#32-能力-skill)。
+入口 Skill 不装领域事实；由 Skill 自身说明首次接入、换仓及绑定失效时的重载要求，触发与加载以回执和评测确认，不能把安装成功视为必然触发。用户个人 AGENTS 由用户自行配置，不纳入本方案开发、托管或验收。具体设计见 [知识库详细设计 §3.2](知识库详细设计.md#32-能力-skill)。
 
 #### 目录 × 链路参与矩阵
 

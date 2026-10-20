@@ -4,7 +4,7 @@
 
 | 模块 | 文件 | 对外接口 | 依赖与边界 |
 |---|---|---|---|
-| M02 项目发现绑定 | `S/workspace.py`；workspace 配置、用户级 registry/托管薄规则；explore reference | `resolve_project(path, base, registry, authority) -> ResolvedBinding`；`load_context(binding, reader) -> ProjectContextReceipt` | 依赖 M01。resolved 与 context_loaded 分开；后者带实际入口字节摘要/读取轨迹，输出实际内容供宿主加载。只写获准缓存/回执，不扫描整盘、不启动摄入 |
+| M02 项目发现绑定 | `S/workspace.py`；workspace 配置、用户级 workspace-registry 有限定位；explore reference | `resolve_project(path, base, registry, authority) -> ResolvedBinding`；`load_context(binding, reader) -> ProjectContextReceipt` | 依赖 M01。resolved 与 context_loaded 分开；后者带实际入口字节摘要/读取轨迹，输出实际内容供宿主加载。只写获准缓存/回执，不扫描整盘、不启动摄入 |
 
 ## 本模块拥有的文件与生成规则
 

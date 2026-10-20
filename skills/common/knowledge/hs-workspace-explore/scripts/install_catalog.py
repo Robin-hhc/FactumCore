@@ -199,7 +199,7 @@ def mapping(loader,node):
         result[key]=loader.construct_object(v)
     return result
 Unique.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,mapping)
-print(json.dumps({k:yaml.load(v,Loader=Unique) for k,v in json.load(sys.stdin).items()}))
+sys.stdout.buffer.write(json.dumps({k:yaml.load(v,Loader=Unique) for k,v in json.loads(sys.stdin.buffer.read()).items()},ensure_ascii=False).encode('utf-8'))
 """
     result = subprocess.run(
         [str(python), "-I", "-c", code],

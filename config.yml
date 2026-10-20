@@ -1,4 +1,4 @@
-# FactumCore code/knowledge workspace; capability packages are provided separately.
+# FactumCore code/knowledge workspace; capabilities are developed in root skills/ and workflows/.
 schema_version: '2.0'
 workspace_id: aiotbot-wifi-v1
 knowledge_roots:

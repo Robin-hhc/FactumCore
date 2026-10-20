@@ -245,6 +245,23 @@ def test_meaningful_tests_need_not_be_named_test_cli(tmp_path):
     ).is_file()
 
 
+def test_unicode_metadata_uses_utf8_across_isolated_python(tmp_path):
+    source = fixture_source(tmp_path)
+    skill = source / "skills/common/knowledge/hs-workspace-explore/SKILL.md"
+    skill.write_text(
+        skill.read_text(encoding="utf-8").replace(
+            "fixture only", "从中文路径加载 WiFi 规则"
+        ),
+        encoding="utf-8",
+    )
+    destination = tmp_path / "中文安装目录"
+    result = install(source, destination)
+    assert result.returncode == 0, result.stderr
+    assert "中文路径" in (
+        destination / "config/skills/hs-workspace-explore/SKILL.md"
+    ).read_text(encoding="utf-8")
+
+
 @pytest.mark.parametrize("key_type", ["OPENSSH", "EC", "ENCRYPTED"])
 def test_private_key_in_an_allowed_text_resource_is_rejected(tmp_path, key_type):
     source = fixture_source(tmp_path)

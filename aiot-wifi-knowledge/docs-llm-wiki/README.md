@@ -7,9 +7,11 @@
 | [AGENTS.md](AGENTS.md) | Agent 阅读入口、维护边界与修改落点 |
 | [AIoTBot知识库架构设计.md](AIoTBot知识库架构设计.md) | 当前总体设计，重点是 §5.3 目录架构及第 11 章知识库架构与链路 |
 | [知识库详细设计.md](知识库详细设计.md) | 目录展开、逐文件开发要求、阶段接口、三链路及验收 |
-| [sdd/knowledge-v1/](sdd/knowledge-v1/README.md) | 18 需求、9 模块、28 任务、148 路径与 E01–E34 追踪，以及实际验收记录 |
+| [sdd/knowledge-v1/](sdd/knowledge-v1/README.md) | 既有需求、模块、任务、追踪与历史验收记录；设计定稿后再重新对齐 |
 
 当前在 FactumCore 单仓开发，目录以主设计 §5.3 为准：`main/` 保持空目录，`skills/` 与 `workflows/` 仅保留指定入口的空骨架，领域仅保留 `aiot-wifi-knowledge/`。本目录位于该领域根内的 `docs-llm-wiki/`，承载系统设计与 SDD，不存放正式业务知识卡。
+
+当前阶段只完善设计文档。《知识库详细设计》按 §5.3 展开具体文件、接口、生产/治理/消费三条链路，并参考 OpenFlow 的 Workflow 模板格式；这些是目标设计，尚未创建运行程序或安装模板。本轮保留现有 SDD，不重置任务状态；后续先重新建立设计基线和任务映射，再实施开发。
 
 首版覆盖 chip12/chip08/chip07c 的 Host/Device 六逻辑 Target。文档只处理五类 raw 目录内已落地原件，真人确认后 stable；代码相关卡本地通过后 stable，上库按最新业务代码只读二次检查。业务路径、构建和版本未登记时保留 unknown。
 

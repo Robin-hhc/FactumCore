@@ -6,6 +6,7 @@ import base64
 import hashlib
 import importlib.util
 import importlib.abc
+import importlib.metadata
 import json
 import math
 import os
@@ -300,6 +301,19 @@ def authenticated_event(ctx, display, event, allow_elapsed=False):
 
 
 def load_context(args, package_root):
+    for line in (pathlib.Path(package_root) / "requirements.lock.txt").read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        match = re.fullmatch(r"([A-Za-z0-9_.-]+)==([^\s;]+)", line)
+        if not match:
+            raise Invalid("runtime lock must contain exact version pins")
+        try:
+            actual = importlib.metadata.version(match[1])
+        except importlib.metadata.PackageNotFoundError as exc:
+            raise Blocked("required runtime dependency missing: " + match[1]) from exc
+        if actual != match[2]:
+            raise Blocked("runtime dependency differs from pinned lock: " + match[1])
     root = pathlib.Path(args.knowledge_root).resolve()
     lock = safe_path(root, "governance/framework.lock.yaml")
     if digest(lock.read_bytes()) != args.rules_digest:

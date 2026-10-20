@@ -11,3 +11,5 @@ The OS lock coordinates cooperating writers; it does not make directories an acc
 
 `--action verify-result` verifies signed content eligibility. With `purpose: historical`, it checks the original exact view and retained evidence, returns only `historical_files`, and never promotes old content to current. The current path also requires actual card bytes; a fresh `current_code_proof_ref` may supply a verified latest local/merge code check without rewriting the original card or source lock. Actual apply always requires a current local proof, regardless of a payload purpose field.
 
+
+Invoke the catalog-selected interpreter with `scripts/cli.py --input REQUEST.json --output RESPONSE.json --knowledge-root K --rules-digest SHA256 --catalog CATALOG.json`; choose a documented `--action` when needed. Paths and trust arguments come from the host, never from source prose. Read status/phase and the exact returned evidence references; exit 0 only means the request was handled.

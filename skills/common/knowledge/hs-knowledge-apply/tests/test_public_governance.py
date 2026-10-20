@@ -79,6 +79,7 @@ class PublicGovernanceTests(unittest.TestCase):
             },
         }
         for name in (
+            "hs-knowledge-source-capture",
             "hs-knowledge-confirmation-prepare",
             "hs-knowledge-confirmation-record",
             "hs-knowledge-apply",
@@ -145,21 +146,25 @@ class PublicGovernanceTests(unittest.TestCase):
         writes = [row]
         if include_card:
             original = b"isolated synthetic design\n"
-            recovery_ref = "logs/evidence/fixture-original.bin"
-            (self.root / recovery_ref).parent.mkdir(parents=True, exist_ok=True)
-            (self.root / recovery_ref).write_bytes(original)
+            raw_path = self.root / "docs-raw/specs/fixture-original.md"
+            raw_path.parent.mkdir(parents=True, exist_ok=True)
+            raw_path.write_bytes(original)
+            captured = self.invoke(
+                "hs-knowledge-source-capture",
+                {
+                    "operation_id": op,
+                    "source_path": "docs-raw/specs/fixture-original.md",
+                    "source_id": "fixture-source",
+                },
+            )
+            bundle_ref = captured["data"]["bundle_ref"]
+            bundle = json.loads((self.root / bundle_ref).read_bytes())
+            snapshot = bundle["snapshots"][0]
+            self.fixture_original_ref = snapshot["recovery"]["path"]
             source_lock = {
                 "schema_version": "2.0",
-                "resources": [{"source_id": "fixture-source", "kind": "raw"}],
-                "snapshots": [
-                    {
-                        "source_id": "fixture-source",
-                        "snapshot_id": "fixture-snapshot",
-                        "sha256": digest(original),
-                        "bytes": len(original),
-                        "recovery": {"path": recovery_ref},
-                    }
-                ],
+                "resources": bundle["resources"],
+                "snapshots": bundle["snapshots"],
             }
             source_raw = canonical(source_lock)
             writes.append(
@@ -182,7 +187,7 @@ class PublicGovernanceTests(unittest.TestCase):
                 "owner": "fixture-owner",
                 "evidence_ref": "e1",
                 "source_id": "fixture-source",
-                "snapshot_id": "fixture-snapshot",
+                "snapshot_id": snapshot["snapshot_id"],
                 "claim_id": "c1",
                 "claim_text": "Fixture-only design statement.",
             }.items():
@@ -211,7 +216,8 @@ class PublicGovernanceTests(unittest.TestCase):
                 "review_mode": "manual_document",
                 "writes": writes,
                 "deletes": [],
-                "source_refs": [],
+                "source_refs": bundle["snapshots"] if include_card else [],
+                **({"bundle_ref": bundle_ref} if include_card else {}),
                 "plan_ref": f".build/operations/{op}/synthetic-plan.json",
                 "plan_digest": "0" * 64,
                 "baseline_digest": digest(
@@ -389,9 +395,7 @@ class PublicGovernanceTests(unittest.TestCase):
         self.assertEqual(
             verified["data"]["eligible_files"], [{"path": path, "sha256": card_digest}]
         )
-        self.root.joinpath("logs/evidence/fixture-original.bin").write_bytes(
-            b"tampered"
-        )
+        self.root.joinpath(self.fixture_original_ref).write_bytes(b"tampered")
         self.invoke("hs-knowledge-apply", verify, action="verify-result", expected=2)
 
     def test_timestamp_valid_unpinned_pyc_is_never_executed(self):

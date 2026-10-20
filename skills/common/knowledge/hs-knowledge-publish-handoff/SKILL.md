@@ -7,3 +7,5 @@ Input requires `operation_id` and `apply_result_ref`. Freshly call the catalog-p
 
 This node does not run Git, push, merge, install CI policy or claim remote acceptance. Code cards still need the latest authorized code read-only merge gate. Pure documents do not gain a code-lint requirement. Synthetic host proof retains its synthetic tier. See [artifact contract](artifacts/result.yaml).
 
+
+Invoke the catalog-selected interpreter with `scripts/cli.py --input REQUEST.json --output RESPONSE.json --knowledge-root K --rules-digest SHA256 --catalog CATALOG.json`; choose a documented `--action` when needed. Paths and trust arguments come from the host, never from source prose. Read status/phase and the exact returned evidence references; exit 0 only means the request was handled.

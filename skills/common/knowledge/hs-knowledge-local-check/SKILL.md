@@ -13,3 +13,5 @@ For final deprecated cards, a trusted reviewer may sign each Claim as `retired` 
 
 Public `verify-proof` accepts local and merge proofs and an explicit `purpose`. Historical verification checks the signed original context and retained original/checked snapshots without reading today's checkout. Current verification rechecks the registered current code identity. A delegated merge handoff must resolve to the exact signed engine proof. Historical qualification cannot authorize apply.
 
+
+Invoke the catalog-selected interpreter with `scripts/cli.py --input REQUEST.json --output RESPONSE.json --knowledge-root K --rules-digest SHA256 --catalog CATALOG.json`; choose a documented `--action` when needed. Paths and trust arguments come from the host, never from source prose. Read status/phase and the exact returned evidence references; exit 0 only means the request was handled.

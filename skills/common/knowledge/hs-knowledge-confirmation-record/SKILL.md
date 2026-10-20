@@ -7,3 +7,5 @@ Run only after confirmation-prepare. Input requires `operation_id`, `display_ref
 
 When a trusted adapter or event is absent, stop in awaiting state. Silence, timeout, tty state, model assertions and Agent-written unsigned JSON never approve. Synthetic adapters require an explicitly pinned isolated fixture root and marker and are labelled synthetic_host; they do not demonstrate real-human acceptance. Never generate a production consent event or private key. See [artifact contract](artifacts/result.yaml).
 
+
+Invoke the catalog-selected interpreter with `scripts/cli.py --input REQUEST.json --output RESPONSE.json --knowledge-root K --rules-digest SHA256 --catalog CATALOG.json`; choose a documented `--action` when needed. Paths and trust arguments come from the host, never from source prose. Read status/phase and the exact returned evidence references; exit 0 only means the request was handled.

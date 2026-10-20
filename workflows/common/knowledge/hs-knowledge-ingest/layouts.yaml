@@ -1,0 +1,18 @@
+template_id: hs-knowledge-ingest
+canvas:
+  nodes:
+    bind_project:
+      x: 0
+      y: 0
+    capture_raw:
+      x: 340
+      y: 0
+    plan_change:
+      x: 680
+      y: 0
+    materialize_view:
+      x: 1020
+      y: 0
+    governance_handoff:
+      x: 0
+      y: 220

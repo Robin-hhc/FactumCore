@@ -1,0 +1,135 @@
+version: 1
+id: hs-knowledge-ingest
+name: hs-knowledge-ingest
+description: WiFi knowledge production to candidate handoff. Blocked exits end with a gap, never successful knowledge
+  approval.
+kind: custom
+source: user_created
+entry:
+  skill: hs-workspace-explore
+entry_node: bind_project
+nodes:
+- id: bind_project
+  title: Bind workspace and load trusted context
+  type: skill
+  owner: coder
+  skill: hs-workspace-explore
+  prompt: Use only the installed trusted catalog public CLI. Pass explicit operation_id and workflow run_id/node_id/attempt_id.
+    Check ResultEnvelope status and phase and the actual immutable result JSON/Markdown manifest bindings; process
+    exit 0 alone is not success. On every loop allocate a fresh attempt_id; changed content requires a new operation/view
+    and approval. Do not forward the workflow object to helper Skills. Stop on errors or unresolved prerequisites,
+    report a gap without claiming completion. Read the user supplied target_path, config and private registry. resolved
+    is insufficient; never scan the disk or infer unknown Target data.
+  exits:
+  - id: bound
+    label: bound
+    condition: status ok, phase context_loaded, actual context_ref and matching project/rules identity verified.
+    target: capture_raw
+  - id: blocked
+    label: blocked
+    condition: 'Missing prerequisites or status blocked/error: end this attempt with an unresolved gap; no success,
+      approval or publish claim.'
+    target: __end__
+- id: capture_raw
+  title: Capture landed raw bytes
+  type: skill
+  owner: coder
+  skill: hs-knowledge-source-capture
+  prompt: Use only the installed trusted catalog public CLI. Pass explicit operation_id and workflow run_id/node_id/attempt_id.
+    Check ResultEnvelope status and phase and the actual immutable result JSON/Markdown manifest bindings; process
+    exit 0 alone is not success. On every loop allocate a fresh attempt_id; changed content requires a new operation/view
+    and approval. Do not forward the workflow object to helper Skills. Stop on errors or unresolved prerequisites,
+    report a gap without claiming completion. Only docs-raw/conventions,chips,storys,specs,protocols landed files
+    are supported. No URL, sources links, external mappings, network or OCR. Originals are read only. Capture may
+    register restrictive maintenance blocks only.
+  exits:
+  - id: captured
+    label: captured
+    condition: A complete bundle with exact readable snapshots, locators and recovery identities exists.
+    target: plan_change
+  - id: deferred
+    label: deferred
+    condition: 'Unsupported source or no usable bytes: preserve explicit defer/backlog reason without a card.'
+    target: __end__
+  - id: blocked
+    label: blocked
+    condition: 'Missing prerequisites or status blocked/error: end this attempt with an unresolved gap; no success,
+      approval or publish claim.'
+    target: __end__
+- id: plan_change
+  title: Plan every candidate disposition
+  type: skill
+  owner: coder
+  skill: hs-knowledge-change-plan
+  prompt: Use only the installed trusted catalog public CLI. Pass explicit operation_id and workflow run_id/node_id/attempt_id.
+    Check ResultEnvelope status and phase and the actual immutable result JSON/Markdown manifest bindings; process
+    exit 0 alone is not success. On every loop allocate a fresh attempt_id; changed content requires a new operation/view
+    and approval. Do not forward the workflow object to helper Skills. Stop on errors or unresolved prerequisites,
+    report a gap without claiming completion. Author evidence-based candidate semantics and provide decisions/card_inputs.
+    Do not silently drop a candidate or treat a template as semantic evidence.
+  exits:
+  - id: planned
+    label: planned
+    condition: Every enumerated candidate has exactly one create/update/merge/split/deprecate/defer decision with
+      inputs and reasons.
+    target: materialize_view
+  - id: deferred
+    label: deferred
+    condition: Whole batch is explicitly deferred; no stable content is claimed.
+    target: __end__
+  - id: blocked
+    label: blocked
+    condition: 'Missing prerequisites or status blocked/error: end this attempt with an unresolved gap; no success,
+      approval or publish claim.'
+    target: __end__
+- id: materialize_view
+  title: Freeze complete final view
+  type: skill
+  owner: coder
+  skill: hs-knowledge-view-materialize
+  prompt: Use only the installed trusted catalog public CLI. Pass explicit operation_id and workflow run_id/node_id/attempt_id.
+    Check ResultEnvelope status and phase and the actual immutable result JSON/Markdown manifest bindings; process
+    exit 0 alone is not success. On every loop allocate a fresh attempt_id; changed content requires a new operation/view
+    and approval. Do not forward the workflow object to helper Skills. Stop on errors or unresolved prerequisites,
+    report a gap without claiming completion. Write only candidate operation artifacts. Do not change knowledge,
+    source lock or original files. Stable bytes must be fixed before review.
+  exits:
+  - id: ready
+    label: ready
+    condition: Exact stable writes/deletes including navigation and source lock, expected baseline and final bytes
+      are fixed in a complete validated final_view.
+    target: governance_handoff
+  - id: stale
+    label: stale
+    condition: 'Baseline/source/input changed: new plan, operation and view are required.'
+    target: plan_change
+  - id: blocked
+    label: blocked
+    condition: 'Missing prerequisites or status blocked/error: end this attempt with an unresolved gap; no success,
+      approval or publish claim.'
+    target: __end__
+- id: governance_handoff
+  title: Hand candidate to separately started governance
+  type: skill
+  owner: coder
+  skill: hs-knowledge-governance-handoff
+  prompt: Use only the installed trusted catalog public CLI. Pass explicit operation_id and workflow run_id/node_id/attempt_id.
+    Check ResultEnvelope status and phase and the actual immutable result JSON/Markdown manifest bindings; process
+    exit 0 alone is not success. On every loop allocate a fresh attempt_id; changed content requires a new operation/view
+    and approval. Do not forward the workflow object to helper Skills. Stop on errors or unresolved prerequisites,
+    report a gap without claiming completion. Return the actual view/handoff references and unresolved gaps. Handoff
+    is not human acceptance, stable application, workflow cross-template launch, Git publish or merge.
+  exits:
+  - id: handed_off
+    label: handed off
+    condition: Exact final-view handoff recorded. Production only ends; user/host starts the separate governance
+      Workflow explicitly.
+    target: __end__
+  - id: blocked
+    label: blocked
+    condition: 'Missing prerequisites or status blocked/error: end this attempt with an unresolved gap; no success,
+      approval or publish claim.'
+    target: __end__
+artifacts:
+  primary: []
+  optional: []

@@ -78,7 +78,7 @@ class PublicGovernanceTests(unittest.TestCase):
                 card = card.replace("{{" + key + "}}", value)
             card = card.replace("lifecycle: draft", "lifecycle: stable").encode("utf-8")
             writes.append({"path": "knowledge/flows/fixture-flow.md", "expected_old_digest": None, "final_digest": digest(card), "bytes_b64": base64.b64encode(card).decode()})
-        view = seal({"schema_version": "2.0", "record_kind": "final_view", "operation_id": op, "rules_digest": self.rules_digest, "tool_identity": {"skill": "synthetic-materializer"}, "review_mode": "manual_document", "writes": writes, "deletes": [], "source_refs": [], "baseline_digest": digest({"files": {item["path"]: item["expected_old_digest"] for item in writes}})})
+        view = seal({"schema_version": "2.0", "record_kind": "final_view", "operation_id": op, "rules_digest": self.rules_digest, "tool_identity": {"skill": "hs-fixture-materializer", "package_digest": "0" * 64, "runtime": "fixture", "requirements_digest": "0" * 64}, "review_mode": "manual_document", "writes": writes, "deletes": [], "source_refs": [], "plan_ref": f".build/operations/{op}/synthetic-plan.json", "plan_digest": "0" * 64, "baseline_digest": digest({"files": {item["path"]: item["expected_old_digest"] for item in writes}})})
         ref = f".build/operations/{op}/view.json"
         path = self.root / ref
         path.parent.mkdir(parents=True, exist_ok=True)

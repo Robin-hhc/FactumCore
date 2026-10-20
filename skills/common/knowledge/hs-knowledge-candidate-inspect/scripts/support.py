@@ -541,6 +541,18 @@ def run(handler, package):
     code = 2
     try:
         request = read_json(args.input)
+        workflow = request.get("workflow")
+        if "workflow" in request:
+            if not isinstance(workflow, dict) or any(
+                key not in workflow for key in ("run_id", "node_id", "attempt_id")
+            ):
+                raise NodeError(
+                    "INVALID_WORKFLOW",
+                    "Explicit workflow needs run, node and attempt IDs",
+                )
+            pieces = [
+                identifier(workflow[key]) for key in ("run_id", "node_id", "attempt_id")
+            ]
         context = Context(args, request, package)
         data, phase = handler(context)
         envelope.update(status="ok", phase=phase, data=data)

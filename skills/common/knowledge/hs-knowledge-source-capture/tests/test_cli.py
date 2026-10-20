@@ -285,6 +285,31 @@ def test_record_reference_cannot_read_restricted_gold(harness):
     assert "PRIVATE_UNREADABLE_GOLD" not in str(response)
 
 
+@pytest.mark.parametrize(
+    "workflow",
+    [
+        {},
+        {"run_id": "../escape", "node_id": "capture_raw", "attempt_id": "1"},
+        {"run_id": "run", "node_id": "capture_raw"},
+    ],
+)
+def test_invalid_workflow_context_has_no_capture_side_effects(harness, workflow):
+    harness.write("docs-raw/specs/source.md", b"Synthetic evidence.\n")
+    response = harness.run(
+        "source-capture",
+        {
+            "operation_id": "op",
+            "source_id": "synthetic",
+            "source_path": "docs-raw/specs/source.md",
+            "workflow": workflow,
+        },
+        expected=2,
+    )
+    assert response["status"] == "error"
+    assert not (harness.root / "logs/evidence").exists()
+    assert not (harness.root / ".build/operations/op").exists()
+
+
 @pytest.mark.parametrize("module", ["support", "capture"])
 def test_unpinned_package_pyc_is_never_executed(harness, tmp_path, module):
     import importlib.util

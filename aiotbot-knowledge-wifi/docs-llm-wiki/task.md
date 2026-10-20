@@ -1,54 +1,170 @@
-# WiFi节点能力开发任务
+# WiFi 知识库开发与剩余任务
 
-日期：2026-10-21。用户已批准按18节点Skill+两个Workflow完成SDD与开发，当前依据[详设v4](知识库详细设计.md)和[knowledge-v2](sdd/knowledge-v2/README.md)。T201–T210已完成开发及隔离机制验收；T211真实外部验收仍pending，不继承knowledge-v1的历史通过状态。
+更新日期：2026-10-21。依据[详细设计 v4.1](知识库详细设计.md)、[knowledge-v2 SDD](sdd/knowledge-v2/README.md)和当前实际验收记录整理。当前文档核对基线为 `cc02534`，运行实现身份为 `fa267cf93ca41f4bcb06d07c68c915863ca71602`。
 
-只做根下aiotbot-knowledge-wifi，main保持空；四个旧聚合Skill不再作为开发分组，hs-knowledge-ingest/hs-knowledge-lint仅是Workflow。节点包、Workflow、领域规则、资产和验收均在FactumCore；使用当前远端，本机安装位置不写进公共config。
+## 1. 当前状态
+
+**核心节点开发已完成，命令行合成 Demo 已跑通，真实 Agent / 真人 / WiFi 业务环境仍待接入验收。** T201–T210 的 complete 表示开发及隔离机制验收完成，不能解释为全部真实使用场景已完成；T211 保持 pending。
+
+| 已有交付 | 已验证到的范围 | 尚未证明的部分 |
+|---|---|---|
+| 18 个节点 Skill、2 个 Workflow | 公开 CLI、包契约、固定版本 OpenFlow loader、18 包隔离安装 | 实际宿主全局注册、隐式触发与 Workflow 全程执行 |
+| raw → 候选 → 最终视图 → 确认 → stable → 索引 → 查询 | 真实程序调用，隔离测试原件、预置候选卡和合成确认事件 | Agent 对真实资料提炼是否正确、真人操作是否可用 |
+| 更新维护、历史查询、事务恢复 | 原件变化阻断旧卡、重新确认更新、索引回退不能绕过阻断、子进程硬退出后恢复 | 真实宿主中断重入及实际资料回归；不声称已验证断电恢复 |
+| 代码来源捕获、本地检查和最新代码合入复验 | 隔离代码仓与合成语义证明；检查只读及缺证据阻断 | 真实六 Target、三 pair、语义审查签发方与业务 CI |
+
+证据：[开发验收](sdd/knowledge-v2/records/development-acceptance-20261021.json)、[实现身份](sdd/knowledge-v2/records/implementation-manifest.json)、[开发代码发布](sdd/knowledge-v2/records/publication-20261021.md)。共 **200 个唯一用例，199 通过、1 跳过**；跳过项为 Windows 符号链接创建，junction 拒绝已验证。2026-10-21 状态核对时另重跑 `test_node_pipeline.py::test_raw_to_confirmed_stable_generation_and_live_source_change`，1 passed、耗时 62.14 秒；这是已有用例复跑，不累加用例数，也不关闭真实验收。
+
+当前 `main/` 仅有 `.gitkeep`；`config.yml` 中真实业务仓根、构建及版本信息未登记。当前没有用户可直接操作的独立 Demo 入口，包隔离安装不等于宿主已注册。
+
+## 2. 剩余任务总览
+
+下列 D01–D12 是本文件内的待办编号，用于展开 T211 的开发、接入和调试工作，不是新建 SDD 票据，也不改变 T201–T210 或 T211 的现有状态。实际实施前，将对应项的需求、接口、失败测试和验收映射补入当前 SDD，再按模块推进。现阶段尚未开始这些真实环境工作。
+
+优先级：P0 先形成可人工操作的真实文档 Demo；P1 补齐日常使用与稳定性；P2 接入真实代码、发布和部署验收。P2 的外部缺口不阻止先做单人本地文档 Demo，但相关场景不能提前宣称完成。
+
+| 编号 | 优先级 | 待办 | 工作性质 | 前置依赖 | 当前状态 |
+|---|---|---|---|---|---|
+| D01 | P0 | 可复现的 Demo 入口与运行指引 | 待开发 | 已完成的 T210 | pending，可先做 |
+| D02 | P0 | 真实宿主展示与真人确认适配器 | 待开发、接入 | 明确目标宿主与可信动作接口 | pending，缺真实适配器 |
+| D03 | P0 | 真实 Agent 编写候选卡与六决策调试 | 待接入、验证 | 已落地真实 raw、可用宿主及节点包 | pending，缺真实运行证据 |
+| D04 | P0 | 两个 Workflow 实际运行与交接 | 待接入、调试 | D02、D03；目标 OpenFlow 运行环境 | pending，只有 loader / 包验证 |
+| D05 | P0 | 真实 raw 文档完整 Demo 验收 | 待验证 | D01、D02、D03、D04 | pending |
+| D06 | P1 | 全局 Skill 注册与仓外隐式触发 | 待接入、验证 | 已有安装器；明确目标宿主 | pending，只有显式路径 CLI 发现 |
+| D07 | P1 | 真实资料、更新维护和异常恢复回归 | 待验证、调试 | D05 | pending，已有合成机制测试 |
+| D08 | P2 | WiFi 六 Target / 三 pair 真实映射与证据 | 待配置、接入 | 真实代码路径、版本及构建输入 | pending，外部输入未知 |
+| D09 | P2 | 真实代码语义审查与证明签发接入 | 待开发、接入 | D08；明确受信审查方及运行方式 | pending，只有合成审查证明 |
+| D10 | P2 | 真实代码卡本地与合入双门禁调试 | 待验证、调试 | D08、D09 | pending，已有双门禁程序 |
+| D11 | P2 | 业务知识卡 CI / committer / shared 发布 | 待开发、接入、验证 | 文档分支依赖 D05；代码分支另依赖 D10 | pending，当前只完成开发代码推送 |
+| D12 | P2 | 实际部署访问隔离与撤销验收 | 待部署、验证 | 明确部署边界、身份和授权存储 | pending，目录不是权限证据 |
+
+## 3. 各项交付与完成条件
+
+### D01：可复现的 Demo 入口与运行指引
+
+- 复用现有公开 CLI，补可操作的入口和步骤：依赖检查、选择工作区及原件、查看每步产物、停等确认、继续治理、构建索引、查询和查看诊断。区分合成演示和真实资料运行，不复制另一套业务引擎。
+- 明确受支持的解释器、锁定依赖、catalog、规则及包身份；本机路径和凭据留在本机，不自动安装或全局注册。补全“缺依赖 / 缺适配器时如何处理”的运行说明。
+- **验收**：在隔离新环境按指引复现合成链路，说明可定位实际卡、来源和查询结果；缺真人适配器时真实模式明确停等。合成签名只能用于显式隔离测试根，不能使真实知识落位。
+
+### D02：真实宿主展示与真人确认适配器
+
+- 在已选定宿主实现完整 `display_ref` 展示到真实用户动作的桥接，覆盖卡、导航、来源锁、删除项、附件原件引用和提取限制；真实动作绑定准确视图、challenge、来源及规则身份。
+- 接通受信 catalog 中的适配器公钥及真实动作事件。签名私钥和签发过程由可信宿主保护，不进入仓库，不由 Agent 生成生产确认事件；现有 confirmation-prepare / record / apply 验证器继续复用。
+- **验收（E219）**：真人确认后可以落位；无回复、拒绝、Agent 自报、伪造或重放事件、视图变更均不能落位。部分同意须重新物化、展示和确认；不能把 Workflow Gate 的 pass 单独当作确认凭证。
+
+### D03：真实 Agent 编写候选卡与六决策调试
+
+- 用已落地真实 raw 运行生产链路，让 Agent 读取固定原文、提取可追溯 Claim、编写 `card_inputs`，并给出 create / update / merge / split / deprecate / defer 决策。必要时补现有 Skill 的指引和修订反馈，不另建未经设计批准的 LLM 生成服务。
+- 当前 change-plan 只检查和冻结 Agent 提供的候选字节，不生成语义结论。现有预置候选测试不能替代本项；真实样本的冲突、缺页、不可解读附件和证据不足须明确保留限制或 defer。
+- **验收**：至少一份真实原件由 Agent 从零产出候选，每条结论能回到准确来源；人工指出错误后可通过修订节点重建最终视图。记录宿主、模型、实际输入输出和人工核对结果，不将结构通过当作内容正确。
+
+### D04：两个 Workflow 实际运行与交接
+
+- 在实际 OpenFlow 中安装、运行 `hs-knowledge-ingest` 与 `hs-knowledge-lint`，接通节点参数、角色、真实 CLI 结果、不可变 run / node / attempt 产物，以及生产结束后由宿主启动治理的明确交接。
+- 调试 user Gate 停等、拒绝修订、错误分支、中断重入及新的 attempt；治理结束只能声明本地结果或待外部发布，不能自动声称 Git / CI 已完成。
+- **验收（E219 运行部分，结合 E215）**：实际 Workflow 轨迹覆盖生产移交、治理确认、修订后重新确认和索引查询；缺适配器或证据时停在准确节点。留存可与 CLI 产物互相核对的真实运行记录，loader 成功不代替实际执行。
+
+### D05：真实 raw 文档完整 Demo 验收
+
+- 选定一份可使用的真实原件，先在隔离领域副本完成演示；确需写正式知识时按真实确认结果执行。将 D01–D04 串成用户可以逐步操作的流程。
+- **验收**：raw 固定 → Agent 编写候选 → 完整最终视图 → 真人确认 → stable 精确落位 → 索引回归与激活 → search / 同代 read 能返回正确内容和原文证据。确认前正式卡不变，纯文档全程不要求代码 lint。
+- 另跑一次拒绝或修订、一次原件更新后的重新确认；保存真实操作证据与内容核对结果。此项通过后，才标记“真实文档 Demo 可用”，不据此关闭六 Target、跨组权限或真实代码发布。
+
+### D06：全局 Skill 注册与仓外隐式触发
+
+- 利用已有安装器完成目标宿主的实际全局 Skill / catalog / 项目登记接入，核对宿主可见性和触发描述；本机安装、registry 和宿主设置不写入公共 `config.yml`。
+- **验收（E220）**：在多个干净会话、多个仓外起点，只告诉 Agent 已登记代码仓路径，不点名 Skill、不手动 bootstrap，留证其实际选用 `hs-workspace-explore`、加载正确配置 / AGENTS / WiFi 知识根的轨迹。覆盖换仓、歧义、失效登记、知识根缺失，并明确阻断原因。
+- 记录具体宿主与版本、尝试次数及失败情况；显式 CLI 的 `context_loaded` 不能替代隐式触发证据，也不能承诺所有宿主必然自动触发。
+
+### D07：真实资料、更新维护和异常恢复回归
+
+- 为五类已落地 raw 整理可复核样本，按现有支持的 MD / TXT、带文字层 PDF、DOCX 段落和表格验证；扫描件、图示、附件和不可提取内容按实际限制处理，不追加 OCR 或网页能力。
+- 用独立人工确认的期望结果，验证来源定位、提炼内容、检索命中、同代读取和输出前有效性检查；覆盖原件更新、合并 / 拆分 / 弃用、旧卡退出当前查询、历史证据可读和复核后恢复。只验证与实际部署资料相关的场景，不恢复旧 benchmark 目录，不读取受限 gold。
+- **验收**：真实更新完整闭环和真实宿主中断重入可复现，恢复保留并发编辑；回归结果记录误命中、漏项及已知限制。Windows 符号链接跳过项在有条件环境补验或保留明确未验，不用 junction 通过代替。进程退出恢复与真实断电分别描述。
+
+### D08：WiFi 六 Target / 三 pair 真实映射与证据
+
+- 登记 chip12 / chip08 / chip07c 的 Host、Device 实际源码根、仓身份、版本、构建配置、宏和协议差异，以及三组 pair 的匹配信息。真实信息未提供前保持 unknown，不创建虚构 `main/` 源码。
+- 将可公开的逻辑映射与本机授权路径分开，固定每次读取 / 构建对应的业务 revision 和实际输入；不把存在同名文件当作 Target 适用性证明。
+- **验收（E221）**：六槽和三 pair 各有可核对记录，分别标明实际完成的读取、构建、运行层级及未完成部分；不能用某一芯片或某一侧的结果覆盖其他槽。缺必要输入时对应槽保持未完成。
+
+### D09：真实代码语义审查与证明签发接入
+
+- 为现有 local-check / merge-check 接入真实受信语义审查方，产生绑定精确视图、Claim、来源、Target / 构建上下文、检查阶段及当前代码身份的审查报告；补审查方到现有公开报告合同的适配。
+- 实际签发身份和密钥由受信环境维护，不能用测试 signer、来源内容自注册或 Agent 自封“审查通过”。复用已有签名验证和逐 Claim 覆盖检查，不重写门禁引擎。
+- **验收（E211 的真实前置，支撑 E221 / E222）**：真实受支持 Claim 获得正向证据；缺证据、反例、错误 Target、陈旧上下文、未受信签名不能通过。报告存在和签名有效均不能替代语义正确性的人工审查。
+
+### D10：真实代码卡本地与合入双门禁调试
+
+- 在已授权真实业务仓验证本地代码检查通过后 stable；再按合入时最新授权业务代码运行二次只读检查。用实际代码变化验证旧证明不会直接复用。
+- **验收（E221 / E222 的门禁部分）**：覆盖通过、代码变化导致不通过、Target / 构建或语义证据缺失导致 incomplete。二次检查前后卡、来源锁、链接及业务源码字节不被门禁改写；纯文档继续免代码 lint。
+- 留下实际候选、业务 revision、Target / 构建、审查身份和检查产物，不把仅执行读取或编译写成已运行业务。
+
+### D11：业务知识卡 CI / committer / shared 发布
+
+- 将现有 publish-handoff 接到授权的外部提交者和 CI；接通真实 merge 身份、受信发布签发方及 shared 索引 / receipt。文档保持真人确认路径，代码另需 D10 的最新业务代码复验。
+- 当前开发代码已推送 FactumCore，只关闭 E224 的现有开发发布部分；它不等于真实业务知识卡已合入，不重复开发节点内 Git 功能。
+- **验收（E222）**：文档、代码分支分别记录状态：文档至少一张真人确认的真实卡完成实际提交、CI、合入及 shared 查询；代码另至少一张真实代码卡经最新代码复验、实际合入及 shared 查询。远端 SHA、卡字节、证明、规则和节点包身份一致；未完成分支保持 pending，不能用文档通过覆盖代码分支。未真实合入、伪 merged、签发身份不符、失败 CI 不得获得 shared 资格，不能静默降为 local 冒充成功。
+
+### D12：实际部署访问隔离与撤销验收
+
+- 在明确的部署边界内配置真实身份、授权存储及必要的原件、卡、索引、日志、凭据、端点和会话隔离；使用独立测试身份 / 隔离环境，不为此在本仓新增其他领域目录或复制跨组资料。
+- **验收（E223）**：未授权身份不能读取原件、卡或衍生缓存；撤销后旧会话、旧 receipt 和缓存不能继续绕过授权读取。分别记录部署授权与知识有效性撤销的结果，目录 / AGENTS / 查询过滤不算 ACL。
+- 单人本地文档 Demo 可先执行；跨组部署在此项通过前保持未验收，不提出已完成权限隔离的主张。
+
+## 4. 建议推进顺序与所需输入
+
+1. **先做真实文档 Demo**：D01 可立即开始；D02 和 D03 在明确宿主及选定原件后并行，随后 D04 → D05。此阶段不等待真实 WiFi 代码。
+2. **再验证日常可用性**：D06 可独立接入指定宿主；D07 基于 D05 的真实材料补更新、查询和恢复回归。
+3. **接真实代码**：取得真实代码与构建信息后 D08 → D09 → D10。六 Target / 三 pair 分槽推进，未完成槽不沿用其他槽成绩。
+4. **接发布和部署**：D11 的文档发布可在 D05 后推进，代码发布另需 D10；D12 按实际部署环境推进。最终逐项核对 E219–E224，外部条件不齐时 T211 仍 pending。
+
+| 所需输入 | 影响事项 | 缺失时的处理 |
+|---|---|---|
+| 目标 Agent / OpenFlow 宿主、版本、角色，以及可用的可信真人动作接口 | D02、D03、D04、D06 | 继续保留机制测试；不伪造适配器已接入 |
+| 可用于演示的已落地真实 raw 及授权范围 | D03、D05、D07 | 不把测试原件或预置候选称为真实资料验收 |
+| 真实代码仓、六 Target 构建 / 宏 / 版本及三 pair 信息 | D08–D10 | `config.yml` 保持 unknown，代码门禁不报通过 |
+| 真实语义审查方、CI / committer 和受信发布身份 | D09、D11 | 不生成生产签名或伪造 merged；已有交接保持待处理 |
+| 实际部署存储、身份与撤销环境 | D12 | 只报告单人 / 本地能力，权限验收保持 pending |
+
+以上是后续输入清单，本次仅更新任务规划，不默认替用户登记宿主、创建密钥或配置外部服务。
+
+## 5. 原 SDD 任务状态与节点归属
+
+原任务状态保留，下面的 complete 均指开发及隔离机制验收完成；D01–D12 的真实环境证据不能由历史通过状态继承。
 
 | 当前票 | 交付 | 依赖 | 状态 |
 |---|---|---|---|
 | [T201](sdd/knowledge-v2/tickets/T201.md) | 契约与运行协议 | 无 | complete |
 | [T202](sdd/knowledge-v2/tickets/T202.md) | 发现与项目绑定 | T201 | complete |
-| [T203](sdd/knowledge-v2/tickets/T203.md) | raw捕获与可恢复快照 | T202 | complete |
+| [T203](sdd/knowledge-v2/tickets/T203.md) | raw 捕获与可恢复快照 | T202 | complete |
 | [T204](sdd/knowledge-v2/tickets/T204.md) | 六决策候选与精确视图 | T203 | complete |
-| [T205](sdd/knowledge-v2/tickets/T205.md) | 真实动作、事务与恢复 | T204 | complete |
+| [T205](sdd/knowledge-v2/tickets/T205.md) | 确认事件验证、事务与恢复 | T204 | complete |
 | [T206](sdd/knowledge-v2/tickets/T206.md) | 索引、查询与回归激活 | T205 | complete |
 | [T207](sdd/knowledge-v2/tickets/T207.md) | 维护事件与双水位 | T203, T205, T206 | complete |
 | [T208](sdd/knowledge-v2/tickets/T208.md) | 代码捕获与只读双门禁 | T202, T204, T205 | complete |
-| [T209](sdd/knowledge-v2/tickets/T209.md) | 两个Workflow和节点包 | T202, T203, T204, T205, T206, T207, T208 | complete |
-| [T210](sdd/knowledge-v2/tickets/T210.md) | 单仓跨节点集成与开发交付 | T201, T202, T203, T204, T205, T206, T207, T208, T209 | complete |
-| [T211](sdd/knowledge-v2/tickets/T211.md) | 真实外部环境验收 | T210 | pending |
+| [T209](sdd/knowledge-v2/tickets/T209.md) | 两个 Workflow 和节点包 | T202–T208 | complete |
+| [T210](sdd/knowledge-v2/tickets/T210.md) | 单仓跨节点集成与开发交付 | T201–T209 | complete |
+| [T211](sdd/knowledge-v2/tickets/T211.md) | 真实外部环境验收 | T210；见本页剩余清单 | pending |
 
-## 节点清单与推进顺序
+18 个节点归属：
 
-- `hs-workspace-explore`：绑定项目（T202）。
-- `hs-knowledge-source-capture`：固定来源（T203）。
-- `hs-knowledge-change-plan`：六决策计划（T204）。
-- `hs-knowledge-view-materialize`：物化最终视图（T204）。
-- `hs-knowledge-governance-handoff`：移交治理（T204）。
-- `hs-knowledge-candidate-inspect`：检查候选身份（T205）。
-- `hs-knowledge-confirmation-prepare`：准备真人展示（T205）。
-- `hs-knowledge-confirmation-record`：记录真实动作（T205）。
-- `hs-knowledge-local-check`：代码本地核验（T208）。
-- `hs-knowledge-candidate-revise`：修订或缩窄（T204）。
-- `hs-knowledge-apply`：精确事务落位（T205）。
-- `hs-knowledge-recover`：恢复事务（T205）。
-- `hs-knowledge-index-build`：构建验证和激活索引（T206）。
-- `hs-knowledge-query-regression`：回归候选代（T206）。
-- `hs-knowledge-publish-handoff`：移交发布（T209）。
-- `hs-knowledge-merge-check`：最新代码合入复验（T208）。
-- `hs-knowledge-maintain`：维护与阻断复核（T207）。
-- `hs-knowledge-query`：消费知识（T206）。
+| 所属票据 | 节点 Skill |
+|---|---|
+| T202 | `hs-workspace-explore` |
+| T203 | `hs-knowledge-source-capture` |
+| T204 | `hs-knowledge-change-plan`、`hs-knowledge-view-materialize`、`hs-knowledge-governance-handoff`、`hs-knowledge-candidate-revise` |
+| T205 | `hs-knowledge-candidate-inspect`、`hs-knowledge-confirmation-prepare`、`hs-knowledge-confirmation-record`、`hs-knowledge-apply`、`hs-knowledge-recover` |
+| T206 | `hs-knowledge-index-build`、`hs-knowledge-query-regression`、`hs-knowledge-query` |
+| T207 | `hs-knowledge-maintain` |
+| T208 | `hs-knowledge-local-check`、`hs-knowledge-merge-check` |
+| T209 | `hs-knowledge-publish-handoff`；另交付 `hs-knowledge-ingest`、`hs-knowledge-lint` 两个 Workflow |
 
-先完成契约→发现→五raw→六决策视图→真人确认与恢复事务→local索引消费，再按依赖补维护/代码门禁、Workflow及单仓跨节点集成。shared代码卡另需真实merge证明；纯文档不额外执行代码lint。
+## 6. 范围与状态更新规则
 
-每票按失败测试→实现→针对验证/回归→独立审查→范围提交/实际发布推进，证据到位后再更新状态。M01–M09仅在v2模块表用作责任索引，历史v1状态不变。
-
-## 验收边界
-
-- 首发只接受conventions/chips/storys/specs/protocols已落地raw；网页、sources链接、仓外映射与3ms延期。
-- 真实人确认确切最终字节；user Gate不变成Skill，未签名/Agent/无动作/陈旧/部分接受不apply。
-- 所有卡metadata受Claim资格约束；过滤后重算全局topK，同代read/receipt，输出前复查撤销。
-- 批次逐项终态完整；受控只读Git禁外部执行；代码检查只读且需正向证据。
-- T211真实人/宿主触发/六Target三pair/真实CI合入/外部权限分别留证；缺输入保持pending，不能用合成测试关闭。
-
-当前验收：[实际结果](sdd/knowledge-v2/records/development-acceptance-20261021.json)；共200个唯一用例，199通过、1跳过。原件/确认/代码等测试材料为隔离合成输入，真实宿主与六Target不据此关闭。
+- 只建设根下 `aiotbot-knowledge-wifi/`；节点与 Workflow 在根下 `skills/`、`workflows/`，与 `main/` 同级，同当前远端发布，无嵌套 Git。本机配置、凭据和跨组资料不提交。
+- 首发文档只接受 `docs-raw/{conventions,chips,storys,specs,protocols}/` 已落地原件。网页、`sources/` 链接、仓外映射及 3ms 继续延期，不列为当前缺陷；不扩展到其他领域。
+- 真人确认完整精确最终字节后纯文档 stable，免代码 lint；无回复、超时、Agent 自报不是同意。代码卡本地通过后 stable，上库按最新业务代码只读复验，不修卡、锁、链接或源码。
+- 索引和 Schema 不证明语义正确；metadata 同样受 Claim 资格约束，过滤后重算全局 topK，同代 read / receipt，输出前复查有效性。代码来源存在、签名存在和合成测试通过不等于真实业务正确。
+- 每项按需求 / 最小纵向实现 / 针对测试 / 独立审查 / 实际记录推进；记录实际源、规则、节点包及环境身份后更新对应状态。开发提交按授权分别合入推送，节点只负责交接，不自行 commit / push。
+- E219–E224 分别留证；缺输入标明 pending / not_run，不以 fixture、静态 loader、目录或历史成绩关闭。`knowledge-v1` 字节、历史状态和原验收记录保持不变，不读取受限 gold。

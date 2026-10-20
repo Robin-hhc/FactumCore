@@ -184,7 +184,7 @@ def finish_pending(context, previous):
     return save_state(context, previous, updated)
 
 
-def register(context):
+def register(context, *, code=False):
     bundle = context.record(context.request["bundle_ref"], "source_bundle")
     lock = load_yaml(fixed_bytes(context.root, "governance/sources.lock.yaml"))
     changes = []
@@ -202,10 +202,48 @@ def register(context):
         resource = next(
             r for r in bundle["resources"] if r["source_id"] == snapshot["source_id"]
         )
-        if (
-            sha(fixed_bytes(context.root, resource["path"], ["docs-raw"]))
-            != snapshot["sha256"]
-        ):
+        if code:
+            if resource.get("kind") != "code":
+                raise NodeError(
+                    "INVALID_SOURCE_KIND", "Code change needs a registered code bundle"
+                )
+            resolved = context.call(
+                "hs-knowledge-source-capture",
+                {
+                    "operation_id": context.operation,
+                    "bundle_ref": context.request["bundle_ref"],
+                    "source_ref": {
+                        "evidence_ref": "current-code",
+                        "source_id": snapshot["source_id"],
+                        "snapshot_id": snapshot["snapshot_id"],
+                        "locator": {
+                            "kind": "bytes",
+                            "start": 0,
+                            "end": snapshot["bytes"],
+                        },
+                    },
+                },
+                "resolve-source",
+            )["data"]
+            current = resolved.get("current_source_matches") is True
+            if (
+                resolved.get("source_kind") != "code"
+                or resolved.get("resource") != resource
+            ):
+                raise NodeError(
+                    "SOURCE_IDENTITY_CHANGED",
+                    "Public resolver differs from code registration",
+                )
+        else:
+            if resource.get("kind") not in {"raw", "attachment"}:
+                raise NodeError(
+                    "INVALID_SOURCE_KIND", "Use register-code-change for code"
+                )
+            current = (
+                sha(fixed_bytes(context.root, resource["path"], ["docs-raw"]))
+                == snapshot["sha256"]
+            )
+        if not current:
             raise NodeError(
                 "SOURCE_CHANGED",
                 "New source changed again before event registration",
@@ -214,6 +252,14 @@ def register(context):
         previous = [
             s for s in lock["snapshots"] if s["source_id"] == snapshot["source_id"]
         ]
+        prior_resources = [
+            r for r in lock["resources"] if r["source_id"] == snapshot["source_id"]
+        ]
+        if previous and prior_resources != [resource]:
+            raise NodeError(
+                "SOURCE_IDENTITY_CHANGED",
+                "Logical source cannot be moved to another resource",
+            )
         if previous and snapshot["snapshot_id"] not in {
             s["snapshot_id"] for s in previous
         }:
@@ -223,6 +269,15 @@ def register(context):
                     "old_snapshot_ids": sorted(s["snapshot_id"] for s in previous),
                     "new_snapshot_id": snapshot["snapshot_id"],
                     "new_sha256": snapshot["sha256"],
+                    **(
+                        {
+                            "source_kind": "code",
+                            "repo_id": resource["repo_id"],
+                            "path": resource["path"],
+                        }
+                        if code
+                        else {}
+                    ),
                 }
             )
     with writer_lock(context):
@@ -254,7 +309,7 @@ def register(context):
                             {
                                 "card_id": card["metadata"]["id"],
                                 "claim_id": claim["id"],
-                                "reason": "source_changed",
+                                "reason": "code_changed" if code else "source_changed",
                                 "event_id": event_id,
                                 "source_id": change["source_id"],
                                 "old_snapshot_ids": change["old_snapshot_ids"],
@@ -364,6 +419,12 @@ def advance(context):
             {
                 "operation_id": applied["operation_id"],
                 "apply_result_ref": request["apply_result_ref"],
+                "purpose": "current",
+                **(
+                    {"current_code_proof_ref": request["current_code_proof_ref"]}
+                    if request.get("current_code_proof_ref")
+                    else {}
+                ),
             },
             "verify-result",
         )
@@ -405,6 +466,7 @@ def advance(context):
         if view["digest"] != applied["view_digest"]:
             raise NodeError("APPLIED_VIEW_CHANGED", "Apply proof and exact view differ")
         reviewed_cards = {}
+        reviewed_paths = {}
         for write in view["writes"]:
             path = write["path"]
             if not path.startswith("knowledge/") or path.endswith("/index.md"):
@@ -421,6 +483,7 @@ def advance(context):
                 )
             card = context.modules["knowledge"].parse_card(raw, path, context.rules)
             reviewed_cards[card["metadata"]["id"]] = card
+            reviewed_paths[card["metadata"]["id"]] = path
         remaining, cleared = [], []
         for block in previous["blocked_claims"]:
             card = reviewed_cards.get(block["card_id"])
@@ -438,6 +501,27 @@ def advance(context):
                 cleared.append(
                     block
                 )  # exact accepted write explicitly removed this old Claim.
+                continue
+            if block.get("reason") == "code_changed":
+                current_proof = request.get("current_code_proof_ref")
+                path = reviewed_paths[block["card_id"]]
+                eligible = verification["data"].get("eligible_files", [])
+                if (
+                    view["review_mode"] != "code_gate"
+                    or not current_proof
+                    or verification["data"].get("current_code_proof_ref")
+                    != current_proof
+                    or not any(
+                        row.get("path") == path
+                        and row.get("sha256") == sha(card["raw"])
+                        for row in eligible
+                    )
+                ):
+                    remaining.append(block)
+                    continue
+                # A fresh signed semantic proof for this exact view establishes
+                # current applicability; historical code evidence stays immutable.
+                cleared.append(block)
                 continue
             sources = {s["evidence_ref"]: s for s in metadata["sources"]}
             refs = [
@@ -459,16 +543,7 @@ def advance(context):
                     {"operation_id": context.operation, "source_ref": ref},
                     "resolve-source",
                 )["data"]
-                lock = load_yaml(
-                    fixed_bytes(context.root, "governance/sources.lock.yaml")
-                )
-                resource = next(
-                    r for r in lock["resources"] if r["source_id"] == ref["source_id"]
-                )
-                if (
-                    sha(fixed_bytes(context.root, resource["path"], ["docs-raw"]))
-                    != resolved["sha256"]
-                ):
+                if resolved.get("current_source_matches") is not True:
                     raise NodeError(
                         "SOURCE_CHANGED_AGAIN",
                         "Reviewed source changed again; keep current block",
@@ -495,6 +570,8 @@ def execute(context):
         return {"state": state(context)}, "inspected"
     if action == "register-source-change":
         return register(context)
+    if action == "register-code-change":
+        return register(context, code=True)
     if action == "recover-events":
         with writer_lock(context):
             recovered = finish_pending(context, state(context))
@@ -503,5 +580,5 @@ def execute(context):
         return advance(context)
     raise NodeError(
         "INVALID_ACTION",
-        "Choose status, register-source-change, recover-events or advance",
+        "Choose status, register-source-change, register-code-change, recover-events or advance",
     )

@@ -247,15 +247,34 @@ def resolve_source(context, reference, bundle=None):
         text = extracted.decode("utf-8")
         locators = json.loads(locator_bytes)["locators"]
         gaps = list(retained.get("limitations", []))
+    elif resource.get("kind") == "code":
+        text, locators = None, []
+        gaps = [
+            "Frozen code snapshot has no interpreted text extraction; only exact original bytes are available"
+        ]
     else:
-        text, locators, _, gaps = extract(
-            data, ".txt" if resource.get("kind") == "code" else suffix, primary=False
-        )
+        text, locators, _, gaps = extract(data, suffix, primary=False)
         if text is not None:
             gaps.append(
                 "This snapshot has no retained extraction; text was re-extracted by the current pinned resolver"
             )
     locator = reference.get("locator", {})
+    if resource.get("kind") == "code" and locator.get("kind") == "bytes":
+        start, end = locator.get("start"), locator.get("end")
+        if (
+            isinstance(start, bool)
+            or isinstance(end, bool)
+            or not isinstance(start, int)
+            or not isinstance(end, int)
+            or not 0 <= start <= end <= len(data)
+        ):
+            raise NodeError(
+                "INVALID_SOURCE_LOCATOR", "Byte range is outside fixed code bytes"
+            )
+        text = None
+        gaps.append(
+            "Byte locator retains exact bytes without asserting semantic text interpretation"
+        )
     if text is not None and not locator:
         raise NodeError(
             "INVALID_SOURCE_LOCATOR",

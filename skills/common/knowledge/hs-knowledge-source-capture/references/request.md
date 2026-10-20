@@ -8,4 +8,6 @@ Registered code request: `operation_id`, `kind:"code"`, `repo_id`, `relative_pat
 
 The result includes `source_kind`, the logical `resource`, immutable original bytes, selected `text`, original locator, snapshot identity and limitations. `current_source_matches` is true/false/null after separately comparing current authorized source bytes. Missing code authorization returns null while retained historical evidence remains readable. A successful historical replay does not prove current applicability. MD/TXT and UTF-8 code use `lines` start/end; PDF uses `page`; DOCX uses `paragraph` or `table_row` with table/row. Opaque attachments return no interpreted text.
 
+Machine code-change verification may use a code-only `bytes` locator with zero-based half-open start/end, including the empty range of an empty file. It returns `text:null` and exact original bytes with an explicit interpretation limitation; it does not assert a text location or positive semantic support.
+
 Changed previously registered sources call the public `hs-knowledge-maintain --action register-source-change` before capture returns success. Missing maintenance installation blocks completion. Recovery objects remain under logs/evidence; capture never writes sources.lock, formal cards or indexes.

@@ -239,3 +239,85 @@ def test_code_resolver_replays_frozen_bytes_after_change_or_removed_authorizatio
     assert historical["text"] == original.decode()
     assert historical["current_source_matches"] is None
     assert any("historical" in gap for gap in historical["limitations"])
+
+
+def test_explicit_code_change_event_blocks_old_claim_idempotently_without_rewriting(
+    harness,
+):
+    repo, context = setup_code(harness)
+    request = {
+        "operation_id": "old-code",
+        "kind": "code",
+        "repo_id": "code",
+        "relative_path": "sample.c",
+        "source_id": "synthetic-code",
+        "context_ref": context,
+    }
+    old_result = harness.run("source-capture", request)
+    old = harness.record(old_result["data"]["bundle_ref"])
+    card = harness.card("existing", old, lifecycle="stable")
+    harness.write("knowledge/rules/existing.md", card)
+    locked = yaml.safe_dump(
+        {
+            "schema_version": "2.0",
+            "resources": old["resources"],
+            "snapshots": old["snapshots"],
+        }
+    ).encode()
+    harness.write("governance/sources.lock.yaml", locked)
+    (repo / "sample.c").write_bytes(b"int changed(void) { return 3; }\n")
+    request["operation_id"] = "new-code"
+    new = harness.run("source-capture", request)
+    assert not (harness.root / "logs/events/state.json").exists()
+    registration = {"operation_id": "changed", "bundle_ref": new["data"]["bundle_ref"]}
+    (repo / "sample.c").write_bytes(b"int changed_again(void) { return 4; }\n")
+    rejected = harness.run("maintain", registration, "register-code-change", expected=3)
+    assert rejected["diagnostics"][0]["code"] == "SOURCE_CHANGED"
+    assert not (harness.root / "logs/events/state.json").exists()
+    (repo / "sample.c").write_bytes(b"int changed(void) { return 3; }\n")
+    result = harness.run("maintain", registration, "register-code-change")
+    repeated = harness.run("maintain", registration, "register-code-change")
+    assert result["data"]["event_refs"] == repeated["data"]["event_refs"]
+    state = harness.record("logs/events/state.json")
+    assert state["validity_epoch"] == 1
+    assert state["blocked_claims"][0]["reason"] == "code_changed"
+    assert state["blocked_claims"][0]["card_id"] == "existing"
+    assert (harness.root / "knowledge/rules/existing.md").read_bytes() == card
+    assert (harness.root / "governance/sources.lock.yaml").read_bytes() == locked
+
+
+@pytest.mark.parametrize("raw", [b"", b"\xff\x00\x81"])
+def test_machine_byte_locator_handles_empty_or_opaque_code_without_interpreted_text(
+    harness, raw
+):
+    repo, context = setup_code(harness)
+    (repo / "sample.c").write_bytes(raw)
+    response = harness.run(
+        "source-capture",
+        {
+            "operation_id": "opaque",
+            "kind": "code",
+            "repo_id": "code",
+            "relative_path": "sample.c",
+            "source_id": "opaque",
+            "context_ref": context,
+        },
+    )
+    bundle = harness.record(response["data"]["bundle_ref"])
+    request = {
+        "operation_id": "opaque-resolve",
+        "bundle_ref": response["data"]["bundle_ref"],
+        "source_ref": {
+            "evidence_ref": "e1",
+            "source_id": "opaque",
+            "snapshot_id": bundle["snapshots"][0]["snapshot_id"],
+            "locator": {"kind": "bytes", "start": 0, "end": len(raw)},
+        },
+    }
+    resolved = harness.run("source-capture", request, "resolve-source")["data"]
+    assert resolved["text"] is None
+    assert resolved["bytes"] == len(raw)
+    assert resolved["current_source_matches"] is True
+    request["source_ref"]["locator"]["end"] += 1
+    invalid = harness.run("source-capture", request, "resolve-source", expected=2)
+    assert invalid["diagnostics"][0]["code"] == "INVALID_SOURCE_LOCATOR"

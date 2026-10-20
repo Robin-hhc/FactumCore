@@ -234,6 +234,23 @@ class ApplyTests(unittest.TestCase):
                 execute(ctx, request, "run")
             self.assertFalse(ctx.path("knowledge/create.md").exists())
 
+    def test_committed_reentry_is_read_only_during_another_recovery(self):
+        from transaction import execute
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ctx, request = self.fixture(pathlib.Path(tmp))
+            original = execute(ctx, request, "run")
+            ctx.save(
+                "logs/operations/other/journal.json",
+                ctx.record(
+                    "transaction_journal",
+                    "other",
+                    status="recovery_required",
+                    entries=[],
+                ),
+            )
+            self.assertEqual(execute(ctx, request, "run"), original)
+
     def test_rollback_preserves_external_final_bytes_on_unattempted_target(self):
         from transaction import execute
         from support import Blocked

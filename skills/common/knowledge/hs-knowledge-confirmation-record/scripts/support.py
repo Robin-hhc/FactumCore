@@ -549,10 +549,12 @@ def load_context(args, package_root):
     return context
 
 
-def workflow_artifact(ctx, request, result):
+def validate_workflow(request):
     workflow = request.get("workflow")
     if not workflow:
         return None
+    if not isinstance(workflow, dict):
+        raise Invalid("workflow must be an object")
     pieces = [workflow.get(key) for key in ("run_id", "node_id", "attempt_id")]
     if any(
         not isinstance(value, str)
@@ -560,6 +562,14 @@ def workflow_artifact(ctx, request, result):
         for value in pieces
     ):
         raise Invalid("workflow requires safe run/node/attempt identities")
+    return pieces
+
+
+def workflow_artifact(ctx, request, result):
+    pieces = validate_workflow(request)
+    if pieces is None:
+        return None
+    workflow = request["workflow"]
     prefix = "logs/workflows/" + pieces[0] + "/nodes/" + pieces[1] + "/" + pieces[2]
     data = dict(result["data"])
     references = {}
@@ -599,6 +609,7 @@ def run_cli(handler, package_root):
     try:
         ctx = load_context(args, package_root)
         request = strict_json(pathlib.Path(args.input).read_text(encoding="utf-8"))
+        validate_workflow(request)
         data = handler(ctx, request, args.action)
         result = {
             "status": "ok",

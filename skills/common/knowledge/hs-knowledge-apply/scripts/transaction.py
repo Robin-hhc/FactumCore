@@ -515,7 +515,11 @@ def execute(ctx, request, action="run"):
                 "phase": "inspected",
             }
         operations = ctx.path("logs/operations")
-        for other_path in operations.glob("*/journal.json"):
+        for other_path in (
+            operations.glob("*/journal.json")
+            if action == "run" and journal is None
+            else []
+        ):
             if other_path.parent.name == op:
                 continue
             other = ctx.read(other_path.relative_to(ctx.root).as_posix())

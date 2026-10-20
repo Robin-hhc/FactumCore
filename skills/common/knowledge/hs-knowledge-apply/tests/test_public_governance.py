@@ -327,16 +327,44 @@ class PublicGovernanceTests(unittest.TestCase):
         self.invoke("hs-knowledge-apply", {**request, "fault_after": 1}, expected=3)
         inspected = self.invoke(
             "hs-knowledge-recover",
-            {"operation_id": "recover", "workflow": {"attempt_id": "inspect1"}},
+            {
+                "operation_id": "recover",
+                "workflow": {
+                    "run_id": "recover-run",
+                    "node_id": "recover_transaction",
+                    "attempt_id": "inspect1",
+                },
+            },
             action="inspect",
         )
         self.assertEqual(inspected["data"]["transaction_status"], "recovery_required")
         resumed = self.invoke(
             "hs-knowledge-recover",
-            {"operation_id": "recover", "workflow": {"attempt_id": "resume1"}},
+            {
+                "operation_id": "recover",
+                "workflow": {
+                    "run_id": "recover-run",
+                    "node_id": "recover_transaction",
+                    "attempt_id": "resume1",
+                },
+            },
             action="resume",
         )
         self.assertEqual(resumed["data"]["transaction_status"], "committed")
+
+    def test_invalid_workflow_is_rejected_before_apply_mutates_files(self):
+        request = self.prepare_and_approve("invalid-workflow")
+        self.invoke(
+            "hs-knowledge-apply",
+            {**request, "workflow": {"attempt_id": "partial"}},
+            expected=2,
+        )
+        self.assertEqual(
+            (self.root / "knowledge/index.md").read_bytes(), b"old navigation"
+        )
+        self.assertFalse(
+            (self.root / "logs/operations/invalid-workflow/journal.json").exists()
+        )
 
     def test_card_eligibility_ignores_unrelated_navigation_and_source_append(self):
         request = self.prepare_and_approve("card", include_card=True)

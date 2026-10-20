@@ -7,12 +7,12 @@
   "implementation": "independent; no CANNBot source copied",
   "sources": [
     {
-      "path": "aiot-wifi-knowledge/docs-llm-wiki/AIoTBot知识库架构.md",
-      "sha256": "d6901c1a433d55359e59a8df1e709f583191fb4012ab8e350b0a7044c79eff52"
+      "path": "aiot-wifi-knowledge/docs-llm-wiki/AIoTBot知识库架构设计.md",
+      "sha256": "4383c17115b2567454f5a44de15221f8c8a7b015cadb2168ecca7ab6cd932757"
     },
     {
       "path": "aiot-wifi-knowledge/docs-llm-wiki/知识库详细设计.md",
-      "sha256": "ac0c69fd54e976e5d125b84e6b61c7decfd9cfd93fa1890c4f657f35b0ce1e8e"
+      "sha256": "7ea06150016730d9f2256cf28c18ea8355c74c253362f6daef666f4d52d3ca0b"
     }
   ],
   "deployment_decision": {
@@ -112,13 +112,31 @@
       "previous_sha256": "60b3a73b71bc6f40713d048aede14dd0dfad42863efec5df7f060ab8cddec72d",
       "sha256": "ac0c69fd54e976e5d125b84e6b61c7decfd9cfd93fa1890c4f657f35b0ce1e8e",
       "scope": "Align current deployment with section 5.3: domain-local docs, one WiFi domain, empty main/Skills/Workflows. Existing diagrams and historical evidence retained; implementation archived outside Git."
+    },
+    {
+      "date": "2026-10-20",
+      "record": "records/naming-paths-20261020.md",
+      "previous_path": "aiot-wifi-knowledge/docs-llm-wiki/AIoTBot知识库架构.md",
+      "path": "aiot-wifi-knowledge/docs-llm-wiki/AIoTBot知识库架构设计.md",
+      "previous_sha256": "d6901c1a433d55359e59a8df1e709f583191fb4012ab8e350b0a7044c79eff52",
+      "sha256": "4383c17115b2567454f5a44de15221f8c8a7b015cadb2168ecca7ab6cd932757",
+      "scope": "Names and paths follow latest section 5.3. Workflow knowledge layer, source-group directory slots, active references and design identity synchronized; section 5.3 bytes and lifecycle behavior retained."
+    },
+    {
+      "date": "2026-10-20",
+      "record": "records/naming-paths-20261020.md",
+      "previous_path": "aiot-wifi-knowledge/docs-llm-wiki/知识库详细设计.md",
+      "path": "aiot-wifi-knowledge/docs-llm-wiki/知识库详细设计.md",
+      "previous_sha256": "ac0c69fd54e976e5d125b84e6b61c7decfd9cfd93fa1890c4f657f35b0ce1e8e",
+      "sha256": "7ea06150016730d9f2256cf28c18ea8355c74c253362f6daef666f4d52d3ca0b",
+      "scope": "Names and paths follow latest section 5.3. Workflow knowledge layer, source-group directory slots, active references and design identity synchronized; section 5.3 bytes and lifecycle behavior retained."
     }
   ],
   "documentation_layout": {
     "root": "aiot-wifi-knowledge/docs-llm-wiki",
     "root_files": [
       "AGENTS.md",
-      "AIoTBot知识库架构.md",
+      "AIoTBot知识库架构设计.md",
       "README.md",
       "知识库详细设计.md"
     ],
@@ -144,6 +162,14 @@
     ],
     "historical_implementation_commit": "ce7b874c7b0ac6fd5549746722055fd928312587",
     "archive_id": "workspace-layout-20261020-142701",
-    "record": "records/workspace-layout-20261020.md"
+    "record": "records/workspace-layout-20261020.md",
+    "naming_record": "records/naming-paths-20261020.md"
+  },
+  "naming_authority": {
+    "path": "aiot-wifi-knowledge/docs-llm-wiki/AIoTBot知识库架构设计.md",
+    "section": "5.3",
+    "section_sha256": "4c061504623a48faea1a35785c89589adfe1d1276b3c2d3febb9b7df90873d1f",
+    "user_source_commit": "0eb631ec7ace819867b73755989df46c842f5418",
+    "rule": "Canonical current names and paths. Historical records retain the identity of the commit they describe."
   }
 }

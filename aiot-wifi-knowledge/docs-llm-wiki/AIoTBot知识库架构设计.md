@@ -181,7 +181,7 @@ flowchart TB
 | ① 入口路由层 | 自动绑定项目，先路由再消费 | `hs-common-workspace-explore` · `AGENTS.md` · `config.yml` · 领域仓根四件套（`README.md` · `CONTRIBUTING.md` · `check.py/check.sh`） |
 | ② 源事实层 | 证据底座：代码事实 + 原始材料，喂知识层 | `main/` · `docs-raw/` |
 | ③ 知识资产层 | 唯一检索对象：治理后的知识卡 | `knowledge/` |
-| ④ 治理与工具层 | 契约约束知识层，三流程执行体 | `governance/` · `.skills/` · `.workflows/` |
+| ④ 治理与工具层 | 契约约束知识层，三流程执行体 | `governance/` · `skills/common/knowledge/` · `workflows/common/knowledge/` |
 | ⑤ 配套支撑层 | 候选暂存 · 回归门禁 · 留痕 · 派生索引 | `.build/` · `evals/` · `logs/` · `artifacts/` · `docs-llm-wiki/` |
 
 递进一句话：证据层喂知识层，契约层束知识层，技能层跑知识层，配套层验知识层，入口层路由知识层。
@@ -232,7 +232,7 @@ device 侧 + host 侧真实代码。`.codegraph/` 是代码图谱索引，**本�
 
 参与链路：hs-common-knowledge-ingest 跑生产、hs-common-knowledge-lint 跑治理
 
-#### aiot-knowledge/ —— 领域知识仓
+#### aiot-wifi-knowledge/ —— 领域知识仓
 
 一个领域一个仓（platform / bgle / gnss / slp / radar / wifi），**内部目录完全同构**，技能跨仓复用零适配。按域分仓的理由见"AIoTBot目标"章：领域知识差异大、保密要求不同；代码与知识放一个仓会有权限冲突和一致性难题，独立建设各自管内容和权限。
 

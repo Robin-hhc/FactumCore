@@ -1,0 +1,33 @@
+{
+  "status": "ok",
+  "scope": "Names, paths, placeholders, navigation, design digests, SDD references and historical evidence. No runtime capability verification.",
+  "base_commit": "0eb631ec7ace819867b73755989df46c842f5418",
+  "authority_section": "5.3",
+  "authority_section_sha256": "4c061504623a48faea1a35785c89589adfe1d1276b3c2d3febb9b7df90873d1f",
+  "authority_section_bytes_preserved": true,
+  "main_mermaid_blocks_preserved": 6,
+  "detail_mermaid_blocks_preserved_except_workflow_path_label": 4,
+  "empty_skill_slots": 4,
+  "empty_workflow_slots": 2,
+  "empty_main_slots": 1,
+  "deferred_source_group_slots": 3,
+  "active_markdown_files": 98,
+  "local_links_checked": 187,
+  "source_line_anchors_checked": 182,
+  "historical_record_blobs_preserved": 27,
+  "historical_statuses_preserved": true,
+  "framework_locked_hashes_checked": 6,
+  "config_bytes_preserved": true,
+  "sdd": {
+    "status": "ok",
+    "requirements": 18,
+    "modules": 9,
+    "tasks": 28,
+    "files": 148,
+    "acceptance": 34,
+    "dag_edges": 49,
+    "future_paths": 3
+  },
+  "current_deployment": "skeleton_only",
+  "functional_tests": "not run; no executable implementation restored"
+}

@@ -2,7 +2,7 @@
 
 ## 1. 交付根、分层和接口
 
-当前开发 workspace 是 FactumCore 仓根，目录按主设计 §5.3。唯一领域 `aiot-wifi-knowledge/` 为直接子目录，不含嵌套 .git；SDD 真源为其 `docs-llm-wiki/sdd/knowledge-v1/`。仓根 `main/` 为空，四个 Skill 与两个 Workflow 仅保留空骨架。下面 `W` 表示 FactumCore 根，`K=W/aiot-wifi-knowledge`；表中的 `S=W/skills/common/knowledge/_shared` 是历史实现路径，其程序、工具和依赖已移至仓外，当前 checkout 不可执行。接口及历史验收保留为后续开发参考，不要求为实现该表恢复已移除目录。当前布局和执行状态见[布局与部署记录](records/workspace-layout-20261020.md)及 `traceability.json.current_deployment`；来源入口为[主设计](../../AIoTBot知识库架构.md)和[知识库详细设计](../../知识库详细设计.md)。
+当前开发 workspace 是 FactumCore 仓根，目录按主设计 §5.3。唯一领域 `aiot-wifi-knowledge/` 为直接子目录，不含嵌套 .git；SDD 真源为其 `docs-llm-wiki/sdd/knowledge-v1/`。仓根 `main/` 为空，四个 Skill 与两个 Workflow 仅保留空骨架。下面 `W` 表示 FactumCore 根，`K=W/aiot-wifi-knowledge`；表中的 `S=W/skills/common/knowledge/_shared` 是历史实现路径，其程序、工具和依赖已移至仓外，当前 checkout 不可执行。接口及历史验收保留为后续开发参考，不要求为实现该表恢复已移除目录。当前布局和执行状态见[布局与部署记录](records/workspace-layout-20261020.md)及 `traceability.json.current_deployment`；来源入口为[主设计](../../AIoTBot知识库架构设计.md)和[知识库详细设计](../../知识库详细设计.md)。
 
 固定边界：首发文档只取 `K/docs-raw/{conventions,chips,storys,specs,protocols}/` 的实际原件；排除控制文件、sources、URL、仓外映射及越界联接。manual_document 只需真实人工确认，不跑代码本地/合入门禁；代码本地通过即 stable、可供 local 消费，上库再按最新源码只读核验。六 Target/三 pair 先建逻辑登记，真实映射、宿主触发、ACL 分别验收。
 

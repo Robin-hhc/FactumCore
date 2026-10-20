@@ -1,6 +1,6 @@
 # WiFi 知识库
 
-这是 FactumCore 单仓内唯一的领域目录，Git 操作统一在 FactumCore 根执行。整体布局遵循[总体设计 §5.3](docs-llm-wiki/AIoTBot知识库架构.md#53-aiotbot-knowledge目录架构)。
+这是 FactumCore 单仓内唯一的领域目录，Git 操作统一在 FactumCore 根执行。整体布局遵循[总体设计 §5.3](docs-llm-wiki/AIoTBot知识库架构设计.md#53-aiotbot-knowledge目录架构)。
 
 | 目录 | 存放内容 |
 |---|---|

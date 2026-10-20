@@ -2,7 +2,7 @@
 
 依据现行[《知识库详细设计》](../../知识库详细设计.md)v2.0；本规格将既有设计展开为可追踪需求，不增加产品范围。按用户最新部署决议，逻辑 workspace 为 FactumCore 单仓，唯一领域 `aiot-wifi-knowledge/` 是仓根普通目录，文档根为其 `docs-llm-wiki/`。`main/` 为空，四个 Skill 和两个 Workflow 保留空骨架，其他现有程序、工具与依赖移至仓外。当前部署和历史实现的区别见[布局与部署记录](records/workspace-layout-20261020.md)。
 
-源文件 SHA-256：`ac0c69fd54e976e5d125b84e6b61c7decfd9cfd93fa1890c4f657f35b0ce1e8e`。共 18 项需求、148 条路径、34 项验收；未来来源 3 条单列 deferred。
+源文件 SHA-256：`7ea06150016730d9f2256cf28c18ea8355c74c253362f6daef666f4d52d3ca0b`。共 18 项需求、148 条路径、34 项验收；未来来源 3 条单列 deferred。
 
 ## 1. 需求基线
 

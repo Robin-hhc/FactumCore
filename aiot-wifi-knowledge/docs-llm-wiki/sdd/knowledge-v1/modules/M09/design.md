@@ -21,9 +21,9 @@
 | `skills/common/knowledge/hs-common-knowledge-lint/references/merge-check.md` | F | 固定 H/B/T/V，说明受信政策、逐断言复用/继承/重验、证明过期与外部证据归档 | 新代码与断言冲突时失败退回本地；必需代码不可访问为 incomplete；无输入改写；错误 head 的报告拒绝 |
 | `skills/common/knowledge/hs-common-knowledge-query/SKILL.md` | F | 加载 query-plan，调用 index/query/source 能力；按问题路由到卡片、原文或代码 | 回答有渠道、范围、卡与来源版本；无覆盖/过期明确缺口；查询不会修改知识正文 |
 | `skills/common/knowledge/hs-common-knowledge-query/references/query-plan.md` | F | 定义 current/guidance/historical、预算、候选后精读、逐断言证据和输出前事件复查 | 错 Target/侧别不能挤占正确候选；切代后精读仍一致；阻断事件立即影响旧代查询 |
-| `workflows/common/hs-common-knowledge-ingest/SKILL.md` | F | 按 §4.2 定义 P1 绑定、P2 固定来源、P3 比较计划、P4 候选及 P5 摘要交接；按代码/raw 路径调用 ingest Skill | 两来源均产可复核最终包；交接摘要可核验；缺口保留；相同输入恢复不重复生成或改变候选 |
-| `workflows/common/hs-common-knowledge-lint/SKILL.md` | F | 按 §4.3 定义 G1 接收、G2C/G2D 分流、G3 apply、G4 索引、G5 授权提交，及独立 G6–G9 检查/合入/发布交接 | 人工未答不应用；检查失败回生产修订；本地 stable 可查；上库失败不撤销本地生命周期；不擅自提交 |
-| `workflows/common/hs-common-knowledge-lint/references/merge-stage.md` | F | 固定受信 H/B/T/V/政策/工具，调用 lint merge，保存外部证明；列出 committer 合入与授权 shared 构建的独立职责 | CI 输入输出隔离；过期或不同 head 拒绝；纯文档不注册必需代码 lint 状态；合入内容与确认证明一致 |
+| `workflows/common/knowledge/hs-common-knowledge-ingest/SKILL.md` | F | 按 §4.2 定义 P1 绑定、P2 固定来源、P3 比较计划、P4 候选及 P5 摘要交接；按代码/raw 路径调用 ingest Skill | 两来源均产可复核最终包；交接摘要可核验；缺口保留；相同输入恢复不重复生成或改变候选 |
+| `workflows/common/knowledge/hs-common-knowledge-lint/SKILL.md` | F | 按 §4.3 定义 G1 接收、G2C/G2D 分流、G3 apply、G4 索引、G5 授权提交，及独立 G6–G9 检查/合入/发布交接 | 人工未答不应用；检查失败回生产修订；本地 stable 可查；上库失败不撤销本地生命周期；不擅自提交 |
+| `workflows/common/knowledge/hs-common-knowledge-lint/references/merge-stage.md` | F | 固定受信 H/B/T/V/政策/工具，调用 lint merge，保存外部证明；列出 committer 合入与授权 shared 构建的独立职责 | CI 输入输出隔离；过期或不同 head 拒绝；纯文档不注册必需代码 lint 状态；合入内容与确认证明一致 |
 | `aiot-wifi-knowledge/AGENTS.md` | F | 写清资产地图、阅读顺序、三条链路入口与修改边界 | 从领域根开始任务可找到正确入口且不批量读取全仓 |
 | `aiot-wifi-knowledge/README.md` | F | 汇总部署步骤、六 Target 登记状态及可运行命令；链接详细运维文档 | 首次使用者可完成最小安装；所有入口链接可解析 |
 | `aiot-wifi-knowledge/CONTRIBUTING.md` | F | 分别写代码卡两道检查、raw 文档人工确认、框架变更审查流程 | 代码/文档各按说明完成一次合成贡献，证据和最终字节对应 |

@@ -32,8 +32,8 @@
 | `aiot-wifi-knowledge/logs/evidence/<bundle_id>/objects/<object_digest>.bin` | R | 保存 dirty 文件、无 Git 导出实际文件或可恢复补丁等原字节，按摘要寻址 | 脱离原临时工作区仍能重放准确来源，不拿 HEAD 代替 dirty 字节 |
 | `aiot-wifi-knowledge/logs/evidence/<bundle_id>/extractions/<extraction_id>/text.txt` | R | 固定转换器、参数和提取文本摘要，与原字节对象关联 | 可追到原始对象及提取版本，重提取差异可解释 |
 | `aiot-wifi-knowledge/logs/evidence/<bundle_id>/extractions/<extraction_id>/locators.json` | R | 保存章节/页码/表图与派生文本区间、相关摘要 | 每个引用可定位回原件，失配映射明确诊断 |
-| `aiot-wifi-knowledge/docs-raw/sources/dbox.md` | P | 后续接入时登记逻辑对象与本机导出映射；适配器取得固定副本后复用文档确认流程 | 首发请求此类来源返回延期且无网络/卡片写入；未来再验收对象身份、下载/导出和历史恢复 |
-| `aiot-wifi-knowledge/docs-raw/sources/wiki.md` | P | 后续由授权网页适配器获取正文/必要附件，形成快照与差异 | 首发不发网络请求；未来用固定授权样例验证完整抓取、失效与人工更新 |
-| `aiot-wifi-knowledge/docs-raw/sources/3ms.md` | P | 保持未支持，取得真实接口与权限条件后另行设计 | 首发返回明确未支持/延期，不建伪造快照 |
+| `aiot-wifi-knowledge/docs-raw/sources/dbox/` | P | 后续接入时登记逻辑对象与本机导出映射；适配器取得固定副本后复用文档确认流程 | 首发请求此类来源返回延期且无网络/卡片写入；未来再验收对象身份、下载/导出和历史恢复 |
+| `aiot-wifi-knowledge/docs-raw/sources/wiki/` | P | 后续由授权网页适配器获取正文/必要附件，形成快照与差异 | 首发不发网络请求；未来用固定授权样例验证完整抓取、失效与人工更新 |
+| `aiot-wifi-knowledge/docs-raw/sources/3ms/` | P | 保持未支持，取得真实接口与权限条件后另行设计 | 首发返回明确未支持/延期，不建伪造快照 |
 
 完整职责与约束字段见 ../../traceability.json，同一路径只有一个主模块。F 为固定实现，D/R/X 是实例、产物或外部入口，P 首发延期；不得手造不存在的业务工程或成功证据。

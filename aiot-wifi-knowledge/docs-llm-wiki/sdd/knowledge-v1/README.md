@@ -1,6 +1,6 @@
 # Knowledge v1 SDD 入口
 
-本 SDD 细化用户确认的[主设计《AIoTBot知识库架构》](../../AIoTBot知识库架构.md) §5.3 + 第 11 章及[《知识库详细设计》](../../知识库详细设计.md)v2.0；源文件实际摘要固定在 [baseline.json](baseline.json)。这些是用户批准的工作区设计文件，不能用较旧 Git HEAD 替代其内容。
+本 SDD 细化用户确认的[主设计《AIoTBot知识库架构设计》](../../AIoTBot知识库架构设计.md) §5.3 + 第 11 章及[《知识库详细设计》](../../知识库详细设计.md)v2.0；源文件实际摘要固定在 [baseline.json](baseline.json)。这些是用户批准的工作区设计文件，不能用较旧 Git HEAD 替代其内容。
 
 当前部署由用户指定为 FactumCore 单仓，目录按主设计 §5.3：仓根 `main/` 为空，`skills/`、`workflows/` 仅保留四个 Skill 和两个 Workflow 的空骨架；唯一领域为 `aiot-wifi-knowledge/`。SDD 位于该领域的 `docs-llm-wiki/sdd/knowledge-v1/`。现有共享实现、工具和依赖已移至仓外，当前 checkout 不可运行历史 CLI。最新布局、归档身份与执行状态见[布局与部署记录](records/workspace-layout-20261020.md)和 `traceability.json.current_deployment`；[单仓迁移记录](records/single-repo-migration.md)保留当时事实。用户级 AGENTS 由用户自行配置，不纳入开发、安装、升级或托管验收；全局 Skill 安装可见性、workspace-registry 定位、仓内 AGENTS 实际加载和仓外宿主实测仍按 T23/T24 交付。
 

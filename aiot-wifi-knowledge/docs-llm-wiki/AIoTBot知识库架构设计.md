@@ -1,33 +1,19 @@
-# AIoTBot知识库架构
+# AIoTBot知识库架构设计
 
 ## 5.3 AIoTBot knowledge目录架构
 
 aiotbot-knowledge知识库仓目录结构如下所示。
 
-- skills/common/knowledge/：存放全局入口 Skill 与三个知识流程 Skill
-- workflows/common/knowledge/：存放知识库增量更新和治理工作流
 - AGENTS.md：项目绑定后的消费路由契约
 - config.yml：四张映射表，把代码仓、架构元素、领域知识实体、符号别名集中登记为一份配置事实
 - main/：真实代码工作区
-- aiot-wifi-knowledge/：领域知识仓根，下一级是 domain，一领域一仓，内部目录完全同构
+- aiot-knowledge/：领域知识仓根，下一级是 domain，一领域一仓，内部目录完全同构
   - knowledge/：知识卡，唯一检索对象，处理后知识的仓库
   - docs-raw/：源文档，原始证据层（LLM 只读）
   - governance/：治理文件夹，存放契约，模板，规范等
   - .build/ · logs/ · evals/ · artifacts/ · docs-llm-wiki/：配套支撑层
 
 ```
-skills/
-└── common/                          # 后续有需要可以下沉进入各领域
-    └── knowledge/
-        ├── hs-common-workspace-explore/    # 全局入口：按代码路径发现、绑定知识入口
-        ├── hs-common-knowledge-ingest/        # Agent 建卡、融合和统一收尾流程
-        ├── hs-common-knowledge-lint/          # 结构、来源检查与语义复核流程
-        └── hs-common-knowledge-query/         # 初版 SQLite 词面检索与索引工具
-workflows/
-└── common/                          # 后续有需要可以下沉进入各领域
-    └── knowledge/
-        ├── hs-common-knowledge-ingest/        # Agent 建卡、融合和统一收尾流程工作流
-        └── hs-common-knowledge-lint/          # 结构、来源检查与语义复核流程工作流
 AGENTS.md                            # 入口：领域/流程路由、卡契约指针、config.yml 说明
 config.yml                           # 代码仓 ↔ 架构元素 ↔ 领域知识实体 ↔ 符号映射
 main/                                # 真实代码工作区
@@ -47,7 +33,16 @@ main/                                # 真实代码工作区
 │       ├── .codegraph/              # [新增]代码图谱db文件，本地生成不上库
 │       └── …
 └── …
-aiot-wifi-knowledge/             # WiFi 领域知识仓；以下展开内部结构
+aiotbot-knowledge┐
+                 ├platform/      # Platform 领域知识仓（结构同构，不展开）
+                 ├bgle/          # BGLE 领域知识仓（结构同构，不展开）
+                 ├gnss/          # GNSS 领域知识仓（结构同构，不展开）
+                 ├slp/           # SLP 领域知识仓（结构同构，不展开）
+                 ├radar/         # Radar 领域知识仓（结构同构，不展开）
+                 ├nfc/           # NFC 领域知识仓（结构同构，不展开）
+                 ├npu/           # NPU 领域知识仓（结构同构，不展开）
+                 ├mcu/           # MCU 领域知识仓（结构同构，不展开）
+                 └wifi/          # WiFi 领域知识仓；以下展开内部结构
 ├── AGENTS.md                    # 知识边界、规则指针与技能入口
 ├── README.md                    # 定位、实际能力、资料导航
 ├── CONTRIBUTING.md              # 生产、核验和贡献流程
@@ -91,6 +86,23 @@ aiot-wifi-knowledge/             # WiFi 领域知识仓；以下展开内部结�
 └── artifacts/                   # 本地派生索引、验证报告，Git 忽略
 ```
 
+knowledge相关skills和workflows（实际实现在skill仓内）：
+
+```
+skills/
+└── common/                          # 后续有需要可以下沉进入各领域
+    └── knowledge/
+        ├── hs-workspace-explore/    # 全局入口：按代码路径发现、绑定知识入口
+        ├── hs-knowledge-ingest/        # Agent 建卡、融合和统一收尾流程
+        ├── hs-knowledge-lint/          # 结构、来源检查与语义复核流程
+        └── hs-knowledge-query/         # 初版 SQLite 词面检索与索引工具
+workflows/
+└── common/                          # 后续有需要可以下沉进入各领域
+    └── knowledge/
+        ├── hs-knowledge-ingest/        # Agent 建卡、融合和统一收尾流程工作流
+        └── hs-knowledge-lint/          # 结构、来源检查与语义复核流程工作流
+```
+
 # 11 AIoTBot知识库架构
 
 前文"AIoTBot knowledge目录架构"回答的是"有哪些目录"，本章回答三个问题：**每个目录是干什么的？为什么要有这个目录？目录之间怎么协作？** 阅读顺序：11.1 建立动机认知（为什么需要知识库）→ 11.2 仓库架构（分层模型 + 目录职责）→ 11.3 知识生命周期（三条链路看目录协作）。
@@ -128,7 +140,7 @@ flowchart TB
 
     subgraph S1["① 入口路由层 · 知识库前台"]
         direction LR
-        A1["hs-common-workspace-explore<br />全局 Skill · 自动发现与绑定项目"]
+        A1["hs-workspace-explore<br />全局 Skill · 自动发现与绑定项目"]
         A2["AGENTS.md<br />消费路由契约"]
         A3["config.yml<br />四张映射表"]
         A4["领域仓根四件套<br />README · CONTRIBUTING · check.py/check.sh"]
@@ -137,7 +149,7 @@ flowchart TB
     subgraph S2["② 源事实层 · 证据底座"]
         direction LR
         B1["main/<br />真实代码<br />.codegraph/ 本地索引（不上库）"]
-        B2["docs-raw/sources/<br />dbox · 3ms · wiki（后续保留）"]
+        B2["docs-raw/sources/<br />dbox · 3ms · wiki（登记制）"]
         B3["docs-raw/ 落库制五类<br />conventions · chips · storys · specs · protocols"]
     end
 
@@ -155,8 +167,8 @@ flowchart TB
     subgraph S4["④ 治理与工具层"]
         direction LR
         D1["governance/<br />templates · schemas · contracts · specs · sources.lock.yaml"]
-        D2["skills/common/knowledge<br />hs-common-knowledge-ingest · hs-common-knowledge-lint · hs-common-knowledge-query"]
-        D3["workflows/common/knowledge<br />hs-common-knowledge-ingest · hs-common-knowledge-lint"]
+        D2["skills/common/knowledge<br />hs-knowledge-ingest · hs-knowledge-lint · hs-knowledge-query"]
+        D3["workflows/common/knowledge<br />hs-knowledge-ingest · hs-knowledge-lint"]
     end
 
     subgraph S5["⑤ 配套支撑层"]
@@ -178,10 +190,10 @@ flowchart TB
 
 | 层 | 一句话职责 | 承载目录/文件 |
 |---|---|---|
-| ① 入口路由层 | 自动绑定项目，先路由再消费 | `hs-common-workspace-explore` · `AGENTS.md` · `config.yml` · 领域仓根四件套（`README.md` · `CONTRIBUTING.md` · `check.py/check.sh`） |
+| ① 入口路由层 | 自动绑定项目，先路由再消费 | `hs-workspace-explore` · `AGENTS.md` · `config.yml` · 领域仓根四件套（`README.md` · `CONTRIBUTING.md` · `check.py/check.sh`） |
 | ② 源事实层 | 证据底座：代码事实 + 原始材料，喂知识层 | `main/` · `docs-raw/` |
 | ③ 知识资产层 | 唯一检索对象：治理后的知识卡 | `knowledge/` |
-| ④ 治理与工具层 | 契约约束知识层，三流程执行体 | `governance/` · `skills/common/knowledge/` · `workflows/common/knowledge/` |
+| ④ 治理与工具层 | 契约约束知识层，三流程执行体 | `governance/` · `.skills/` · `.workflows/` |
 | ⑤ 配套支撑层 | 候选暂存 · 回归门禁 · 留痕 · 派生索引 | `.build/` · `evals/` · `logs/` · `artifacts/` · `docs-llm-wiki/` |
 
 递进一句话：证据层喂知识层，契约层束知识层，技能层跑知识层，配套层验知识层，入口层路由知识层。
@@ -192,7 +204,7 @@ flowchart TB
 
 Agent 会话入口。作用是"先路由，再消费"：代码静态事实走 CodeGraph CLI，设计意图/动态语义走知识卡，历史原始材料走 raw，禁止全库扫描。没有这个入口，Agent 每次都要猜路径；有了它，一次会话的上下文预算花在刀刃上。
 
-仓外启动时先由全局 `hs-common-workspace-explore` 按目标代码路径定位 `config.yml` 与知识仓，再读取适用 `AGENTS.md`；不假定提示词中出现路径就已自动加载项目规则。
+仓外启动时先由全局 `hs-workspace-explore` 按目标代码路径定位 `config.yml` 与知识仓，再读取适用 `AGENTS.md`；不假定提示词中出现路径就已自动加载项目规则。
 
 参与链路：消费链路（前置路由）。生产、治理链路不经过它——ingest / lint 是显式触发，不走会话路由。
 
@@ -214,12 +226,12 @@ device 侧 + host 侧真实代码。`.codegraph/` 是代码图谱索引，**本�
 
 | 技能 | 职责 | 一句话 |
 |------|------|--------|
-| `hs-common-workspace-explore/` | 全局发现与绑定项目、加载知识入口 | 先接入 |
-| `hs-common-knowledge-ingest/` | Agent 建卡、融合和统一收尾流程 | 怎么进 |
-| `hs-common-knowledge-lint/` | 结构、来源检查与语义复核流程 | 怎么验 |
-| `hs-common-knowledge-query/` | 初版 SQLite 词面检索与索引工具 | 怎么找 |
+| `hs-workspace-explore/` | 全局发现与绑定项目视图、加载知识入口 | 先接入 |
+| `hs-knowledge-ingest/` | Agent 建卡、融合和统一收尾流程 | 怎么进 |
+| `hs-knowledge-lint/` | 结构、来源检查与语义复核流程 | 怎么验 |
+| `hs-knowledge-query/` | 初版 SQLite 词面检索与索引工具 | 怎么找 |
 
-参与链路：**三条链路各由一个技能执行**——hs-common-knowledge-ingest 跑生产、hs-common-knowledge-lint 跑治理、hs-common-knowledge-query 跑消费。
+参与链路：**三条链路各由一个技能执行**——hs-knowledge-ingest 跑生产、hs-knowledge-lint 跑治理、hs-knowledge-query 跑消费。
 
 #### `workflows/common/knowledge`/ —— 增量更新与治理工作流
 
@@ -227,12 +239,12 @@ device 侧 + host 侧真实代码。`.codegraph/` 是代码图谱索引，**本�
 
 | 技能 | 职责 | 一句话 |
 |------|------|--------|
-| `hs-common-knowledge-ingest/` | Agent 建卡、融合和统一收尾流程 | 怎么进 |
-| `hs-common-knowledge-lint/` | 结构、来源检查与语义复核流程 | 怎么验 |
+| `hs-knowledge-ingest/` | Agent 建卡、融合和统一收尾流程 | 怎么进 |
+| `hs-knowledge-lint/` | 结构、来源检查与语义复核流程 | 怎么验 |
 
-参与链路：hs-common-knowledge-ingest 跑生产、hs-common-knowledge-lint 跑治理
+参与链路：hs-knowledge-ingest 跑生产、hs-knowledge-lint 跑治理
 
-#### aiot-wifi-knowledge/ —— 领域知识仓
+#### aiot-knowledge/ —— 领域知识仓
 
 一个领域一个仓（platform / bgle / gnss / slp / radar / wifi），**内部目录完全同构**，技能跨仓复用零适配。按域分仓的理由见"AIoTBot目标"章：领域知识差异大、保密要求不同；代码与知识放一个仓会有权限冲突和一致性难题，独立建设各自管内容和权限。
 
@@ -269,7 +281,7 @@ flowchart LR
     Q -->|"这个词什么意思？"| GL["glossaries/ 术语卡：组内黑话与缩写"]
 ```
 
-目录来源标注了蒸馏出处（文档系统A、storys、specs、conventions、内部Wiki），建卡时按材料类型对号入座。`AGENTS.md` + `index.md` 是领域规则与逐层导航。
+目录来源标注了蒸馏出处（dbox、storys、specs、conventions、wiki），建卡时按材料类型对号入座。`AGENTS.md` + `index.md` 是领域规则与逐层导航。
 
 **上库管理标准**：知识卡正文随仓提交、进评审流程，仓库里沉淀的是卡片、导航、规则、模板与评测全量事实；不上库的只有可重建的派生物（`artifacts/` 索引、验证报告）与暂存区（`.build/`），Git 历史只承载"人确认过的知识"。
 
@@ -281,7 +293,7 @@ flowchart LR
 
 两套存放形态：
 
-- **登记制（`sources/`，后续保留）**：按文档工具登记"链接 + 版本 + hash + 密级"；首发不处理链接更新、dbox 仓外路径映射、wiki 网页获取及 3ms 接入。用户可先将导出原件放入下面五类目录，再走人工确认路径。
+- **登记制（`sources/`）**：不好落到本地的文件（dbox、3ms、wiki），按公司三个文档管理工具分类登记"链接 + 版本 + hash + 密级"，原件仍由源系统持有，与薪火平台共管理；`governance/sources.lock.yaml` 锁声明版本与恢复说明。（首发版本暂不支持）
 - **落库制（conventions / chips / storys / specs / protocols）**：内部公开、上库 Git 仓的文件，按 WiFi 组可能用到的材料类型分五类。
 
 ##### 分类对知识卡生成的影响
@@ -363,7 +375,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    M["① 来源材料<br />docs-raw/ 六类"] --> R1["sources/ 链接类<br />文档系统A / 文档系统B / 内部Wiki<br />仅链接上库 · agent 联网读取更新（首发版本暂不支持）"]
+    M["① 来源材料<br />docs-raw/ 六类"] --> R1["sources/ 链接类<br />dbox / 3ms / wiki<br />仅链接上库 · agent 联网读取更新（首发版本暂不支持）"]
     M --> R2["conventions/<br />编码规范，上库"]
     M --> R3["chips/<br />芯片文档，上库"]
     M --> R4["storys/<br />迭代设计文档，上库"]
@@ -382,7 +394,7 @@ flowchart LR
 
 ### 链路二：治理上库 —— lint 门禁
 
-输入是 `.build/` 里的候选卡，输出是**合入 Git 的 stable 卡**。`hs-common-knowledge-lint` 技能定义流程，`governance/` 提供契约，`check.py / check.sh` 是执行入口。两道门禁、一套契约——本地门禁查 `.build/` 候选卡，CI 门禁在上库合入时全库重校验：
+输入是 `.build/` 里的候选卡，输出是**合入 Git 的 stable 卡**。`hs-knowledge-lint` 技能定义流程，`governance/` 提供契约，`check.py / check.sh` 是执行入口。两道门禁、一套契约——本地门禁查 `.build/` 候选卡，CI 门禁在上库合入时全库重校验：
 
 ```mermaid
 flowchart LR
@@ -413,7 +425,7 @@ flowchart TB
     R -->|"代码静态事实"| CODE["CodeGraph CLI<br />main/ 符号 / 调用图查询"]
     R -->|"历史原始材料"| RAW["docs-raw/ 直读原件<br />（问题本身要的就是原件，不经卡）"]
 
-    subgraph KQ["hs-common-knowledge-query 检索"]
+    subgraph KQ["hs-knowledge-query 检索"]
         C["① SQLite 词项召回<br />按知识卡字段重合度（词面匹配）打分<br />召回匹配度高的知识卡"] --> D["② frontmatter 字段过滤<br />过滤范围不符 / 状态不符<br />"]
         D --> E["③ 精读四要素<br />结论 / 适用条件 / 失效边界 / 验证方法"]
         E --> F["④ 溯源 + 印证<br />卡内 sources 指针 → docs-raw/ · main/"]
@@ -428,7 +440,7 @@ flowchart TB
 
 | 目录/文件 | 生产（材料 → 候选卡） | 治理上库（候选卡 → 合入） | 消费（卡 → 答案） |
 |---|---|---|---|
-| `hs-common-workspace-explore` | 显式流程可复用项目绑定 | 同一绑定上下文 | 前置：自动发现与加载 |
+| `hs-workspace-explore` | 显式流程可复用项目绑定 | 同一绑定上下文 | 前置：自动发现与加载 |
 | `AGENTS.md` | 不参与 | 不参与 | 前置：路由 |
 | `config.yml` | — | — | 前置：路由依据 |
 | `main/` | 来源之一（代码事实） | — | ④ 交叉印证 |

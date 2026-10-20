@@ -30,6 +30,19 @@ def canonical(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
 
 
+def strict_json(value):
+    def pairs(items):
+        result = {}
+        for key, item in items:
+            if key in result:
+                raise Invalid("duplicate JSON key")
+            result[key] = item
+        return result
+    def nonfinite(value):
+        raise Invalid("nonfinite JSON value: " + value)
+    return json.loads(value, object_pairs_hook=pairs, parse_constant=nonfinite)
+
+
 def digest(value):
     return hashlib.sha256(value if isinstance(value, bytes) else canonical(value)).hexdigest()
 
@@ -58,7 +71,7 @@ def safe_path(root, relative, prefixes=None):
         raise Invalid("expected knowledge-root relative POSIX path")
     parts = relative.split("/")
     reserved = {"con", "prn", "aux", "nul"} | {"com" + str(n) for n in range(1, 10)} | {"lpt" + str(n) for n in range(1, 10)}
-    if any(p in ("", ".", "..") or p.rstrip(". ") != p or p.split(".")[0].lower() in reserved for p in parts):
+    if any(p in ("", ".", "..") or p.rstrip(". ") != p or p.split(".")[0].lower() in reserved or any(ord(c) < 32 or c in '<>"|?*' for c in p) for p in parts):
         raise Invalid("unsafe path component")
     if prefixes and not any(relative == p or relative.startswith(p.rstrip("/") + "/") for p in prefixes):
         raise Invalid("path is outside its prescribed subtree")
@@ -180,7 +193,7 @@ class Context:
         return result
 
     def read(self, relative):
-        value = json.loads(self.path(relative).read_text(encoding="utf-8"))
+        value = strict_json(self.path(relative).read_text(encoding="utf-8"))
         verify(value)
         if value.get("rules_digest") != self.rules_digest:
             raise Invalid("record rules identity mismatch")
@@ -322,7 +335,7 @@ def load_context(args, package_root):
     sys.modules[spec.name] = domain
     spec.loader.exec_module(domain)
     rules = domain.load_rules(root, args.rules_digest)
-    catalog = json.loads(pathlib.Path(args.catalog).read_text(encoding="utf-8")) if args.catalog else {}
+    catalog = strict_json(pathlib.Path(args.catalog).read_text(encoding="utf-8")) if args.catalog else {}
     if catalog and catalog.get("schema_version") != "2.0":
         raise Invalid("invalid installed catalog version")
     context = Context(root, args.rules_digest, identity(package_root), catalog, domain, rules)
@@ -342,7 +355,7 @@ def run_cli(handler, package_root):
     tool = identity(package_root)
     try:
         ctx = load_context(args, package_root)
-        request = json.loads(pathlib.Path(args.input).read_text(encoding="utf-8"))
+        request = strict_json(pathlib.Path(args.input).read_text(encoding="utf-8"))
         data = handler(ctx, request, args.action)
         result = {"status": "ok", "phase": data.pop("phase", "completed"), "data": data, "diagnostics": []}
         code = 0

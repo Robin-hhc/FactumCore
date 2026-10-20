@@ -1,7 +1,7 @@
 """Persist only an authenticated, exactly bound human decision."""
 import json
 
-from support import Blocked, Invalid, authenticated_event, checked_view
+from support import Blocked, Invalid, authenticated_event, checked_view, strict_json
 
 
 def record_confirmation(ctx, request):
@@ -20,7 +20,7 @@ def record_confirmation(ctx, request):
     event_path = ctx.path(event_ref, (f".build/operations/{op}", "logs/host-events"))
     if not event_path.is_file():
         raise Blocked("awaiting trusted host event")
-    event = json.loads(event_path.read_text(encoding="utf-8"))
+    event = strict_json(event_path.read_text(encoding="utf-8"))
     tier = authenticated_event(ctx, display, event)
     decision = event["payload"]["decision"]
     proof = ctx.record("manual_review", op, status="approved" if decision == "approve" else "rejected", view_ref=display["view_ref"], view_digest=display["view_digest"], display_ref=display_ref, display_digest=display["digest"], host_event=event, verification_tier=tier)

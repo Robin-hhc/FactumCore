@@ -1,14 +1,23 @@
 """Single writer/CAS transaction engine with durable recovery."""
+
 import base64
 import importlib
-import json
 import pathlib
 import secrets
 import subprocess
-import sys
 
-from support import (Blocked, Invalid, WriterLock, atomic_bytes, authenticated_event,
-                     canonical, checked_view, digest, package_digest, sync_directory)
+from support import (
+    Blocked,
+    Invalid,
+    WriterLock,
+    atomic_bytes,
+    authenticated_event,
+    canonical,
+    checked_view,
+    digest,
+    package_digest,
+    sync_directory,
+)
 
 
 def current_digest(ctx, path):
@@ -26,48 +35,106 @@ def invoke_checker(ctx, request):
         raise Blocked("trusted installed catalog path is required")
     root = pathlib.Path(spec["root"]).resolve()
     entry = root / spec.get("entry", "scripts/cli.py")
-    if entry.resolve() != root / "scripts/cli.py" or package_digest(root) != spec.get("package_digest"):
+    if entry.resolve() != root / "scripts/cli.py" or package_digest(root) != spec.get(
+        "package_digest"
+    ):
         raise Invalid("code checker package identity mismatch")
     op = ctx.operation(request)
     req_ref = f".build/operations/{op}/apply-code-proof-request.json"
-    request_bytes = canonical({"operation_id": op, "view_ref": request["view_ref"], "proof_ref": request["proof_ref"]})
+    request_bytes = canonical(
+        {
+            "operation_id": op,
+            "view_ref": request["view_ref"],
+            "proof_ref": request["proof_ref"],
+        }
+    )
     target = ctx.path(req_ref)
     if target.exists() and target.read_bytes() != request_bytes:
         raise Blocked("code proof request already frozen")
     if not target.exists():
         atomic_bytes(target, request_bytes)
-    response_ref = f".build/operations/{op}/apply-code-proof-response-{secrets.token_hex(12)}.json"
+    response_ref = (
+        f".build/operations/{op}/apply-code-proof-response-{secrets.token_hex(12)}.json"
+    )
     response_path = ctx.path(response_ref)
-    command = [spec["python"], str(entry), "--input", str(target), "--output", str(response_path), "--knowledge-root", str(ctx.root), "--rules-digest", ctx.rules_digest, "--catalog", ctx.catalog_path, "--action", "verify-proof"]
+    command = [
+        spec["python"],
+        str(entry),
+        "--input",
+        str(target),
+        "--output",
+        str(response_path),
+        "--knowledge-root",
+        str(ctx.root),
+        "--rules-digest",
+        ctx.rules_digest,
+        "--catalog",
+        ctx.catalog_path,
+        "--action",
+        "verify-proof",
+    ]
     completed = subprocess.run(command, check=False, capture_output=True, timeout=120)
     if completed.returncode != 0 or not response_path.is_file():
         raise Blocked("trusted code checker did not verify proof")
     response = ctx.read(response_ref)
-    if response.get("tool_identity", {}).get("package_digest") != spec["package_digest"] or response.get("status") != "ok" or response.get("data", {}).get("proof_verified") is not True:
+    if (
+        response.get("tool_identity", {}).get("package_digest")
+        != spec["package_digest"]
+        or response.get("status") != "ok"
+        or response.get("data", {}).get("proof_verified") is not True
+    ):
         raise Blocked("code proof is incomplete or unsupported")
 
 
 def validate_proof(ctx, request, view):
     proof_ref = request.get("proof_ref")
-    ctx.path(proof_ref, (f"logs/operations/{view['operation_id']}", f".build/operations/{view['operation_id']}"))
+    ctx.path(
+        proof_ref,
+        (
+            f"logs/operations/{view['operation_id']}",
+            f".build/operations/{view['operation_id']}",
+        ),
+    )
     proof = ctx.read(proof_ref)
-    if proof.get("operation_id") != view["operation_id"] or proof.get("view_digest") != view["digest"]:
+    if (
+        proof.get("operation_id") != view["operation_id"]
+        or proof.get("view_digest") != view["digest"]
+    ):
         raise Invalid("proof is not bound to this exact final view")
     if view.get("review_mode") == "manual_document":
-        if proof.get("record_kind") != "manual_review" or proof.get("status") != "approved":
+        if (
+            proof.get("record_kind") != "manual_review"
+            or proof.get("status") != "approved"
+        ):
             raise Blocked("document view requires explicit real-human approval")
-        ctx.path(proof.get("display_ref"), (f".build/operations/{view['operation_id']}",))
+        ctx.path(
+            proof.get("display_ref"), (f".build/operations/{view['operation_id']}",)
+        )
         display = ctx.read(proof.get("display_ref"))
-        if display.get("digest") != proof.get("display_digest") or display.get("view_digest") != view["digest"] or display.get("writes") != view.get("writes") or display.get("deletes") != view.get("deletes"):
+        if (
+            display.get("digest") != proof.get("display_digest")
+            or display.get("view_digest") != view["digest"]
+            or display.get("writes") != view.get("writes")
+            or display.get("deletes") != view.get("deletes")
+        ):
             raise Invalid("manual proof display binding mismatch")
-        authenticated_event(ctx, display, proof.get("host_event", {}), allow_elapsed=True)
+        authenticated_event(
+            ctx, display, proof.get("host_event", {}), allow_elapsed=True
+        )
         if proof["host_event"]["payload"]["decision"] != "approve":
             raise Blocked("human rejected this view")
     elif view.get("review_mode") == "code_gate":
-        if proof.get("record_kind") != "local_check" or proof.get("status") != "passed" or proof.get("mode") != "local":
+        if (
+            proof.get("record_kind") != "local_check"
+            or proof.get("status") != "passed"
+            or proof.get("mode") != "local"
+        ):
             raise Blocked("code view requires a passing local code proof")
         claims = proof.get("claims")
-        if not claims or any(row.get("status") not in ("supported", "retired") or not row.get("evidence") for row in claims):
+        if not claims or any(
+            row.get("status") not in ("supported", "retired") or not row.get("evidence")
+            for row in claims
+        ):
             raise Blocked("every code Claim requires positive evidence")
         invoke_checker(ctx, request)
     else:
@@ -96,7 +163,9 @@ def validate_final_cards(ctx, view):
         if row["path"] == "governance/sources.lock.yaml":
             rules["source_lock"] = ctx.domain.load_yaml(raw)
             ctx.domain.validate_shape("sources", rules["source_lock"], rules)
-        elif row["path"].startswith("knowledge/") and pathlib.PurePosixPath(row["path"]).name not in ("AGENTS.md", "index.md", "README.md"):
+        elif row["path"].startswith("knowledge/") and pathlib.PurePosixPath(
+            row["path"]
+        ).name not in ("AGENTS.md", "index.md", "README.md"):
             if not row["path"].endswith(".md"):
                 raise Invalid("knowledge cards must be Markdown")
             entries[row["path"]] = raw
@@ -107,7 +176,10 @@ def validate_final_cards(ctx, view):
         if key in cards:
             raise Invalid("duplicate card ID in final view")
         cards[key] = card
-        if path in {row["path"] for row in view["writes"]} and (card["metadata"]["review_mode"] != view["review_mode"] or card["metadata"]["lifecycle"] not in ("stable", "deprecated")):
+        if path in {row["path"] for row in view["writes"]} and (
+            card["metadata"]["review_mode"] != view["review_mode"]
+            or card["metadata"]["lifecycle"] not in ("stable", "deprecated")
+        ):
             raise Invalid("final card review mode/lifecycle mismatches approved view")
     for card in cards.values():
         knowledge.validate_card(card, cards, rules)
@@ -115,40 +187,89 @@ def validate_final_cards(ctx, view):
 
 
 def baseline(view):
-    return digest({"files": {row["path"]: row["expected_old_digest"] for row in view["writes"] + view.get("deletes", [])}})
+    return digest(
+        {
+            "files": {
+                row["path"]: row["expected_old_digest"]
+                for row in view["writes"] + view.get("deletes", [])
+            }
+        }
+    )
 
 
 def fixture_fault_allowed(ctx):
     marker = ctx.root / ".isolated-knowledge-fixture"
     adapters = ctx.catalog.get("review_trust", {}).get("adapters", {}).values()
-    return marker.is_file() and marker.read_text(encoding="utf-8").strip() == "AIOTBOT_SYNTHETIC_FIXTURE_V2" and any(spec.get("synthetic") and spec.get("fixture_root") and pathlib.Path(spec["fixture_root"]).resolve() == ctx.root for spec in adapters)
+    return (
+        marker.is_file()
+        and marker.read_text(encoding="utf-8").strip() == "AIOTBOT_SYNTHETIC_FIXTURE_V2"
+        and any(
+            spec.get("synthetic")
+            and spec.get("fixture_root")
+            and pathlib.Path(spec["fixture_root"]).resolve() == ctx.root
+            for spec in adapters
+        )
+    )
 
 
 def save_journal(ctx, journal):
-    ctx.save(f"logs/operations/{journal['operation_id']}/journal.json", journal, immutable=False)
+    ctx.save(
+        f"logs/operations/{journal['operation_id']}/journal.json",
+        journal,
+        immutable=False,
+    )
 
 
 def preflight_recovery(ctx, journal):
     for row in journal["entries"]:
         actual = current_digest(ctx, row["path"])
+        if not row.get("attempted") and actual != row["old_digest"]:
+            raise Blocked(
+                "external bytes on unattempted target are preserved: " + row["path"]
+            )
         if actual not in (row["old_digest"], row["new_digest"]):
             raise Blocked("external edit preserved; recovery conflict: " + row["path"])
 
 
 def validate_journal(ctx, journal, op):
     """A resealed Agent-written journal is not authority to mutate files."""
-    if journal.get("record_kind") != "transaction_journal" or journal.get("operation_id") != op:
+    if (
+        journal.get("record_kind") != "transaction_journal"
+        or journal.get("operation_id") != op
+    ):
         raise Invalid("transaction journal identity mismatch")
-    request = {"operation_id": op, "view_ref": journal.get("view_ref"), "proof_ref": journal.get("proof_ref")}
+    request = {
+        "operation_id": op,
+        "view_ref": journal.get("view_ref"),
+        "proof_ref": journal.get("proof_ref"),
+    }
     view = checked_view(ctx, request)
     proof = validate_proof(ctx, request, view)
-    if view["digest"] != journal.get("view_digest") or proof["digest"] != journal.get("proof_digest"):
+    if view["digest"] != journal.get("view_digest") or proof["digest"] != journal.get(
+        "proof_digest"
+    ):
         raise Invalid("journal is not bound to reviewed inputs")
     expected = []
     for row in view["writes"] + view.get("deletes", []):
         old = row["expected_old_digest"]
-        expected.append({"path": row["path"], "old_digest": old, "new_digest": row.get("final_digest"), "bytes_b64": row.get("bytes_b64"), "backup_ref": f"logs/operations/{op}/backups/{old}.bin" if old else None})
-    actual = [{key: row.get(key) for key in ("path", "old_digest", "new_digest", "bytes_b64", "backup_ref")} for row in journal.get("entries", [])]
+        expected.append(
+            {
+                "path": row["path"],
+                "old_digest": old,
+                "new_digest": row.get("final_digest"),
+                "bytes_b64": row.get("bytes_b64"),
+                "backup_ref": f"logs/operations/{op}/backups/{old}.bin"
+                if old
+                else None,
+            }
+        )
+    actual = [
+        {
+            key: row.get(key)
+            for key in ("path", "old_digest", "new_digest", "bytes_b64", "backup_ref")
+        }
+        for row in journal.get("entries", [])
+    ]
     if actual != expected:
         raise Invalid("journal write set differs from reviewed exact bytes")
     return view, proof
@@ -157,12 +278,32 @@ def validate_journal(ctx, journal, op):
 def finish_commit(ctx, journal):
     op = journal["operation_id"]
     result_ref = f"logs/operations/{op}/apply-result.json"
-    result = ctx.record("apply_result", op, status="committed", view_ref=journal["view_ref"], view_digest=journal["view_digest"], proof_ref=journal["proof_ref"], proof_digest=journal["proof_digest"], writes=[row["path"] for row in journal["entries"] if row["new_digest"] is not None], deletes=[row["path"] for row in journal["entries"] if row["new_digest"] is None], verification_tier=journal["verification_tier"])
+    result = ctx.record(
+        "apply_result",
+        op,
+        status="committed",
+        view_ref=journal["view_ref"],
+        view_digest=journal["view_digest"],
+        proof_ref=journal["proof_ref"],
+        proof_digest=journal["proof_digest"],
+        writes=[
+            row["path"] for row in journal["entries"] if row["new_digest"] is not None
+        ],
+        deletes=[
+            row["path"] for row in journal["entries"] if row["new_digest"] is None
+        ],
+        verification_tier=journal["verification_tier"],
+    )
     ctx.save(result_ref, result)
     journal["status"] = "committed"
     journal["result_ref"] = result_ref
     save_journal(ctx, journal)
-    return {"apply_result_ref": result_ref, "apply_result_digest": result["digest"], "transaction_status": "committed", "phase": "committed"}
+    return {
+        "apply_result_ref": result_ref,
+        "apply_result_digest": result["digest"],
+        "transaction_status": "committed",
+        "phase": "committed",
+    }
 
 
 def mutate(ctx, journal, fault_after=None):
@@ -172,11 +313,15 @@ def mutate(ctx, journal, fault_after=None):
     try:
         for row in journal["entries"]:
             actual = current_digest(ctx, row["path"])
-            if actual == row["new_digest"]:
+            if actual == row["new_digest"] and (
+                row.get("attempted") or row["old_digest"] == row["new_digest"]
+            ):
                 continue
             if actual != row["old_digest"]:
                 raise Blocked("external edit preserved during apply: " + row["path"])
             target = ctx.path(row["path"])
+            row["attempted"] = True
+            save_journal(ctx, journal)
             if row["new_digest"] is None:
                 if target.exists():
                     target.unlink()
@@ -210,33 +355,71 @@ def execute(ctx, request, action="run"):
         result = ctx.read(result_ref)
         journal = ctx.read(f"logs/operations/{op}/journal.json")
         view, proof = validate_journal(ctx, journal, op)
-        if journal.get("status") != "committed" or journal.get("result_ref") != result_ref or result.get("record_kind") != "apply_result" or result.get("status") != "committed" or result.get("operation_id") != op or result.get("view_digest") != view["digest"] or result.get("proof_digest") != proof["digest"]:
+        if (
+            journal.get("status") != "committed"
+            or journal.get("result_ref") != result_ref
+            or result.get("record_kind") != "apply_result"
+            or result.get("status") != "committed"
+            or result.get("operation_id") != op
+            or result.get("view_digest") != view["digest"]
+            or result.get("proof_digest") != proof["digest"]
+        ):
             raise Invalid("apply result is not an authenticated committed transaction")
         expected_writes = [row["path"] for row in view["writes"]]
         expected_deletes = [row["path"] for row in view.get("deletes", [])]
-        if result.get("writes") != expected_writes or result.get("deletes") != expected_deletes:
+        if (
+            result.get("writes") != expected_writes
+            or result.get("deletes") != expected_deletes
+        ):
             raise Invalid("apply result write set was changed")
-        eligible = []
+        eligible, historical = [], []
         for row in view["writes"]:
-            if not row["path"].startswith("knowledge/") or pathlib.PurePosixPath(row["path"]).name in ("index.md", "AGENTS.md", "README.md"):
+            if not row["path"].startswith("knowledge/") or pathlib.PurePosixPath(
+                row["path"]
+            ).name in ("index.md", "AGENTS.md", "README.md"):
                 continue
             if current_digest(ctx, row["path"]) != row["final_digest"]:
                 continue
             if ctx.domain:
-                knowledge = importlib.import_module(ctx.domain.__package__ + ".knowledge")
-                sources = importlib.import_module(ctx.domain.__package__ + ".source_resources")
-                card = knowledge.parse_card(ctx.path(row["path"]).read_bytes(), row["path"], ctx.rules)
+                knowledge = importlib.import_module(
+                    ctx.domain.__package__ + ".knowledge"
+                )
+                sources = importlib.import_module(
+                    ctx.domain.__package__ + ".source_resources"
+                )
+                card = knowledge.parse_card(
+                    ctx.path(row["path"]).read_bytes(), row["path"], ctx.rules
+                )
                 knowledge.validate_card(card, None, ctx.rules)
-                if card["metadata"]["lifecycle"] != "stable":
-                    continue
                 source_lock = sources.read_source_lock(ctx.root)
                 for ref in card["metadata"]["sources"]:
                     snapshot = sources.validate_source_ref(ref, source_lock)
                     sources.recover_snapshot(ctx.root, snapshot)
+                if card["metadata"]["lifecycle"] == "deprecated":
+                    historical.append(
+                        {"path": row["path"], "sha256": row["final_digest"]}
+                    )
+                    continue
             eligible.append({"path": row["path"], "sha256": row["final_digest"]})
-        if request.get("card_path") and not any(row["path"] == request["card_path"] and row["sha256"] == request.get("card_digest") for row in eligible):
-            raise Blocked("requested card has no current authenticated exact-content eligibility")
-        return {"result_verified": True, "verification_scope": "authenticated_content_eligibility", "eligible_files": eligible, "view_ref": journal["view_ref"], "view_digest": view["digest"], "proof_ref": journal["proof_ref"], "verification_tier": proof.get("verification_tier", "code_gate"), "phase": "verified"}
+        if request.get("card_path") and not any(
+            row["path"] == request["card_path"]
+            and row["sha256"] == request.get("card_digest")
+            for row in eligible
+        ):
+            raise Blocked(
+                "requested card has no current authenticated exact-content eligibility"
+            )
+        return {
+            "result_verified": True,
+            "verification_scope": "authenticated_content_eligibility",
+            "eligible_files": eligible,
+            "historical_files": historical,
+            "view_ref": journal["view_ref"],
+            "view_digest": view["digest"],
+            "proof_ref": journal["proof_ref"],
+            "verification_tier": proof.get("verification_tier", "code_gate"),
+            "phase": "verified",
+        }
     if action not in ("run", "inspect", "resume", "rollback"):
         raise Invalid("unsupported transaction action")
     journal_ref = f"logs/operations/{op}/journal.json"
@@ -245,17 +428,57 @@ def execute(ctx, request, action="run"):
         if action == "inspect":
             if not journal:
                 raise Blocked("operation has no transaction journal")
-            return {"journal_ref": journal_ref, "transaction_status": journal["status"], "entries": [{"path": row["path"], "old_digest": row["old_digest"], "final_digest": row["new_digest"], "current_digest": current_digest(ctx, row["path"])} for row in journal["entries"]], "phase": "inspected"}
+            return {
+                "journal_ref": journal_ref,
+                "transaction_status": journal["status"],
+                "entries": [
+                    {
+                        "path": row["path"],
+                        "old_digest": row["old_digest"],
+                        "final_digest": row["new_digest"],
+                        "current_digest": current_digest(ctx, row["path"]),
+                    }
+                    for row in journal["entries"]
+                ],
+                "phase": "inspected",
+            }
+        operations = ctx.path("logs/operations")
+        for other_path in operations.glob("*/journal.json"):
+            if other_path.parent.name == op:
+                continue
+            other = ctx.read(other_path.relative_to(ctx.root).as_posix())
+            if other.get("record_kind") != "transaction_journal" or other.get(
+                "status"
+            ) not in ("committed", "rolled_back"):
+                raise Blocked(
+                    "another operation requires recovery before domain writes: "
+                    + other_path.parent.name
+                )
         if journal and journal["status"] == "committed":
             if action == "rollback":
-                raise Blocked("committed transactions require a new reviewed change, not rollback")
-            if request.get("view_ref", journal["view_ref"]) != journal["view_ref"] or request.get("proof_ref", journal["proof_ref"]) != journal["proof_ref"]:
+                raise Blocked(
+                    "committed transactions require a new reviewed change, not rollback"
+                )
+            if (
+                request.get("view_ref", journal["view_ref"]) != journal["view_ref"]
+                or request.get("proof_ref", journal["proof_ref"])
+                != journal["proof_ref"]
+            ):
                 raise Invalid("operation ID already committed another request")
             result = ctx.read(journal["result_ref"])
-            return {"apply_result_ref": journal["result_ref"], "apply_result_digest": result["digest"], "transaction_status": "committed", "phase": "committed"}
+            return {
+                "apply_result_ref": journal["result_ref"],
+                "apply_result_digest": result["digest"],
+                "transaction_status": "committed",
+                "phase": "committed",
+            }
         if journal and journal["status"] == "rolled_back":
             if action == "rollback":
-                return {"journal_ref": journal_ref, "transaction_status": "rolled_back", "phase": "rolled_back"}
+                return {
+                    "journal_ref": journal_ref,
+                    "transaction_status": "rolled_back",
+                    "phase": "rolled_back",
+                }
             raise Blocked("rolled-back operation is closed; create a new operation")
         if action in ("resume", "rollback"):
             if not journal:
@@ -270,11 +493,15 @@ def execute(ctx, request, action="run"):
                         if digest(raw) != row["old_digest"]:
                             raise Invalid("recovery backup digest mismatch")
                 for row in reversed(journal["entries"]):
+                    if not row.get("attempted"):
+                        continue
                     current = current_digest(ctx, row["path"])
                     if current == row["old_digest"]:
                         continue
                     if current != row["new_digest"]:
-                        raise Blocked("external edit preserved during rollback: " + row["path"])
+                        raise Blocked(
+                            "external edit preserved during rollback: " + row["path"]
+                        )
                     target = ctx.path(row["path"])
                     if row["old_digest"] is None:
                         target.unlink()
@@ -283,11 +510,22 @@ def execute(ctx, request, action="run"):
                         atomic_bytes(target, ctx.path(row["backup_ref"]).read_bytes())
                 journal["status"] = "rolled_back"
                 save_journal(ctx, journal)
-                return {"journal_ref": journal_ref, "transaction_status": "rolled_back", "phase": "rolled_back"}
-            request = {"operation_id": op, "view_ref": journal["view_ref"], "proof_ref": journal["proof_ref"]}
+                return {
+                    "journal_ref": journal_ref,
+                    "transaction_status": "rolled_back",
+                    "phase": "rolled_back",
+                }
+            request = {
+                "operation_id": op,
+                "view_ref": journal["view_ref"],
+                "proof_ref": journal["proof_ref"],
+            }
             view = checked_view(ctx, request)
             proof = validate_proof(ctx, request, view)
-            if view["digest"] != journal["view_digest"] or proof["digest"] != journal["proof_digest"]:
+            if (
+                view["digest"] != journal["view_digest"]
+                or proof["digest"] != journal["proof_digest"]
+            ):
                 raise Invalid("recovery inputs changed")
             validate_final_cards(ctx, view)
             return mutate(ctx, journal)
@@ -303,7 +541,12 @@ def execute(ctx, request, action="run"):
             if current_digest(ctx, row["path"]) != row["expected_old_digest"]:
                 raise Blocked("complete write-set CAS conflict: " + row["path"])
         fault = request.get("fault_after")
-        if fault is not None and (not isinstance(fault, int) or isinstance(fault, bool) or fault < 1 or not fixture_fault_allowed(ctx)):
+        if fault is not None and (
+            not isinstance(fault, int)
+            or isinstance(fault, bool)
+            or fault < 1
+            or not fixture_fault_allowed(ctx)
+        ):
             raise Invalid("fault injection requires an explicit isolated fixture")
         entries = []
         for row in rows:
@@ -318,11 +561,31 @@ def execute(ctx, request, action="run"):
                     raise Invalid("backup object corrupted")
                 if not backup_path.exists():
                     atomic_bytes(backup_path, raw)
-            entries.append({"path": row["path"], "old_digest": old, "new_digest": row.get("final_digest"), "bytes_b64": row.get("bytes_b64"), "backup_ref": backup_ref, "installed": False})
+            entries.append(
+                {
+                    "path": row["path"],
+                    "old_digest": old,
+                    "new_digest": row.get("final_digest"),
+                    "bytes_b64": row.get("bytes_b64"),
+                    "backup_ref": backup_ref,
+                    "installed": False,
+                    "attempted": False,
+                }
+            )
         # Recheck all files after durable backups, before the prepared journal.
         for row in rows:
             if current_digest(ctx, row["path"]) != row["expected_old_digest"]:
                 raise Blocked("write set changed while preparing transaction")
-        journal = ctx.record("transaction_journal", op, status="prepared", view_ref=request["view_ref"], view_digest=view["digest"], proof_ref=request["proof_ref"], proof_digest=proof["digest"], verification_tier=proof.get("verification_tier", "code_gate"), entries=entries)
+        journal = ctx.record(
+            "transaction_journal",
+            op,
+            status="prepared",
+            view_ref=request["view_ref"],
+            view_digest=view["digest"],
+            proof_ref=request["proof_ref"],
+            proof_digest=proof["digest"],
+            verification_tier=proof.get("verification_tier", "code_gate"),
+            entries=entries,
+        )
         save_journal(ctx, journal)
         return mutate(ctx, journal, fault)

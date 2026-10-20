@@ -1,4 +1,5 @@
 """Package-local protocol support. No sibling private imports."""
+
 from __future__ import annotations
 
 import argparse
@@ -13,11 +14,9 @@ import os
 import pathlib
 import platform
 import re
-import subprocess
 import sys
 import tempfile
 import time
-import types
 
 
 class Invalid(ValueError):
@@ -29,7 +28,13 @@ class Blocked(Invalid):
 
 
 def canonical(value):
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
 
 
 def strict_json(value):
@@ -40,13 +45,17 @@ def strict_json(value):
                 raise Invalid("duplicate JSON key")
             result[key] = item
         return result
+
     def nonfinite(value):
         raise Invalid("nonfinite JSON value: " + value)
+
     return json.loads(value, object_pairs_hook=pairs, parse_constant=nonfinite)
 
 
 def digest(value):
-    return hashlib.sha256(value if isinstance(value, bytes) else canonical(value)).hexdigest()
+    return hashlib.sha256(
+        value if isinstance(value, bytes) else canonical(value)
+    ).hexdigest()
 
 
 def seal(record):
@@ -69,23 +78,47 @@ def verify(record):
 
 
 def safe_path(root, relative, prefixes=None):
-    if not isinstance(relative, str) or not relative or "\\" in relative or ":" in relative or relative.startswith("/"):
+    if (
+        not isinstance(relative, str)
+        or not relative
+        or "\\" in relative
+        or ":" in relative
+        or relative.startswith("/")
+    ):
         raise Invalid("expected knowledge-root relative POSIX path")
     parts = relative.split("/")
-    reserved = {"con", "prn", "aux", "nul"} | {"com" + str(n) for n in range(1, 10)} | {"lpt" + str(n) for n in range(1, 10)}
-    if any(p in ("", ".", "..") or p.rstrip(". ") != p or p.split(".")[0].lower() in reserved or any(ord(c) < 32 or c in '<>"|?*' for c in p) for p in parts):
+    reserved = (
+        {"con", "prn", "aux", "nul"}
+        | {"com" + str(n) for n in range(1, 10)}
+        | {"lpt" + str(n) for n in range(1, 10)}
+    )
+    if any(
+        p in ("", ".", "..")
+        or p.rstrip(". ") != p
+        or p.split(".")[0].lower() in reserved
+        or any(ord(c) < 32 or c in '<>"|?*' for c in p)
+        for p in parts
+    ):
         raise Invalid("unsafe path component")
-    if prefixes and not any(relative == p or relative.startswith(p.rstrip("/") + "/") for p in prefixes):
+    if prefixes and not any(
+        relative == p or relative.startswith(p.rstrip("/") + "/") for p in prefixes
+    ):
         raise Invalid("path is outside its prescribed subtree")
     root = pathlib.Path(root).resolve()
     current = root
     for part in parts:
         if current.exists():
-            aliases = [entry.name for entry in current.iterdir() if entry.name.casefold() == part.casefold()]
+            aliases = [
+                entry.name
+                for entry in current.iterdir()
+                if entry.name.casefold() == part.casefold()
+            ]
             if aliases and aliases != [part]:
                 raise Invalid("case alias is not permitted")
         current = current / part
-        if current.is_symlink() or (hasattr(current, "is_junction") and current.is_junction()):
+        if current.is_symlink() or (
+            hasattr(current, "is_junction") and current.is_junction()
+        ):
             raise Invalid("symlink or junction is not permitted")
         try:
             current.resolve().relative_to(root)
@@ -98,9 +131,17 @@ def package_digest(root):
     entries = {}
     for p in pathlib.Path(root).rglob("*"):
         rel = p.relative_to(root).as_posix()
-        if not p.is_file() or "__pycache__" in p.parts or "tests" in p.relative_to(root).parts:
+        if (
+            not p.is_file()
+            or "__pycache__" in p.parts
+            or "tests" in p.relative_to(root).parts
+        ):
             continue
-        if rel == "SKILL.md" or rel.startswith(("scripts/", "references/", "artifacts/")) or (p.name.startswith("requirements") and p.suffix == ".txt"):
+        if (
+            rel == "SKILL.md"
+            or rel.startswith(("scripts/", "references/", "artifacts/"))
+            or (p.name.startswith("requirements") and p.suffix == ".txt")
+        ):
             entries[rel] = digest(p.read_bytes())
     return digest(entries)
 
@@ -108,7 +149,12 @@ def package_digest(root):
 def identity(root):
     root = pathlib.Path(root)
     lock = root / "requirements.lock.txt"
-    return {"skill": root.name, "package_digest": package_digest(root), "runtime": platform.python_version(), "requirements_digest": digest(lock.read_bytes())}
+    return {
+        "skill": root.name,
+        "package_digest": package_digest(root),
+        "runtime": platform.python_version(),
+        "requirements_digest": digest(lock.read_bytes()),
+    }
 
 
 def atomic_bytes(path, content):
@@ -151,9 +197,11 @@ class WriterLock:
         try:
             if os.name == "nt":
                 import msvcrt
+
                 msvcrt.locking(self.stream.fileno(), msvcrt.LK_NBLCK, 1)
             else:
                 import fcntl
+
                 fcntl.flock(self.stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError as exc:
             self.stream.close()
@@ -165,16 +213,20 @@ class WriterLock:
             self.stream.seek(0)
             if os.name == "nt":
                 import msvcrt
+
                 msvcrt.locking(self.stream.fileno(), msvcrt.LK_UNLCK, 1)
             else:
                 import fcntl
+
                 fcntl.flock(self.stream, fcntl.LOCK_UN)
         finally:
             self.stream.close()
 
 
 class Context:
-    def __init__(self, root, rules_digest, tool_identity, catalog=None, domain=None, rules=None):
+    def __init__(
+        self, root, rules_digest, tool_identity, catalog=None, domain=None, rules=None
+    ):
         self.root = pathlib.Path(root).resolve()
         self.rules_digest = rules_digest
         self.identity = tool_identity
@@ -186,7 +238,16 @@ class Context:
     @classmethod
     def synthetic(cls, root, skill):
         """Explicit dependency-injection seam for unit tests, never used by CLI."""
-        return cls(root, "0" * 64, {"skill": skill, "package_digest": "0" * 64, "runtime": platform.python_version(), "requirements_digest": "0" * 64})
+        return cls(
+            root,
+            "0" * 64,
+            {
+                "skill": skill,
+                "package_digest": "0" * 64,
+                "runtime": platform.python_version(),
+                "requirements_digest": "0" * 64,
+            },
+        )
 
     def path(self, relative, prefixes=None):
         result = safe_path(self.root, relative, prefixes)
@@ -200,36 +261,60 @@ class Context:
         if value.get("rules_digest") != self.rules_digest:
             raise Invalid("record rules identity mismatch")
         if self.domain:
-            self.domain.validate_shape(value.get("record_kind", "record"), value, self.rules)
+            self.domain.validate_shape(
+                value.get("record_kind", "record"), value, self.rules
+            )
         return value
 
     def save(self, relative, record, immutable=True):
         path = self.path(relative, (".build/operations", "logs"))
         record = seal(record)
         if self.domain:
-            self.domain.validate_shape(record.get("record_kind", "record"), record, self.rules)
+            self.domain.validate_shape(
+                record.get("record_kind", "record"), record, self.rules
+            )
         content = canonical(record) + b"\n"
         if immutable:
             path.parent.mkdir(parents=True, exist_ok=True)
+            fd, temporary = tempfile.mkstemp(prefix=".record-", dir=str(path.parent))
             try:
-                with path.open("xb") as stream:
+                with os.fdopen(fd, "wb") as stream:
                     stream.write(content)
                     stream.flush()
                     os.fsync(stream.fileno())
-                sync_directory(path.parent)
-            except FileExistsError:
-                if path.read_bytes() != content:
-                    raise Blocked("immutable record already exists with different bytes")
+                self.path(relative, (".build/operations", "logs"))
+                try:
+                    os.link(temporary, path)
+                    sync_directory(path.parent)
+                except FileExistsError:
+                    if path.read_bytes() != content:
+                        raise Blocked(
+                            "immutable record already exists with different bytes"
+                        )
+            finally:
+                if os.path.exists(temporary):
+                    os.unlink(temporary)
         else:
             atomic_bytes(path, content)
         return relative
 
     def record(self, kind, operation_id, **fields):
-        return seal({"schema_version": "2.0", "record_kind": kind, "operation_id": operation_id, "rules_digest": self.rules_digest, "tool_identity": self.identity, **fields})
+        return seal(
+            {
+                "schema_version": "2.0",
+                "record_kind": kind,
+                "operation_id": operation_id,
+                "rules_digest": self.rules_digest,
+                "tool_identity": self.identity,
+                **fields,
+            }
+        )
 
     def operation(self, request):
         op = request.get("operation_id")
-        if not isinstance(op, str) or not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}", op):
+        if not isinstance(op, str) or not re.fullmatch(
+            r"[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}", op
+        ):
             raise Invalid("invalid operation_id")
         return op
 
@@ -244,7 +329,10 @@ def checked_view(ctx, request):
     if view.get("record_kind") != "final_view" or view.get("operation_id") != op:
         raise Invalid("final view identity mismatch")
     paths = set()
-    if any(row.get("path") == "governance/sources.lock.yaml" for row in view.get("deletes", [])):
+    if any(
+        row.get("path") == "governance/sources.lock.yaml"
+        for row in view.get("deletes", [])
+    ):
         raise Invalid("source registry cannot be deleted by a knowledge transaction")
     for row in view.get("writes", []) + view.get("deletes", []):
         path = row.get("path")
@@ -253,7 +341,9 @@ def checked_view(ctx, request):
             raise Invalid("duplicate write/delete path")
         paths.add(path.casefold())
         old = row.get("expected_old_digest")
-        if old is not None and (not isinstance(old, str) or not re.fullmatch(r"[0-9a-f]{64}", old)):
+        if old is not None and (
+            not isinstance(old, str) or not re.fullmatch(r"[0-9a-f]{64}", old)
+        ):
             raise Invalid("invalid expected-old digest")
     for row in view.get("writes", []):
         try:
@@ -275,33 +365,68 @@ def authenticated_event(ctx, display, event, allow_elapsed=False):
     if trust.get("synthetic"):
         fixture = trust.get("fixture_root")
         marker = ctx.root / ".isolated-knowledge-fixture"
-        if not fixture or pathlib.Path(fixture).resolve() != ctx.root or not marker.is_file() or marker.read_text(encoding="utf-8").strip() != "AIOTBOT_SYNTHETIC_FIXTURE_V2":
+        if (
+            not fixture
+            or pathlib.Path(fixture).resolve() != ctx.root
+            or not marker.is_file()
+            or marker.read_text(encoding="utf-8").strip()
+            != "AIOTBOT_SYNTHETIC_FIXTURE_V2"
+        ):
             raise Blocked("synthetic adapter requires explicitly isolated fixture root")
     payload = event.get("payload")
-    if not isinstance(payload, dict) or event.get("record_kind") != "host_event" or event.get("schema_version") != "2.0":
+    if (
+        not isinstance(payload, dict)
+        or event.get("record_kind") != "host_event"
+        or event.get("schema_version") != "2.0"
+    ):
         raise Invalid("invalid authenticated host event")
     try:
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-        key = Ed25519PublicKey.from_public_bytes(base64.b64decode(trust["public_key_b64"], validate=True))
-        key.verify(base64.b64decode(event["signature_b64"], validate=True), canonical(payload))
+
+        key = Ed25519PublicKey.from_public_bytes(
+            base64.b64decode(trust["public_key_b64"], validate=True)
+        )
+        key.verify(
+            base64.b64decode(event["signature_b64"], validate=True), canonical(payload)
+        )
     except Exception as exc:
         raise Invalid("host event signature invalid") from exc
-    expected = {"display_digest": display["digest"], "view_digest": display["view_digest"], "challenge": display["challenge"]}
+    expected = {
+        "display_digest": display["digest"],
+        "view_digest": display["view_digest"],
+        "challenge": display["challenge"],
+    }
     if any(payload.get(key) != value for key, value in expected.items()):
         raise Invalid("host event exact-view binding mismatch")
-    if payload.get("actor_type") != "human" or not isinstance(payload.get("actor_id"), str) or not payload["actor_id"].strip():
+    if (
+        payload.get("actor_type") != "human"
+        or not isinstance(payload.get("actor_id"), str)
+        or not payload["actor_id"].strip()
+    ):
         raise Blocked("event does not attest a real human actor")
     if payload.get("decision") not in ("approve", "reject"):
         raise Blocked("human decision absent")
     now = time.time()
     issued = payload.get("issued_at")
-    if not isinstance(issued, (int, float)) or isinstance(issued, bool) or not math.isfinite(issued) or issued < display["created_at"] - 1 or issued > now + 60 or issued > display["expires_at"] or (not allow_elapsed and now > display["expires_at"]):
+    if (
+        not isinstance(issued, (int, float))
+        or isinstance(issued, bool)
+        or not math.isfinite(issued)
+        or issued < display["created_at"] - 1
+        or issued > now + 60
+        or issued > display["expires_at"]
+        or (not allow_elapsed and now > display["expires_at"])
+    ):
         raise Blocked("human event expired or predates display")
     return "synthetic_host" if trust.get("synthetic") else "authenticated_host"
 
 
 def load_context(args, package_root):
-    for line in (pathlib.Path(package_root) / "requirements.lock.txt").read_text(encoding="utf-8").splitlines():
+    for line in (
+        (pathlib.Path(package_root) / "requirements.lock.txt")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ):
         line = line.strip()
         if not line or line.startswith("#"):
             continue
@@ -319,8 +444,10 @@ def load_context(args, package_root):
     if digest(lock.read_bytes()) != args.rules_digest:
         raise Invalid("framework lock digest mismatch")
     import yaml
+
     class UniqueLoader(yaml.SafeLoader):
         pass
+
     def mapping(loader, node, deep=False):
         value = {}
         for key_node, value_node in node.value:
@@ -329,7 +456,10 @@ def load_context(args, package_root):
                 raise Invalid("duplicate YAML key")
             value[key] = loader.construct_object(value_node, deep=deep)
         return value
-    UniqueLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, mapping)
+
+    UniqueLoader.add_constructor(
+        yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, mapping
+    )
     document = yaml.load(lock.read_bytes(), Loader=UniqueLoader)
     files = document.get("files", {})
     verified = {}
@@ -352,25 +482,39 @@ def load_context(args, package_root):
     for name in ("__init__", "validation", "knowledge", "source_resources", "records"):
         if "governance/contracts/" + name + ".py" not in verified:
             raise Invalid("domain program is not pinned")
+
     class PinnedLoader(importlib.abc.Loader):
         def __init__(self, reference):
             self.reference = reference
+
         def create_module(self, spec):
             return None
+
         def exec_module(self, module):
             if module.__name__ == package_name:
                 module.__path__ = []
             module.__file__ = str(root / self.reference)
-            exec(compile(verified[self.reference], module.__file__, "exec"), module.__dict__)
+            exec(
+                compile(verified[self.reference], module.__file__, "exec"),
+                module.__dict__,
+            )
+
     class PinnedFinder(importlib.abc.MetaPathFinder):
         def find_spec(self, fullname, path=None, target=None):
             if fullname != package_name and not fullname.startswith(package_name + "."):
                 return None
-            name = "__init__" if fullname == package_name else fullname[len(package_name) + 1:]
+            name = (
+                "__init__"
+                if fullname == package_name
+                else fullname[len(package_name) + 1 :]
+            )
             reference = "governance/contracts/" + name.replace(".", "/") + ".py"
             if reference not in verified:
                 raise ImportError("unlocked domain module: " + fullname)
-            return importlib.util.spec_from_loader(fullname, PinnedLoader(reference), is_package=fullname == package_name)
+            return importlib.util.spec_from_loader(
+                fullname, PinnedLoader(reference), is_package=fullname == package_name
+            )
+
     finder = PinnedFinder()
     sys.meta_path.insert(0, finder)
     try:
@@ -384,11 +528,19 @@ def load_context(args, package_root):
     for reference, raw in verified.items():
         if safe_path(root, reference).read_bytes() != raw:
             raise Invalid("rules changed while loading")
-    catalog = strict_json(pathlib.Path(args.catalog).read_text(encoding="utf-8")) if args.catalog else {}
+    catalog = (
+        strict_json(pathlib.Path(args.catalog).read_text(encoding="utf-8"))
+        if args.catalog
+        else {}
+    )
     if catalog and catalog.get("schema_version") != "2.0":
         raise Invalid("invalid installed catalog version")
-    context = Context(root, args.rules_digest, identity(package_root), catalog, domain, rules)
-    context.catalog_path = str(pathlib.Path(args.catalog).resolve()) if args.catalog else None
+    context = Context(
+        root, args.rules_digest, identity(package_root), catalog, domain, rules
+    )
+    context.catalog_path = (
+        str(pathlib.Path(args.catalog).resolve()) if args.catalog else None
+    )
     return context
 
 
@@ -406,21 +558,46 @@ def run_cli(handler, package_root):
         ctx = load_context(args, package_root)
         request = strict_json(pathlib.Path(args.input).read_text(encoding="utf-8"))
         data = handler(ctx, request, args.action)
-        result = {"status": "ok", "phase": data.pop("phase", "completed"), "data": data, "diagnostics": []}
+        result = {
+            "status": "ok",
+            "phase": data.pop("phase", "completed"),
+            "data": data,
+            "diagnostics": [],
+        }
         code = 0
     except Blocked as exc:
-        result = {"status": "blocked", "phase": "awaiting", "data": {}, "diagnostics": [{"code": exc.code, "message": str(exc)}]}
+        result = {
+            "status": "blocked",
+            "phase": "awaiting",
+            "data": {},
+            "diagnostics": [{"code": exc.code, "message": str(exc)}],
+        }
         code = 3
     except Exception as exc:
-        result = {"status": "error", "phase": "invalid", "data": {}, "diagnostics": [{"code": getattr(exc, "code", "invalid_input"), "message": str(exc)}]}
+        result = {
+            "status": "error",
+            "phase": "invalid",
+            "data": {},
+            "diagnostics": [
+                {"code": getattr(exc, "code", "invalid_input"), "message": str(exc)}
+            ],
+        }
         code = 2
-    result = seal({"schema_version": "2.0", "record_kind": "result", "rules_digest": args.rules_digest, "tool_identity": tool, **result})
+    result = seal(
+        {
+            "schema_version": "2.0",
+            "record_kind": "result",
+            "rules_digest": args.rules_digest,
+            "tool_identity": tool,
+            **result,
+        }
+    )
     output = pathlib.Path(args.output).resolve()
     try:
         root = pathlib.Path(args.knowledge_root).resolve()
         if output.is_relative_to(root):
             rel = output.relative_to(root).as_posix()
-            safe_path(root, rel, (".build/operations", "logs"))
+            safe_path(root, rel, (".build", "logs"))
         if output.exists() and output.read_bytes() != canonical(result) + b"\n":
             raise Invalid("response path already exists; use a new attempt output")
         atomic_bytes(output, canonical(result) + b"\n")

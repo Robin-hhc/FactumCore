@@ -397,6 +397,25 @@ def register(context, *, code=False):
     }, "registered"
 
 
+def validate_generation_baseline(context, generation):
+    paths = [
+        path for path in (context.root / "knowledge").rglob("*.md") if path.is_file()
+    ]
+    paths.append(context.root / "governance/sources.lock.yaml")
+    files = {
+        path.relative_to(context.root).as_posix(): sha(
+            fixed_bytes(context.root, path.relative_to(context.root).as_posix())
+        )
+        for path in sorted(paths)
+    }
+    if generation.get("knowledge_baseline") != digest(files):
+        raise NodeError(
+            "STALE_GENERATION",
+            "Active generation does not represent current exact knowledge and source-lock bytes",
+            blocked=True,
+        )
+
+
 def advance(context):
     request = context.request
     if not request.get("apply_result_ref") or not request.get("generation_ref"):
@@ -462,6 +481,7 @@ def advance(context):
                 "Review generation is not actually active",
                 blocked=True,
             )
+        validate_generation_baseline(context, generation)
         view = context.record(applied["view_ref"], "final_view")
         if view["digest"] != applied["view_digest"]:
             raise NodeError("APPLIED_VIEW_CHANGED", "Apply proof and exact view differ")
@@ -555,6 +575,7 @@ def advance(context):
         updated["knowledge_apply_watermark"] = applied["digest"]
         if cleared:
             updated["validity_epoch"] += 1
+        validate_generation_baseline(context, generation)
         result = save_state(context, previous, updated)
     return {
         "cleared_claims": cleared,

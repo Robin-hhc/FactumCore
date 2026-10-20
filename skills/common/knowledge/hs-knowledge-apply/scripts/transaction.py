@@ -559,7 +559,12 @@ def execute(ctx, request, action="run"):
         if action in ("resume", "rollback"):
             if not journal:
                 raise Blocked("no interrupted transaction to recover")
-            validate_journal(ctx, journal, op)
+            validate_journal(
+                ctx,
+                journal,
+                op,
+                purpose="historical" if action == "rollback" else "current",
+            )
             preflight_recovery(ctx, journal)
             if action == "rollback":
                 # Check every old backup before changing any target.

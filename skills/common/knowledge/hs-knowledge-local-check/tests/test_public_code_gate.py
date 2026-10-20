@@ -51,6 +51,7 @@ class PublicCodeGateTests(unittest.TestCase):
         self.code = self.workspace / "code"
         self.code.mkdir()
         self.git("init", "--initial-branch=main", "-q")
+        self.git("remote", "add", "origin", "synthetic-wifi-code")
         self.code.joinpath("src").mkdir()
         self.source = b"int fixture_wifi_ready(void) { return 1; }\n"
         self.code.joinpath("src/wifi.c").write_bytes(self.source)
@@ -417,6 +418,66 @@ class PublicCodeGateTests(unittest.TestCase):
     def test_missing_signed_support_stays_incomplete(self):
         result = self.invoke(request={"operation_id": "op", "view_ref": self.view_ref})
         self.assertEqual(result["data"]["check_status"], "incomplete")
+
+    def test_official_context_receipt_state_and_location_are_supported(self):
+        context = json.loads((self.root / self.context_ref).read_bytes())
+        context["state"] = "context_loaded"
+        self.context_ref = ".build/project-context/fixture.json"
+        self.save(self.context_ref, seal(context))
+        self.sign_report("local")
+        self.assertEqual(self.invoke()["data"]["check_status"], "passed")
+
+    def test_actual_git_origin_must_match_registered_identity(self):
+        self.git("remote", "set-url", "origin", "different-fixture-repository")
+        self.assertEqual(self.invoke()["data"]["check_status"], "incomplete")
+
+    def test_interrupted_apply_can_roll_back_after_code_revision_changes(self):
+        self.catalog["review_trust"] = {
+            "adapters": {"fixture": {"synthetic": True, "fixture_root": str(self.root)}}
+        }
+        self.catalog_path.write_bytes(canonical(self.catalog))
+        checked = self.invoke()
+        before_lock = (self.root / "governance/sources.lock.yaml").read_bytes()
+        self.invoke(
+            skill="hs-knowledge-apply",
+            request={
+                "operation_id": "op",
+                "view_ref": self.view_ref,
+                "proof_ref": checked["data"]["local_check_ref"],
+                "fault_after": 1,
+            },
+            expected=3,
+        )
+        self.assertTrue((self.root / "knowledge/flows/fixture-code-flow.md").is_file())
+        self.code.joinpath("src/wifi.c").write_bytes(b"changed latest fixture code\n")
+        self.git("add", "src/wifi.c")
+        self.git(
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "-qm",
+            "changed during recovery",
+        )
+        self.invoke(
+            skill="hs-knowledge-apply",
+            action="resume",
+            request={"operation_id": "op"},
+            expected=3,
+        )
+        recovered = self.invoke(
+            skill="hs-knowledge-apply",
+            action="rollback",
+            request={"operation_id": "op"},
+        )
+        self.assertEqual(recovered["data"]["transaction_status"], "rolled_back")
+        self.assertFalse((self.root / "knowledge/flows/fixture-code-flow.md").exists())
+        self.assertEqual(
+            (self.root / "governance/sources.lock.yaml").read_bytes(), before_lock
+        )
 
     def test_tampered_signed_support_fails(self):
         report = json.loads((self.root / self.report_ref).read_text(encoding="utf-8"))

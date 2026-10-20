@@ -550,9 +550,9 @@ def load_context(args, package_root):
 
 
 def validate_workflow(request):
-    workflow = request.get("workflow")
-    if not workflow:
+    if "workflow" not in request:
         return None
+    workflow = request.get("workflow")
     if not isinstance(workflow, dict):
         raise Invalid("workflow must be an object")
     pieces = [workflow.get(key) for key in ("run_id", "node_id", "attempt_id")]

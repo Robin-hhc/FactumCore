@@ -354,11 +354,12 @@ class PublicGovernanceTests(unittest.TestCase):
 
     def test_invalid_workflow_is_rejected_before_apply_mutates_files(self):
         request = self.prepare_and_approve("invalid-workflow")
-        self.invoke(
-            "hs-knowledge-apply",
-            {**request, "workflow": {"attempt_id": "partial"}},
-            expected=2,
-        )
+        for workflow in ({"attempt_id": "partial"}, {}, None, []):
+            self.invoke(
+                "hs-knowledge-apply",
+                {**request, "workflow": workflow},
+                expected=2,
+            )
         self.assertEqual(
             (self.root / "knowledge/index.md").read_bytes(), b"old navigation"
         )

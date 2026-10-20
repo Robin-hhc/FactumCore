@@ -35,7 +35,12 @@ def known(value):
 
 def git_read(root, arguments):
     """Only object/ref reads; no diff/status/filter/hook-capable commands."""
-    if arguments[0] not in ("rev-parse", "cat-file"):
+    if arguments[0] not in ("rev-parse", "cat-file") and arguments != [
+        "config",
+        "--local",
+        "--get",
+        "remote.origin.url",
+    ]:
         raise Invalid("unapproved Git read operation")
     environment = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
     environment.update(
@@ -45,6 +50,7 @@ def git_read(root, arguments):
             "GIT_TERMINAL_PROMPT": "0",
             "GIT_OPTIONAL_LOCKS": "0",
             "GIT_PAGER": "cat",
+            "GIT_NO_LAZY_FETCH": "1",
         }
     )
     command = [
@@ -58,6 +64,10 @@ def git_read(root, arguments):
         "diff.external=",
         "-c",
         "core.pager=cat",
+        "-c",
+        "protocol.allow=never",
+        "-c",
+        "protocol.file.allow=never",
         "-C",
         str(root),
         *arguments,
@@ -169,6 +179,19 @@ def code_identity(ctx, context, config, policy, mode):
             )
         if registered_repo["kind"] != "git" or not root.is_dir():
             raise Incomplete("a real registered Git checkout is required")
+        actual_root = pathlib.Path(
+            git_read(root, ["rev-parse", "--show-toplevel"]).decode("utf-8").strip()
+        ).resolve()
+        actual_identity = (
+            git_read(root, ["config", "--local", "--get", "remote.origin.url"])
+            .decode("utf-8")
+            .strip()
+        )
+        if (
+            actual_root != root
+            or actual_identity != registered_repo["expected_identity"]
+        ):
+            raise Incomplete("actual Git root/origin differs from registered identity")
         if mode == "merge":
             allowed_ref = policy.get("allowed_ref")
             if (
@@ -377,14 +400,19 @@ def evaluate(
     if not context_ref:
         raise Incomplete("fixed real code context is missing")
     ctx.path(
-        context_ref, (f".build/operations/{view['operation_id']}", "logs/contexts")
+        context_ref,
+        (
+            f".build/operations/{view['operation_id']}",
+            ".build/project-context",
+            "logs/contexts",
+        ),
     )
     if not ctx.path(context_ref).is_file():
         raise Incomplete("fixed real code context is unavailable")
     context = ctx.read(context_ref)
     if (
         context.get("record_kind") != "project_context"
-        or context.get("state") != "loaded"
+        or context.get("state") not in ("loaded", "context_loaded")
         or (
             not historical
             and pathlib.Path(context.get("knowledge_root", "")).resolve() != ctx.root

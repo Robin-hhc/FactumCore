@@ -4,6 +4,7 @@ import pathlib
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "scripts"))
 
@@ -48,6 +49,18 @@ class LocalCheckTests(unittest.TestCase):
             ctx = Context.synthetic(pathlib.Path(tmp), "hs-knowledge-local-check")
             with self.assertRaises(Invalid):
                 local_check(ctx, self.view(ctx, "manual_document"), "run")
+
+    def test_object_read_disables_partial_clone_lazy_fetch(self):
+        from check import git_read
+        import subprocess
+
+        with patch("check.subprocess.run") as run:
+            run.return_value = subprocess.CompletedProcess([], 0, stdout=b"fixture")
+            self.assertEqual(
+                git_read(pathlib.Path("."), ["cat-file", "blob", "HEAD:source"]),
+                b"fixture",
+            )
+            self.assertEqual(run.call_args.kwargs["env"].get("GIT_NO_LAZY_FETCH"), "1")
 
 
 if __name__ == "__main__":

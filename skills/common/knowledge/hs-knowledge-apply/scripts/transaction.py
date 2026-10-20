@@ -93,8 +93,8 @@ def validate_final_cards(ctx, view):
     for row in view["writes"]:
         raw = base64.b64decode(row["bytes_b64"], validate=True)
         if row["path"] == "governance/sources.lock.yaml":
-            import yaml
-            rules["source_lock"] = yaml.safe_load(raw)
+            rules["source_lock"] = ctx.domain.load_yaml(raw)
+            ctx.domain.validate_shape("sources", rules["source_lock"], rules)
         elif row["path"].startswith("knowledge/") and pathlib.PurePosixPath(row["path"]).name not in ("AGENTS.md", "index.md", "README.md"):
             if not row["path"].endswith(".md"):
                 raise Invalid("knowledge cards must be Markdown")
@@ -102,10 +102,12 @@ def validate_final_cards(ctx, view):
     cards = {}
     for path, raw in entries.items():
         card = knowledge.parse_card(raw, path, rules)
-        key = card["metadata"]["card_id"]
+        key = card["metadata"]["id"]
         if key in cards:
             raise Invalid("duplicate card ID in final view")
         cards[key] = card
+        if path in {row["path"] for row in view["writes"]} and (card["metadata"]["review_mode"] != view["review_mode"] or card["metadata"]["lifecycle"] != "stable"):
+            raise Invalid("final card review mode/lifecycle mismatches approved view")
     for card in cards.values():
         knowledge.validate_card(card, cards, rules)
     knowledge.validate_relations(cards)
@@ -213,7 +215,25 @@ def execute(ctx, request, action="run"):
         expected_deletes = [row["path"] for row in view.get("deletes", [])]
         if result.get("writes") != expected_writes or result.get("deletes") != expected_deletes:
             raise Invalid("apply result write set was changed")
-        return {"result_verified": True, "view_ref": journal["view_ref"], "view_digest": view["digest"], "proof_ref": journal["proof_ref"], "verification_tier": proof.get("verification_tier", "code_gate"), "phase": "verified"}
+        eligible = []
+        for row in view["writes"]:
+            if not row["path"].startswith("knowledge/") or pathlib.PurePosixPath(row["path"]).name in ("index.md", "AGENTS.md", "README.md"):
+                continue
+            if current_digest(ctx, row["path"]) != row["final_digest"]:
+                continue
+            if ctx.domain:
+                knowledge = importlib.import_module(ctx.domain.__package__ + ".knowledge")
+                sources = importlib.import_module(ctx.domain.__package__ + ".source_resources")
+                card = knowledge.parse_card(ctx.path(row["path"]).read_bytes(), row["path"], ctx.rules)
+                knowledge.validate_card(card, None, ctx.rules)
+                source_lock = sources.read_source_lock(ctx.root)
+                for ref in card["metadata"]["sources"]:
+                    snapshot = sources.validate_source_ref(ref, source_lock)
+                    sources.recover_snapshot(ctx.root, snapshot)
+            eligible.append({"path": row["path"], "sha256": row["final_digest"]})
+        if request.get("card_path") and not any(row["path"] == request["card_path"] and row["sha256"] == request.get("card_digest") for row in eligible):
+            raise Blocked("requested card has no current authenticated exact-content eligibility")
+        return {"result_verified": True, "verification_scope": "authenticated_content_eligibility", "eligible_files": eligible, "view_ref": journal["view_ref"], "view_digest": view["digest"], "proof_ref": journal["proof_ref"], "verification_tier": proof.get("verification_tier", "code_gate"), "phase": "verified"}
     if action not in ("run", "inspect", "resume", "rollback"):
         raise Invalid("unsupported transaction action")
     journal_ref = f"logs/operations/{op}/journal.json"

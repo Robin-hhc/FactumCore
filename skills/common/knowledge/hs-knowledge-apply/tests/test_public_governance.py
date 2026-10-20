@@ -58,10 +58,24 @@ class PublicGovernanceTests(unittest.TestCase):
         self.assertEqual(completed.returncode, expected, (completed.stderr.decode(errors="replace"), result))
         return result
 
-    def prepare_and_approve(self, op):
+    def prepare_and_approve(self, op, include_card=False):
         old = self.root.joinpath("knowledge/index.md").read_bytes()
         row = {"path": "knowledge/index.md", "expected_old_digest": digest(old), "final_digest": digest(b"new navigation"), "bytes_b64": base64.b64encode(b"new navigation").decode()}
-        view = seal({"schema_version": "2.0", "record_kind": "final_view", "operation_id": op, "rules_digest": self.rules_digest, "tool_identity": {"skill": "synthetic-materializer"}, "review_mode": "manual_document", "writes": [row], "deletes": [], "source_refs": [], "baseline_digest": digest({"files": {row["path"]: row["expected_old_digest"]}})})
+        writes = [row]
+        if include_card:
+            original = b"isolated synthetic design\n"
+            recovery_ref = "logs/evidence/fixture-original.bin"
+            (self.root / recovery_ref).parent.mkdir(parents=True, exist_ok=True)
+            (self.root / recovery_ref).write_bytes(original)
+            source_lock = {"schema_version": "2.0", "resources": [{"source_id": "fixture-source", "kind": "raw"}], "snapshots": [{"source_id": "fixture-source", "snapshot_id": "fixture-snapshot", "sha256": digest(original), "bytes": len(original), "recovery": {"path": recovery_ref}}]}
+            source_raw = canonical(source_lock)
+            writes.append({"path": "governance/sources.lock.yaml", "expected_old_digest": digest((self.root / "governance/sources.lock.yaml").read_bytes()), "final_digest": digest(source_raw), "bytes_b64": base64.b64encode(source_raw).decode()})
+            card = (self.root / "governance/templates/flow.md").read_text(encoding="utf-8")
+            for key, value in {"card_id": "fixture-flow", "title": "Synthetic flow", "summary": "Synthetic design guidance", "owner": "fixture-owner", "evidence_ref": "e1", "source_id": "fixture-source", "snapshot_id": "fixture-snapshot", "claim_id": "c1", "claim_text": "Fixture-only design statement."}.items():
+                card = card.replace("{{" + key + "}}", value)
+            card = card.replace("lifecycle: draft", "lifecycle: stable").encode("utf-8")
+            writes.append({"path": "knowledge/flows/fixture-flow.md", "expected_old_digest": None, "final_digest": digest(card), "bytes_b64": base64.b64encode(card).decode()})
+        view = seal({"schema_version": "2.0", "record_kind": "final_view", "operation_id": op, "rules_digest": self.rules_digest, "tool_identity": {"skill": "synthetic-materializer"}, "review_mode": "manual_document", "writes": writes, "deletes": [], "source_refs": [], "baseline_digest": digest({"files": {item["path"]: item["expected_old_digest"] for item in writes}})})
         ref = f".build/operations/{op}/view.json"
         path = self.root / ref
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -98,6 +112,22 @@ class PublicGovernanceTests(unittest.TestCase):
         self.assertEqual(inspected["data"]["transaction_status"], "recovery_required")
         resumed = self.invoke("hs-knowledge-recover", {"operation_id": "recover", "workflow": {"attempt_id": "resume1"}}, action="resume")
         self.assertEqual(resumed["data"]["transaction_status"], "committed")
+
+    def test_card_eligibility_ignores_unrelated_navigation_and_source_append(self):
+        request = self.prepare_and_approve("card", include_card=True)
+        applied = self.invoke("hs-knowledge-apply", request)
+        path = "knowledge/flows/fixture-flow.md"
+        card_digest = digest((self.root / path).read_bytes())
+        verify = {"operation_id": "card", "apply_result_ref": applied["data"]["apply_result_ref"], "card_path": path, "card_digest": card_digest}
+        self.root.joinpath("knowledge/index.md").write_bytes(b"later unrelated navigation")
+        source_lock_path = self.root / "governance/sources.lock.yaml"
+        current = json.loads(source_lock_path.read_text(encoding="utf-8"))
+        current["resources"].append({"source_id": "unrelated-source", "kind": "raw"})
+        source_lock_path.write_bytes(canonical(current))
+        verified = self.invoke("hs-knowledge-apply", verify, action="verify-result")
+        self.assertEqual(verified["data"]["eligible_files"], [{"path": path, "sha256": card_digest}])
+        self.root.joinpath("logs/evidence/fixture-original.bin").write_bytes(b"tampered")
+        self.invoke("hs-knowledge-apply", verify, action="verify-result", expected=2)
 
 
 if __name__ == "__main__":

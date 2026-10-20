@@ -7,7 +7,7 @@
 | `config.yml` | 代码、架构、领域实体、符号及六 Target/三 pair 的唯一映射；未提供的真实路径、构建、版本保持 unknown |
 | `main/` | 业务代码工作区；当前仅 `.gitkeep`，不创建虚构源码树 |
 | `aiotbot-knowledge-wifi/` | 唯一领域根；原件、契约、知识及配套支撑按其 AGENTS 分层 |
-| `aiotbot-knowledge-wifi/docs-llm-wiki/` | 四份平铺设计/入口文档与 `sdd/`；不在仓根另建文档目录 |
+| `aiotbot-knowledge-wifi/docs-llm-wiki/` | 平铺设计、模块任务与入口文档及 `sdd/`；不在仓根另建文档目录 |
 | 独立能力仓 `skills/common/knowledge/` | `hs-workspace-explore`、`hs-knowledge-ingest`、`hs-knowledge-lint`、`hs-knowledge-query`；仓根、URL、版本及安装状态未提供，保持 unknown |
 | 独立能力仓 `workflows/common/knowledge/` | `hs-knowledge-ingest`、`hs-knowledge-lint`；只编排能力，不在 FactumCore 保留旧占位 |
 

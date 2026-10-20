@@ -14,7 +14,7 @@ def execute(context):
     if journals.exists():
         for path in journals.glob("*/journal.json"):
             record = context.record(path.relative_to(context.root).as_posix())
-            if record.get("state") not in {"committed", "rolled_back"}:
+            if record.get("status") not in {"committed", "rolled_back"}:
                 return {
                     "view_ref": request["view_ref"],
                     "operation_id": record["operation_id"],
@@ -66,7 +66,7 @@ def execute(context):
             )
         safe(context.root, ref, ["knowledge"])
         baseline[ref] = deletion["expected_old_digest"]
-    if digest(baseline) != view["baseline_digest"]:
+    if digest({"files": baseline}) != view["baseline_digest"]:
         raise NodeError("BASELINE_CHANGED", "Final-view baseline binding differs")
     for ref, expected in baseline.items():
         path = safe(context.root, ref)

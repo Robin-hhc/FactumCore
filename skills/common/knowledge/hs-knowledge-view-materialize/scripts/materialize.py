@@ -91,7 +91,7 @@ def execute(context):
             "source_set_digest": digest(sources),
             "bundle_ref": plan["bundle_ref"],
             "context_ref": plan.get("context_ref"),
-            "baseline_digest": digest(baseline),
+            "baseline_digest": digest({"files": baseline}),
             "dispositions": plan["decisions"],
         },
         "final_view",

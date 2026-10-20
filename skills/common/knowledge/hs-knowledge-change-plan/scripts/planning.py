@@ -162,6 +162,19 @@ def execute(context):
             {"operation_id": context.operation, "bundle_ref": plan["bundle_ref"]},
             "resolve",
         )
+        if digest(plan["request"]) != plan["request_digest"]:
+            raise NodeError(
+                "PLAN_CHANGED", "Original authored request differs from frozen digest"
+            )
+        reproduced = context.call(context.package.name, plan["request"], "rederive")
+        if (
+            reproduced["data"].get("plan_ref") != request["plan_ref"]
+            or reproduced["data"].get("plan_digest") != plan["digest"]
+        ):
+            raise NodeError(
+                "PLAN_CHANGED",
+                "Plan is not reproducible from its exact authored request",
+            )
         return {"plan_ref": request["plan_ref"], "plan": plan}, "verified"
     bundle = context.call(
         "hs-knowledge-source-capture",
@@ -419,6 +432,7 @@ def execute(context):
             "source_lock": source_lock,
             "review_mode": next(iter(modes), "manual_document"),
             "request_digest": digest(request),
+            "request": request,
         },
         "change_plan",
     )

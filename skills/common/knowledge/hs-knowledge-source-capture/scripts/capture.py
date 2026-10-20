@@ -207,13 +207,21 @@ def resolve_source(context, reference, bundle=None):
         )
     snapshot = matches[0]
     recovery = snapshot.get("recovery", {})
-    if not isinstance(recovery, dict) or not recovery.get("reference"):
+    if not isinstance(recovery, dict) or not (
+        recovery.get("path") or recovery.get("reference")
+    ):
         raise NodeError(
             "RECOVERY_UNAVAILABLE",
             "No supported immutable local recovery object",
             blocked=True,
         )
-    original_ref = recovery["reference"]
+    if (
+        recovery.get("path")
+        and recovery.get("reference")
+        and recovery["path"] != recovery["reference"]
+    ):
+        raise NodeError("SOURCE_INTEGRITY_ERROR", "Recovery path aliases disagree")
+    original_ref = recovery.get("path", recovery.get("reference"))
     data = fixed_bytes(context.root, original_ref, ["logs/evidence"])
     if sha(data) != snapshot["sha256"] or len(data) != snapshot["bytes"]:
         raise NodeError(
@@ -335,8 +343,19 @@ def execute(context):
     if context.args.action == "resolve":
         bundle = context.record(request["bundle_ref"], "source_bundle")
         for snapshot in bundle["snapshots"]:
+            recovery = snapshot["recovery"]
+            if (
+                recovery.get("path")
+                and recovery.get("reference")
+                and recovery["path"] != recovery["reference"]
+            ):
+                raise NodeError(
+                    "SOURCE_INTEGRITY_ERROR", "Recovery path aliases disagree"
+                )
             data = fixed_bytes(
-                context.root, snapshot["recovery"]["reference"], ["logs/evidence"]
+                context.root,
+                recovery.get("path", recovery.get("reference")),
+                ["logs/evidence"],
             )
             if sha(data) != snapshot["sha256"] or len(data) != snapshot["bytes"]:
                 raise NodeError(
@@ -429,6 +448,7 @@ def execute(context):
                 },
                 "recovery": {
                     "method": "evidence_object",
+                    "path": object_ref,
                     "reference": object_ref,
                     "status": "available",
                 },

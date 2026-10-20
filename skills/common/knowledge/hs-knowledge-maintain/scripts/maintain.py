@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import copy
 from contextlib import contextmanager
 import os
 
@@ -78,6 +79,8 @@ def state(context):
         "blocked_claims": [],
         "processed_event_ids": [],
         "pending_event_ids": [],
+        "pending_events": [],
+        "observed_sources": {},
         "impact_scan_watermark": None,
         "knowledge_apply_watermark": None,
     }
@@ -128,13 +131,70 @@ def domain_cards(context):
     return cards
 
 
+def finish_pending(context, previous):
+    events = previous.get("pending_events", [])
+    if {e["event_id"] for e in events} != set(previous.get("pending_event_ids", [])):
+        raise NodeError(
+            "EVENT_RECOVERY_REQUIRED",
+            "Pending event state lacks its complete durable payload",
+            blocked=True,
+        )
+    if not events:
+        return previous
+    updated = copy.deepcopy(previous)
+    processed = set(previous.get("processed_event_ids", []))
+    observed = dict(previous.get("observed_sources", {}))
+    for event in events:
+        context.modules["records"].verify(event)
+        context.modules["validation"].validate_shape(
+            "maintenance_event", event, context.rules
+        )
+        if (
+            event["event_id"] != digest(event["change"])
+            or event["rules_digest"] != context.args.rules_digest
+        ):
+            raise NodeError(
+                "EVENT_CONFLICT",
+                "Pending event identity differs from its durable change",
+            )
+        snapshot = event["source_snapshot"]
+        recovery = snapshot["recovery"]
+        original = fixed_bytes(
+            context.root,
+            recovery.get("path", recovery.get("reference")),
+            ["logs/evidence"],
+        )
+        if sha(original) != snapshot["sha256"] or len(original) != snapshot["bytes"]:
+            raise NodeError(
+                "SOURCE_INTEGRITY_ERROR", "Pending event original bytes are unavailable"
+            )
+        context.save("logs/events/" + event["event_id"] + ".json", event)
+        processed.add(event["event_id"])
+        updated["impact_scan_watermark"] = event["event_id"]
+        observed[event["change"]["source_id"]] = {
+            "snapshot_id": event["change"]["new_snapshot_id"],
+            "event_id": event["event_id"],
+        }
+    updated.update(
+        processed_event_ids=sorted(processed),
+        pending_event_ids=[],
+        pending_events=[],
+        observed_sources=observed,
+    )
+    return save_state(context, previous, updated)
+
+
 def register(context):
     bundle = context.record(context.request["bundle_ref"], "source_bundle")
     lock = load_yaml(fixed_bytes(context.root, "governance/sources.lock.yaml"))
     changes = []
     for snapshot in bundle["snapshots"]:
         recovery = snapshot["recovery"]
-        data = fixed_bytes(context.root, recovery["reference"], ["logs/evidence"])
+        data = fixed_bytes(
+            context.root,
+            recovery.get("path", recovery.get("reference")),
+            ["logs/evidence"],
+        )
         if sha(data) != snapshot["sha256"] or len(data) != snapshot["bytes"]:
             raise NodeError(
                 "SOURCE_INTEGRITY_ERROR", "New source snapshot bytes cannot be verified"
@@ -166,8 +226,8 @@ def register(context):
                 }
             )
     with writer_lock(context):
-        previous = state(context)
-        updated = dict(previous)
+        previous = finish_pending(context, state(context))
+        updated = copy.deepcopy(previous)
         updated["blocked_claims"] = list(previous["blocked_claims"])
         processed = set(previous.get("processed_event_ids", []))
         pending = set(previous.get("pending_event_ids", []))
@@ -211,8 +271,34 @@ def register(context):
                 updated["validity_epoch"] += 1
                 pending.add(event_id)
                 updated["pending_event_ids"] = sorted(pending)
+                snapshot = next(
+                    s
+                    for s in bundle["snapshots"]
+                    if s["snapshot_id"] == change["new_snapshot_id"]
+                )
+                resource = next(
+                    r
+                    for r in bundle["resources"]
+                    if r["source_id"] == change["source_id"]
+                )
+                staged_event = context.seal(
+                    {
+                        "event_id": event_id,
+                        "change": change,
+                        "bundle_ref": context.request["bundle_ref"],
+                        "bundle_digest": bundle["digest"],
+                        "source_snapshot": snapshot,
+                        "source_resource": resource,
+                        "affected_claims": affected,
+                    },
+                    "maintenance_event",
+                )
+                updated["pending_events"] = [
+                    *previous.get("pending_events", []),
+                    staged_event,
+                ]
                 previous = save_state(context, previous, updated)
-                updated = dict(previous)
+                updated = copy.deepcopy(previous)
             if safe(context.root, ref).exists():
                 event = context.record(ref, "maintenance_event")
                 if event.get("change") != change:
@@ -221,14 +307,8 @@ def register(context):
                         "Existing event differs from source transition",
                     )
             else:
-                event = context.seal(
-                    {
-                        "event_id": event_id,
-                        "change": change,
-                        "bundle_ref": context.request["bundle_ref"],
-                        "affected_claims": affected,
-                    },
-                    "maintenance_event",
+                event = next(
+                    e for e in updated["pending_events"] if e["event_id"] == event_id
                 )
                 context.save(ref, event)
             # Re-scan actual cards after a crash between event and state publication.
@@ -238,7 +318,19 @@ def register(context):
             processed.add(event_id)
             pending.discard(event_id)
             updated["pending_event_ids"] = sorted(pending)
+            updated["pending_events"] = [
+                e for e in updated["pending_events"] if e["event_id"] != event_id
+            ]
+            observed = dict(updated.get("observed_sources", {}))
+            observed[change["source_id"]] = {
+                "snapshot_id": change["new_snapshot_id"],
+                "event_id": event_id,
+            }
+            updated["observed_sources"] = observed
             updated["impact_scan_watermark"] = event_id
+            updated["processed_event_ids"] = sorted(processed)
+            previous = save_state(context, previous, updated)
+            updated = copy.deepcopy(previous)
         updated["processed_event_ids"] = sorted(processed)
         final = (
             save_state(context, previous, updated) if updated != previous else previous
@@ -353,9 +445,12 @@ def advance(context):
                 for r in claim["source_refs"]
                 if sources[r]["source_id"] == block["source_id"]
             ]
-            if not refs or any(
-                r["snapshot_id"] != block["new_snapshot_id"] for r in refs
-            ):
+            latest = (
+                previous.get("observed_sources", {})
+                .get(block["source_id"], {})
+                .get("snapshot_id", block["new_snapshot_id"])
+            )
+            if not refs or any(r["snapshot_id"] != latest for r in refs):
                 remaining.append(block)
                 continue
             for ref in refs:
@@ -380,7 +475,7 @@ def advance(context):
                         blocked=True,
                     )
             cleared.append(block)
-        updated = dict(previous)
+        updated = copy.deepcopy(previous)
         updated["blocked_claims"] = remaining
         updated["knowledge_apply_watermark"] = applied["digest"]
         if cleared:
@@ -400,8 +495,13 @@ def execute(context):
         return {"state": state(context)}, "inspected"
     if action == "register-source-change":
         return register(context)
+    if action == "recover-events":
+        with writer_lock(context):
+            recovered = finish_pending(context, state(context))
+        return {"state": recovered}, "recovered"
     if action == "advance":
         return advance(context)
     raise NodeError(
-        "INVALID_ACTION", "Choose status, register-source-change or advance"
+        "INVALID_ACTION",
+        "Choose status, register-source-change, recover-events or advance",
     )

@@ -397,9 +397,27 @@ class Context:
         return ref
 
     def record(self, ref, kind=None):
-        data = fixed_bytes(self.root, ref)
+        allowed = {
+            "index_manifest": ["artifacts/indexes"],
+            "generation": ["artifacts/indexes"],
+            "project_context": [".build/project-context", ".build/operations", "logs"],
+        }.get(
+            kind,
+            [".build/operations", "logs"]
+            if kind
+            else [
+                ".build/operations",
+                ".build/project-context",
+                "logs",
+                "artifacts/indexes",
+            ],
+        )
+        data = fixed_bytes(self.root, ref, allowed)
         value = json.loads(data, object_pairs_hook=unique)
         self.modules["records"].verify(value)
+        self.modules["validation"].validate_shape(
+            value.get("record_kind", "record"), value, self.rules
+        )
         if value.get("rules_digest") != self.args.rules_digest:
             raise NodeError(
                 "STALE_RULES", "Referenced record uses different rules", ref
@@ -428,6 +446,12 @@ class Context:
                 blocked=True,
             )
         package = Path(entry["root"]).resolve(strict=True)
+        if entry.get("entry") != "scripts/cli.py":
+            raise NodeError(
+                "INVALID_CATALOG_ENTRY",
+                "Catalog must name the fixed public scripts/cli.py entry",
+                name,
+            )
         if package_digest(package) != entry.get("package_digest"):
             raise NodeError(
                 "PACKAGE_DIGEST_MISMATCH", "Installed Skill differs from catalog", name
@@ -459,6 +483,26 @@ class Context:
             argv += ["--action", action]
         result = subprocess.run(argv, capture_output=True, timeout=120, check=False)
         response = read_json(safe(self.root, outgoing))
+        if response.get("digest") != digest(
+            {key: value for key, value in response.items() if key != "digest"}
+        ):
+            raise NodeError(
+                "SIBLING_RESULT_CHANGED",
+                "Response envelope digest is missing or invalid",
+                name,
+            )
+        if (
+            response.get("schema_version") != "2.0"
+            or response.get("record_kind") != "result"
+            or response.get("rules_digest") != self.args.rules_digest
+            or response.get("tool_identity", {}).get("package_digest")
+            != entry["package_digest"]
+        ):
+            raise NodeError(
+                "SIBLING_IDENTITY_MISMATCH",
+                "Response does not bind the pinned public Skill",
+                name,
+            )
         if package_digest(package) != entry["package_digest"]:
             raise NodeError(
                 "PACKAGE_CHANGED", "Sibling package changed during invocation", name
@@ -548,5 +592,8 @@ def run(handler, package):
     if root.exists() and output.is_relative_to(root):
         safe(root, output.relative_to(root).as_posix(), [".build", "logs"])
     output.parent.mkdir(parents=True, exist_ok=True)
+    envelope["digest"] = digest(
+        {key: value for key, value in envelope.items() if key != "digest"}
+    )
     output.write_bytes(canonical(envelope))
     return code

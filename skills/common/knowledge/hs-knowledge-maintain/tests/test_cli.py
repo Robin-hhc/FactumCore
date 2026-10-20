@@ -113,6 +113,9 @@ def test_interrupted_event_publish_keeps_blocks_and_resumes_without_epoch_duplic
     interrupted = json.loads((harness.root / "logs/events/state.json").read_text())
     assert interrupted["validity_epoch"] == 1 and interrupted["blocked_claims"]
     assert interrupted["pending_event_ids"]
+    assert interrupted["pending_events"][0]["change"]["new_snapshot_id"]
+    assert interrupted["pending_events"][0]["source_snapshot"]["recovery"]["path"]
+    harness.run("maintain", {"operation_id": "recover"}, "recover-events")
     harness.run(
         "maintain",
         {"operation_id": "new", "bundle_ref": new_ref},

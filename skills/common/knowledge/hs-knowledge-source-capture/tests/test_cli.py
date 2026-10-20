@@ -256,3 +256,63 @@ def test_text_pdf_has_page_locator(harness):
         "resolve-source",
     )
     assert "Synthetic text layer" in resolved["data"]["text"]
+
+
+def test_payload_output_path_does_not_authorize_host_file_writes(harness, tmp_path):
+    victim = tmp_path / "payload-selected.txt"
+    harness.write("docs-raw/specs/source.md", b"# Source\nSynthetic evidence.\n")
+    harness.run(
+        "source-capture",
+        {
+            "operation_id": "op",
+            "source_id": "synthetic",
+            "source_path": "docs-raw/specs/source.md",
+            "output_path": str(victim),
+        },
+    )
+    assert not victim.exists()
+
+
+def test_record_reference_cannot_read_restricted_gold(harness):
+    harness.write("evals/gold/secret.json", b"PRIVATE_UNREADABLE_GOLD")
+    response = harness.run(
+        "source-capture",
+        {"operation_id": "op", "bundle_ref": "evals/gold/secret.json"},
+        "resolve",
+        expected=2,
+    )
+    assert response["diagnostics"][0]["code"] == "UNSAFE_PATH"
+    assert "PRIVATE_UNREADABLE_GOLD" not in str(response)
+
+
+@pytest.mark.parametrize("module", ["support", "capture"])
+def test_unpinned_package_pyc_is_never_executed(harness, tmp_path, module):
+    import importlib.util
+    import os
+    import py_compile
+
+    target = harness.packages / "hs-knowledge-source-capture/scripts" / (module + ".py")
+    original = target.read_bytes()
+    marker = tmp_path / (module + "-PYC-EXECUTED")
+    malicious = (
+        "from pathlib import Path\nPath("
+        + repr(str(marker))
+        + ").write_text('bad')\nraise RuntimeError('untrusted package pyc')\n"
+    ).encode()
+    attacker = tmp_path / "attacker.py"
+    attacker.write_bytes(malicious + b" " * (len(original) - len(malicious)))
+    os.utime(attacker, ns=(target.stat().st_atime_ns, target.stat().st_mtime_ns))
+    cache = Path(importlib.util.cache_from_source(str(target)))
+    cache.parent.mkdir(exist_ok=True)
+    prior = cache.read_bytes() if cache.exists() else None
+    try:
+        py_compile.compile(
+            str(attacker), cfile=str(cache), dfile=str(target), doraise=True
+        )
+        harness.capture()
+        assert not marker.exists()
+    finally:
+        if prior is None:
+            cache.unlink(missing_ok=True)
+        else:
+            cache.write_bytes(prior)

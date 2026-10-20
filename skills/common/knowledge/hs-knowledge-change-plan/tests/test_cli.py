@@ -249,3 +249,33 @@ def test_distinct_cards_may_share_a_local_claim_id(harness):
         "change-plan", {"operation_id": "op", "bundle_ref": ref, "decisions": decisions}
     )
     assert len(harness.record(planned["data"]["plan_ref"])["writes"]) == 2
+
+
+def test_resealed_plan_writes_must_rederive_from_authored_candidate(harness):
+    import base64
+    import hashlib
+    import json
+
+    ref, _ = harness.plan()
+    plan = harness.record(ref)
+    changed = base64.b64decode(plan["writes"][0]["bytes_b64"]).replace(
+        b"Synthetic fixture statement.", b"Undeclared statement mutation."
+    )
+    plan["writes"][0]["bytes_b64"] = base64.b64encode(changed).decode()
+    plan["writes"][0]["final_digest"] = hashlib.sha256(changed).hexdigest()
+    plan.pop("digest")
+    plan["digest"] = hashlib.sha256(
+        json.dumps(
+            plan, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode()
+    ).hexdigest()
+    harness.write(
+        ref,
+        json.dumps(
+            plan, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode(),
+    )
+    result = harness.run(
+        "change-plan", {"operation_id": "op", "plan_ref": ref}, "verify", expected=2
+    )
+    assert result["diagnostics"][0]["code"] == "OPERATION_CONFLICT"

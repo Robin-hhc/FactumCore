@@ -58,3 +58,51 @@ def test_navigation_change_after_plan_requires_replan(harness):
         "view-materialize", {"operation_id": "op", "plan_ref": plan}, expected=2
     )
     assert result["diagnostics"][0]["code"] == "BASELINE_CHANGED"
+
+
+def test_view_source_identity_excludes_unrelated_registered_sources(harness):
+    import base64
+    import yaml
+
+    harness.write(
+        "governance/sources.lock.yaml",
+        yaml.safe_dump(
+            {
+                "schema_version": "2.0",
+                "resources": [
+                    {
+                        "source_id": "unrelated",
+                        "kind": "raw",
+                        "path": "docs-raw/specs/unrelated.md",
+                    }
+                ],
+                "snapshots": [
+                    {
+                        "source_id": "unrelated",
+                        "snapshot_id": "raw:unrelated",
+                        "sha256": "a" * 64,
+                        "bytes": 100,
+                        "recovery": {"path": "logs/evidence/unavailable.bin"},
+                    }
+                ],
+            }
+        ).encode(),
+    )
+    ref, bundle = harness.view()
+    view = harness.record(ref)
+    assert [s["snapshot_id"] for s in view["source_refs"]] == [
+        bundle["snapshots"][0]["snapshot_id"]
+    ]
+    source_lock = next(
+        w for w in view["writes"] if w["path"] == "governance/sources.lock.yaml"
+    )
+    assert (
+        len(yaml.safe_load(base64.b64decode(source_lock["bytes_b64"]))["snapshots"])
+        == 2
+    )
+    assert (
+        harness.run("candidate-inspect", {"operation_id": "op", "view_ref": ref})[
+            "phase"
+        ]
+        == "manual_ready"
+    )

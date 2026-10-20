@@ -75,10 +75,20 @@ def execute(context):
                 "BASELINE_CHANGED", "Official target changed since planning", ref
             )
     lock = load_yaml(targets["governance/sources.lock.yaml"])
-    if (
-        digest(lock["snapshots"]) != view["source_set_digest"]
-        or lock["snapshots"] != view["source_refs"]
-    ):
+    referenced_snapshots = {
+        source["snapshot_id"]
+        for card in card_writes.values()
+        for source in card["metadata"]["sources"]
+    }
+    relevant = sorted(
+        (
+            snapshot
+            for snapshot in lock["snapshots"]
+            if snapshot["snapshot_id"] in referenced_snapshots
+        ),
+        key=lambda s: s["snapshot_id"],
+    )
+    if digest(relevant) != view["source_set_digest"] or relevant != view["source_refs"]:
         raise NodeError("SOURCE_SET_CHANGED", "Final-view source-set binding differs")
     cards = {}
     knowledge = safe(context.root, "knowledge")

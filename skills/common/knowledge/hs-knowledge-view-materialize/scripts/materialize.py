@@ -24,6 +24,7 @@ def execute(context):
         }, "deferred"
     writes = list(plan["writes"])
     navigation = {}
+    referenced_snapshots = set()
     for write in writes:
         data = base64.b64decode(write["bytes_b64"], validate=True)
         if sha(data) != write["final_digest"]:
@@ -34,6 +35,9 @@ def execute(context):
             data, write["path"], context.rules
         )
         metadata = card["metadata"]
+        referenced_snapshots.update(
+            source["snapshot_id"] for source in metadata["sources"]
+        )
         index_ref = str(PurePosixPath(write["path"]).parent / "index.md")
         if index_ref not in navigation:
             path = safe(context.root, index_ref)
@@ -79,7 +83,14 @@ def execute(context):
         path = safe(context.root, ref)
         if (sha(path.read_bytes()) if path.exists() else None) != expected:
             raise NodeError("BASELINE_CHANGED", "Final-view baseline changed", ref)
-    sources = plan["source_lock"]["snapshots"]
+    sources = sorted(
+        (
+            snapshot
+            for snapshot in plan["source_lock"]["snapshots"]
+            if snapshot["snapshot_id"] in referenced_snapshots
+        ),
+        key=lambda s: s["snapshot_id"],
+    )
     view = context.seal(
         {
             "writes": sorted(writes, key=lambda w: w["path"]),

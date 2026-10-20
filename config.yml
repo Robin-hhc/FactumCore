@@ -1,8 +1,8 @@
-# FactumCore single-repository deployment; paths are relative to this config file.
+# FactumCore code/knowledge workspace; capability packages are provided separately.
 schema_version: '1.0'
 workspace_id: aiotbot-wifi-v1
 knowledge_roots:
-  wifi: aiot-wifi-knowledge
+  wifi: aiotbot-knowledge/wifi
 repos:
 - repo_id: wifi-code
   kind: git

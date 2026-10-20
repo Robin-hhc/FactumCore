@@ -17,10 +17,10 @@ config.local.yml
 **/.codegraph/
 
 # Domain runtime products: publish empty slots, never generated contents.
-/aiot-wifi-knowledge/.build/*
-!/aiot-wifi-knowledge/.build/.gitkeep
-/aiot-wifi-knowledge/artifacts/*
-!/aiot-wifi-knowledge/artifacts/.gitkeep
+/aiotbot-knowledge/*/.build/*
+!/aiotbot-knowledge/*/.build/.gitkeep
+/aiotbot-knowledge/*/artifacts/*
+!/aiotbot-knowledge/*/artifacts/.gitkeep
 
 # Retired independent checkout, if still present locally.
 /aiot-knowledge/

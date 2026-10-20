@@ -1,0 +1,5731 @@
+{
+  "schema_version": "2.0",
+  "design_version": "4.0",
+  "knowledge_root": "aiotbot-knowledge-wifi",
+  "requirements": [
+    {
+      "id": "R201",
+      "story": "作为WiFi维护者，我希望系统只建设指定知识目录，以便当前任务不混入其他领域。",
+      "acceptance": "只WiFi、main不虚造源码、领域规则与节点程序职责分层。",
+      "primary_ticket": "T201"
+    },
+    {
+      "id": "R202",
+      "story": "作为规则维护者，我希望所有节点解释同一套规则，以便卡片与证明不会因工具不同而漂移。",
+      "acceptance": "产品2.0、七Profile、来源/记录/范围单点契约，锁定代码与声明摘要。",
+      "primary_ticket": "T201"
+    },
+    {
+      "id": "R203",
+      "story": "作为使用者，我希望运行的是可识别的受信工具版本，以便升级、审查和回放有据可查。",
+      "acceptance": "catalog解析精确包/解释器/锁，不自动安装，不发布本机路径。",
+      "primary_ticket": "T202"
+    },
+    {
+      "id": "R204",
+      "story": "作为仓外启动的使用者，我希望只给代码路径即可加载正确项目规则，以便避免猜错知识库。",
+      "acceptance": "resolved/context_loaded分开，歧义/旧登记/换仓失效，无整盘扫描。",
+      "primary_ticket": "T202"
+    },
+    {
+      "id": "R205",
+      "story": "作为文档贡献者，我希望固定已落地原件与附件，以便旧结论可回到当时材料。",
+      "acceptance": "只五raw、固定字节/locator/恢复，来源网页/映射延期，原件只读。",
+      "primary_ticket": "T203"
+    },
+    {
+      "id": "R206",
+      "story": "作为代码审查者，我希望代码证据保留真实版本与环境，以便不把同名代码当作同一行为。",
+      "acceptance": "Git/dirty/导出固定实际字节，真实构建宏/Target未知保持unknown，受控只读Git。",
+      "primary_ticket": "T208"
+    },
+    {
+      "id": "R207",
+      "story": "作为知识生产者，我希望每个候选都有明确处理结果，以便批次中没有静默漏项。",
+      "acceptance": "七Profile、六决策、逐候选唯一处置，merge/split/deprecate保留替代导航。",
+      "primary_ticket": "T204"
+    },
+    {
+      "id": "R208",
+      "story": "作为确认人，我希望看到与最终落位完全相同的内容，以便决定不会被后续隐式改写。",
+      "acceptance": "精确writes/deletes含导航与来源锁，stable字节提前固定；生产不写正式资产。",
+      "primary_ticket": "T204"
+    },
+    {
+      "id": "R209",
+      "story": "作为文档确认人，我希望只有我的真实明确动作才能接受内容，以便等待或Agent表态不会冒充同意。",
+      "acceptance": "可信adapter签名人事件；无动作/Agent/陈旧/部分接受不apply；文档免代码lint。",
+      "primary_ticket": "T205"
+    },
+    {
+      "id": "R210",
+      "story": "作为协作维护者，我希望落位失败可恢复且不覆盖新编辑，以便知识不会半写或倒退。",
+      "acceptance": "域锁/全写集CAS/持久备份journal/幂等/恢复，单文件原子而非虚称多文件原子。",
+      "primary_ticket": "T205"
+    },
+    {
+      "id": "R211",
+      "story": "作为代码卡贡献者，我希望本地与合入都对真实代码核验，以便过期结论不会被放行。",
+      "acceptance": "正向逐Claim证据，local/最新授权merge只读；缺代码/证据incomplete，纯文档拒绝门禁。",
+      "primary_ticket": "T208"
+    },
+    {
+      "id": "R212",
+      "story": "作为检索者，我希望适用知识不会被错误范围卡挤走，以便结果与目标环境一致。",
+      "acceptance": "全候选先资格过滤，仅有效Claim重计分求全局topK；metadata同样受资格约束。",
+      "primary_ticket": "T206"
+    },
+    {
+      "id": "R213",
+      "story": "作为阅读者，我希望答案、卡片和原文版本一致，以便可判断依据与缺口。",
+      "acceptance": "同代read/receipt、唯一snapshot/locator、local/shared资格、真实merged身份。",
+      "primary_ticket": "T206"
+    },
+    {
+      "id": "R214",
+      "story": "作为维护者，我希望变化后旧结论立即受阻断，以便旧索引或回滚不会继续输出过期事实。",
+      "acceptance": "幂等事件/条件化影响、live block、双水位、受控复核恢复。",
+      "primary_ticket": "T207"
+    },
+    {
+      "id": "R215",
+      "story": "作为流程使用者，我希望节点交接可恢复且责任清楚，以便等待/修订不导致重复写入。",
+      "acceptance": "18Skill/2Workflow、user Gate、不可变run/node/attempt manifest、模板可达与公开CLI复用。",
+      "primary_ticket": "T209"
+    },
+    {
+      "id": "R216",
+      "story": "作为验收者，我希望不同验证层级分别留证，以便合成机制不会被说成真实业务通过。",
+      "acceptance": "单包/跨节点/真实人/宿主/六Target/权限/CI分层，缺外部输入保持pending。",
+      "primary_ticket": "T210"
+    },
+    {
+      "id": "R217",
+      "story": "作为发布者，我希望每个完成模块有准确提交与发布身份，以便不把本地结果冒充已合入。",
+      "acceptance": "有用户授权的外部发布流程执行Git；节点只交接，跨节点分别记录实际SHA/远端/包身份。",
+      "primary_ticket": "T210"
+    },
+    {
+      "id": "R218",
+      "story": "作为节点调用者，我希望输入输出和阻断原因一致，以便Workflow不会凭退出零误判成功。",
+      "acceptance": "统一JSON协议、精确tool/rules摘要、status/phase、0/2/3语义和安全路径。",
+      "primary_ticket": "T201"
+    }
+  ],
+  "modules": [
+    {
+      "id": "M01",
+      "name": "契约与协议",
+      "status": "pending"
+    },
+    {
+      "id": "M02",
+      "name": "项目发现",
+      "status": "pending"
+    },
+    {
+      "id": "M03",
+      "name": "来源快照",
+      "status": "pending"
+    },
+    {
+      "id": "M04",
+      "name": "候选与六决策",
+      "status": "pending"
+    },
+    {
+      "id": "M05",
+      "name": "确认、事务与恢复",
+      "status": "pending"
+    },
+    {
+      "id": "M06",
+      "name": "代码只读双门禁",
+      "status": "pending"
+    },
+    {
+      "id": "M07",
+      "name": "索引与消费",
+      "status": "pending"
+    },
+    {
+      "id": "M08",
+      "name": "维护事件与水位",
+      "status": "pending"
+    },
+    {
+      "id": "M09",
+      "name": "Workflow、集成和真实验收",
+      "status": "pending"
+    }
+  ],
+  "skills": [
+    {
+      "id": "hs-workspace-explore",
+      "node_id": "bind_project",
+      "ticket": "T202",
+      "input": "code_path/config_ref/registry_ref",
+      "output": "Binding、context_loaded回执",
+      "constraints": "定位与真实加载；未绑定/歧义停止，不先要求Context",
+      "state": "pending"
+    },
+    {
+      "id": "hs-knowledge-source-capture",
+      "node_id": "capture_raw",
+      "ticket": "T203",
+      "input": "source_path/source_id/version/attachments/context_ref",
+      "output": "bundle_ref、固定snapshots和恢复依据",
+      "constraints": "仅五类raw；代码分支由T208补齐；resolve-source只读，不联网",
+      "state": "pending"
+    },
+    {
+      "id": "hs-knowledge-change-plan",
+      "node_id": "plan_change",
+      "ticket": "T204",
+      "input": "bundle_ref、decisions数组",
+      "output": "plan_ref、逐候选处置与缺口",
+      "constraints": "每个candidate_id恰有一个终态；明确内容由Agent提供，不从原件首段自动生结论",
+      "state": "pending"
+    },
+    {
+      "id": "hs-knowledge-view-materialize",
+      "node_id": "materialize_view",
+      "ticket": "T204",
+      "input": "plan_ref、正式基线",
+      "output": "view_ref、精确writes/deletes",
+      "constraints": "只写候选区；拟stable字节提前固定，含导航和来源锁",
+      "state": "pending"
+    },
+    {
+      "id": "hs-knowledge-governance-handoff",
+      "node_id": "governance_handoff",
+      "ticket": "T204",
+      "input": "view_ref、context_ref、plan_ref",
+      "output": "不可变handoff_ref",
+      "constraints": "只交接，不直接启动另一模板、不写knowledge或伪造已审",
+      "state": "pending"
+    },
+    {
+      "id": "hs-knowledge-candidate-inspect",
+      "node_id": "inspect_candidate",
+      "ticket": "T205",
+      "input": "view_ref、handoff_ref",
+      "output": "manual_ready/code_ready/recovery_required",
+      "constraints": "非代码技术一致性检查；文档不调用local-check",
+      "state": "pending"
+    },
+    {
+      "id": "hs-knowledge-confirmation-prepare",
+      "node_id": "prepare_confirmation",
+      "ticket": "T205",
+      "input": "view_ref、固定来源",
+      "output": "display_ref、新challenge及完整展示包",
+      "constraints": "不生成accepted；完整字节/差异/来源/缺口都可见",
+      "state": "pending"
+    },
+    {
+      "id": "hs-knowledge-confirmation-record",
+      "node_id": "record_confirmation",
+      "ticket": "T205",
+      "input": "display_ref、host_event_ref",
+      "output": "manual_review或awaiting_confirmation",
+      "constraints": "可信catalog适配器/公钥认证真实人事件；Agent/未签名/无动作均不批准",
+      "state": "pending"
+    },
+    {
+      "id": "hs-knowledge-local-check",
+      "node_id": "local_check",
+      "ticket": "T208",
+      "input": "code_gate view_ref、真实代码/构建/Target证据",
+      "output": "local_check、pass/fail/incomplete",
+      "constraints": "只读、逐Claim正向证据；manual_document拒绝代码门禁",
+      "state": "pending"
+    },
+    {
+      "id": "hs-knowledge-candidate-revise",
+      "node_id": "revise_candidate",
+      "ticket": "T204",
+      "input": "旧view、退回/部分接受范围、新操作身份",
+      "output": "新plan/view、重新确认要求",
+      "constraints": "经公开change-plan/materialize接口，不复制算法；不得复用旧接受",
+      "state": "pending"
+    },
+    {
+      "id": "hs-knowledge-apply",
+      "node_id": "apply_view",
+      "ticket": "T205",
+      "input": "view_ref、proof_ref",
+      "output": "ApplyResult、持久journal终态",
+      "constraints": "唯一事务引擎owner；CAS/域锁/备份/幂等；无静默补字段",
+      "state": "pending"
+    },
+    {
+      "id": "hs-knowledge-recover",
+      "node_id": "recover_transaction",
+      "ticket": "T205",
+      "input": "operation_id、inspect/rollback/resume",
+      "output": "恢复状态或完整ApplyResult",
+      "constraints": "调用apply公开recovery action；不复制事务引擎、不覆盖后续外部编辑",
+      "state": "pending"
+    },
+    {
+      "id": "hs-knowledge-index-build",
+      "node_id": "rebuild_index",
+      "ticket": "T206",
+      "input": "channel、固定知识/证明快照、action",
+      "output": "generation_ref、manifest/verify/activate结果",
+      "constraints": "唯一索引引擎owner；锁内快照/激活CAS，失败保留旧代",
+      "state": "pending"
+    },
+    {
+      "id": "hs-knowledge-query-regression",
+      "node_id": "query_regression",
+      "ticket": "T206",
+      "input": "固定候选generation、声明式cases",
+      "output": "evaluation报告、成功后激活结果",
+      "constraints": "复用query与index-build公开接口；不把未激活评测当用户答案",
+      "state": "pending"
+    },
+    {
+      "id": "hs-knowledge-publish-handoff",
+      "node_id": "publish_handoff",
+      "ticket": "T209",
+      "input": "已验证本地结果、已有授权",
+      "output": "发布清单/缺口与外部责任",
+      "constraints": "不自行commit/push、制造merged或安装CI策略",
+      "state": "pending"
+    },
+    {
+      "id": "hs-knowledge-merge-check",
+      "node_id": "verify_merge",
+      "ticket": "T208",
+      "input": "提案/base/integration、最新授权代码政策",
+      "output": "merge_gate与只读报告",
+      "constraints": "首发两个模板之外的CI动作；复用local-check公开merge引擎",
+      "state": "pending"
+    },
+    {
+      "id": "hs-knowledge-maintain",
+      "node_id": "maintain_knowledge",
+      "ticket": "T207",
+      "input": "固定来源变化/失效事件、复核证据",
+      "output": "幂等event、阻断state、双水位",
+      "constraints": "capture仅调幂等阻断原语；解除须匹配新证明/确认/激活，不反向调用capture形成环",
+      "state": "pending"
+    },
+    {
+      "id": "hs-knowledge-query",
+      "node_id": "query_knowledge",
+      "ticket": "T206",
+      "input": "query/request、context、channel、generation",
+      "output": "search/read/receipt、合格Claim与缺口",
+      "constraints": "过滤后重算全局topK；标题/摘要/别名不绕过Claim资格，同代精读并复查撤销",
+      "state": "pending"
+    }
+  ],
+  "workflows": [
+    {
+      "id": "hs-knowledge-ingest",
+      "state": "pending"
+    },
+    {
+      "id": "hs-knowledge-lint",
+      "state": "pending"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T201",
+      "title": "契约与运行协议",
+      "module": "M01",
+      "depends_on": [],
+      "requirement_ids": [
+        "R201",
+        "R202",
+        "R218"
+      ],
+      "acceptance_ids": [
+        "E201",
+        "E202",
+        "E218"
+      ],
+      "status": "pending",
+      "completion_records": []
+    },
+    {
+      "id": "T202",
+      "title": "发现与项目绑定",
+      "module": "M02",
+      "depends_on": [
+        "T201"
+      ],
+      "requirement_ids": [
+        "R203",
+        "R204"
+      ],
+      "acceptance_ids": [
+        "E203",
+        "E204"
+      ],
+      "status": "pending",
+      "completion_records": []
+    },
+    {
+      "id": "T203",
+      "title": "raw捕获与可恢复快照",
+      "module": "M03",
+      "depends_on": [
+        "T202"
+      ],
+      "requirement_ids": [
+        "R205"
+      ],
+      "acceptance_ids": [
+        "E205"
+      ],
+      "status": "pending",
+      "completion_records": []
+    },
+    {
+      "id": "T204",
+      "title": "六决策候选与精确视图",
+      "module": "M04",
+      "depends_on": [
+        "T203"
+      ],
+      "requirement_ids": [
+        "R207",
+        "R208"
+      ],
+      "acceptance_ids": [
+        "E207",
+        "E208"
+      ],
+      "status": "pending",
+      "completion_records": []
+    },
+    {
+      "id": "T205",
+      "title": "真实动作、事务与恢复",
+      "module": "M05",
+      "depends_on": [
+        "T204"
+      ],
+      "requirement_ids": [
+        "R209",
+        "R210"
+      ],
+      "acceptance_ids": [
+        "E209",
+        "E210"
+      ],
+      "status": "pending",
+      "completion_records": []
+    },
+    {
+      "id": "T206",
+      "title": "索引、查询与回归激活",
+      "module": "M07",
+      "depends_on": [
+        "T205"
+      ],
+      "requirement_ids": [
+        "R212",
+        "R213"
+      ],
+      "acceptance_ids": [
+        "E212",
+        "E213"
+      ],
+      "status": "pending",
+      "completion_records": []
+    },
+    {
+      "id": "T207",
+      "title": "维护事件与双水位",
+      "module": "M08",
+      "depends_on": [
+        "T203",
+        "T205",
+        "T206"
+      ],
+      "requirement_ids": [
+        "R214"
+      ],
+      "acceptance_ids": [
+        "E214"
+      ],
+      "status": "pending",
+      "completion_records": []
+    },
+    {
+      "id": "T208",
+      "title": "代码捕获与只读双门禁",
+      "module": "M06",
+      "depends_on": [
+        "T202",
+        "T204",
+        "T205"
+      ],
+      "requirement_ids": [
+        "R206",
+        "R211"
+      ],
+      "acceptance_ids": [
+        "E206",
+        "E211"
+      ],
+      "status": "pending",
+      "completion_records": []
+    },
+    {
+      "id": "T209",
+      "title": "两个Workflow和节点包",
+      "module": "M09",
+      "depends_on": [
+        "T202",
+        "T203",
+        "T204",
+        "T205",
+        "T206",
+        "T207",
+        "T208"
+      ],
+      "requirement_ids": [
+        "R215"
+      ],
+      "acceptance_ids": [
+        "E215"
+      ],
+      "status": "pending",
+      "completion_records": []
+    },
+    {
+      "id": "T210",
+      "title": "节点集成与开发交付",
+      "module": "M09",
+      "depends_on": [
+        "T201",
+        "T202",
+        "T203",
+        "T204",
+        "T205",
+        "T206",
+        "T207",
+        "T208",
+        "T209"
+      ],
+      "requirement_ids": [
+        "R216",
+        "R217"
+      ],
+      "acceptance_ids": [
+        "E216",
+        "E217"
+      ],
+      "status": "pending",
+      "completion_records": []
+    },
+    {
+      "id": "T211",
+      "title": "真实外部环境验收",
+      "module": "M09",
+      "depends_on": [
+        "T210"
+      ],
+      "requirement_ids": [
+        "R203",
+        "R204",
+        "R206",
+        "R209",
+        "R211",
+        "R213",
+        "R216",
+        "R217"
+      ],
+      "acceptance_ids": [
+        "E219",
+        "E220",
+        "E221",
+        "E222",
+        "E223",
+        "E224"
+      ],
+      "status": "pending",
+      "completion_records": []
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "E201",
+      "requirement_id": "R201",
+      "primary_ticket": "T201",
+      "criteria": "只WiFi、main不虚造源码、领域规则与节点程序职责分层。",
+      "status": "pending"
+    },
+    {
+      "id": "E202",
+      "requirement_id": "R202",
+      "primary_ticket": "T201",
+      "criteria": "产品2.0、七Profile、来源/记录/范围单点契约，锁定代码与声明摘要。",
+      "status": "pending"
+    },
+    {
+      "id": "E203",
+      "requirement_id": "R203",
+      "primary_ticket": "T202",
+      "criteria": "catalog解析精确包/解释器/锁，不自动安装，不发布本机路径。",
+      "status": "pending"
+    },
+    {
+      "id": "E204",
+      "requirement_id": "R204",
+      "primary_ticket": "T202",
+      "criteria": "resolved/context_loaded分开，歧义/旧登记/换仓失效，无整盘扫描。",
+      "status": "pending"
+    },
+    {
+      "id": "E205",
+      "requirement_id": "R205",
+      "primary_ticket": "T203",
+      "criteria": "只五raw、固定字节/locator/恢复，来源网页/映射延期，原件只读。",
+      "status": "pending"
+    },
+    {
+      "id": "E206",
+      "requirement_id": "R206",
+      "primary_ticket": "T208",
+      "criteria": "Git/dirty/导出固定实际字节，真实构建宏/Target未知保持unknown，受控只读Git。",
+      "status": "pending"
+    },
+    {
+      "id": "E207",
+      "requirement_id": "R207",
+      "primary_ticket": "T204",
+      "criteria": "七Profile、六决策、逐候选唯一处置，merge/split/deprecate保留替代导航。",
+      "status": "pending"
+    },
+    {
+      "id": "E208",
+      "requirement_id": "R208",
+      "primary_ticket": "T204",
+      "criteria": "精确writes/deletes含导航与来源锁，stable字节提前固定；生产不写正式资产。",
+      "status": "pending"
+    },
+    {
+      "id": "E209",
+      "requirement_id": "R209",
+      "primary_ticket": "T205",
+      "criteria": "可信adapter签名人事件；无动作/Agent/陈旧/部分接受不apply；文档免代码lint。",
+      "status": "pending"
+    },
+    {
+      "id": "E210",
+      "requirement_id": "R210",
+      "primary_ticket": "T205",
+      "criteria": "域锁/全写集CAS/持久备份journal/幂等/恢复，单文件原子而非虚称多文件原子。",
+      "status": "pending"
+    },
+    {
+      "id": "E211",
+      "requirement_id": "R211",
+      "primary_ticket": "T208",
+      "criteria": "正向逐Claim证据，local/最新授权merge只读；缺代码/证据incomplete，纯文档拒绝门禁。",
+      "status": "pending"
+    },
+    {
+      "id": "E212",
+      "requirement_id": "R212",
+      "primary_ticket": "T206",
+      "criteria": "全候选先资格过滤，仅有效Claim重计分求全局topK；metadata同样受资格约束。",
+      "status": "pending"
+    },
+    {
+      "id": "E213",
+      "requirement_id": "R213",
+      "primary_ticket": "T206",
+      "criteria": "同代read/receipt、唯一snapshot/locator、local/shared资格、真实merged身份。",
+      "status": "pending"
+    },
+    {
+      "id": "E214",
+      "requirement_id": "R214",
+      "primary_ticket": "T207",
+      "criteria": "幂等事件/条件化影响、live block、双水位、受控复核恢复。",
+      "status": "pending"
+    },
+    {
+      "id": "E215",
+      "requirement_id": "R215",
+      "primary_ticket": "T209",
+      "criteria": "18Skill/2Workflow、user Gate、不可变run/node/attempt manifest、模板可达与公开CLI复用。",
+      "status": "pending"
+    },
+    {
+      "id": "E216",
+      "requirement_id": "R216",
+      "primary_ticket": "T210",
+      "criteria": "单包/单仓跨节点/真实人/宿主/六Target/权限/CI分层，缺外部输入保持pending。",
+      "status": "pending"
+    },
+    {
+      "id": "E217",
+      "requirement_id": "R217",
+      "primary_ticket": "T210",
+      "criteria": "有用户授权的外部发布流程执行Git；节点只交接，单仓跨节点分别记录实际SHA/远端/包身份。",
+      "status": "pending"
+    },
+    {
+      "id": "E218",
+      "requirement_id": "R218",
+      "primary_ticket": "T201",
+      "criteria": "统一JSON协议、精确tool/rules摘要、status/phase、0/2/3语义和安全路径。",
+      "status": "pending"
+    },
+    {
+      "id": "E219",
+      "requirement_id": "R209",
+      "primary_ticket": "T211",
+      "criteria": "真实人确认完整视图；无动作/Agent/未签名不通过，视图变更重新确认",
+      "status": "pending",
+      "evidence_tier": "real_external"
+    },
+    {
+      "id": "E220",
+      "requirement_id": "R204",
+      "primary_ticket": "T211",
+      "criteria": "真实目标宿主从仓外只给代码路径，实际可见/选用/加载工具轨迹成立",
+      "status": "pending",
+      "evidence_tier": "real_external"
+    },
+    {
+      "id": "E221",
+      "requirement_id": "R206",
+      "primary_ticket": "T211",
+      "criteria": "真实chip12/chip08/chip07c六Target/三pair逐槽登记并分读取/构建/运行层留证",
+      "status": "pending",
+      "evidence_tier": "real_external"
+    },
+    {
+      "id": "E222",
+      "requirement_id": "R213",
+      "primary_ticket": "T211",
+      "criteria": "实际受信CI/committer合入与shared内容/证明身份一致，无伪merged或静默local降级",
+      "status": "pending",
+      "evidence_tier": "real_external"
+    },
+    {
+      "id": "E223",
+      "requirement_id": "R216",
+      "primary_ticket": "T211",
+      "criteria": "真实跨组访问拒绝、存储/会话/端点隔离和撤销负测；目录/filter不作ACL证据",
+      "status": "pending",
+      "evidence_tier": "real_external"
+    },
+    {
+      "id": "E224",
+      "requirement_id": "R217",
+      "primary_ticket": "T211",
+      "criteria": "当前FactumCore远端实际发布与本地提交一致，节点包摘要和规则身份可验证",
+      "status": "pending",
+      "evidence_tier": "real_external"
+    }
+  ],
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "kind": "F",
+      "responsibility": "项目路由入口",
+      "development": "短表指向 config、K、18节点Skill、两 Workflow",
+      "constraints": "不含业务结论，不替代真实加载，不代管用户个人 AGENTS",
+      "acceptance": "仓内/仓外绑定后均能找到同一知识入口",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "config.yml",
+      "kind": "F",
+      "responsibility": "四映射表及六 Target/三 pair",
+      "development": "保留 repos/architecture/wiki_entities/symbol_aliases，补充版本、工具与查询政策引用",
+      "constraints": "未登记真实代码根、宏、构建、版本为 null/unknown；配置不是已验证知识",
+      "acceptance": "六 Target/三 pair 引用闭合；共享 Host 路径不被武断选成单芯片",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": ".gitignore",
+      "kind": "F",
+      "responsibility": "运行与本机产物排除",
+      "development": "忽略 .build/artifacts/.codegraph、缓存、锁、临时备份",
+      "constraints": "不整目录忽略 logs 而丢失唯一确认；不恢复根 runtime 目录",
+      "acceptance": "git status 不含机器索引/凭据，必要审计记录仍可提交",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": ".gitattributes",
+      "kind": "F",
+      "responsibility": "文本与原件字节政策",
+      "development": "系统文本 LF，raw 二进制/冻结原件按字节保留",
+      "constraints": "原件不因迁移或换行被改 hash",
+      "acceptance": "原件迁移前后摘要相同",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "main/.gitkeep",
+      "kind": "F",
+      "responsibility": "业务代码槽位",
+      "development": "维持现行空目录",
+      "constraints": "不按主设计示意树虚造 device/host 源码",
+      "acceptance": "main 仅占位；真实代码未知仍报告 unknown",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "main/device/bfgx/<source-relative-path>",
+      "kind": "X",
+      "responsibility": "主设计业务源码示意槽位",
+      "development": "仅登记实际授权仓/版本或导出；当前不创建源树",
+      "constraints": "不是本库生成文件；不由目录名推导芯片适用性",
+      "acceptance": "真实读取/编译/运行分层验收",
+      "delivery_state": "external_or_deferred",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "main/device/common/<source-relative-path>",
+      "kind": "X",
+      "responsibility": "主设计业务源码示意槽位",
+      "development": "仅登记实际授权仓/版本或导出；当前不创建源树",
+      "constraints": "不是本库生成文件；不由目录名推导芯片适用性",
+      "acceptance": "真实读取/编译/运行分层验收",
+      "delivery_state": "external_or_deferred",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "main/device/dpa/<source-relative-path>",
+      "kind": "X",
+      "responsibility": "主设计业务源码示意槽位",
+      "development": "仅登记实际授权仓/版本或导出；当前不创建源树",
+      "constraints": "不是本库生成文件；不由目录名推导芯片适用性",
+      "acceptance": "真实读取/编译/运行分层验收",
+      "delivery_state": "external_or_deferred",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "main/device/platform/<source-relative-path>",
+      "kind": "X",
+      "responsibility": "主设计业务源码示意槽位",
+      "development": "仅登记实际授权仓/版本或导出；当前不创建源树",
+      "constraints": "不是本库生成文件；不由目录名推导芯片适用性",
+      "acceptance": "真实读取/编译/运行分层验收",
+      "delivery_state": "external_or_deferred",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "main/device/sensorhub/<source-relative-path>",
+      "kind": "X",
+      "responsibility": "主设计业务源码示意槽位",
+      "development": "仅登记实际授权仓/版本或导出；当前不创建源树",
+      "constraints": "不是本库生成文件；不由目录名推导芯片适用性",
+      "acceptance": "真实读取/编译/运行分层验收",
+      "delivery_state": "external_or_deferred",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "main/drivers/bfgx/<source-relative-path>",
+      "kind": "X",
+      "responsibility": "主设计业务源码示意槽位",
+      "development": "仅登记实际授权仓/版本或导出；当前不创建源树",
+      "constraints": "不是本库生成文件；不由目录名推导芯片适用性",
+      "acceptance": "真实读取/编译/运行分层验收",
+      "delivery_state": "external_or_deferred",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "main/drivers/common/<source-relative-path>",
+      "kind": "X",
+      "responsibility": "主设计业务源码示意槽位",
+      "development": "仅登记实际授权仓/版本或导出；当前不创建源树",
+      "constraints": "不是本库生成文件；不由目录名推导芯片适用性",
+      "acceptance": "真实读取/编译/运行分层验收",
+      "delivery_state": "external_or_deferred",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "main/drivers/dpa/<source-relative-path>",
+      "kind": "X",
+      "responsibility": "主设计业务源码示意槽位",
+      "development": "仅登记实际授权仓/版本或导出；当前不创建源树",
+      "constraints": "不是本库生成文件；不由目录名推导芯片适用性",
+      "acceptance": "真实读取/编译/运行分层验收",
+      "delivery_state": "external_or_deferred",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "main/drivers/platform/<source-relative-path>",
+      "kind": "X",
+      "responsibility": "主设计业务源码示意槽位",
+      "development": "仅登记实际授权仓/版本或导出；当前不创建源树",
+      "constraints": "不是本库生成文件；不由目录名推导芯片适用性",
+      "acceptance": "真实读取/编译/运行分层验收",
+      "delivery_state": "external_or_deferred",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "main/drivers/sensorhub/<source-relative-path>",
+      "kind": "X",
+      "responsibility": "主设计业务源码示意槽位",
+      "development": "仅登记实际授权仓/版本或导出；当前不创建源树",
+      "constraints": "不是本库生成文件；不由目录名推导芯片适用性",
+      "acceptance": "真实读取/编译/运行分层验收",
+      "delivery_state": "external_or_deferred",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "main/device/wifi/mp1x/<source-relative-path>",
+      "kind": "X",
+      "responsibility": "WiFi真实代码示意",
+      "development": "实际路径和逻辑Target对应由config登记",
+      "constraints": "main当前空，不生成假代码；mp1x/mp12不自动对应chip12/08/07c",
+      "acceptance": "对应授权工程的来源身份、构建和范围可核验",
+      "delivery_state": "external_or_deferred",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "main/device/wifi/mp1x/.codegraph/<tool-artifact>",
+      "kind": "X",
+      "responsibility": "本地代码图谱对象",
+      "development": "由实际CodeGraph工具构建并固定源码/Target身份",
+      "constraints": "不上库，陈旧图不能作当前语义证明；门禁不重建图",
+      "acceptance": "旧图/错Target报告缺口并回源码",
+      "delivery_state": "external_or_deferred",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "main/device/wifi/mp12/<source-relative-path>",
+      "kind": "X",
+      "responsibility": "WiFi真实代码示意",
+      "development": "实际路径和逻辑Target对应由config登记",
+      "constraints": "main当前空，不生成假代码；mp1x/mp12不自动对应chip12/08/07c",
+      "acceptance": "对应授权工程的来源身份、构建和范围可核验",
+      "delivery_state": "external_or_deferred",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "main/device/wifi/mp12/.codegraph/<tool-artifact>",
+      "kind": "X",
+      "responsibility": "本地代码图谱对象",
+      "development": "由实际CodeGraph工具构建并固定源码/Target身份",
+      "constraints": "不上库，陈旧图不能作当前语义证明；门禁不重建图",
+      "acceptance": "旧图/错Target报告缺口并回源码",
+      "delivery_state": "external_or_deferred",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "main/drivers/wifi/<source-relative-path>",
+      "kind": "X",
+      "responsibility": "WiFi真实代码示意",
+      "development": "实际路径和逻辑Target对应由config登记",
+      "constraints": "main当前空，不生成假代码；mp1x/mp12不自动对应chip12/08/07c",
+      "acceptance": "对应授权工程的来源身份、构建和范围可核验",
+      "delivery_state": "external_or_deferred",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "main/drivers/wifi/.codegraph/<tool-artifact>",
+      "kind": "X",
+      "responsibility": "本地代码图谱对象",
+      "development": "由实际CodeGraph工具构建并固定源码/Target身份",
+      "constraints": "不上库，陈旧图不能作当前语义证明；门禁不重建图",
+      "acceptance": "旧图/错Target报告缺口并回源码",
+      "delivery_state": "external_or_deferred",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/AGENTS.md",
+      "kind": "F",
+      "responsibility": "领域入口",
+      "development": "指知识/原件/治理/18节点Skill/两 Workflow",
+      "constraints": "不装业务结论；明确当前能力状态",
+      "acceptance": "与根入口没有互斥规则",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/README.md",
+      "kind": "F",
+      "responsibility": "人读定位/现状/安装入口",
+      "development": "真实可用能力与未实现边界，指系统文档与验收",
+      "constraints": "空骨架不得写成已运行",
+      "acceptance": "新人沿导航可找到准确操作入口",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/CONTRIBUTING.md",
+      "kind": "F",
+      "responsibility": "贡献与上库规则",
+      "development": "raw人工流程、代码双门禁、Scoped Git提交",
+      "constraints": "自己可确认自己的文档，但必须真实动作；保留其他dirty",
+      "acceptance": "贡献者可按说明分别完成两条合成演练",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/check.py",
+      "kind": "F",
+      "responsibility": "治理构建薄包装",
+      "development": "从自身位置识别K/W；从受信安装清单按local/merge解析hs-knowledge-local-check或hs-knowledge-merge-check的已安装CLI，以argv转发明确K/context/view或merge参数",
+      "constraints": "不假定W/skills或相邻能力仓路径；无代码/规则副本，无自动修复/安装；纯文档免代码门禁",
+      "acceptance": "与 Lint CLI 同结果，任意 cwd 可执行",
+      "delivery_state": "planned",
+      "module": "M06",
+      "ticket_ids": [
+        "T208"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/check.sh",
+      "kind": "F",
+      "responsibility": "Unix兼容入口",
+      "development": "精确定位脚本目录后 exec python check.py \"$@\"",
+      "constraints": "不安装工具，不改 cwd 假定，不吞exitcode",
+      "acceptance": "空格路径/失败退出码传递正确",
+      "delivery_state": "planned",
+      "module": "M06",
+      "ticket_ids": [
+        "T208"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-raw/AGENTS.md",
+      "kind": "F",
+      "responsibility": "原件只读边界",
+      "development": "五允许类、sources延期、控制文件排除、真实格式缺口",
+      "constraints": "不以raw文字获得执行/发布权限",
+      "acceptance": "提示注入只能作为正文呈现",
+      "delivery_state": "planned",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-raw/index.md",
+      "kind": "F",
+      "responsibility": "原件导航",
+      "development": "按类别列 document_id、版本、相对落点、source引用",
+      "constraints": "不是第六原件，不复制结论",
+      "acceptance": "每项可回到真实字节/锁",
+      "delivery_state": "planned",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-raw/conventions/<document-id>/<version-or-digest>/<original-file>",
+      "kind": "D",
+      "responsibility": "规范原件",
+      "development": "用户放入真实不可变原件",
+      "constraints": "只读，批准身份未知保持未知",
+      "acceptance": "source锁恢复同字节",
+      "delivery_state": "runtime_or_instance",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-raw/conventions/<document-id>/<version-or-digest>/<attachment-file>",
+      "kind": "D",
+      "responsibility": "规范附件",
+      "development": "必要附件分别登记",
+      "constraints": "缺附件不报完整",
+      "acceptance": "主文不变附件改仍提示影响",
+      "delivery_state": "runtime_or_instance",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-raw/chips/<document-id>/<version-or-digest>/<original-file>",
+      "kind": "D",
+      "responsibility": "芯片原件",
+      "development": "真实版本及芯片范围",
+      "constraints": "不默认三芯片通用",
+      "acceptance": "不跨芯片current误用",
+      "delivery_state": "runtime_or_instance",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-raw/chips/<document-id>/<version-or-digest>/<attachment-file>",
+      "kind": "D",
+      "responsibility": "芯片图表附件",
+      "development": "固定hash/页图定位",
+      "constraints": "单位和图表人工检查",
+      "acceptance": "附件字节可恢复",
+      "delivery_state": "runtime_or_instance",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-raw/storys/<document-id>/<version-or-digest>/<original-file>",
+      "kind": "D",
+      "responsibility": "迭代设计原件",
+      "development": "保留计划/实现/实测身份",
+      "constraints": "计划不是验证结果",
+      "acceptance": "候选能区分身份",
+      "delivery_state": "runtime_or_instance",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-raw/storys/<document-id>/<version-or-digest>/<attachment-file>",
+      "kind": "D",
+      "responsibility": "迭代附件",
+      "development": "独立快照与主文关系",
+      "constraints": "不纳凭据/无关日志",
+      "acceptance": "引用闭合",
+      "delivery_state": "runtime_or_instance",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-raw/specs/<document-id>/<version-or-digest>/<original-file>",
+      "kind": "D",
+      "responsibility": "SDD原件",
+      "development": "固定规格/设计版本",
+      "constraints": "系统自身SDD不是自动来源，必须明确落raw与授权",
+      "acceptance": "AI设计不冒充已实现",
+      "delivery_state": "runtime_or_instance",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-raw/specs/<document-id>/<version-or-digest>/<attachment-file>",
+      "kind": "D",
+      "responsibility": "SDD必要附表",
+      "development": "独立hash/locator",
+      "constraints": "不隐式复制docs-llm-wiki成领域事实",
+      "acceptance": "正式引用可追踪",
+      "delivery_state": "runtime_or_instance",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-raw/protocols/<document-id>/<version-or-digest>/<original-file>",
+      "kind": "D",
+      "responsibility": "协议原件",
+      "development": "标准版本/章节/原页",
+      "constraints": "标准与产品支持分开",
+      "acceptance": "不混用不同版本",
+      "delivery_state": "runtime_or_instance",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-raw/protocols/<document-id>/<version-or-digest>/<attachment-file>",
+      "kind": "D",
+      "responsibility": "协议勘误/附录",
+      "development": "固定主版本关联",
+      "constraints": "采用勘误须人工决定",
+      "acceptance": "旧条款与新勘误同时恢复",
+      "delivery_state": "runtime_or_instance",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-raw/sources/dbox/<source-id>.md",
+      "kind": "P",
+      "responsibility": "dbox登记页",
+      "development": "未来链接/版本/hash/密级/授权登记",
+      "constraints": "首发只保留.gitkeep，不访问、不更新卡",
+      "acceptance": "输入此路径返回SOURCE_DEFERRED且无网络",
+      "delivery_state": "external_or_deferred",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-raw/sources/3ms/<source-id>.md",
+      "kind": "P",
+      "responsibility": "3ms登记页",
+      "development": "未来可行性与权限确认后设计",
+      "constraints": "当前不支持访问",
+      "acceptance": "不伪造3ms读取结果",
+      "delivery_state": "external_or_deferred",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-raw/sources/wiki/<source-id>.md",
+      "kind": "P",
+      "responsibility": "wiki登记页",
+      "development": "未来网页授权/取回/固定快照后设计",
+      "constraints": "首发不联网获取",
+      "acceptance": "相同输入明确延期",
+      "delivery_state": "external_or_deferred",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-raw/chips/.gitkeep",
+      "kind": "F",
+      "responsibility": "当前空目录占位",
+      "development": "保持当前骨架，实施该目录固定文件时按同一模块提交移除占位",
+      "constraints": "占位不是Skill、Workflow、索引或来源访问能力",
+      "acceptance": "新clone能看到对应目录，不产生虚假业务文件",
+      "delivery_state": "planned",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-raw/conventions/.gitkeep",
+      "kind": "F",
+      "responsibility": "当前空目录占位",
+      "development": "保持当前骨架，实施该目录固定文件时按同一模块提交移除占位",
+      "constraints": "占位不是Skill、Workflow、索引或来源访问能力",
+      "acceptance": "新clone能看到对应目录，不产生虚假业务文件",
+      "delivery_state": "planned",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-raw/protocols/.gitkeep",
+      "kind": "F",
+      "responsibility": "当前空目录占位",
+      "development": "保持当前骨架，实施该目录固定文件时按同一模块提交移除占位",
+      "constraints": "占位不是Skill、Workflow、索引或来源访问能力",
+      "acceptance": "新clone能看到对应目录，不产生虚假业务文件",
+      "delivery_state": "planned",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-raw/sources/3ms/.gitkeep",
+      "kind": "F",
+      "responsibility": "当前空目录占位",
+      "development": "保持当前骨架，实施该目录固定文件时按同一模块提交移除占位",
+      "constraints": "占位不是Skill、Workflow、索引或来源访问能力",
+      "acceptance": "新clone能看到对应目录，不产生虚假业务文件",
+      "delivery_state": "planned",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-raw/sources/dbox/.gitkeep",
+      "kind": "F",
+      "responsibility": "当前空目录占位",
+      "development": "保持当前骨架，实施该目录固定文件时按同一模块提交移除占位",
+      "constraints": "占位不是Skill、Workflow、索引或来源访问能力",
+      "acceptance": "新clone能看到对应目录，不产生虚假业务文件",
+      "delivery_state": "planned",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-raw/sources/wiki/.gitkeep",
+      "kind": "F",
+      "responsibility": "当前空目录占位",
+      "development": "保持当前骨架，实施该目录固定文件时按同一模块提交移除占位",
+      "constraints": "占位不是Skill、Workflow、索引或来源访问能力",
+      "acceptance": "新clone能看到对应目录，不产生虚假业务文件",
+      "delivery_state": "planned",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-raw/specs/.gitkeep",
+      "kind": "F",
+      "responsibility": "当前空目录占位",
+      "development": "保持当前骨架，实施该目录固定文件时按同一模块提交移除占位",
+      "constraints": "占位不是Skill、Workflow、索引或来源访问能力",
+      "acceptance": "新clone能看到对应目录，不产生虚假业务文件",
+      "delivery_state": "planned",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-raw/storys/.gitkeep",
+      "kind": "F",
+      "responsibility": "当前空目录占位",
+      "development": "保持当前骨架，实施该目录固定文件时按同一模块提交移除占位",
+      "constraints": "占位不是Skill、Workflow、索引或来源访问能力",
+      "acceptance": "新clone能看到对应目录，不产生虚假业务文件",
+      "delivery_state": "planned",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/governance/AGENTS.md",
+      "kind": "F",
+      "responsibility": "规则改动入口",
+      "development": "说明声明规则/契约/模板/锁/测试位置",
+      "constraints": "主设计不变；规则改动有兼容和迁移说明",
+      "acceptance": "规则维护者能找到单一契约来源",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/governance/index.md",
+      "kind": "F",
+      "responsibility": "治理导航",
+      "development": "链接下列固定文件",
+      "constraints": "不复制另一份字段规范",
+      "acceptance": "无断链、无 _shared 现行入口",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/governance/framework.lock.yaml",
+      "kind": "F",
+      "responsibility": "锁定领域契约与外部工具兼容身份",
+      "development": "本仓仅锁治理契约/规则的领域相对路径及hash；外部能力锁release/commit、包摘要及兼容要求，由受信安装清单解析实际入口",
+      "constraints": "不声称存在已归档执行器；受信CI基线不由PR任意调低；未来2.0另锁定允许的能力release/包摘要；本轮1.0相对规则路径及字节不改",
+      "acceptance": "同版本hash可复核；不兼容拒绝",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/governance/sources.lock.yaml",
+      "kind": "F",
+      "responsibility": "SourceResource/快照SSOT",
+      "development": "保留旧合法记录；实际导入时追加固定source/snapshot及恢复信息",
+      "constraints": "空锁不表示已读取资料；原件不被capture覆盖",
+      "acceptance": "所用来源引用闭合、旧版本可恢复",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/governance/schemas/frontmatter.schema.json",
+      "kind": "F",
+      "responsibility": "卡/Claim字段",
+      "development": "现有1.0为迁移输入，按2.0契约明确7 Profile、scope、sources、claims、relations",
+      "constraints": "字段兼容迁移显式；不能靠Schema声称内容正确",
+      "acceptance": "缺字段/错枚举定位准确",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/governance/schemas/sources.schema.json",
+      "kind": "F",
+      "responsibility": "来源/快照字段",
+      "development": "Git、导出、raw来源与定位、hash/bytes/恢复",
+      "constraints": "来源链接只是登记，首发不拉远端",
+      "acceptance": "缺字节摘要、错误版本、不可恢复可识别",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/governance/schemas/records.schema.json",
+      "kind": "F",
+      "responsibility": "记录字段",
+      "development": "ProjectContext/SourceSnapshot/ChangeSet/人工/代码检查/事务/索引/收据统一判形",
+      "constraints": "人工决定≠代码pass；记录不含自身递归摘要",
+      "acceptance": "记录与实际对象摘要绑定",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/governance/schemas/workspace.schema.json",
+      "kind": "F",
+      "responsibility": "config字段/引用",
+      "development": "四映射表、Target/pair、覆盖边界",
+      "constraints": "不复制实际业务路径注册",
+      "acceptance": "对现行 config 及unknown正确校验",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/governance/schemas/profiles.yaml",
+      "kind": "F",
+      "responsibility": "七类章节义务",
+      "development": "保持现有entity/flow/protocol/rule/command/runbook/glossary",
+      "constraints": "不按资料工具扩Profile；Profile不决定审核模式",
+      "acceptance": "七模板必需章节完整",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/governance/schemas/registries.yaml",
+      "kind": "F",
+      "responsibility": "受控公共枚举",
+      "development": "登记受控枚举、五类raw允许根及来源类别；真实Target/代码位置仍只在config.yml；不放凭据或本机私有路径",
+      "constraints": "Target/实际repo映射仍只在config",
+      "acceptance": "枚举闭合、无CANN业务遗留",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/governance/contracts/__init__.py",
+      "kind": "F",
+      "responsibility": "契约公开接口",
+      "development": "仅导出版本及五模块需要的稳定纯函数",
+      "constraints": "导入不扫描/联网/写入",
+      "acceptance": "独立加载无副作用",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/governance/contracts/validation.py",
+      "kind": "F",
+      "responsibility": "通用本地规则加载",
+      "development": "Schema/Profile/枚举加载、canonical摘要、诊断类型、safe路径读",
+      "constraints": "禁远端$ref、eval、从raw读程序；缓存绑定规则hash",
+      "acceptance": "畸形/未知版本/路径绕出拒绝，中文摘要确定",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/governance/contracts/knowledge.py",
+      "kind": "F",
+      "responsibility": "卡片完整解释",
+      "development": "Markdown frontmatter/claim text_ref/七Profile/ID/关系/适用范围纯函数",
+      "constraints": "解析不修卡；scope unknown不当通配；导航/AGENTS不当卡",
+      "acceptance": "三Skill对同卡得到同一ParsedCard与排除原因",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/governance/contracts/source_resources.py",
+      "kind": "F",
+      "responsibility": "来源资源/快照契约",
+      "development": "来源锁解析、引用/locator/恢复元数据、实际字节hash验证",
+      "constraints": "只读已批准来源；不联网抓取；不混用旧source snapshot",
+      "acceptance": "原文、附件、版本变化分别可诊断",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/governance/contracts/records.py",
+      "kind": "F",
+      "responsibility": "记录绑定验证",
+      "development": "**替换现有从 _shared.contracts/_shared.changes 导入的失效adapter**，改为本层validation与具体绑定纯函数",
+      "constraints": "不包办真人交互/事务；信任不由confirmed_by字段产生",
+      "acceptance": "无 _shared 依赖；旧兼容记录可判形但不冒充新部署有效证明",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/governance/templates/entity.md",
+      "kind": "F",
+      "responsibility": "实体候选模板",
+      "development": "职责/边界/接口/依赖/证据",
+      "constraints": "draft占位不能当实际结论",
+      "acceptance": "Profile章节齐全",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/governance/templates/flow.md",
+      "kind": "F",
+      "responsibility": "流程候选模板",
+      "development": "起终点/步骤/调用与消息/异常/条件/证据",
+      "constraints": "跨侧缺口显式",
+      "acceptance": "Profile章节齐全",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/governance/templates/protocol.md",
+      "kind": "F",
+      "responsibility": "协议候选模板",
+      "development": "机制/字段与状态/约束/标准版本/产品支持边界/证据",
+      "constraints": "标准不等于产品实现",
+      "acceptance": "Profile章节齐全",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/governance/templates/rule.md",
+      "kind": "F",
+      "responsibility": "规范候选模板",
+      "development": "规则对象/约束/例外/批准身份/检查办法/证据",
+      "constraints": "无批准信息不补造",
+      "acceptance": "Profile章节齐全",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/governance/templates/command.md",
+      "kind": "F",
+      "responsibility": "命令候选模板",
+      "development": "语法/参数/前置条件/输出判读/误用/验证/证据",
+      "constraints": "原task不等于可执行维测命令，须确有命令语义",
+      "acceptance": "Profile章节齐全",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/governance/templates/runbook.md",
+      "kind": "F",
+      "responsibility": "诊断候选模板",
+      "development": "现象/信号/分支/步骤/根因状态/解法/验证/证据",
+      "constraints": "推测归因不得标已验证",
+      "acceptance": "Profile章节齐全",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/governance/templates/glossary.md",
+      "kind": "F",
+      "responsibility": "术语候选模板",
+      "development": "定义/别名/歧义/范围/证据",
+      "constraints": "含歧义和来源上下文",
+      "acceptance": "Profile章节齐全",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/governance/templates/index.md",
+      "kind": "F",
+      "responsibility": "导航模板",
+      "development": "层级/卡ID/短用途/状态",
+      "constraints": "非第8卡Profile",
+      "acceptance": "不入词面索引",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/governance/templates/manual-review.json",
+      "kind": "F",
+      "responsibility": "人工记录形状样例",
+      "development": "无真实姓名/时间/接受状态的占位样例",
+      "constraints": "**模板不是确认**，占位记录永不授权apply",
+      "acceptance": "模板直接作确认必被拒绝",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/governance/specs/cards.md",
+      "kind": "F",
+      "responsibility": "卡编写规范",
+      "development": "七Profile/四要素/Claim/证据/scope/关系规则",
+      "constraints": "不复制Schema逐字段定义形成漂移",
+      "acceptance": "模板、解析、规范一致",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/governance/specs/sources.md",
+      "kind": "F",
+      "responsibility": "来源与人工更新规范",
+      "development": "五raw、不可变版本、附件、恢复、设计与实现区分",
+      "constraints": "远端三来源延期",
+      "acceptance": "新旧原件可同时恢复并精确定位",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/governance/specs/lifecycle.md",
+      "kind": "F",
+      "responsibility": "生命周期与共享资格",
+      "development": "draft→stable；deprecated/替代；local/shared与manual/code分支",
+      "constraints": "stable不是已合入；CI不改卡；回滚不覆盖历史",
+      "acceptance": "每个状态转换有责任人与确切证据",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/governance/specs/records.md",
+      "kind": "F",
+      "responsibility": "记录信任与绑定",
+      "development": "终端真人确认、摘要、代码双检、事务/收据、schema迁移",
+      "constraints": "去掉旧 _shared 命令描述；明确新CLI与历史身份",
+      "acceptance": "新命令能真实重放，历史记录不得伪装当前部署",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/knowledge/AGENTS.md",
+      "kind": "F",
+      "responsibility": "知识读取与写入规则",
+      "development": "七 Profile、stable/范围/来源/复核边界",
+      "constraints": "不虚构业务模块/Target实配",
+      "acceptance": "卡片任务有清晰Profile落点",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204",
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/knowledge/index.md",
+      "kind": "F",
+      "responsibility": "正式知识总导航",
+      "development": "分类入口、卡ID和简短用途",
+      "constraints": "人读导航不入技术检索",
+      "acceptance": "每张已落位卡可按ID寻址",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204",
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/knowledge/concepts/index.md",
+      "kind": "F",
+      "responsibility": "概念导航",
+      "development": "指entities/flows/protocols",
+      "constraints": "不存独立技术事实",
+      "acceptance": "三子导航链接完整",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204",
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/knowledge/concepts/entities/index.md",
+      "kind": "F",
+      "responsibility": "实体卡导航",
+      "development": "实体ID/职责入口",
+      "constraints": "不把目录等于模块已存在",
+      "acceptance": "条目可达、无悬空卡",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204",
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/knowledge/concepts/flows/index.md",
+      "kind": "F",
+      "responsibility": "流程卡导航",
+      "development": "场景/起终点入口",
+      "constraints": "不重复卡正文",
+      "acceptance": "merge/split后入口可达",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204",
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/knowledge/concepts/protocols/index.md",
+      "kind": "F",
+      "responsibility": "协议卡导航",
+      "development": "协议版本/机制入口",
+      "constraints": "标准与产品支持不混写",
+      "acceptance": "可定位相应版本卡",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204",
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/knowledge/rules/index.md",
+      "kind": "F",
+      "responsibility": "规范卡导航",
+      "development": "规则对象/状态入口",
+      "constraints": "不将规范声明当实现遵从",
+      "acceptance": "适用边界可见",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204",
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/knowledge/commands/index.md",
+      "kind": "F",
+      "responsibility": "命令卡导航",
+      "development": "工具/命令入口",
+      "constraints": "不自动执行命令",
+      "acceptance": "只跳转正式卡",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204",
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/knowledge/runbooks/index.md",
+      "kind": "F",
+      "responsibility": "诊断卡导航",
+      "development": "症状/环境入口",
+      "constraints": "不把未实测归因写为已证",
+      "acceptance": "卡内根因状态可查",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204",
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/knowledge/glossaries/index.md",
+      "kind": "F",
+      "responsibility": "术语卡导航",
+      "development": "词/别名/歧义入口",
+      "constraints": "别名不直接等同源码符号事实",
+      "acceptance": "词条可追溯来源",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204",
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/knowledge/concepts/entities/<card-id>.md",
+      "kind": "D",
+      "responsibility": "entity卡",
+      "development": "entity模板与4要素/Claims",
+      "constraints": "模块/OPS/回调只写有证据职责",
+      "acceptance": "Profile及语义人工/代码证据适配",
+      "delivery_state": "runtime_or_instance",
+      "module": "M04",
+      "ticket_ids": [
+        "T204",
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/knowledge/concepts/flows/<card-id>.md",
+      "kind": "D",
+      "responsibility": "flow卡",
+      "development": "flow模板，边/条件/跨侧证据",
+      "constraints": "缺一侧不得完链",
+      "acceptance": "起终点/异常/条件可验证",
+      "delivery_state": "runtime_or_instance",
+      "module": "M04",
+      "ticket_ids": [
+        "T204",
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/knowledge/concepts/protocols/<card-id>.md",
+      "kind": "D",
+      "responsibility": "protocol卡",
+      "development": "标准机制与产品支持独立Claim",
+      "constraints": "标准文档确认不证明芯片支持",
+      "acceptance": "版本/范围/定位闭合",
+      "delivery_state": "runtime_or_instance",
+      "module": "M04",
+      "ticket_ids": [
+        "T204",
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/knowledge/rules/<card-id>.md",
+      "kind": "D",
+      "responsibility": "rule卡",
+      "development": "可检查规则/例外/批准身份",
+      "constraints": "未知批准不补造",
+      "acceptance": "约束与例外有证据",
+      "delivery_state": "runtime_or_instance",
+      "module": "M04",
+      "ticket_ids": [
+        "T204",
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/knowledge/commands/<card-id>.md",
+      "kind": "D",
+      "responsibility": "command卡",
+      "development": "真实命令/参数/输出/误用",
+      "constraints": "不把SDD task标题生造命令",
+      "acceptance": "前置条件和验证明确",
+      "delivery_state": "runtime_or_instance",
+      "module": "M04",
+      "ticket_ids": [
+        "T204",
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/knowledge/runbooks/<card-id>.md",
+      "kind": "D",
+      "responsibility": "runbook卡",
+      "development": "现象/信号/分支/根因状态/解法/验证",
+      "constraints": "推测不冒充根因已证",
+      "acceptance": "相同症状的边界可见",
+      "delivery_state": "runtime_or_instance",
+      "module": "M04",
+      "ticket_ids": [
+        "T204",
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/knowledge/glossaries/<card-id>.md",
+      "kind": "D",
+      "responsibility": "glossary卡",
+      "development": "定义/别名/歧义/范围",
+      "constraints": "组内词不无条件映射代码符号",
+      "acceptance": "适用范围与证据可恢复",
+      "delivery_state": "runtime_or_instance",
+      "module": "M04",
+      "ticket_ids": [
+        "T204",
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/.build/operations/<operation-id>/operation.json",
+      "kind": "R",
+      "responsibility": "操作状态/绑定",
+      "development": "固定workspace/K/操作种类/输入摘要",
+      "constraints": "ignored；不是最终授权",
+      "acceptance": "能判恢复/输入已变",
+      "delivery_state": "runtime_or_instance",
+      "module": "M04",
+      "ticket_ids": [
+        "T204",
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/.build/operations/<operation-id>/captures/<snapshot-id>/original.bin",
+      "kind": "R",
+      "responsibility": "读取期间固定原字节",
+      "development": "临时一致读副本；raw本身仍只读",
+      "constraints": "ignored，不能成为唯一恢复源；final锁需真实raw版本/历史恢复",
+      "acceptance": "清.build后仍能恢复正式卡证据",
+      "delivery_state": "runtime_or_instance",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/.build/operations/<operation-id>/captures/<snapshot-id>/normalized.md",
+      "kind": "R",
+      "responsibility": "规范化文本",
+      "development": "提取器输出带缺口",
+      "constraints": "ignored，不充当新原文版本",
+      "acceptance": "可从locator回真实字节",
+      "delivery_state": "runtime_or_instance",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/.build/operations/<operation-id>/captures/<snapshot-id>/locators.json",
+      "kind": "R",
+      "responsibility": "章节/页/段定位",
+      "development": "normalized span→原定位",
+      "constraints": "ignored，格式/工具版本入manifest",
+      "acceptance": "抽样锚点可往返回源",
+      "delivery_state": "runtime_or_instance",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/.build/operations/<operation-id>/captures/<snapshot-id>/manifest.json",
+      "kind": "R",
+      "responsibility": "捕获清单",
+      "development": "snapshot/hash/bytes/附件/提取版本/恢复条件",
+      "constraints": "ignored；待应用source增量尚非正式锁",
+      "acceptance": "读中变化与缺附件可识别",
+      "delivery_state": "runtime_or_instance",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/.build/operations/<operation-id>/plan.json",
+      "kind": "R",
+      "responsibility": "六决策/影响面",
+      "development": "基线/输出/理由/缺口/责任",
+      "constraints": "ignored；不是已执行记录",
+      "acceptance": "plan不写正式卡",
+      "delivery_state": "runtime_or_instance",
+      "module": "M04",
+      "ticket_ids": [
+        "T204",
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/.build/operations/<operation-id>/changeset.json",
+      "kind": "R",
+      "responsibility": "确切写清单",
+      "development": "每文件baseline/final hash/动作、来源及scope",
+      "constraints": "ignored；范围不可隐式扩张",
+      "acceptance": "额外路径不在确认范围则拒绝",
+      "delivery_state": "runtime_or_instance",
+      "module": "M04",
+      "ticket_ids": [
+        "T204",
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/.build/operations/<operation-id>/candidates/<card-id>.md",
+      "kind": "R",
+      "responsibility": "draft工作稿",
+      "development": "人/Agent迭代工作稿",
+      "constraints": "ignored，永不检索",
+      "acceptance": "draft字节不误进knowledge",
+      "delivery_state": "runtime_or_instance",
+      "module": "M04",
+      "ticket_ids": [
+        "T204",
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/.build/operations/<operation-id>/final-view/<relative-path>",
+      "kind": "R",
+      "responsibility": "拟落位stable精确字节",
+      "development": "卡/导航/锁最终文件视图",
+      "constraints": "ignored；确认的是这里的精确对象，apply不再补字段",
+      "acceptance": "确认后变1字节旧确认失效",
+      "delivery_state": "runtime_or_instance",
+      "module": "M04",
+      "ticket_ids": [
+        "T204",
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/.build/operations/<operation-id>/review-package.json",
+      "kind": "R",
+      "responsibility": "人工展示包",
+      "development": "final-view摘要/固定来源/附件/缺口/确认动作说明",
+      "constraints": "ignored，展示不是同意",
+      "acceptance": "展示内容可与确认记录摘要核对",
+      "delivery_state": "runtime_or_instance",
+      "module": "M04",
+      "ticket_ids": [
+        "T204",
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/.build/operations/<operation-id>/review-package.md",
+      "kind": "R",
+      "responsibility": "人读候选差异",
+      "development": "结论/新增删改/范围/新旧证据与待确认项",
+      "constraints": "ignored，与JSON同包摘要",
+      "acceptance": "用户可明确接受/退回/无影响/部分接受",
+      "delivery_state": "runtime_or_instance",
+      "module": "M04",
+      "ticket_ids": [
+        "T204",
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/logs/document-reviews/<review-id>.json",
+      "kind": "R",
+      "responsibility": "真人决定审计",
+      "development": "真实动作后产生，绑定操作/最终视图/来源/范围/决定",
+      "constraints": "必要事实可提交；无回复/模板/Agent自述不生成accepted",
+      "acceptance": "确认变化后过期；原记录只追加不覆盖",
+      "delivery_state": "runtime_or_instance",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/logs/local-checks/<check-id>.json",
+      "kind": "R",
+      "responsibility": "本地code_gate结果",
+      "development": "local只读报告通过后由ingest apply原字节持久归档，绑定确切卡/代码/规则；lint不回写正式目录",
+      "constraints": "可提交证据摘要；manual_document无此记录",
+      "acceptance": "与当前final-view匹配才授权apply",
+      "delivery_state": "runtime_or_instance",
+      "module": "M06",
+      "ticket_ids": [
+        "T208"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/logs/merge-gates/<gate-id>.json",
+      "kind": "R",
+      "responsibility": "merge结果归档",
+      "development": "CI外部产物验证后受控保存/引用",
+      "constraints": "CI只写独立output，不回写PR；外部证明不必卡内链接修订",
+      "acceptance": "绑定head/代码最新ref/规则，可验证CI身份",
+      "delivery_state": "runtime_or_instance",
+      "module": "M06",
+      "ticket_ids": [
+        "T208"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/logs/operations/<operation-id>/journal.json",
+      "kind": "R",
+      "responsibility": "持久写事务意图/进度",
+      "development": "apply前durable journal，逐步追加/刷新",
+      "constraints": "不是.build；写前flush，路径与hash固定",
+      "acceptance": "中断后定位唯一恢复步骤",
+      "delivery_state": "runtime_or_instance",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/logs/operations/<operation-id>/backups/<file-key>.bin",
+      "kind": "R",
+      "responsibility": "写前备份",
+      "development": "file-key为正式目标相对路径UTF-8的SHA-256；旧字节按键保存，由backup-manifest映射路径/摘要/absent状态",
+      "constraints": "不默认提交、单独ignore；仅本域卡/导航/锁，不含raw/源码",
+      "acceptance": "回滚恢复旧hash，完成后按保留政策清理",
+      "delivery_state": "runtime_or_instance",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/logs/operations/<operation-id>/result.json",
+      "kind": "R",
+      "responsibility": "实际完成回执",
+      "development": "成功后记录最终hash/文件/状态/证明引用",
+      "constraints": "可提交事实；部分执行不可写success",
+      "acceptance": "幂等重复返回同operation结果",
+      "delivery_state": "runtime_or_instance",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/logs/operations/.writer.lock",
+      "kind": "R",
+      "responsibility": "域写互斥",
+      "development": "OS文件锁持有token/进程信息，崩溃释放策略",
+      "constraints": "本机不提交；过期文件不等于锁仍活跃",
+      "acceptance": "同域并行apply只有一方写，另一方明确busy",
+      "delivery_state": "runtime_or_instance",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/logs/events/<event-id>.json",
+      "kind": "R",
+      "responsibility": "来源更新/失效/替代事件",
+      "development": "只追加，关联源/卡/Claim/原因/生效范围",
+      "constraints": "事件不直接修卡/宣称重验；更新被blocked的current输出",
+      "acceptance": "旧代仍可历史读，current即时排除阻断Claim",
+      "delivery_state": "runtime_or_instance",
+      "module": "M08",
+      "ticket_ids": [
+        "T207"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/logs/backlog/<item-id>.json",
+      "kind": "R",
+      "responsibility": "defer事实",
+      "development": "明确缺来源/缺适用条件等理由与待补项",
+      "constraints": "不造技术卡，不写虚假已恢复",
+      "acceptance": "后续显式重入能关联旧defer",
+      "delivery_state": "runtime_or_instance",
+      "module": "M08",
+      "ticket_ids": [
+        "T207"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/artifacts/indexes/<channel>/active.json",
+      "kind": "R",
+      "responsibility": "当前索引指针",
+      "development": "原子切换已完整校验generation_id",
+      "constraints": "ignored；旧代可继续供已开始查询",
+      "acceptance": "构建失败不切指针",
+      "delivery_state": "runtime_or_instance",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/artifacts/indexes/<channel>/<generation-id>/manifest.json",
+      "kind": "R",
+      "responsibility": "代次内容身份",
+      "development": "卡/规则/确认/代码证明/合入身份/词项器版本摘要",
+      "constraints": "ignored；local/shared资格分别声明",
+      "acceptance": "把本地未合入卡冒充shared会拒绝",
+      "delivery_state": "runtime_or_instance",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/artifacts/indexes/<channel>/<generation-id>/index.sqlite3",
+      "kind": "R",
+      "responsibility": "词面索引",
+      "development": "documents/claims/postings/relations/metadata；SQL按候选→字段过滤→topk",
+      "constraints": "ignored，不含raw正文；不信任旧DB覆盖新规则",
+      "acceptance": "字段过滤先于limit，排序可解释",
+      "delivery_state": "runtime_or_instance",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/artifacts/indexes/<channel>/<generation-id>/bodies/<card-id>.md",
+      "kind": "R",
+      "responsibility": "同代精读字节",
+      "development": "从固定知识快照复制/内容寻址",
+      "constraints": "ignored；不能精读实时另一版正文",
+      "acceptance": "切代并发仍命中同代hash",
+      "delivery_state": "runtime_or_instance",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/artifacts/receipts/<receipt-id>.json",
+      "kind": "R",
+      "responsibility": "Search Receipt",
+      "development": "查询/上下文/渠道/generation/命中排除/读卡/来源/缺口/置信",
+      "constraints": "ignored，含用户问题可能敏感；不自动提交",
+      "acceptance": "每个回答采用Claim可回源",
+      "delivery_state": "runtime_or_instance",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/artifacts/reports/<run-id>.json",
+      "kind": "R",
+      "responsibility": "检查/评测机器报告",
+      "development": "命令输入版本/诊断/实际测试结果",
+      "constraints": "ignored；不凭空填pass",
+      "acceptance": "可复核实际执行身份",
+      "delivery_state": "runtime_or_instance",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/artifacts/test-tmp/<run-id>/<temporary-file>",
+      "kind": "R",
+      "responsibility": "测试专属临时目录",
+      "development": "单次命令唯一末级目录",
+      "constraints": "ignored；不得碰真实K/main",
+      "acceptance": "并行测试互不覆盖",
+      "delivery_state": "runtime_or_instance",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/logs/workflows/<workflow-run-id>/nodes/<node-id>/<attempt-id>/<artifact-id>.md",
+      "kind": "R",
+      "responsibility": "工作流节点产物的不可变展示清单",
+      "development": "由各Skill CLI --artifact-manifest写入，绑定权威runtime run/node/attempt、operation与真实JSON摘要",
+      "constraints": "同节点循环用新attempt；Agent只上报location；不包含跨域资料、凭据或虚构通过",
+      "acceptance": "产物map revision总能回读原始字节；跨run、node、attempt或operation错配被adapter拒绝",
+      "delivery_state": "runtime_or_instance",
+      "module": "M09",
+      "ticket_ids": [
+        "T209"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/.build/operations/<operation-id>/reports/local-check.json",
+      "kind": "R",
+      "responsibility": "本地只读代码检查输出",
+      "development": "lint local写入独立候选报告；apply验证后原字节归档到logs/local-checks",
+      "constraints": "报告不是修改许可之外的发布授权；manual_document无此代码证明要求",
+      "acceptance": "报告与确切final-view、代码和规则摘要绑定",
+      "delivery_state": "runtime_or_instance",
+      "module": "M06",
+      "ticket_ids": [
+        "T208"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/logs/operations/<operation-id>/backup-manifest.json",
+      "kind": "R",
+      "responsibility": "持久恢复清单",
+      "development": "写入前列出每个正式目标的旧/新摘要、长度、backup键与原先absent标记",
+      "constraints": "不能把清单与唯一备份放.build；不含源码/raw备份",
+      "acceptance": "逐个恢复目标与原始字节核对",
+      "delivery_state": "runtime_or_instance",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/logs/evidence/<bundle-id>/manifest.json",
+      "kind": "R",
+      "responsibility": "持久来源恢复身份",
+      "development": "capture固定source/snapshot、对象hash/bytes、提取版本、locator与恢复策略",
+      "constraints": "不是来源内容的第二份可编辑真源；声明是否本机可用/跨机可恢复",
+      "acceptance": "清理.build后仍能回放；不可用则明确缺口",
+      "delivery_state": "runtime_or_instance",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/logs/evidence/<bundle-id>/objects/<object-digest>.bin",
+      "kind": "R",
+      "responsibility": "同域不可变来源恢复对象",
+      "development": "以内容摘要寻址保留必要原始字节，或声明可验证的固定Git/归档恢复方式",
+      "constraints": "默认不上库、不进入公共框架发行；受原件同域权限保护",
+      "acceptance": "旧raw被替换或dirty代码改变仍取回原hash；否则incomplete",
+      "delivery_state": "runtime_or_instance",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/logs/evidence/<bundle-id>/extractions/<extraction-id>/text.txt",
+      "kind": "R",
+      "responsibility": "固定转换文本",
+      "development": "由固定提取器产生并绑定对象摘要",
+      "constraints": "不是新原件，不反写raw；不自动联网/OCR",
+      "acceptance": "正文可读部分及未提取缺口可追踪",
+      "delivery_state": "runtime_or_instance",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/logs/evidence/<bundle-id>/extractions/<extraction-id>/locators.json",
+      "kind": "R",
+      "responsibility": "转换与原件定位映射",
+      "development": "保存段落/页/章节和原字节对象的映射",
+      "constraints": "不伪造PDF分页或DOCX物理页号",
+      "acceptance": "采用的每个锚点可回到固定对象",
+      "delivery_state": "runtime_or_instance",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/logs/workflows/<workflow-run-id>.json",
+      "kind": "R",
+      "responsibility": "编排阶段与交接状态",
+      "development": "保存parent_run_id、operation_id、阶段输入输出摘要及重入位置",
+      "constraints": "阶段completed不替代人工/代码/合入证明",
+      "acceptance": "两个Workflow可恢复且不重复apply或提交",
+      "delivery_state": "runtime_or_instance",
+      "module": "M09",
+      "ticket_ids": [
+        "T209"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/logs/events/state.json",
+      "kind": "R",
+      "responsibility": "当前阻断与双水位",
+      "development": "由immutable事件重放，保存validity_epoch、impact_scan_watermark、knowledge_apply_watermark及条件化阻断引用",
+      "constraints": "先持久化事件/影响再推进扫描水位；复核和激活齐备才推进应用水位",
+      "acceptance": "中断不丢阻断；旧代与回滚索引仍受当前阻断",
+      "delivery_state": "runtime_or_instance",
+      "module": "M08",
+      "ticket_ids": [
+        "T207"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/artifacts/contexts/<request-id>/binding.json",
+      "kind": "R",
+      "responsibility": "已解析项目定位回执",
+      "development": "explore resolve在已定位并获授权的领域artifacts中输出规范路径、checkout/config身份及候选根",
+      "constraints": "只表示resolved；尚不声称入口已读；未绑定时只向stdout输出诊断",
+      "acceptance": "仓外只给路径可定位；多命中不写假绑定",
+      "delivery_state": "runtime_or_instance",
+      "module": "M02",
+      "ticket_ids": [
+        "T202"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/artifacts/contexts/<request-id>/project-context.json",
+      "kind": "R",
+      "responsibility": "已实际加载的上下文回执",
+      "development": "explore load-context从binding实际读取适用入口，固定读取摘要、范围与未知项",
+      "constraints": "本机ignored；后续CLI核当前config/checkout/授权，不把旧回执当永不过期授权",
+      "acceptance": "未读/变动/撤权明确失效；context_loaded有真实读取轨迹",
+      "delivery_state": "runtime_or_instance",
+      "module": "M02",
+      "ticket_ids": [
+        "T202"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/.build/operations/<operation-id>/handoff.json",
+      "kind": "R",
+      "responsibility": "生产到治理的不可变交接包",
+      "development": "materialize完成时固定context、原件、plan/changeset/final-view及基线/规则/工具摘要、review_mode、目标模板与缺口",
+      "constraints": "P5只核验并交接；不能跨模板target或重新复制正文冒充原视图",
+      "acceptance": "治理重读实际对象并拒绝陈旧/跨operation交接",
+      "delivery_state": "runtime_or_instance",
+      "module": "M04",
+      "ticket_ids": [
+        "T204",
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/logs/document-reviews/displays/<display-id>.json",
+      "kind": "R",
+      "responsibility": "实际展示回执",
+      "development": "confirm的受信展示adapter实际展示精确view后记录通道/run/op/node/attempt、view与来源摘要及可定位展示引用",
+      "constraints": "未展示不生成已展示回执；不是接受；后续不能覆盖原字节",
+      "acceptance": "用户决策唯一绑定到实际展示的确切内容",
+      "delivery_state": "runtime_or_instance",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/logs/document-reviews/decisions/<decision-id>.json",
+      "kind": "R",
+      "responsibility": "原始人工通道决定的审计引用",
+      "development": "trusted_adapter从真实UI事件/认证通道或受支持人工终端取得动作、身份、时间、展示引用及原始证据来源",
+      "constraints": "默认本机不提交敏感身份/交互原文；decidedBy=user字符串不证明真人；不能接收Agent自造accepted",
+      "acceptance": "无可信原始交互则awaiting；旧事件或错view拒绝",
+      "delivery_state": "runtime_or_instance",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/.build/.gitkeep",
+      "kind": "F",
+      "responsibility": "当前空目录占位",
+      "development": "保持当前骨架，实施该目录固定文件时按同一模块提交移除占位",
+      "constraints": "占位不是Skill、Workflow、索引或来源访问能力",
+      "acceptance": "新clone能看到对应目录，不产生虚假业务文件",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204",
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/artifacts/.gitkeep",
+      "kind": "F",
+      "responsibility": "当前空目录占位",
+      "development": "保持当前骨架，实施该目录固定文件时按同一模块提交移除占位",
+      "constraints": "占位不是Skill、Workflow、索引或来源访问能力",
+      "acceptance": "新clone能看到对应目录，不产生虚假业务文件",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/logs/.gitkeep",
+      "kind": "F",
+      "responsibility": "当前空目录占位",
+      "development": "保持当前骨架，实施该目录固定文件时按同一模块提交移除占位",
+      "constraints": "占位不是Skill、Workflow、索引或来源访问能力",
+      "acceptance": "新clone能看到对应目录，不产生虚假业务文件",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/evals/README.md",
+      "kind": "F",
+      "responsibility": "跨能力验收导航",
+      "development": "说明unit/synthetic/真实业务/宿主分层与命令",
+      "constraints": "不设受限gold读取入口、不复制旧benchmark",
+      "acceptance": "当前未运行项明确",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/evals/requirements-dev.lock.txt",
+      "kind": "F",
+      "responsibility": "领域集成验收依赖锁",
+      "development": "只冻结领域契约和单仓跨节点验收runner实际依赖；另记录受信已安装Skill release的兼容要求，不代替其运行/开发锁",
+      "constraints": "显式安装、不运行时联网；支持格式依赖矩阵与真实锁一致",
+      "acceptance": "先具备受信Skill安装和各自运行依赖，再在独立领域验收环境按此锁运行evals；不据此宣称Skill单测已执行",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/evals/pyproject.toml",
+      "kind": "F",
+      "responsibility": "pytest/ruff范围配置",
+      "development": "只配置域内evals检查范围、报告与专用tmp；Skill自有tests由能力仓各自执行",
+      "constraints": "不配置W/skills路径或PYTHONPATH单仓跨节点导入；不把相邻checkout当受信发行",
+      "acceptance": "从任意cwd给-c绝对路径运行正确测试集",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/evals/run_acceptance.py",
+      "kind": "F",
+      "responsibility": "单一验收入口",
+      "development": "解析声明的验收scope，以argv调用已登记受信Skill CLI与本域测试；记录知识SHA、实际工具release/包/解释器身份",
+      "constraints": "只做单仓跨节点集成验收；不假定工具源码在FactumCore，不覆盖K真实资料，不伪造真实外部验证",
+      "acceptance": "各scope失败原exitcode上报；报告准确记录命令/版本/边界",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/evals/cases/retrieval.jsonl",
+      "kind": "F",
+      "responsibility": "检索回归输入",
+      "development": "合成/公开toy问题、上下文、expected/include/exclude规则",
+      "constraints": "不放真实秘密，不能由Agent读受限答案",
+      "acceptance": "六Target、未知、同词歧义、过滤后topk可回归",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/evals/tests/test_contracts.py",
+      "kind": "F",
+      "responsibility": "跨Skill共用契约回归",
+      "development": "对本地Schema/卡/来源/records API的外部输入验证",
+      "constraints": "契约不复制到Skill；不访问受限gold",
+      "acceptance": "各Skill对同输入解释一致，模板契约兼容",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/evals/tests/test_document_chain.py",
+      "kind": "F",
+      "responsibility": "raw到stable纵向验收",
+      "development": "使用临时原件/卡、专属合成终端、事务、索引与检索",
+      "constraints": "不为真实业务卡伪造人确认",
+      "acceptance": "接受/拒绝/陈旧/部分接受/失败恢复完整",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/evals/tests/test_code_chain.py",
+      "kind": "F",
+      "responsibility": "codegate合成纵向验收",
+      "development": "toy代码、不同rev、local/merge分工、无改写",
+      "constraints": "main保持空，synthetic源码仅tmp",
+      "acceptance": "旧代码证明不能批准新卡/新代码",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/evals/tests/test_workflow_contracts.py",
+      "kind": "F",
+      "responsibility": "两Workflow交接/路由验收",
+      "development": "检查Skill名、命令、阶段输入输出、无复制执行逻辑",
+      "constraints": "静态检查不冒充真实host触发",
+      "acceptance": "文件名/引用/分流/责任不漂移",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/evals/tests/test_retrieval.py",
+      "kind": "F",
+      "responsibility": "词面过滤/证据收据纵向",
+      "development": "调Query真实CLI对cases建库检索",
+      "constraints": "拒绝wrongScope，不卡死于错误范围高分候选",
+      "acceptance": "预期include/exclude与固定receipt吻合",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/evals/validate_design.py",
+      "kind": "F",
+      "responsibility": "当前设计与SDD静态一致性检查",
+      "development": "以标准库校验设计hash、文件表/树、来源锚点、需求任务关系、DAG、目录约束和实际占位",
+      "constraints": "仅证明文档和追踪一致；不验业务语义或宿主触发；不硬编码旧148条",
+      "acceptance": "正常规格通过；改hash、失效锚点或依赖环必须失败",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/evals/.gitkeep",
+      "kind": "F",
+      "responsibility": "当前空目录占位",
+      "development": "保持当前骨架，实施该目录固定文件时按同一模块提交移除占位",
+      "constraints": "占位不是Skill、Workflow、索引或来源访问能力",
+      "acceptance": "新clone能看到对应目录，不产生虚假业务文件",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/AGENTS.md",
+      "kind": "F",
+      "responsibility": "系统文档维护规则",
+      "development": "主设计→详设→SDD阅读与修改方向",
+      "constraints": "不存第二份业务事实；历史记录原样保留",
+      "acceptance": "修改者能确定当前依据",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/README.md",
+      "kind": "F",
+      "responsibility": "设计、模块任务与SDD导航",
+      "development": "准确链接与部署身份",
+      "constraints": "旧230测试注明历史归档",
+      "acceptance": "不把空技能宣称可用",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/AIoTBot知识库架构设计.md",
+      "kind": "F",
+      "responsibility": "§5.3/11基线",
+      "development": "仅扩展节点能力清单及对应归属/标签，不重构原图",
+      "constraints": "名称路径SSOT；保留原图节点与边结构",
+      "acceptance": "图结构与改前一致，其他改动限能力清单与归属",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/知识库详细设计.md",
+      "kind": "F",
+      "responsibility": "具体文件/接口/链路/验收",
+      "development": "采用此文件manifest并嵌原图",
+      "constraints": "定义待实现与现状，所有固定文件都有5列",
+      "acceptance": "§5.3所有目录覆盖；无_shared现行实现",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/task.md",
+      "kind": "F",
+      "responsibility": "当前模块任务粗排",
+      "development": "按九模块列任务、依赖、完成条件与推进顺序，后续交接SDD细拆",
+      "constraints": "不继承历史完成状态，不代替正式票据与验收",
+      "acceptance": "模块范围与本设计一致，依赖清楚，当前状态如实记录",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/README.md",
+      "kind": "H",
+      "responsibility": "历史SDD入口",
+      "development": "保留原有导航；新实现基线由knowledge-v2承接",
+      "constraints": "不改knowledge-v1；历史证据不能转名为新实现通过",
+      "acceptance": "文件与本轮开始时字节一致",
+      "delivery_state": "historical",
+      "module": "historical",
+      "ticket_ids": []
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/requirements.md",
+      "kind": "H",
+      "responsibility": "既有需求",
+      "development": "保留当前内容；后续SDD逐条与新详设对齐",
+      "constraints": "不改knowledge-v1；新实现由knowledge-v2承接",
+      "acceptance": "文件与本轮开始时字节一致",
+      "delivery_state": "historical",
+      "module": "historical",
+      "ticket_ids": []
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/design.md",
+      "kind": "H",
+      "responsibility": "既有模块设计",
+      "development": "当前物理接口已滞后；后续按本详设更新",
+      "constraints": "不改knowledge-v1；新实现由knowledge-v2承接",
+      "acceptance": "文件与本轮开始时字节一致",
+      "delivery_state": "historical",
+      "module": "historical",
+      "ticket_ids": []
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/module-map.md",
+      "kind": "H",
+      "responsibility": "既有模块导航",
+      "development": "后续重新核对文件拥有者，不在本轮重排",
+      "constraints": "不改knowledge-v1；新实现由knowledge-v2承接",
+      "acceptance": "文件与本轮开始时字节一致",
+      "delivery_state": "historical",
+      "module": "historical",
+      "ticket_ids": []
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tasks.md",
+      "kind": "H",
+      "responsibility": "既有任务状态",
+      "development": "保留原始状态；不得视为新目录接口已实现",
+      "constraints": "不改knowledge-v1；新实现由knowledge-v2承接",
+      "acceptance": "文件与本轮开始时字节一致",
+      "delivery_state": "historical",
+      "module": "historical",
+      "ticket_ids": []
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/test-plan.md",
+      "kind": "H",
+      "responsibility": "既有验收计划",
+      "development": "后续按新CLI与Workflow阶段重新映射",
+      "constraints": "不改knowledge-v1；新实现由knowledge-v2承接",
+      "acceptance": "文件与本轮开始时字节一致",
+      "delivery_state": "historical",
+      "module": "historical",
+      "ticket_ids": []
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/baseline.json",
+      "kind": "H",
+      "responsibility": "既有基线身份",
+      "development": "保留当前摘要；本轮不更新为已完成SDD同步",
+      "constraints": "不改knowledge-v1；新实现由knowledge-v2承接",
+      "acceptance": "文件与本轮开始时字节一致",
+      "delivery_state": "historical",
+      "module": "historical",
+      "ticket_ids": []
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/traceability.json",
+      "kind": "H",
+      "responsibility": "既有机器追踪",
+      "development": "保留现有逻辑ID与历史成绩；设计定稿后单独重新基线",
+      "constraints": "不改knowledge-v1；新实现由knowledge-v2承接",
+      "acceptance": "文件与本轮开始时字节一致",
+      "delivery_state": "historical",
+      "module": "historical",
+      "ticket_ids": []
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/first-slice.md",
+      "kind": "H",
+      "responsibility": "历史首切片手册",
+      "development": "原字节保留；当前程序已归档，不作为可运行命令",
+      "constraints": "不改knowledge-v1；新实现由knowledge-v2承接",
+      "acceptance": "文件与本轮开始时字节一致",
+      "delivery_state": "historical",
+      "module": "historical",
+      "ticket_ids": []
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/batch-02.md",
+      "kind": "H",
+      "responsibility": "历史批次手册",
+      "development": "原字节保留；只说明当时实现和验收",
+      "constraints": "不改knowledge-v1；新实现由knowledge-v2承接",
+      "acceptance": "文件与本轮开始时字节一致",
+      "delivery_state": "historical",
+      "module": "historical",
+      "ticket_ids": []
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/document-chain-usage.md",
+      "kind": "H",
+      "responsibility": "历史raw操作手册",
+      "development": "原字节保留；新接口以本详设及后续SDD为准",
+      "constraints": "不改knowledge-v1；新实现由knowledge-v2承接",
+      "acceptance": "文件与本轮开始时字节一致",
+      "delivery_state": "historical",
+      "module": "historical",
+      "ticket_ids": []
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/<module-id>/spec.md",
+      "kind": "H",
+      "responsibility": "现有九模块规格/设计/任务",
+      "development": "module-id为旧M01–M09；原字节保留，新设计仅在knowledge-v2维护",
+      "constraints": "本轮只保留现状，不用占位目录宣称实现",
+      "acceptance": "现存各模块文件完整保留",
+      "delivery_state": "historical",
+      "module": "historical",
+      "ticket_ids": []
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/<module-id>/design.md",
+      "kind": "H",
+      "responsibility": "现有九模块规格/设计/任务",
+      "development": "module-id为旧M01–M09；原字节保留，新设计仅在knowledge-v2维护",
+      "constraints": "本轮只保留现状，不用占位目录宣称实现",
+      "acceptance": "现存各模块文件完整保留",
+      "delivery_state": "historical",
+      "module": "historical",
+      "ticket_ids": []
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/<module-id>/tasks.md",
+      "kind": "H",
+      "responsibility": "现有九模块规格/设计/任务",
+      "development": "module-id为旧M01–M09；原字节保留，新设计仅在knowledge-v2维护",
+      "constraints": "本轮只保留现状，不用占位目录宣称实现",
+      "acceptance": "现存各模块文件完整保留",
+      "delivery_state": "historical",
+      "module": "historical",
+      "ticket_ids": []
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tickets/<ticket-id>.md",
+      "kind": "H",
+      "responsibility": "现有28张任务票",
+      "development": "ticket-id为现有T01–T28；后续SDD重核依赖、交付与验收",
+      "constraints": "本轮不重置票状态，不继承历史完成为新接口完成",
+      "acceptance": "现存票据完整保留",
+      "delivery_state": "historical",
+      "module": "historical",
+      "ticket_ids": []
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/<record-file>",
+      "kind": "H",
+      "responsibility": "已发生开发、测试、迁移与发布证据",
+      "development": "保留已有文件原始身份；后续新证据独立命名",
+      "constraints": "不覆盖、不补写虚构成绩",
+      "acceptance": "现存records全部原字节保留",
+      "delivery_state": "historical",
+      "module": "historical",
+      "ticket_ids": []
+    },
+    {
+      "path": "<user-agent-home>/aiotbot-installations/<installation-id>.json",
+      "kind": "L",
+      "responsibility": "受控安装清单",
+      "development": "登记源commit、包hash、宿主版本/位置、拥有文件及校验结果",
+      "constraints": "仅本机；更新/卸载仅操作本清单拥有且未被用户改动的包",
+      "acceptance": "同名用户包不覆盖，版本和宿主实测可核验",
+      "delivery_state": "external_or_deferred",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "<openflow-data-root>/config/workflow-templates/<workflow-id>/workflow.yaml",
+      "kind": "L",
+      "responsibility": "OpenFlow安装后运行模板",
+      "development": "workflow-id仅为能力仓两个hs-knowledge模板；复制受控完整包并核hash",
+      "constraints": "宿主路径不是项目新真源；不声称自动扫描仓内workflows",
+      "acceptance": "真实loader/catalog/角色可加载",
+      "delivery_state": "external_or_deferred",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "<openflow-data-root>/config/workflow-templates/<workflow-id>/layouts.yaml",
+      "kind": "L",
+      "responsibility": "OpenFlow安装后画布布局",
+      "development": "与对应workflow同包受控更新",
+      "constraints": "仅画布；不能影响运行判断",
+      "acceptance": "template_id和运行模板一致",
+      "delivery_state": "external_or_deferred",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "<openflow-data-root>/config/skills/<skill-id>/<package-relative-path>",
+      "kind": "L",
+      "responsibility": "OpenFlow已安装Skill包",
+      "development": "skill-id仅为能力仓18个节点Skill，包相对文件逐个对应本设计Skill清单",
+      "constraints": "包含各自scripts/tests/artifacts资源及实际需要的references，不夹带领域原件/卡/锁或本机凭据",
+      "acceptance": "Skill资源与产物契约可见，实际选用/工具轨迹单独验证",
+      "delivery_state": "external_or_deferred",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "<user-agent-home>/workspace-registry.json",
+      "kind": "L",
+      "responsibility": "本机workspace定位登记",
+      "development": "安装或显式登记时保存workspace_id/config位置与匹配索引；宿主私有区保存",
+      "constraints": "只定位，不替代config事实或授权；不创建用户AGENTS，不扫描整盘",
+      "acceptance": "多checkout/失效登记有诊断；仓外仅给已登记路径可加载",
+      "delivery_state": "external_or_deferred",
+      "module": "M02",
+      "ticket_ids": [
+        "T202"
+      ]
+    },
+    {
+      "path": "<user-agent-home>/skills/hs-workspace-explore/SKILL.md",
+      "kind": "L",
+      "responsibility": "宿主可见全局入口副本或受控链接",
+      "development": "按已授权安装固定版本的explore Skill及其references/scripts",
+      "constraints": "安装不代表自动触发；依赖版本和源路径变更需受控更新",
+      "acceptance": "真实新会话只给代码路径有可见/选用/加载工具轨迹",
+      "delivery_state": "external_or_deferred",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "<registered-code-root>/<source-relative-path>",
+      "kind": "X",
+      "responsibility": "config映射的实际业务代码",
+      "development": "可为main挂载或真实独立checkout/无Git导出，登记真实身份",
+      "constraints": "实际路径未知不臆造；dirty必须固定实际读取字节",
+      "acceptance": "固定Git/dirty/导出各能回放，否则incomplete",
+      "delivery_state": "external_or_deferred",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "<ci-output>/<run-id>/merge-gate.json",
+      "kind": "X",
+      "responsibility": "CI只读门禁报告",
+      "development": "从受信CI固定H/B/T/V及规则生成独立报告",
+      "constraints": "不回写PR卡/锁/链接/源码；不得自报已合入",
+      "acceptance": "报告输入与实际提案/最新业务观察点绑定",
+      "delivery_state": "external_or_deferred",
+      "module": "M06",
+      "ticket_ids": [
+        "T208"
+      ]
+    },
+    {
+      "path": "<ci-output>/<run-id>/index/<derived-file>",
+      "kind": "X",
+      "responsibility": "CI临时索引与回归输出",
+      "development": "只在job独立目录完整重建和检验，随任务输出证据",
+      "constraints": "不能写待审K/artifacts或激活shared；未运行单列",
+      "acceptance": "输入树前后字节不变，回归失败可定位",
+      "delivery_state": "external_or_deferred",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/README.md",
+      "kind": "F",
+      "responsibility": "节点化SDD当前工件",
+      "development": "按本轮批准的18Skill/2Workflow需求、接口、依赖与验收维护",
+      "constraints": "当前任务初始pending；knowledge-v1字节与状态保持历史身份",
+      "acceptance": "引用/依赖/基线实际hash一致，缺真实外部证据不结案",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/requirements.md",
+      "kind": "F",
+      "responsibility": "节点化SDD当前工件",
+      "development": "按本轮批准的18Skill/2Workflow需求、接口、依赖与验收维护",
+      "constraints": "当前任务初始pending；knowledge-v1字节与状态保持历史身份",
+      "acceptance": "引用/依赖/基线实际hash一致，缺真实外部证据不结案",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/design.md",
+      "kind": "F",
+      "responsibility": "节点化SDD当前工件",
+      "development": "按本轮批准的18Skill/2Workflow需求、接口、依赖与验收维护",
+      "constraints": "当前任务初始pending；knowledge-v1字节与状态保持历史身份",
+      "acceptance": "引用/依赖/基线实际hash一致，缺真实外部证据不结案",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/test-plan.md",
+      "kind": "F",
+      "responsibility": "节点化SDD当前工件",
+      "development": "按本轮批准的18Skill/2Workflow需求、接口、依赖与验收维护",
+      "constraints": "当前任务初始pending；knowledge-v1字节与状态保持历史身份",
+      "acceptance": "引用/依赖/基线实际hash一致，缺真实外部证据不结案",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/baseline.json",
+      "kind": "F",
+      "responsibility": "节点化SDD当前工件",
+      "development": "按本轮批准的18Skill/2Workflow需求、接口、依赖与验收维护",
+      "constraints": "当前任务初始pending；knowledge-v1字节与状态保持历史身份",
+      "acceptance": "引用/依赖/基线实际hash一致，缺真实外部证据不结案",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/module-map.md",
+      "kind": "F",
+      "responsibility": "节点化SDD当前工件",
+      "development": "按本轮批准的18Skill/2Workflow需求、接口、依赖与验收维护",
+      "constraints": "当前任务初始pending；knowledge-v1字节与状态保持历史身份",
+      "acceptance": "引用/依赖/基线实际hash一致，缺真实外部证据不结案",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/traceability.json",
+      "kind": "F",
+      "responsibility": "节点化SDD当前工件",
+      "development": "按本轮批准的18Skill/2Workflow需求、接口、依赖与验收维护",
+      "constraints": "当前任务初始pending；knowledge-v1字节与状态保持历史身份",
+      "acceptance": "引用/依赖/基线实际hash一致，缺真实外部证据不结案",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/records/README.md",
+      "kind": "F",
+      "responsibility": "节点化SDD当前工件",
+      "development": "按本轮批准的18Skill/2Workflow需求、接口、依赖与验收维护",
+      "constraints": "当前任务初始pending；knowledge-v1字节与状态保持历史身份",
+      "acceptance": "引用/依赖/基线实际hash一致，缺真实外部证据不结案",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/tickets/T201.md",
+      "kind": "F",
+      "responsibility": "节点化SDD当前工件",
+      "development": "按本轮批准的18Skill/2Workflow需求、接口、依赖与验收维护",
+      "constraints": "当前任务初始pending；knowledge-v1字节与状态保持历史身份",
+      "acceptance": "引用/依赖/基线实际hash一致，缺真实外部证据不结案",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/tickets/T202.md",
+      "kind": "F",
+      "responsibility": "节点化SDD当前工件",
+      "development": "按本轮批准的18Skill/2Workflow需求、接口、依赖与验收维护",
+      "constraints": "当前任务初始pending；knowledge-v1字节与状态保持历史身份",
+      "acceptance": "引用/依赖/基线实际hash一致，缺真实外部证据不结案",
+      "delivery_state": "planned",
+      "module": "M02",
+      "ticket_ids": [
+        "T202"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/tickets/T203.md",
+      "kind": "F",
+      "responsibility": "节点化SDD当前工件",
+      "development": "按本轮批准的18Skill/2Workflow需求、接口、依赖与验收维护",
+      "constraints": "当前任务初始pending；knowledge-v1字节与状态保持历史身份",
+      "acceptance": "引用/依赖/基线实际hash一致，缺真实外部证据不结案",
+      "delivery_state": "planned",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/tickets/T204.md",
+      "kind": "F",
+      "responsibility": "节点化SDD当前工件",
+      "development": "按本轮批准的18Skill/2Workflow需求、接口、依赖与验收维护",
+      "constraints": "当前任务初始pending；knowledge-v1字节与状态保持历史身份",
+      "acceptance": "引用/依赖/基线实际hash一致，缺真实外部证据不结案",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/tickets/T205.md",
+      "kind": "F",
+      "responsibility": "节点化SDD当前工件",
+      "development": "按本轮批准的18Skill/2Workflow需求、接口、依赖与验收维护",
+      "constraints": "当前任务初始pending；knowledge-v1字节与状态保持历史身份",
+      "acceptance": "引用/依赖/基线实际hash一致，缺真实外部证据不结案",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/tickets/T206.md",
+      "kind": "F",
+      "responsibility": "节点化SDD当前工件",
+      "development": "按本轮批准的18Skill/2Workflow需求、接口、依赖与验收维护",
+      "constraints": "当前任务初始pending；knowledge-v1字节与状态保持历史身份",
+      "acceptance": "引用/依赖/基线实际hash一致，缺真实外部证据不结案",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/tickets/T207.md",
+      "kind": "F",
+      "responsibility": "节点化SDD当前工件",
+      "development": "按本轮批准的18Skill/2Workflow需求、接口、依赖与验收维护",
+      "constraints": "当前任务初始pending；knowledge-v1字节与状态保持历史身份",
+      "acceptance": "引用/依赖/基线实际hash一致，缺真实外部证据不结案",
+      "delivery_state": "planned",
+      "module": "M08",
+      "ticket_ids": [
+        "T207"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/tickets/T208.md",
+      "kind": "F",
+      "responsibility": "节点化SDD当前工件",
+      "development": "按本轮批准的18Skill/2Workflow需求、接口、依赖与验收维护",
+      "constraints": "当前任务初始pending；knowledge-v1字节与状态保持历史身份",
+      "acceptance": "引用/依赖/基线实际hash一致，缺真实外部证据不结案",
+      "delivery_state": "planned",
+      "module": "M06",
+      "ticket_ids": [
+        "T208"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/tickets/T209.md",
+      "kind": "F",
+      "responsibility": "节点化SDD当前工件",
+      "development": "按本轮批准的18Skill/2Workflow需求、接口、依赖与验收维护",
+      "constraints": "当前任务初始pending；knowledge-v1字节与状态保持历史身份",
+      "acceptance": "引用/依赖/基线实际hash一致，缺真实外部证据不结案",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T209"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/tickets/T210.md",
+      "kind": "F",
+      "responsibility": "节点化SDD当前工件",
+      "development": "按本轮批准的18Skill/2Workflow需求、接口、依赖与验收维护",
+      "constraints": "当前任务初始pending；knowledge-v1字节与状态保持历史身份",
+      "acceptance": "引用/依赖/基线实际hash一致，缺真实外部证据不结案",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T210"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/tickets/T211.md",
+      "kind": "F",
+      "responsibility": "节点化SDD当前工件",
+      "development": "按本轮批准的18Skill/2Workflow需求、接口、依赖与验收维护",
+      "constraints": "当前任务初始pending；knowledge-v1字节与状态保持历史身份",
+      "acceptance": "引用/依赖/基线实际hash一致，缺真实外部证据不结案",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T211"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-workspace-explore/SKILL.md",
+      "kind": "F",
+      "responsibility": "能力入口与边界",
+      "development": "明确本节点输入、动作、结果与缺口，指向公开CLI和产物合同",
+      "constraints": "不包装成聚合Workflow；不自授人确认或发布",
+      "acceptance": "名称与目录及catalog完全一致，入口无秘密",
+      "delivery_state": "planned",
+      "module": "M02",
+      "ticket_ids": [
+        "T202"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-workspace-explore/scripts/cli.py",
+      "kind": "F",
+      "responsibility": "公开进程入口",
+      "development": "解析统一JSON进出、K/rules/catalog/action并调本包实现",
+      "constraints": "不导入其他Skill私有代码；无运行时安装/联网/Git发布",
+      "acceptance": "外部进程可调用；0/2/3与phase语义符合协议",
+      "delivery_state": "planned",
+      "module": "M02",
+      "ticket_ids": [
+        "T202"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-workspace-explore/scripts/support.py",
+      "kind": "F",
+      "responsibility": "本包薄适配与bootstrap",
+      "development": "校验包/锁身份、绑定受信领域规则与catalog，封装明确公开接口",
+      "constraints": "不能复制Schema/卡/Scope/来源/证明规则，不成为聚合业务引擎",
+      "acceptance": "错误规则/包摘要/入口拒绝；加载前已验证代码字节",
+      "delivery_state": "planned",
+      "module": "M02",
+      "ticket_ids": [
+        "T202"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-workspace-explore/tests/test_cli.py",
+      "kind": "F",
+      "responsibility": "本节点公开边界回归",
+      "development": "用隔离合成K和公开CLI覆盖成功/阻断/无副作用/陈旧输入",
+      "constraints": "合成动作只用于fixture根，不能证明真实人或宿主",
+      "acceptance": "正常与失败反例实际运行；stdout和持久记录可核",
+      "delivery_state": "planned",
+      "module": "M02",
+      "ticket_ids": [
+        "T202"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-workspace-explore/requirements.lock.txt",
+      "kind": "F",
+      "responsibility": "运行依赖锁",
+      "development": "冻结本包实际运行依赖版本/hash并纳tool_identity",
+      "constraints": "不以空文件宣称可复现；不从来源临时安装",
+      "acceptance": "显式锁定环境可运行本包；版本变化改变工具身份",
+      "delivery_state": "planned",
+      "module": "M02",
+      "ticket_ids": [
+        "T202"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-workspace-explore/requirements-dev.lock.txt",
+      "kind": "F",
+      "responsibility": "开发测试依赖锁",
+      "development": "固定本包测试/检查依赖及兼容运行锁",
+      "constraints": "不恢复仓根依赖/旧共享包",
+      "acceptance": "空环境显式安装后本包测试可复现",
+      "delivery_state": "planned",
+      "module": "M02",
+      "ticket_ids": [
+        "T202"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-workspace-explore/artifacts/result.yaml",
+      "kind": "F",
+      "responsibility": "节点产物合同",
+      "development": "id为Skill唯一结果ID，指定node/exit义务与三份资源",
+      "constraints": "location为合法markdown_file，机器JSON身份仍须真实核验",
+      "acceptance": "固定loader可读，引用资源存在且不跨run复用",
+      "delivery_state": "planned",
+      "module": "M02",
+      "ticket_ids": [
+        "T202"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-workspace-explore/artifacts/templates/result.md",
+      "kind": "F",
+      "responsibility": "可见manifest模板",
+      "development": "呈现run/node/attempt/op、phase、实际JSON引用/hash、范围与缺口",
+      "constraints": "不预填accepted/pass/完成；模板不是证明",
+      "acceptance": "未执行占位不能被当作产物完成",
+      "delivery_state": "planned",
+      "module": "M02",
+      "ticket_ids": [
+        "T202"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-workspace-explore/artifacts/writing-guide.md",
+      "kind": "F",
+      "responsibility": "manifest生成约束",
+      "development": "由程序从实际JSON生成不可变manifest，引用真实文件摘要",
+      "constraints": "不手写假记录、不把工作流运行ID当操作ID",
+      "acceptance": "manifest与JSON及本次attempt绑定一致",
+      "delivery_state": "planned",
+      "module": "M02",
+      "ticket_ids": [
+        "T202"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-workspace-explore/artifacts/review-guide.md",
+      "kind": "F",
+      "responsibility": "产物核验说明",
+      "development": "检验摘要/路径/来源和证据边界，区分已处理与成功终态",
+      "constraints": "模型零finding/文件存在不代替真实同意或事实核验",
+      "acceptance": "陈旧/错run/缺机器证据明确拒绝",
+      "delivery_state": "planned",
+      "module": "M02",
+      "ticket_ids": [
+        "T202"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-source-capture/SKILL.md",
+      "kind": "F",
+      "responsibility": "能力入口与边界",
+      "development": "明确本节点输入、动作、结果与缺口，指向公开CLI和产物合同",
+      "constraints": "不包装成聚合Workflow；不自授人确认或发布",
+      "acceptance": "名称与目录及catalog完全一致，入口无秘密",
+      "delivery_state": "planned",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-source-capture/scripts/cli.py",
+      "kind": "F",
+      "responsibility": "公开进程入口",
+      "development": "解析统一JSON进出、K/rules/catalog/action并调本包实现",
+      "constraints": "不导入其他Skill私有代码；无运行时安装/联网/Git发布",
+      "acceptance": "外部进程可调用；0/2/3与phase语义符合协议",
+      "delivery_state": "planned",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-source-capture/scripts/support.py",
+      "kind": "F",
+      "responsibility": "本包薄适配与bootstrap",
+      "development": "校验包/锁身份、绑定受信领域规则与catalog，封装明确公开接口",
+      "constraints": "不能复制Schema/卡/Scope/来源/证明规则，不成为聚合业务引擎",
+      "acceptance": "错误规则/包摘要/入口拒绝；加载前已验证代码字节",
+      "delivery_state": "planned",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-source-capture/tests/test_cli.py",
+      "kind": "F",
+      "responsibility": "本节点公开边界回归",
+      "development": "用隔离合成K和公开CLI覆盖成功/阻断/无副作用/陈旧输入",
+      "constraints": "合成动作只用于fixture根，不能证明真实人或宿主",
+      "acceptance": "正常与失败反例实际运行；stdout和持久记录可核",
+      "delivery_state": "planned",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-source-capture/requirements.lock.txt",
+      "kind": "F",
+      "responsibility": "运行依赖锁",
+      "development": "冻结本包实际运行依赖版本/hash并纳tool_identity",
+      "constraints": "不以空文件宣称可复现；不从来源临时安装",
+      "acceptance": "显式锁定环境可运行本包；版本变化改变工具身份",
+      "delivery_state": "planned",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-source-capture/requirements-dev.lock.txt",
+      "kind": "F",
+      "responsibility": "开发测试依赖锁",
+      "development": "固定本包测试/检查依赖及兼容运行锁",
+      "constraints": "不恢复仓根依赖/旧共享包",
+      "acceptance": "空环境显式安装后本包测试可复现",
+      "delivery_state": "planned",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-source-capture/artifacts/result.yaml",
+      "kind": "F",
+      "responsibility": "节点产物合同",
+      "development": "id为Skill唯一结果ID，指定node/exit义务与三份资源",
+      "constraints": "location为合法markdown_file，机器JSON身份仍须真实核验",
+      "acceptance": "固定loader可读，引用资源存在且不跨run复用",
+      "delivery_state": "planned",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-source-capture/artifacts/templates/result.md",
+      "kind": "F",
+      "responsibility": "可见manifest模板",
+      "development": "呈现run/node/attempt/op、phase、实际JSON引用/hash、范围与缺口",
+      "constraints": "不预填accepted/pass/完成；模板不是证明",
+      "acceptance": "未执行占位不能被当作产物完成",
+      "delivery_state": "planned",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-source-capture/artifacts/writing-guide.md",
+      "kind": "F",
+      "responsibility": "manifest生成约束",
+      "development": "由程序从实际JSON生成不可变manifest，引用真实文件摘要",
+      "constraints": "不手写假记录、不把工作流运行ID当操作ID",
+      "acceptance": "manifest与JSON及本次attempt绑定一致",
+      "delivery_state": "planned",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-source-capture/artifacts/review-guide.md",
+      "kind": "F",
+      "responsibility": "产物核验说明",
+      "development": "检验摘要/路径/来源和证据边界，区分已处理与成功终态",
+      "constraints": "模型零finding/文件存在不代替真实同意或事实核验",
+      "acceptance": "陈旧/错run/缺机器证据明确拒绝",
+      "delivery_state": "planned",
+      "module": "M03",
+      "ticket_ids": [
+        "T203"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-change-plan/SKILL.md",
+      "kind": "F",
+      "responsibility": "能力入口与边界",
+      "development": "明确本节点输入、动作、结果与缺口，指向公开CLI和产物合同",
+      "constraints": "不包装成聚合Workflow；不自授人确认或发布",
+      "acceptance": "名称与目录及catalog完全一致，入口无秘密",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-change-plan/scripts/cli.py",
+      "kind": "F",
+      "responsibility": "公开进程入口",
+      "development": "解析统一JSON进出、K/rules/catalog/action并调本包实现",
+      "constraints": "不导入其他Skill私有代码；无运行时安装/联网/Git发布",
+      "acceptance": "外部进程可调用；0/2/3与phase语义符合协议",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-change-plan/scripts/support.py",
+      "kind": "F",
+      "responsibility": "本包薄适配与bootstrap",
+      "development": "校验包/锁身份、绑定受信领域规则与catalog，封装明确公开接口",
+      "constraints": "不能复制Schema/卡/Scope/来源/证明规则，不成为聚合业务引擎",
+      "acceptance": "错误规则/包摘要/入口拒绝；加载前已验证代码字节",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-change-plan/tests/test_cli.py",
+      "kind": "F",
+      "responsibility": "本节点公开边界回归",
+      "development": "用隔离合成K和公开CLI覆盖成功/阻断/无副作用/陈旧输入",
+      "constraints": "合成动作只用于fixture根，不能证明真实人或宿主",
+      "acceptance": "正常与失败反例实际运行；stdout和持久记录可核",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-change-plan/requirements.lock.txt",
+      "kind": "F",
+      "responsibility": "运行依赖锁",
+      "development": "冻结本包实际运行依赖版本/hash并纳tool_identity",
+      "constraints": "不以空文件宣称可复现；不从来源临时安装",
+      "acceptance": "显式锁定环境可运行本包；版本变化改变工具身份",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-change-plan/requirements-dev.lock.txt",
+      "kind": "F",
+      "responsibility": "开发测试依赖锁",
+      "development": "固定本包测试/检查依赖及兼容运行锁",
+      "constraints": "不恢复仓根依赖/旧共享包",
+      "acceptance": "空环境显式安装后本包测试可复现",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-change-plan/artifacts/result.yaml",
+      "kind": "F",
+      "responsibility": "节点产物合同",
+      "development": "id为Skill唯一结果ID，指定node/exit义务与三份资源",
+      "constraints": "location为合法markdown_file，机器JSON身份仍须真实核验",
+      "acceptance": "固定loader可读，引用资源存在且不跨run复用",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-change-plan/artifacts/templates/result.md",
+      "kind": "F",
+      "responsibility": "可见manifest模板",
+      "development": "呈现run/node/attempt/op、phase、实际JSON引用/hash、范围与缺口",
+      "constraints": "不预填accepted/pass/完成；模板不是证明",
+      "acceptance": "未执行占位不能被当作产物完成",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-change-plan/artifacts/writing-guide.md",
+      "kind": "F",
+      "responsibility": "manifest生成约束",
+      "development": "由程序从实际JSON生成不可变manifest，引用真实文件摘要",
+      "constraints": "不手写假记录、不把工作流运行ID当操作ID",
+      "acceptance": "manifest与JSON及本次attempt绑定一致",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-change-plan/artifacts/review-guide.md",
+      "kind": "F",
+      "responsibility": "产物核验说明",
+      "development": "检验摘要/路径/来源和证据边界，区分已处理与成功终态",
+      "constraints": "模型零finding/文件存在不代替真实同意或事实核验",
+      "acceptance": "陈旧/错run/缺机器证据明确拒绝",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-view-materialize/SKILL.md",
+      "kind": "F",
+      "responsibility": "能力入口与边界",
+      "development": "明确本节点输入、动作、结果与缺口，指向公开CLI和产物合同",
+      "constraints": "不包装成聚合Workflow；不自授人确认或发布",
+      "acceptance": "名称与目录及catalog完全一致，入口无秘密",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-view-materialize/scripts/cli.py",
+      "kind": "F",
+      "responsibility": "公开进程入口",
+      "development": "解析统一JSON进出、K/rules/catalog/action并调本包实现",
+      "constraints": "不导入其他Skill私有代码；无运行时安装/联网/Git发布",
+      "acceptance": "外部进程可调用；0/2/3与phase语义符合协议",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-view-materialize/scripts/support.py",
+      "kind": "F",
+      "responsibility": "本包薄适配与bootstrap",
+      "development": "校验包/锁身份、绑定受信领域规则与catalog，封装明确公开接口",
+      "constraints": "不能复制Schema/卡/Scope/来源/证明规则，不成为聚合业务引擎",
+      "acceptance": "错误规则/包摘要/入口拒绝；加载前已验证代码字节",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-view-materialize/tests/test_cli.py",
+      "kind": "F",
+      "responsibility": "本节点公开边界回归",
+      "development": "用隔离合成K和公开CLI覆盖成功/阻断/无副作用/陈旧输入",
+      "constraints": "合成动作只用于fixture根，不能证明真实人或宿主",
+      "acceptance": "正常与失败反例实际运行；stdout和持久记录可核",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-view-materialize/requirements.lock.txt",
+      "kind": "F",
+      "responsibility": "运行依赖锁",
+      "development": "冻结本包实际运行依赖版本/hash并纳tool_identity",
+      "constraints": "不以空文件宣称可复现；不从来源临时安装",
+      "acceptance": "显式锁定环境可运行本包；版本变化改变工具身份",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-view-materialize/requirements-dev.lock.txt",
+      "kind": "F",
+      "responsibility": "开发测试依赖锁",
+      "development": "固定本包测试/检查依赖及兼容运行锁",
+      "constraints": "不恢复仓根依赖/旧共享包",
+      "acceptance": "空环境显式安装后本包测试可复现",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-view-materialize/artifacts/result.yaml",
+      "kind": "F",
+      "responsibility": "节点产物合同",
+      "development": "id为Skill唯一结果ID，指定node/exit义务与三份资源",
+      "constraints": "location为合法markdown_file，机器JSON身份仍须真实核验",
+      "acceptance": "固定loader可读，引用资源存在且不跨run复用",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-view-materialize/artifacts/templates/result.md",
+      "kind": "F",
+      "responsibility": "可见manifest模板",
+      "development": "呈现run/node/attempt/op、phase、实际JSON引用/hash、范围与缺口",
+      "constraints": "不预填accepted/pass/完成；模板不是证明",
+      "acceptance": "未执行占位不能被当作产物完成",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-view-materialize/artifacts/writing-guide.md",
+      "kind": "F",
+      "responsibility": "manifest生成约束",
+      "development": "由程序从实际JSON生成不可变manifest，引用真实文件摘要",
+      "constraints": "不手写假记录、不把工作流运行ID当操作ID",
+      "acceptance": "manifest与JSON及本次attempt绑定一致",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-view-materialize/artifacts/review-guide.md",
+      "kind": "F",
+      "responsibility": "产物核验说明",
+      "development": "检验摘要/路径/来源和证据边界，区分已处理与成功终态",
+      "constraints": "模型零finding/文件存在不代替真实同意或事实核验",
+      "acceptance": "陈旧/错run/缺机器证据明确拒绝",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-governance-handoff/SKILL.md",
+      "kind": "F",
+      "responsibility": "能力入口与边界",
+      "development": "明确本节点输入、动作、结果与缺口，指向公开CLI和产物合同",
+      "constraints": "不包装成聚合Workflow；不自授人确认或发布",
+      "acceptance": "名称与目录及catalog完全一致，入口无秘密",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-governance-handoff/scripts/cli.py",
+      "kind": "F",
+      "responsibility": "公开进程入口",
+      "development": "解析统一JSON进出、K/rules/catalog/action并调本包实现",
+      "constraints": "不导入其他Skill私有代码；无运行时安装/联网/Git发布",
+      "acceptance": "外部进程可调用；0/2/3与phase语义符合协议",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-governance-handoff/scripts/support.py",
+      "kind": "F",
+      "responsibility": "本包薄适配与bootstrap",
+      "development": "校验包/锁身份、绑定受信领域规则与catalog，封装明确公开接口",
+      "constraints": "不能复制Schema/卡/Scope/来源/证明规则，不成为聚合业务引擎",
+      "acceptance": "错误规则/包摘要/入口拒绝；加载前已验证代码字节",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-governance-handoff/tests/test_cli.py",
+      "kind": "F",
+      "responsibility": "本节点公开边界回归",
+      "development": "用隔离合成K和公开CLI覆盖成功/阻断/无副作用/陈旧输入",
+      "constraints": "合成动作只用于fixture根，不能证明真实人或宿主",
+      "acceptance": "正常与失败反例实际运行；stdout和持久记录可核",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-governance-handoff/requirements.lock.txt",
+      "kind": "F",
+      "responsibility": "运行依赖锁",
+      "development": "冻结本包实际运行依赖版本/hash并纳tool_identity",
+      "constraints": "不以空文件宣称可复现；不从来源临时安装",
+      "acceptance": "显式锁定环境可运行本包；版本变化改变工具身份",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-governance-handoff/requirements-dev.lock.txt",
+      "kind": "F",
+      "responsibility": "开发测试依赖锁",
+      "development": "固定本包测试/检查依赖及兼容运行锁",
+      "constraints": "不恢复仓根依赖/旧共享包",
+      "acceptance": "空环境显式安装后本包测试可复现",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-governance-handoff/artifacts/result.yaml",
+      "kind": "F",
+      "responsibility": "节点产物合同",
+      "development": "id为Skill唯一结果ID，指定node/exit义务与三份资源",
+      "constraints": "location为合法markdown_file，机器JSON身份仍须真实核验",
+      "acceptance": "固定loader可读，引用资源存在且不跨run复用",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-governance-handoff/artifacts/templates/result.md",
+      "kind": "F",
+      "responsibility": "可见manifest模板",
+      "development": "呈现run/node/attempt/op、phase、实际JSON引用/hash、范围与缺口",
+      "constraints": "不预填accepted/pass/完成；模板不是证明",
+      "acceptance": "未执行占位不能被当作产物完成",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-governance-handoff/artifacts/writing-guide.md",
+      "kind": "F",
+      "responsibility": "manifest生成约束",
+      "development": "由程序从实际JSON生成不可变manifest，引用真实文件摘要",
+      "constraints": "不手写假记录、不把工作流运行ID当操作ID",
+      "acceptance": "manifest与JSON及本次attempt绑定一致",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-governance-handoff/artifacts/review-guide.md",
+      "kind": "F",
+      "responsibility": "产物核验说明",
+      "development": "检验摘要/路径/来源和证据边界，区分已处理与成功终态",
+      "constraints": "模型零finding/文件存在不代替真实同意或事实核验",
+      "acceptance": "陈旧/错run/缺机器证据明确拒绝",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-candidate-inspect/SKILL.md",
+      "kind": "F",
+      "responsibility": "能力入口与边界",
+      "development": "明确本节点输入、动作、结果与缺口，指向公开CLI和产物合同",
+      "constraints": "不包装成聚合Workflow；不自授人确认或发布",
+      "acceptance": "名称与目录及catalog完全一致，入口无秘密",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-candidate-inspect/scripts/cli.py",
+      "kind": "F",
+      "responsibility": "公开进程入口",
+      "development": "解析统一JSON进出、K/rules/catalog/action并调本包实现",
+      "constraints": "不导入其他Skill私有代码；无运行时安装/联网/Git发布",
+      "acceptance": "外部进程可调用；0/2/3与phase语义符合协议",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-candidate-inspect/scripts/support.py",
+      "kind": "F",
+      "responsibility": "本包薄适配与bootstrap",
+      "development": "校验包/锁身份、绑定受信领域规则与catalog，封装明确公开接口",
+      "constraints": "不能复制Schema/卡/Scope/来源/证明规则，不成为聚合业务引擎",
+      "acceptance": "错误规则/包摘要/入口拒绝；加载前已验证代码字节",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-candidate-inspect/tests/test_cli.py",
+      "kind": "F",
+      "responsibility": "本节点公开边界回归",
+      "development": "用隔离合成K和公开CLI覆盖成功/阻断/无副作用/陈旧输入",
+      "constraints": "合成动作只用于fixture根，不能证明真实人或宿主",
+      "acceptance": "正常与失败反例实际运行；stdout和持久记录可核",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-candidate-inspect/requirements.lock.txt",
+      "kind": "F",
+      "responsibility": "运行依赖锁",
+      "development": "冻结本包实际运行依赖版本/hash并纳tool_identity",
+      "constraints": "不以空文件宣称可复现；不从来源临时安装",
+      "acceptance": "显式锁定环境可运行本包；版本变化改变工具身份",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-candidate-inspect/requirements-dev.lock.txt",
+      "kind": "F",
+      "responsibility": "开发测试依赖锁",
+      "development": "固定本包测试/检查依赖及兼容运行锁",
+      "constraints": "不恢复仓根依赖/旧共享包",
+      "acceptance": "空环境显式安装后本包测试可复现",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-candidate-inspect/artifacts/result.yaml",
+      "kind": "F",
+      "responsibility": "节点产物合同",
+      "development": "id为Skill唯一结果ID，指定node/exit义务与三份资源",
+      "constraints": "location为合法markdown_file，机器JSON身份仍须真实核验",
+      "acceptance": "固定loader可读，引用资源存在且不跨run复用",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-candidate-inspect/artifacts/templates/result.md",
+      "kind": "F",
+      "responsibility": "可见manifest模板",
+      "development": "呈现run/node/attempt/op、phase、实际JSON引用/hash、范围与缺口",
+      "constraints": "不预填accepted/pass/完成；模板不是证明",
+      "acceptance": "未执行占位不能被当作产物完成",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-candidate-inspect/artifacts/writing-guide.md",
+      "kind": "F",
+      "responsibility": "manifest生成约束",
+      "development": "由程序从实际JSON生成不可变manifest，引用真实文件摘要",
+      "constraints": "不手写假记录、不把工作流运行ID当操作ID",
+      "acceptance": "manifest与JSON及本次attempt绑定一致",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-candidate-inspect/artifacts/review-guide.md",
+      "kind": "F",
+      "responsibility": "产物核验说明",
+      "development": "检验摘要/路径/来源和证据边界，区分已处理与成功终态",
+      "constraints": "模型零finding/文件存在不代替真实同意或事实核验",
+      "acceptance": "陈旧/错run/缺机器证据明确拒绝",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-confirmation-prepare/SKILL.md",
+      "kind": "F",
+      "responsibility": "能力入口与边界",
+      "development": "明确本节点输入、动作、结果与缺口，指向公开CLI和产物合同",
+      "constraints": "不包装成聚合Workflow；不自授人确认或发布",
+      "acceptance": "名称与目录及catalog完全一致，入口无秘密",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-confirmation-prepare/scripts/cli.py",
+      "kind": "F",
+      "responsibility": "公开进程入口",
+      "development": "解析统一JSON进出、K/rules/catalog/action并调本包实现",
+      "constraints": "不导入其他Skill私有代码；无运行时安装/联网/Git发布",
+      "acceptance": "外部进程可调用；0/2/3与phase语义符合协议",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-confirmation-prepare/scripts/support.py",
+      "kind": "F",
+      "responsibility": "本包薄适配与bootstrap",
+      "development": "校验包/锁身份、绑定受信领域规则与catalog，封装明确公开接口",
+      "constraints": "不能复制Schema/卡/Scope/来源/证明规则，不成为聚合业务引擎",
+      "acceptance": "错误规则/包摘要/入口拒绝；加载前已验证代码字节",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-confirmation-prepare/tests/test_cli.py",
+      "kind": "F",
+      "responsibility": "本节点公开边界回归",
+      "development": "用隔离合成K和公开CLI覆盖成功/阻断/无副作用/陈旧输入",
+      "constraints": "合成动作只用于fixture根，不能证明真实人或宿主",
+      "acceptance": "正常与失败反例实际运行；stdout和持久记录可核",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-confirmation-prepare/requirements.lock.txt",
+      "kind": "F",
+      "responsibility": "运行依赖锁",
+      "development": "冻结本包实际运行依赖版本/hash并纳tool_identity",
+      "constraints": "不以空文件宣称可复现；不从来源临时安装",
+      "acceptance": "显式锁定环境可运行本包；版本变化改变工具身份",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-confirmation-prepare/requirements-dev.lock.txt",
+      "kind": "F",
+      "responsibility": "开发测试依赖锁",
+      "development": "固定本包测试/检查依赖及兼容运行锁",
+      "constraints": "不恢复仓根依赖/旧共享包",
+      "acceptance": "空环境显式安装后本包测试可复现",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-confirmation-prepare/artifacts/result.yaml",
+      "kind": "F",
+      "responsibility": "节点产物合同",
+      "development": "id为Skill唯一结果ID，指定node/exit义务与三份资源",
+      "constraints": "location为合法markdown_file，机器JSON身份仍须真实核验",
+      "acceptance": "固定loader可读，引用资源存在且不跨run复用",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-confirmation-prepare/artifacts/templates/result.md",
+      "kind": "F",
+      "responsibility": "可见manifest模板",
+      "development": "呈现run/node/attempt/op、phase、实际JSON引用/hash、范围与缺口",
+      "constraints": "不预填accepted/pass/完成；模板不是证明",
+      "acceptance": "未执行占位不能被当作产物完成",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-confirmation-prepare/artifacts/writing-guide.md",
+      "kind": "F",
+      "responsibility": "manifest生成约束",
+      "development": "由程序从实际JSON生成不可变manifest，引用真实文件摘要",
+      "constraints": "不手写假记录、不把工作流运行ID当操作ID",
+      "acceptance": "manifest与JSON及本次attempt绑定一致",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-confirmation-prepare/artifacts/review-guide.md",
+      "kind": "F",
+      "responsibility": "产物核验说明",
+      "development": "检验摘要/路径/来源和证据边界，区分已处理与成功终态",
+      "constraints": "模型零finding/文件存在不代替真实同意或事实核验",
+      "acceptance": "陈旧/错run/缺机器证据明确拒绝",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-confirmation-record/SKILL.md",
+      "kind": "F",
+      "responsibility": "能力入口与边界",
+      "development": "明确本节点输入、动作、结果与缺口，指向公开CLI和产物合同",
+      "constraints": "不包装成聚合Workflow；不自授人确认或发布",
+      "acceptance": "名称与目录及catalog完全一致，入口无秘密",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-confirmation-record/scripts/cli.py",
+      "kind": "F",
+      "responsibility": "公开进程入口",
+      "development": "解析统一JSON进出、K/rules/catalog/action并调本包实现",
+      "constraints": "不导入其他Skill私有代码；无运行时安装/联网/Git发布",
+      "acceptance": "外部进程可调用；0/2/3与phase语义符合协议",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-confirmation-record/scripts/support.py",
+      "kind": "F",
+      "responsibility": "本包薄适配与bootstrap",
+      "development": "校验包/锁身份、绑定受信领域规则与catalog，封装明确公开接口",
+      "constraints": "不能复制Schema/卡/Scope/来源/证明规则，不成为聚合业务引擎",
+      "acceptance": "错误规则/包摘要/入口拒绝；加载前已验证代码字节",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-confirmation-record/tests/test_cli.py",
+      "kind": "F",
+      "responsibility": "本节点公开边界回归",
+      "development": "用隔离合成K和公开CLI覆盖成功/阻断/无副作用/陈旧输入",
+      "constraints": "合成动作只用于fixture根，不能证明真实人或宿主",
+      "acceptance": "正常与失败反例实际运行；stdout和持久记录可核",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-confirmation-record/requirements.lock.txt",
+      "kind": "F",
+      "responsibility": "运行依赖锁",
+      "development": "冻结本包实际运行依赖版本/hash并纳tool_identity",
+      "constraints": "不以空文件宣称可复现；不从来源临时安装",
+      "acceptance": "显式锁定环境可运行本包；版本变化改变工具身份",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-confirmation-record/requirements-dev.lock.txt",
+      "kind": "F",
+      "responsibility": "开发测试依赖锁",
+      "development": "固定本包测试/检查依赖及兼容运行锁",
+      "constraints": "不恢复仓根依赖/旧共享包",
+      "acceptance": "空环境显式安装后本包测试可复现",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-confirmation-record/artifacts/result.yaml",
+      "kind": "F",
+      "responsibility": "节点产物合同",
+      "development": "id为Skill唯一结果ID，指定node/exit义务与三份资源",
+      "constraints": "location为合法markdown_file，机器JSON身份仍须真实核验",
+      "acceptance": "固定loader可读，引用资源存在且不跨run复用",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-confirmation-record/artifacts/templates/result.md",
+      "kind": "F",
+      "responsibility": "可见manifest模板",
+      "development": "呈现run/node/attempt/op、phase、实际JSON引用/hash、范围与缺口",
+      "constraints": "不预填accepted/pass/完成；模板不是证明",
+      "acceptance": "未执行占位不能被当作产物完成",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-confirmation-record/artifacts/writing-guide.md",
+      "kind": "F",
+      "responsibility": "manifest生成约束",
+      "development": "由程序从实际JSON生成不可变manifest，引用真实文件摘要",
+      "constraints": "不手写假记录、不把工作流运行ID当操作ID",
+      "acceptance": "manifest与JSON及本次attempt绑定一致",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-confirmation-record/artifacts/review-guide.md",
+      "kind": "F",
+      "responsibility": "产物核验说明",
+      "development": "检验摘要/路径/来源和证据边界，区分已处理与成功终态",
+      "constraints": "模型零finding/文件存在不代替真实同意或事实核验",
+      "acceptance": "陈旧/错run/缺机器证据明确拒绝",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-local-check/SKILL.md",
+      "kind": "F",
+      "responsibility": "能力入口与边界",
+      "development": "明确本节点输入、动作、结果与缺口，指向公开CLI和产物合同",
+      "constraints": "不包装成聚合Workflow；不自授人确认或发布",
+      "acceptance": "名称与目录及catalog完全一致，入口无秘密",
+      "delivery_state": "planned",
+      "module": "M06",
+      "ticket_ids": [
+        "T208"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-local-check/scripts/cli.py",
+      "kind": "F",
+      "responsibility": "公开进程入口",
+      "development": "解析统一JSON进出、K/rules/catalog/action并调本包实现",
+      "constraints": "不导入其他Skill私有代码；无运行时安装/联网/Git发布",
+      "acceptance": "外部进程可调用；0/2/3与phase语义符合协议",
+      "delivery_state": "planned",
+      "module": "M06",
+      "ticket_ids": [
+        "T208"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-local-check/scripts/support.py",
+      "kind": "F",
+      "responsibility": "本包薄适配与bootstrap",
+      "development": "校验包/锁身份、绑定受信领域规则与catalog，封装明确公开接口",
+      "constraints": "不能复制Schema/卡/Scope/来源/证明规则，不成为聚合业务引擎",
+      "acceptance": "错误规则/包摘要/入口拒绝；加载前已验证代码字节",
+      "delivery_state": "planned",
+      "module": "M06",
+      "ticket_ids": [
+        "T208"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-local-check/tests/test_cli.py",
+      "kind": "F",
+      "responsibility": "本节点公开边界回归",
+      "development": "用隔离合成K和公开CLI覆盖成功/阻断/无副作用/陈旧输入",
+      "constraints": "合成动作只用于fixture根，不能证明真实人或宿主",
+      "acceptance": "正常与失败反例实际运行；stdout和持久记录可核",
+      "delivery_state": "planned",
+      "module": "M06",
+      "ticket_ids": [
+        "T208"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-local-check/requirements.lock.txt",
+      "kind": "F",
+      "responsibility": "运行依赖锁",
+      "development": "冻结本包实际运行依赖版本/hash并纳tool_identity",
+      "constraints": "不以空文件宣称可复现；不从来源临时安装",
+      "acceptance": "显式锁定环境可运行本包；版本变化改变工具身份",
+      "delivery_state": "planned",
+      "module": "M06",
+      "ticket_ids": [
+        "T208"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-local-check/requirements-dev.lock.txt",
+      "kind": "F",
+      "responsibility": "开发测试依赖锁",
+      "development": "固定本包测试/检查依赖及兼容运行锁",
+      "constraints": "不恢复仓根依赖/旧共享包",
+      "acceptance": "空环境显式安装后本包测试可复现",
+      "delivery_state": "planned",
+      "module": "M06",
+      "ticket_ids": [
+        "T208"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-local-check/artifacts/result.yaml",
+      "kind": "F",
+      "responsibility": "节点产物合同",
+      "development": "id为Skill唯一结果ID，指定node/exit义务与三份资源",
+      "constraints": "location为合法markdown_file，机器JSON身份仍须真实核验",
+      "acceptance": "固定loader可读，引用资源存在且不跨run复用",
+      "delivery_state": "planned",
+      "module": "M06",
+      "ticket_ids": [
+        "T208"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-local-check/artifacts/templates/result.md",
+      "kind": "F",
+      "responsibility": "可见manifest模板",
+      "development": "呈现run/node/attempt/op、phase、实际JSON引用/hash、范围与缺口",
+      "constraints": "不预填accepted/pass/完成；模板不是证明",
+      "acceptance": "未执行占位不能被当作产物完成",
+      "delivery_state": "planned",
+      "module": "M06",
+      "ticket_ids": [
+        "T208"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-local-check/artifacts/writing-guide.md",
+      "kind": "F",
+      "responsibility": "manifest生成约束",
+      "development": "由程序从实际JSON生成不可变manifest，引用真实文件摘要",
+      "constraints": "不手写假记录、不把工作流运行ID当操作ID",
+      "acceptance": "manifest与JSON及本次attempt绑定一致",
+      "delivery_state": "planned",
+      "module": "M06",
+      "ticket_ids": [
+        "T208"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-local-check/artifacts/review-guide.md",
+      "kind": "F",
+      "responsibility": "产物核验说明",
+      "development": "检验摘要/路径/来源和证据边界，区分已处理与成功终态",
+      "constraints": "模型零finding/文件存在不代替真实同意或事实核验",
+      "acceptance": "陈旧/错run/缺机器证据明确拒绝",
+      "delivery_state": "planned",
+      "module": "M06",
+      "ticket_ids": [
+        "T208"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-candidate-revise/SKILL.md",
+      "kind": "F",
+      "responsibility": "能力入口与边界",
+      "development": "明确本节点输入、动作、结果与缺口，指向公开CLI和产物合同",
+      "constraints": "不包装成聚合Workflow；不自授人确认或发布",
+      "acceptance": "名称与目录及catalog完全一致，入口无秘密",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-candidate-revise/scripts/cli.py",
+      "kind": "F",
+      "responsibility": "公开进程入口",
+      "development": "解析统一JSON进出、K/rules/catalog/action并调本包实现",
+      "constraints": "不导入其他Skill私有代码；无运行时安装/联网/Git发布",
+      "acceptance": "外部进程可调用；0/2/3与phase语义符合协议",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-candidate-revise/scripts/support.py",
+      "kind": "F",
+      "responsibility": "本包薄适配与bootstrap",
+      "development": "校验包/锁身份、绑定受信领域规则与catalog，封装明确公开接口",
+      "constraints": "不能复制Schema/卡/Scope/来源/证明规则，不成为聚合业务引擎",
+      "acceptance": "错误规则/包摘要/入口拒绝；加载前已验证代码字节",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-candidate-revise/tests/test_cli.py",
+      "kind": "F",
+      "responsibility": "本节点公开边界回归",
+      "development": "用隔离合成K和公开CLI覆盖成功/阻断/无副作用/陈旧输入",
+      "constraints": "合成动作只用于fixture根，不能证明真实人或宿主",
+      "acceptance": "正常与失败反例实际运行；stdout和持久记录可核",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-candidate-revise/requirements.lock.txt",
+      "kind": "F",
+      "responsibility": "运行依赖锁",
+      "development": "冻结本包实际运行依赖版本/hash并纳tool_identity",
+      "constraints": "不以空文件宣称可复现；不从来源临时安装",
+      "acceptance": "显式锁定环境可运行本包；版本变化改变工具身份",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-candidate-revise/requirements-dev.lock.txt",
+      "kind": "F",
+      "responsibility": "开发测试依赖锁",
+      "development": "固定本包测试/检查依赖及兼容运行锁",
+      "constraints": "不恢复仓根依赖/旧共享包",
+      "acceptance": "空环境显式安装后本包测试可复现",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-candidate-revise/artifacts/result.yaml",
+      "kind": "F",
+      "responsibility": "节点产物合同",
+      "development": "id为Skill唯一结果ID，指定node/exit义务与三份资源",
+      "constraints": "location为合法markdown_file，机器JSON身份仍须真实核验",
+      "acceptance": "固定loader可读，引用资源存在且不跨run复用",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-candidate-revise/artifacts/templates/result.md",
+      "kind": "F",
+      "responsibility": "可见manifest模板",
+      "development": "呈现run/node/attempt/op、phase、实际JSON引用/hash、范围与缺口",
+      "constraints": "不预填accepted/pass/完成；模板不是证明",
+      "acceptance": "未执行占位不能被当作产物完成",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-candidate-revise/artifacts/writing-guide.md",
+      "kind": "F",
+      "responsibility": "manifest生成约束",
+      "development": "由程序从实际JSON生成不可变manifest，引用真实文件摘要",
+      "constraints": "不手写假记录、不把工作流运行ID当操作ID",
+      "acceptance": "manifest与JSON及本次attempt绑定一致",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-candidate-revise/artifacts/review-guide.md",
+      "kind": "F",
+      "responsibility": "产物核验说明",
+      "development": "检验摘要/路径/来源和证据边界，区分已处理与成功终态",
+      "constraints": "模型零finding/文件存在不代替真实同意或事实核验",
+      "acceptance": "陈旧/错run/缺机器证据明确拒绝",
+      "delivery_state": "planned",
+      "module": "M04",
+      "ticket_ids": [
+        "T204"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-apply/SKILL.md",
+      "kind": "F",
+      "responsibility": "能力入口与边界",
+      "development": "明确本节点输入、动作、结果与缺口，指向公开CLI和产物合同",
+      "constraints": "不包装成聚合Workflow；不自授人确认或发布",
+      "acceptance": "名称与目录及catalog完全一致，入口无秘密",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-apply/scripts/cli.py",
+      "kind": "F",
+      "responsibility": "公开进程入口",
+      "development": "解析统一JSON进出、K/rules/catalog/action并调本包实现",
+      "constraints": "不导入其他Skill私有代码；无运行时安装/联网/Git发布",
+      "acceptance": "外部进程可调用；0/2/3与phase语义符合协议",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-apply/scripts/support.py",
+      "kind": "F",
+      "responsibility": "本包薄适配与bootstrap",
+      "development": "校验包/锁身份、绑定受信领域规则与catalog，封装明确公开接口",
+      "constraints": "不能复制Schema/卡/Scope/来源/证明规则，不成为聚合业务引擎",
+      "acceptance": "错误规则/包摘要/入口拒绝；加载前已验证代码字节",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-apply/tests/test_cli.py",
+      "kind": "F",
+      "responsibility": "本节点公开边界回归",
+      "development": "用隔离合成K和公开CLI覆盖成功/阻断/无副作用/陈旧输入",
+      "constraints": "合成动作只用于fixture根，不能证明真实人或宿主",
+      "acceptance": "正常与失败反例实际运行；stdout和持久记录可核",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-apply/requirements.lock.txt",
+      "kind": "F",
+      "responsibility": "运行依赖锁",
+      "development": "冻结本包实际运行依赖版本/hash并纳tool_identity",
+      "constraints": "不以空文件宣称可复现；不从来源临时安装",
+      "acceptance": "显式锁定环境可运行本包；版本变化改变工具身份",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-apply/requirements-dev.lock.txt",
+      "kind": "F",
+      "responsibility": "开发测试依赖锁",
+      "development": "固定本包测试/检查依赖及兼容运行锁",
+      "constraints": "不恢复仓根依赖/旧共享包",
+      "acceptance": "空环境显式安装后本包测试可复现",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-apply/artifacts/result.yaml",
+      "kind": "F",
+      "responsibility": "节点产物合同",
+      "development": "id为Skill唯一结果ID，指定node/exit义务与三份资源",
+      "constraints": "location为合法markdown_file，机器JSON身份仍须真实核验",
+      "acceptance": "固定loader可读，引用资源存在且不跨run复用",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-apply/artifacts/templates/result.md",
+      "kind": "F",
+      "responsibility": "可见manifest模板",
+      "development": "呈现run/node/attempt/op、phase、实际JSON引用/hash、范围与缺口",
+      "constraints": "不预填accepted/pass/完成；模板不是证明",
+      "acceptance": "未执行占位不能被当作产物完成",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-apply/artifacts/writing-guide.md",
+      "kind": "F",
+      "responsibility": "manifest生成约束",
+      "development": "由程序从实际JSON生成不可变manifest，引用真实文件摘要",
+      "constraints": "不手写假记录、不把工作流运行ID当操作ID",
+      "acceptance": "manifest与JSON及本次attempt绑定一致",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-apply/artifacts/review-guide.md",
+      "kind": "F",
+      "responsibility": "产物核验说明",
+      "development": "检验摘要/路径/来源和证据边界，区分已处理与成功终态",
+      "constraints": "模型零finding/文件存在不代替真实同意或事实核验",
+      "acceptance": "陈旧/错run/缺机器证据明确拒绝",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-recover/SKILL.md",
+      "kind": "F",
+      "responsibility": "能力入口与边界",
+      "development": "明确本节点输入、动作、结果与缺口，指向公开CLI和产物合同",
+      "constraints": "不包装成聚合Workflow；不自授人确认或发布",
+      "acceptance": "名称与目录及catalog完全一致，入口无秘密",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-recover/scripts/cli.py",
+      "kind": "F",
+      "responsibility": "公开进程入口",
+      "development": "解析统一JSON进出、K/rules/catalog/action并调本包实现",
+      "constraints": "不导入其他Skill私有代码；无运行时安装/联网/Git发布",
+      "acceptance": "外部进程可调用；0/2/3与phase语义符合协议",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-recover/scripts/support.py",
+      "kind": "F",
+      "responsibility": "本包薄适配与bootstrap",
+      "development": "校验包/锁身份、绑定受信领域规则与catalog，封装明确公开接口",
+      "constraints": "不能复制Schema/卡/Scope/来源/证明规则，不成为聚合业务引擎",
+      "acceptance": "错误规则/包摘要/入口拒绝；加载前已验证代码字节",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-recover/tests/test_cli.py",
+      "kind": "F",
+      "responsibility": "本节点公开边界回归",
+      "development": "用隔离合成K和公开CLI覆盖成功/阻断/无副作用/陈旧输入",
+      "constraints": "合成动作只用于fixture根，不能证明真实人或宿主",
+      "acceptance": "正常与失败反例实际运行；stdout和持久记录可核",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-recover/requirements.lock.txt",
+      "kind": "F",
+      "responsibility": "运行依赖锁",
+      "development": "冻结本包实际运行依赖版本/hash并纳tool_identity",
+      "constraints": "不以空文件宣称可复现；不从来源临时安装",
+      "acceptance": "显式锁定环境可运行本包；版本变化改变工具身份",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-recover/requirements-dev.lock.txt",
+      "kind": "F",
+      "responsibility": "开发测试依赖锁",
+      "development": "固定本包测试/检查依赖及兼容运行锁",
+      "constraints": "不恢复仓根依赖/旧共享包",
+      "acceptance": "空环境显式安装后本包测试可复现",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-recover/artifacts/result.yaml",
+      "kind": "F",
+      "responsibility": "节点产物合同",
+      "development": "id为Skill唯一结果ID，指定node/exit义务与三份资源",
+      "constraints": "location为合法markdown_file，机器JSON身份仍须真实核验",
+      "acceptance": "固定loader可读，引用资源存在且不跨run复用",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-recover/artifacts/templates/result.md",
+      "kind": "F",
+      "responsibility": "可见manifest模板",
+      "development": "呈现run/node/attempt/op、phase、实际JSON引用/hash、范围与缺口",
+      "constraints": "不预填accepted/pass/完成；模板不是证明",
+      "acceptance": "未执行占位不能被当作产物完成",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-recover/artifacts/writing-guide.md",
+      "kind": "F",
+      "responsibility": "manifest生成约束",
+      "development": "由程序从实际JSON生成不可变manifest，引用真实文件摘要",
+      "constraints": "不手写假记录、不把工作流运行ID当操作ID",
+      "acceptance": "manifest与JSON及本次attempt绑定一致",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-recover/artifacts/review-guide.md",
+      "kind": "F",
+      "responsibility": "产物核验说明",
+      "development": "检验摘要/路径/来源和证据边界，区分已处理与成功终态",
+      "constraints": "模型零finding/文件存在不代替真实同意或事实核验",
+      "acceptance": "陈旧/错run/缺机器证据明确拒绝",
+      "delivery_state": "planned",
+      "module": "M05",
+      "ticket_ids": [
+        "T205"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-index-build/SKILL.md",
+      "kind": "F",
+      "responsibility": "能力入口与边界",
+      "development": "明确本节点输入、动作、结果与缺口，指向公开CLI和产物合同",
+      "constraints": "不包装成聚合Workflow；不自授人确认或发布",
+      "acceptance": "名称与目录及catalog完全一致，入口无秘密",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-index-build/scripts/cli.py",
+      "kind": "F",
+      "responsibility": "公开进程入口",
+      "development": "解析统一JSON进出、K/rules/catalog/action并调本包实现",
+      "constraints": "不导入其他Skill私有代码；无运行时安装/联网/Git发布",
+      "acceptance": "外部进程可调用；0/2/3与phase语义符合协议",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-index-build/scripts/support.py",
+      "kind": "F",
+      "responsibility": "本包薄适配与bootstrap",
+      "development": "校验包/锁身份、绑定受信领域规则与catalog，封装明确公开接口",
+      "constraints": "不能复制Schema/卡/Scope/来源/证明规则，不成为聚合业务引擎",
+      "acceptance": "错误规则/包摘要/入口拒绝；加载前已验证代码字节",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-index-build/tests/test_cli.py",
+      "kind": "F",
+      "responsibility": "本节点公开边界回归",
+      "development": "用隔离合成K和公开CLI覆盖成功/阻断/无副作用/陈旧输入",
+      "constraints": "合成动作只用于fixture根，不能证明真实人或宿主",
+      "acceptance": "正常与失败反例实际运行；stdout和持久记录可核",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-index-build/requirements.lock.txt",
+      "kind": "F",
+      "responsibility": "运行依赖锁",
+      "development": "冻结本包实际运行依赖版本/hash并纳tool_identity",
+      "constraints": "不以空文件宣称可复现；不从来源临时安装",
+      "acceptance": "显式锁定环境可运行本包；版本变化改变工具身份",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-index-build/requirements-dev.lock.txt",
+      "kind": "F",
+      "responsibility": "开发测试依赖锁",
+      "development": "固定本包测试/检查依赖及兼容运行锁",
+      "constraints": "不恢复仓根依赖/旧共享包",
+      "acceptance": "空环境显式安装后本包测试可复现",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-index-build/artifacts/result.yaml",
+      "kind": "F",
+      "responsibility": "节点产物合同",
+      "development": "id为Skill唯一结果ID，指定node/exit义务与三份资源",
+      "constraints": "location为合法markdown_file，机器JSON身份仍须真实核验",
+      "acceptance": "固定loader可读，引用资源存在且不跨run复用",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-index-build/artifacts/templates/result.md",
+      "kind": "F",
+      "responsibility": "可见manifest模板",
+      "development": "呈现run/node/attempt/op、phase、实际JSON引用/hash、范围与缺口",
+      "constraints": "不预填accepted/pass/完成；模板不是证明",
+      "acceptance": "未执行占位不能被当作产物完成",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-index-build/artifacts/writing-guide.md",
+      "kind": "F",
+      "responsibility": "manifest生成约束",
+      "development": "由程序从实际JSON生成不可变manifest，引用真实文件摘要",
+      "constraints": "不手写假记录、不把工作流运行ID当操作ID",
+      "acceptance": "manifest与JSON及本次attempt绑定一致",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-index-build/artifacts/review-guide.md",
+      "kind": "F",
+      "responsibility": "产物核验说明",
+      "development": "检验摘要/路径/来源和证据边界，区分已处理与成功终态",
+      "constraints": "模型零finding/文件存在不代替真实同意或事实核验",
+      "acceptance": "陈旧/错run/缺机器证据明确拒绝",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-query-regression/SKILL.md",
+      "kind": "F",
+      "responsibility": "能力入口与边界",
+      "development": "明确本节点输入、动作、结果与缺口，指向公开CLI和产物合同",
+      "constraints": "不包装成聚合Workflow；不自授人确认或发布",
+      "acceptance": "名称与目录及catalog完全一致，入口无秘密",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-query-regression/scripts/cli.py",
+      "kind": "F",
+      "responsibility": "公开进程入口",
+      "development": "解析统一JSON进出、K/rules/catalog/action并调本包实现",
+      "constraints": "不导入其他Skill私有代码；无运行时安装/联网/Git发布",
+      "acceptance": "外部进程可调用；0/2/3与phase语义符合协议",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-query-regression/scripts/support.py",
+      "kind": "F",
+      "responsibility": "本包薄适配与bootstrap",
+      "development": "校验包/锁身份、绑定受信领域规则与catalog，封装明确公开接口",
+      "constraints": "不能复制Schema/卡/Scope/来源/证明规则，不成为聚合业务引擎",
+      "acceptance": "错误规则/包摘要/入口拒绝；加载前已验证代码字节",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-query-regression/tests/test_cli.py",
+      "kind": "F",
+      "responsibility": "本节点公开边界回归",
+      "development": "用隔离合成K和公开CLI覆盖成功/阻断/无副作用/陈旧输入",
+      "constraints": "合成动作只用于fixture根，不能证明真实人或宿主",
+      "acceptance": "正常与失败反例实际运行；stdout和持久记录可核",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-query-regression/requirements.lock.txt",
+      "kind": "F",
+      "responsibility": "运行依赖锁",
+      "development": "冻结本包实际运行依赖版本/hash并纳tool_identity",
+      "constraints": "不以空文件宣称可复现；不从来源临时安装",
+      "acceptance": "显式锁定环境可运行本包；版本变化改变工具身份",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-query-regression/requirements-dev.lock.txt",
+      "kind": "F",
+      "responsibility": "开发测试依赖锁",
+      "development": "固定本包测试/检查依赖及兼容运行锁",
+      "constraints": "不恢复仓根依赖/旧共享包",
+      "acceptance": "空环境显式安装后本包测试可复现",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-query-regression/artifacts/result.yaml",
+      "kind": "F",
+      "responsibility": "节点产物合同",
+      "development": "id为Skill唯一结果ID，指定node/exit义务与三份资源",
+      "constraints": "location为合法markdown_file，机器JSON身份仍须真实核验",
+      "acceptance": "固定loader可读，引用资源存在且不跨run复用",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-query-regression/artifacts/templates/result.md",
+      "kind": "F",
+      "responsibility": "可见manifest模板",
+      "development": "呈现run/node/attempt/op、phase、实际JSON引用/hash、范围与缺口",
+      "constraints": "不预填accepted/pass/完成；模板不是证明",
+      "acceptance": "未执行占位不能被当作产物完成",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-query-regression/artifacts/writing-guide.md",
+      "kind": "F",
+      "responsibility": "manifest生成约束",
+      "development": "由程序从实际JSON生成不可变manifest，引用真实文件摘要",
+      "constraints": "不手写假记录、不把工作流运行ID当操作ID",
+      "acceptance": "manifest与JSON及本次attempt绑定一致",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-query-regression/artifacts/review-guide.md",
+      "kind": "F",
+      "responsibility": "产物核验说明",
+      "development": "检验摘要/路径/来源和证据边界，区分已处理与成功终态",
+      "constraints": "模型零finding/文件存在不代替真实同意或事实核验",
+      "acceptance": "陈旧/错run/缺机器证据明确拒绝",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-publish-handoff/SKILL.md",
+      "kind": "F",
+      "responsibility": "能力入口与边界",
+      "development": "明确本节点输入、动作、结果与缺口，指向公开CLI和产物合同",
+      "constraints": "不包装成聚合Workflow；不自授人确认或发布",
+      "acceptance": "名称与目录及catalog完全一致，入口无秘密",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T209"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-publish-handoff/scripts/cli.py",
+      "kind": "F",
+      "responsibility": "公开进程入口",
+      "development": "解析统一JSON进出、K/rules/catalog/action并调本包实现",
+      "constraints": "不导入其他Skill私有代码；无运行时安装/联网/Git发布",
+      "acceptance": "外部进程可调用；0/2/3与phase语义符合协议",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T209"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-publish-handoff/scripts/support.py",
+      "kind": "F",
+      "responsibility": "本包薄适配与bootstrap",
+      "development": "校验包/锁身份、绑定受信领域规则与catalog，封装明确公开接口",
+      "constraints": "不能复制Schema/卡/Scope/来源/证明规则，不成为聚合业务引擎",
+      "acceptance": "错误规则/包摘要/入口拒绝；加载前已验证代码字节",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T209"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-publish-handoff/tests/test_cli.py",
+      "kind": "F",
+      "responsibility": "本节点公开边界回归",
+      "development": "用隔离合成K和公开CLI覆盖成功/阻断/无副作用/陈旧输入",
+      "constraints": "合成动作只用于fixture根，不能证明真实人或宿主",
+      "acceptance": "正常与失败反例实际运行；stdout和持久记录可核",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T209"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-publish-handoff/requirements.lock.txt",
+      "kind": "F",
+      "responsibility": "运行依赖锁",
+      "development": "冻结本包实际运行依赖版本/hash并纳tool_identity",
+      "constraints": "不以空文件宣称可复现；不从来源临时安装",
+      "acceptance": "显式锁定环境可运行本包；版本变化改变工具身份",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T209"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-publish-handoff/requirements-dev.lock.txt",
+      "kind": "F",
+      "responsibility": "开发测试依赖锁",
+      "development": "固定本包测试/检查依赖及兼容运行锁",
+      "constraints": "不恢复仓根依赖/旧共享包",
+      "acceptance": "空环境显式安装后本包测试可复现",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T209"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-publish-handoff/artifacts/result.yaml",
+      "kind": "F",
+      "responsibility": "节点产物合同",
+      "development": "id为Skill唯一结果ID，指定node/exit义务与三份资源",
+      "constraints": "location为合法markdown_file，机器JSON身份仍须真实核验",
+      "acceptance": "固定loader可读，引用资源存在且不跨run复用",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T209"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-publish-handoff/artifacts/templates/result.md",
+      "kind": "F",
+      "responsibility": "可见manifest模板",
+      "development": "呈现run/node/attempt/op、phase、实际JSON引用/hash、范围与缺口",
+      "constraints": "不预填accepted/pass/完成；模板不是证明",
+      "acceptance": "未执行占位不能被当作产物完成",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T209"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-publish-handoff/artifacts/writing-guide.md",
+      "kind": "F",
+      "responsibility": "manifest生成约束",
+      "development": "由程序从实际JSON生成不可变manifest，引用真实文件摘要",
+      "constraints": "不手写假记录、不把工作流运行ID当操作ID",
+      "acceptance": "manifest与JSON及本次attempt绑定一致",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T209"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-publish-handoff/artifacts/review-guide.md",
+      "kind": "F",
+      "responsibility": "产物核验说明",
+      "development": "检验摘要/路径/来源和证据边界，区分已处理与成功终态",
+      "constraints": "模型零finding/文件存在不代替真实同意或事实核验",
+      "acceptance": "陈旧/错run/缺机器证据明确拒绝",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T209"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-merge-check/SKILL.md",
+      "kind": "F",
+      "responsibility": "能力入口与边界",
+      "development": "明确本节点输入、动作、结果与缺口，指向公开CLI和产物合同",
+      "constraints": "不包装成聚合Workflow；不自授人确认或发布",
+      "acceptance": "名称与目录及catalog完全一致，入口无秘密",
+      "delivery_state": "planned",
+      "module": "M06",
+      "ticket_ids": [
+        "T208"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-merge-check/scripts/cli.py",
+      "kind": "F",
+      "responsibility": "公开进程入口",
+      "development": "解析统一JSON进出、K/rules/catalog/action并调本包实现",
+      "constraints": "不导入其他Skill私有代码；无运行时安装/联网/Git发布",
+      "acceptance": "外部进程可调用；0/2/3与phase语义符合协议",
+      "delivery_state": "planned",
+      "module": "M06",
+      "ticket_ids": [
+        "T208"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-merge-check/scripts/support.py",
+      "kind": "F",
+      "responsibility": "本包薄适配与bootstrap",
+      "development": "校验包/锁身份、绑定受信领域规则与catalog，封装明确公开接口",
+      "constraints": "不能复制Schema/卡/Scope/来源/证明规则，不成为聚合业务引擎",
+      "acceptance": "错误规则/包摘要/入口拒绝；加载前已验证代码字节",
+      "delivery_state": "planned",
+      "module": "M06",
+      "ticket_ids": [
+        "T208"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-merge-check/tests/test_cli.py",
+      "kind": "F",
+      "responsibility": "本节点公开边界回归",
+      "development": "用隔离合成K和公开CLI覆盖成功/阻断/无副作用/陈旧输入",
+      "constraints": "合成动作只用于fixture根，不能证明真实人或宿主",
+      "acceptance": "正常与失败反例实际运行；stdout和持久记录可核",
+      "delivery_state": "planned",
+      "module": "M06",
+      "ticket_ids": [
+        "T208"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-merge-check/requirements.lock.txt",
+      "kind": "F",
+      "responsibility": "运行依赖锁",
+      "development": "冻结本包实际运行依赖版本/hash并纳tool_identity",
+      "constraints": "不以空文件宣称可复现；不从来源临时安装",
+      "acceptance": "显式锁定环境可运行本包；版本变化改变工具身份",
+      "delivery_state": "planned",
+      "module": "M06",
+      "ticket_ids": [
+        "T208"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-merge-check/requirements-dev.lock.txt",
+      "kind": "F",
+      "responsibility": "开发测试依赖锁",
+      "development": "固定本包测试/检查依赖及兼容运行锁",
+      "constraints": "不恢复仓根依赖/旧共享包",
+      "acceptance": "空环境显式安装后本包测试可复现",
+      "delivery_state": "planned",
+      "module": "M06",
+      "ticket_ids": [
+        "T208"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-merge-check/artifacts/result.yaml",
+      "kind": "F",
+      "responsibility": "节点产物合同",
+      "development": "id为Skill唯一结果ID，指定node/exit义务与三份资源",
+      "constraints": "location为合法markdown_file，机器JSON身份仍须真实核验",
+      "acceptance": "固定loader可读，引用资源存在且不跨run复用",
+      "delivery_state": "planned",
+      "module": "M06",
+      "ticket_ids": [
+        "T208"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-merge-check/artifacts/templates/result.md",
+      "kind": "F",
+      "responsibility": "可见manifest模板",
+      "development": "呈现run/node/attempt/op、phase、实际JSON引用/hash、范围与缺口",
+      "constraints": "不预填accepted/pass/完成；模板不是证明",
+      "acceptance": "未执行占位不能被当作产物完成",
+      "delivery_state": "planned",
+      "module": "M06",
+      "ticket_ids": [
+        "T208"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-merge-check/artifacts/writing-guide.md",
+      "kind": "F",
+      "responsibility": "manifest生成约束",
+      "development": "由程序从实际JSON生成不可变manifest，引用真实文件摘要",
+      "constraints": "不手写假记录、不把工作流运行ID当操作ID",
+      "acceptance": "manifest与JSON及本次attempt绑定一致",
+      "delivery_state": "planned",
+      "module": "M06",
+      "ticket_ids": [
+        "T208"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-merge-check/artifacts/review-guide.md",
+      "kind": "F",
+      "responsibility": "产物核验说明",
+      "development": "检验摘要/路径/来源和证据边界，区分已处理与成功终态",
+      "constraints": "模型零finding/文件存在不代替真实同意或事实核验",
+      "acceptance": "陈旧/错run/缺机器证据明确拒绝",
+      "delivery_state": "planned",
+      "module": "M06",
+      "ticket_ids": [
+        "T208"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-maintain/SKILL.md",
+      "kind": "F",
+      "responsibility": "能力入口与边界",
+      "development": "明确本节点输入、动作、结果与缺口，指向公开CLI和产物合同",
+      "constraints": "不包装成聚合Workflow；不自授人确认或发布",
+      "acceptance": "名称与目录及catalog完全一致，入口无秘密",
+      "delivery_state": "planned",
+      "module": "M08",
+      "ticket_ids": [
+        "T207"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-maintain/scripts/cli.py",
+      "kind": "F",
+      "responsibility": "公开进程入口",
+      "development": "解析统一JSON进出、K/rules/catalog/action并调本包实现",
+      "constraints": "不导入其他Skill私有代码；无运行时安装/联网/Git发布",
+      "acceptance": "外部进程可调用；0/2/3与phase语义符合协议",
+      "delivery_state": "planned",
+      "module": "M08",
+      "ticket_ids": [
+        "T207"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-maintain/scripts/support.py",
+      "kind": "F",
+      "responsibility": "本包薄适配与bootstrap",
+      "development": "校验包/锁身份、绑定受信领域规则与catalog，封装明确公开接口",
+      "constraints": "不能复制Schema/卡/Scope/来源/证明规则，不成为聚合业务引擎",
+      "acceptance": "错误规则/包摘要/入口拒绝；加载前已验证代码字节",
+      "delivery_state": "planned",
+      "module": "M08",
+      "ticket_ids": [
+        "T207"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-maintain/tests/test_cli.py",
+      "kind": "F",
+      "responsibility": "本节点公开边界回归",
+      "development": "用隔离合成K和公开CLI覆盖成功/阻断/无副作用/陈旧输入",
+      "constraints": "合成动作只用于fixture根，不能证明真实人或宿主",
+      "acceptance": "正常与失败反例实际运行；stdout和持久记录可核",
+      "delivery_state": "planned",
+      "module": "M08",
+      "ticket_ids": [
+        "T207"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-maintain/requirements.lock.txt",
+      "kind": "F",
+      "responsibility": "运行依赖锁",
+      "development": "冻结本包实际运行依赖版本/hash并纳tool_identity",
+      "constraints": "不以空文件宣称可复现；不从来源临时安装",
+      "acceptance": "显式锁定环境可运行本包；版本变化改变工具身份",
+      "delivery_state": "planned",
+      "module": "M08",
+      "ticket_ids": [
+        "T207"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-maintain/requirements-dev.lock.txt",
+      "kind": "F",
+      "responsibility": "开发测试依赖锁",
+      "development": "固定本包测试/检查依赖及兼容运行锁",
+      "constraints": "不恢复仓根依赖/旧共享包",
+      "acceptance": "空环境显式安装后本包测试可复现",
+      "delivery_state": "planned",
+      "module": "M08",
+      "ticket_ids": [
+        "T207"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-maintain/artifacts/result.yaml",
+      "kind": "F",
+      "responsibility": "节点产物合同",
+      "development": "id为Skill唯一结果ID，指定node/exit义务与三份资源",
+      "constraints": "location为合法markdown_file，机器JSON身份仍须真实核验",
+      "acceptance": "固定loader可读，引用资源存在且不跨run复用",
+      "delivery_state": "planned",
+      "module": "M08",
+      "ticket_ids": [
+        "T207"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-maintain/artifacts/templates/result.md",
+      "kind": "F",
+      "responsibility": "可见manifest模板",
+      "development": "呈现run/node/attempt/op、phase、实际JSON引用/hash、范围与缺口",
+      "constraints": "不预填accepted/pass/完成；模板不是证明",
+      "acceptance": "未执行占位不能被当作产物完成",
+      "delivery_state": "planned",
+      "module": "M08",
+      "ticket_ids": [
+        "T207"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-maintain/artifacts/writing-guide.md",
+      "kind": "F",
+      "responsibility": "manifest生成约束",
+      "development": "由程序从实际JSON生成不可变manifest，引用真实文件摘要",
+      "constraints": "不手写假记录、不把工作流运行ID当操作ID",
+      "acceptance": "manifest与JSON及本次attempt绑定一致",
+      "delivery_state": "planned",
+      "module": "M08",
+      "ticket_ids": [
+        "T207"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-maintain/artifacts/review-guide.md",
+      "kind": "F",
+      "responsibility": "产物核验说明",
+      "development": "检验摘要/路径/来源和证据边界，区分已处理与成功终态",
+      "constraints": "模型零finding/文件存在不代替真实同意或事实核验",
+      "acceptance": "陈旧/错run/缺机器证据明确拒绝",
+      "delivery_state": "planned",
+      "module": "M08",
+      "ticket_ids": [
+        "T207"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-query/SKILL.md",
+      "kind": "F",
+      "responsibility": "能力入口与边界",
+      "development": "明确本节点输入、动作、结果与缺口，指向公开CLI和产物合同",
+      "constraints": "不包装成聚合Workflow；不自授人确认或发布",
+      "acceptance": "名称与目录及catalog完全一致，入口无秘密",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-query/scripts/cli.py",
+      "kind": "F",
+      "responsibility": "公开进程入口",
+      "development": "解析统一JSON进出、K/rules/catalog/action并调本包实现",
+      "constraints": "不导入其他Skill私有代码；无运行时安装/联网/Git发布",
+      "acceptance": "外部进程可调用；0/2/3与phase语义符合协议",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-query/scripts/support.py",
+      "kind": "F",
+      "responsibility": "本包薄适配与bootstrap",
+      "development": "校验包/锁身份、绑定受信领域规则与catalog，封装明确公开接口",
+      "constraints": "不能复制Schema/卡/Scope/来源/证明规则，不成为聚合业务引擎",
+      "acceptance": "错误规则/包摘要/入口拒绝；加载前已验证代码字节",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-query/tests/test_cli.py",
+      "kind": "F",
+      "responsibility": "本节点公开边界回归",
+      "development": "用隔离合成K和公开CLI覆盖成功/阻断/无副作用/陈旧输入",
+      "constraints": "合成动作只用于fixture根，不能证明真实人或宿主",
+      "acceptance": "正常与失败反例实际运行；stdout和持久记录可核",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-query/requirements.lock.txt",
+      "kind": "F",
+      "responsibility": "运行依赖锁",
+      "development": "冻结本包实际运行依赖版本/hash并纳tool_identity",
+      "constraints": "不以空文件宣称可复现；不从来源临时安装",
+      "acceptance": "显式锁定环境可运行本包；版本变化改变工具身份",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-query/requirements-dev.lock.txt",
+      "kind": "F",
+      "responsibility": "开发测试依赖锁",
+      "development": "固定本包测试/检查依赖及兼容运行锁",
+      "constraints": "不恢复仓根依赖/旧共享包",
+      "acceptance": "空环境显式安装后本包测试可复现",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-query/artifacts/result.yaml",
+      "kind": "F",
+      "responsibility": "节点产物合同",
+      "development": "id为Skill唯一结果ID，指定node/exit义务与三份资源",
+      "constraints": "location为合法markdown_file，机器JSON身份仍须真实核验",
+      "acceptance": "固定loader可读，引用资源存在且不跨run复用",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-query/artifacts/templates/result.md",
+      "kind": "F",
+      "responsibility": "可见manifest模板",
+      "development": "呈现run/node/attempt/op、phase、实际JSON引用/hash、范围与缺口",
+      "constraints": "不预填accepted/pass/完成；模板不是证明",
+      "acceptance": "未执行占位不能被当作产物完成",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-query/artifacts/writing-guide.md",
+      "kind": "F",
+      "responsibility": "manifest生成约束",
+      "development": "由程序从实际JSON生成不可变manifest，引用真实文件摘要",
+      "constraints": "不手写假记录、不把工作流运行ID当操作ID",
+      "acceptance": "manifest与JSON及本次attempt绑定一致",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-query/artifacts/review-guide.md",
+      "kind": "F",
+      "responsibility": "产物核验说明",
+      "development": "检验摘要/路径/来源和证据边界，区分已处理与成功终态",
+      "constraints": "模型零finding/文件存在不代替真实同意或事实核验",
+      "acceptance": "陈旧/错run/缺机器证据明确拒绝",
+      "delivery_state": "planned",
+      "module": "M07",
+      "ticket_ids": [
+        "T206"
+      ]
+    },
+    {
+      "path": "workflows/common/knowledge/hs-knowledge-ingest/workflow.yaml",
+      "kind": "F",
+      "responsibility": "运行编排真源",
+      "development": "完整定义本模板node/owner/skill/exit；布局只声明真实ID与坐标",
+      "constraints": "user Gate不自动接受；不复制Skill算法、不把G6–G9塞入模板",
+      "acceptance": "固定版本loader/catalog校验通过；所有节点可达，缺动作等待",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T209"
+      ]
+    },
+    {
+      "path": "workflows/common/knowledge/hs-knowledge-ingest/layouts.yaml",
+      "kind": "F",
+      "responsibility": "画布展示布局",
+      "development": "完整定义本模板node/owner/skill/exit；布局只声明真实ID与坐标",
+      "constraints": "user Gate不自动接受；不复制Skill算法、不把G6–G9塞入模板",
+      "acceptance": "固定版本loader/catalog校验通过；所有节点可达，缺动作等待",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T209"
+      ]
+    },
+    {
+      "path": "workflows/common/knowledge/hs-knowledge-lint/workflow.yaml",
+      "kind": "F",
+      "responsibility": "运行编排真源",
+      "development": "完整定义本模板node/owner/skill/exit；布局只声明真实ID与坐标",
+      "constraints": "user Gate不自动接受；不复制Skill算法、不把G6–G9塞入模板",
+      "acceptance": "固定版本loader/catalog校验通过；所有节点可达，缺动作等待",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T209"
+      ]
+    },
+    {
+      "path": "workflows/common/knowledge/hs-knowledge-lint/layouts.yaml",
+      "kind": "F",
+      "responsibility": "画布展示布局",
+      "development": "完整定义本模板node/owner/skill/exit；布局只声明真实ID与坐标",
+      "constraints": "user Gate不自动接受；不复制Skill算法、不把G6–G9塞入模板",
+      "acceptance": "固定版本loader/catalog校验通过；所有节点可达，缺动作等待",
+      "delivery_state": "planned",
+      "module": "M09",
+      "ticket_ids": [
+        "T209"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/implementation-protocol.md",
+      "kind": "F",
+      "responsibility": "产品2.0公开实施协议",
+      "development": "从本轮冻结协议完整保留；作为18节点公开JSON/API边界",
+      "constraints": "修改须同步规则/包/SDD基线；不是额外聚合执行程序",
+      "acceptance": "源文件hash准确，协议与公开CLI一致",
+      "delivery_state": "planned",
+      "module": "M01",
+      "ticket_ids": [
+        "T201"
+      ]
+    }
+  ],
+  "verification_boundary": "Planning is not runtime validation. T211 needs real external evidence. v1 bytes remain historical.",
+  "acceptance_note": "E201-E218 describe general behavior; E219-E224 independently require real external evidence and cannot be closed by fixtures.",
+  "deployment": {
+    "repository": "https://github.com/Robin-hhc/FactumCore",
+    "layout": "single_repository",
+    "skills_root": "skills/common/knowledge",
+    "workflows_root": "workflows/common/knowledge",
+    "nested_git": false
+  }
+}

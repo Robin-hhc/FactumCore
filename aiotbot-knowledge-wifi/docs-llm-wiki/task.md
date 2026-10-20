@@ -1,49 +1,52 @@
-# WiFi 知识库模块任务
+# WiFi节点能力开发任务
 
-日期：2026-10-20。依据[总体设计 §5.3 与第 11 章](AIoTBot知识库架构设计.md)和[知识库详细设计](知识库详细设计.md)，先按模块整理首版工作；后续再拆成可开发、可验收的 SDD 任务。
+日期：2026-10-21。用户已批准按18节点Skill+两个Workflow完成SDD与开发，当前依据[详设v4](知识库详细设计.md)和[knowledge-v2](sdd/knowledge-v2/README.md)。以下初始状态均pending，不继承knowledge-v1的历史通过状态。
 
-本表沿用 M01–M09 作为模块索引，便于对照已有资料；不继承历史 SDD 的完成状态，不替代其需求、票据和验收记录。当前只有目录骨架与部分治理声明资产，以下模块均尚未按现行设计完成实现与验收。本轮仅整理任务，不启动开发。
+只做根下aiotbot-knowledge-wifi，main保持空；四个旧聚合Skill不再作为开发分组，hs-knowledge-ingest/hs-knowledge-lint仅是Workflow。节点包、Workflow、领域规则、资产和验收均在FactumCore；使用当前远端，本机安装位置不写进公共config。
 
-## 1. 范围与交付归属
+| 当前票 | 交付 | 依赖 | 状态 |
+|---|---|---|---|
+| [T201](sdd/knowledge-v2/tickets/T201.md) | 契约与运行协议 | 无 | pending |
+| [T202](sdd/knowledge-v2/tickets/T202.md) | 发现与项目绑定 | T201 | pending |
+| [T203](sdd/knowledge-v2/tickets/T203.md) | raw捕获与可恢复快照 | T202 | pending |
+| [T204](sdd/knowledge-v2/tickets/T204.md) | 六决策候选与精确视图 | T203 | pending |
+| [T205](sdd/knowledge-v2/tickets/T205.md) | 真实动作、事务与恢复 | T204 | pending |
+| [T206](sdd/knowledge-v2/tickets/T206.md) | 索引、查询与回归激活 | T205 | pending |
+| [T207](sdd/knowledge-v2/tickets/T207.md) | 维护事件与双水位 | T203, T205, T206 | pending |
+| [T208](sdd/knowledge-v2/tickets/T208.md) | 代码捕获与只读双门禁 | T202, T204, T205 | pending |
+| [T209](sdd/knowledge-v2/tickets/T209.md) | 两个Workflow和节点包 | T202, T203, T204, T205, T206, T207, T208 | pending |
+| [T210](sdd/knowledge-v2/tickets/T210.md) | 单仓跨节点集成与开发交付 | T201, T202, T203, T204, T205, T206, T207, T208, T209 | pending |
+| [T211](sdd/knowledge-v2/tickets/T211.md) | 真实外部环境验收 | T210 | pending |
 
-- 只建设根下的 `aiotbot-knowledge-wifi/`，不创建其他领域目录；业务 `main/` 仍为空。
-- 本仓保存配置、WiFi 原件、治理契约、知识、领域验收与系统文档。四个 Skill 和两个 Workflow 在独立能力仓开发，保持现行 `hs-*` 名称。
-- 首发文档只处理 `docs-raw/{conventions,chips,storys,specs,protocols}/` 已落地文件。文档须真人确认确切 final-view，免代码 lint；代码卡走本地检查与合入只读复验。
-- 目标业务范围为 chip12、chip08、chip07c 的 Host/Device 六 Target 与三 pair；真实路径、构建、宏、版本未提供时保持 unknown。
+## 节点清单与推进顺序
 
-## 2. 模块任务总表
+- `hs-workspace-explore`：绑定项目（T202）。
+- `hs-knowledge-source-capture`：固定来源（T203）。
+- `hs-knowledge-change-plan`：六决策计划（T204）。
+- `hs-knowledge-view-materialize`：物化最终视图（T204）。
+- `hs-knowledge-governance-handoff`：移交治理（T204）。
+- `hs-knowledge-candidate-inspect`：检查候选身份（T205）。
+- `hs-knowledge-confirmation-prepare`：准备真人展示（T205）。
+- `hs-knowledge-confirmation-record`：记录真实动作（T205）。
+- `hs-knowledge-local-check`：代码本地核验（T208）。
+- `hs-knowledge-candidate-revise`：修订或缩窄（T204）。
+- `hs-knowledge-apply`：精确事务落位（T205）。
+- `hs-knowledge-recover`：恢复事务（T205）。
+- `hs-knowledge-index-build`：构建验证和激活索引（T206）。
+- `hs-knowledge-query-regression`：回归候选代（T206）。
+- `hs-knowledge-publish-handoff`：移交发布（T209）。
+- `hs-knowledge-merge-check`：最新代码合入复验（T208）。
+- `hs-knowledge-maintain`：维护与阻断复核（T207）。
+- `hs-knowledge-query`：消费知识（T206）。
 
-表内依赖是模块级关系，具体切片可先做最小闭环，再补全同一模块的剩余能力。
+先完成契约→发现→五raw→六决策视图→真人确认与恢复事务→local索引消费，再按依赖补维护/代码门禁、Workflow及单仓跨节点集成。shared代码卡另需真实merge证明；纯文档不额外执行代码lint。
 
-| 模块 | 当前待做任务 | 主要交付归属 | 前置依赖 | 完成标志 |
-|---|---|---|---|---|
-| M01 契约与运行基础 | 对齐字段、七类卡模板、来源/记录契约、范围与关系规则；固定兼容版本、依赖和统一诊断 | 本仓 `governance/`、`config.yml`；能力仓各 Skill 的接口与依赖锁 | 无；实现前明确能力仓及运行环境 | 合法输入可解析，错版本/缺字段/错范围有明确诊断；未登记事实仍为 unknown |
-| M02 项目发现与绑定 | 实现 `hs-workspace-explore`：代码路径定位项目、读取入口、生成上下文，处理多 checkout、失效登记和切仓 | 能力仓 explore；宿主私有登记；本仓配置与入口 | M01 | 仓外给代码路径可正确绑定并真实加载规则；歧义或入口未读不能冒充已加载 |
-| M03 来源捕获与快照 | 捕获五类 raw 原件及附件，固定字节、版本、提取定位和恢复依据；随后补代码来源快照接口 | 能力仓 ingest；本仓 `docs-raw/`、`.build/`、`logs/evidence/` | M01、M02 | 旧原件可回放；读中变化、缺附件、不可恢复有缺口；原件不被修改 |
-| M04 卡片与六决策候选 | 生成卡片/Claim、六决策计划、影响集、精确 final-view 和交接包；先打通 create/update，再补 merge/split/deprecate/defer | 能力仓 ingest；本仓模板与候选区 | M01、M03 | 生产不改正式知识；ID/关系闭合；每个已枚举候选都有明确处理结果，无遗漏或重复 |
-| M05 真人确认与 stable 落位 | 展示确切视图、收集真实确认；实现受控 apply、写集 CAS、域锁、持久备份/journal、幂等与恢复 | 能力仓 ingest；本仓 `knowledge/`、来源锁、导航和 `logs/` | M04 | 未确认/陈旧证明不落位；文档免代码 lint；中断可恢复，外部新编辑不被覆盖 |
-| M06 代码取证与双门禁 | 固定真实代码/构建/宏/Target，逐 Claim 本地检查；合入时针对最新授权代码只读复验，提供薄 check 包装 | 能力仓 lint、ingest 代码捕获；本仓 `check.py/check.sh`；外部 CI | M02、M03、M04、M05；真实业务输入 | pass/fail/incomplete 分明；无支持证据不能仅凭零违规通过；卡、锁、链接与源码不被门禁修写 |
-| M07 代次索引与知识消费 | 实现 SQLite 建库、验证/回归/激活，local/shared 资格、词面检索、范围过滤、同代精读、溯源与 Search Receipt | 能力仓 query；本仓 `artifacts/` 与检索案例 | M01、M02、M05；local 先行，shared 按审核模式补合入证明，代码另需 M06 | 过滤后按有效 Claim 分数求全局 topK；读卡与索引同代，来源可核，失败保留旧代 |
-| M08 更新影响与持续治理 | 识别 raw/代码变化，登记幂等事件、条件化影响与阻断，形成复核候选并受控恢复，维护扫描/应用两水位 | 能力仓 ingest、query；本仓事件、backlog、复核及索引状态 | M03、M05、M07；代码复核另需 M06 | 更新未完成时受影响 current 结论被阻断；回滚索引不能撤销当前阻断，重复事件不重复应用 |
-| M09 Skill/Workflow 与交付验收 | 随各模块打包 Skill、产物契约和安装说明；编排生产/治理两个 Workflow，完成跨仓、真实宿主及发布接入验收 | 独立能力仓 `skills/`、`workflows/`；本仓 `evals/`；宿主/CI | 基础安装贯穿各模块；完整编排依赖相应能力，最终验收依赖 M01–M08 | 等待/修订/重入不重复 apply；真实人、仓外触发、六 Target、实际合入分别留证，不以合成测试冒充业务验收 |
+每票按失败测试→实现→针对验证/回归→独立审查→范围提交/实际发布推进，证据到位后再更新状态。M01–M09仅在v2模块表用作责任索引，历史v1状态不变。
 
-## 3. 建议推进顺序
+## 验收边界
 
-1. **先定开发基线**：明确独立能力仓、运行环境和发行入口，完成 M01；按当前设计重新对齐 SDD 后再开发，不恢复旧票据的通过状态。
-2. **先打通 raw 最小闭环**：M02 → M03 的 raw 路径 → M04 的 create/update → M05 的真人确认与 stable 落位 → M07 的 local 查询。以真实落地文档跑通全过程。
-3. **补齐生产与治理能力**：完善 M04 六决策与 M08 更新维护，再接 M06 代码取证、六 Target 与两道只读门禁；所需业务输入未提供时如实记录未验收。
-4. **完成编排与交付**：M09 的基本安装和模块测试随开发同步做；能力可用后接完整 Workflow、真实宿主、CI/committer 与 shared 消费验收。
-
-## 4. 开发验收需盯住的边界
-
-- 标题、摘要、别名同样受对应 Claim 的适用性和失效状态约束；不能只过滤正文。
-- 条件过滤会改变分数，必须按最终有效分数求 topK，不能按原排名收够 K 张就停止。
-- 批次候选逐项有终态和理由；零落位也应保留处理结果，不能静默漏项。
-- Git 取证使用受控只读入口，限制 fsmonitor、hooks、外部 diff/textconv 等程序；检查输入前后不变。
-- 人工确认、Schema 通过、模型零 finding、索引成功和真实业务验证分别记录，不互相代替。
-
-## 5. 当前外部前提与后续拆分
-
-- 独立能力仓的地址、本机根和发行方式尚未指定；当前只登记归属，不假定已有可运行包。
-- 真实 WiFi 代码、构建/宏、版本、三 pair 兼容条件、CI 与宿主环境需在对应模块实施前登记。
-- 模块确定后，再为每个最小闭环补齐需求、接口、失败用例、验收记录与提交范围。每个完成模块独立验证、审查和发布，记录知识仓及实际能力包的身份。
+- 首发只接受conventions/chips/storys/specs/protocols已落地raw；网页、sources链接、仓外映射与3ms延期。
+- 真实人确认确切最终字节；user Gate不变成Skill，未签名/Agent/无动作/陈旧/部分接受不apply。
+- 所有卡metadata受Claim资格约束；过滤后重算全局topK，同代read/receipt，输出前复查撤销。
+- 批次逐项终态完整；受控只读Git禁外部执行；代码检查只读且需正向证据。
+- T211真实人/宿主触发/六Target三pair/真实CI合入/外部权限分别留证；缺输入保持pending，不能用合成测试关闭。

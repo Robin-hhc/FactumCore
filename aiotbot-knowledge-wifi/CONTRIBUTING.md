@@ -1,8 +1,8 @@
 # 贡献约定
 
-先读 [AGENTS.md](AGENTS.md) 和[设计入口](docs-llm-wiki/README.md)。当前按主设计 §5.3 调整目录骨架和详细设计，既有 [SDD](docs-llm-wiki/sdd/knowledge-v1/README.md) 原字节与历史状态保留；设计定稿后再重新建立基线，按需求、模块、ticket、失败测试、实现、验证和独立审查推进。历史操作手册不代表现有可运行命令，不用占位程序伪造成功。
+先读 [AGENTS.md](AGENTS.md) 和[设计入口](docs-llm-wiki/README.md)。当前按批准的18节点Skill与两个Workflow实施[knowledge-v2 SDD](docs-llm-wiki/sdd/knowledge-v2/README.md)，按需求、模块、ticket、失败测试、实现、验证和独立审查推进；knowledge-v1原字节与历史状态保留。历史操作手册不代表现有可运行命令，不用占位程序伪造成功。
 
-WiFi 资产只进入根下的 `aiotbot-knowledge-wifi/`，无中间目录，本次不创建其他领域目录。四个 Skill 使用 `hs-workspace-explore`、`hs-knowledge-ingest`、`hs-knowledge-lint`、`hs-knowledge-query` 名称，与两个同名生产、治理 Workflow 一起在独立能力仓维护；FactumCore 不复建其空目录。能力仓根、URL、版本和安装方式未确定时保留 unknown。
+WiFi 资产只进入根下的 `aiotbot-knowledge-wifi/`，无中间目录，本次不创建其他领域目录。18个节点Skill与hs-knowledge-ingest、hs-knowledge-lint两个Workflow 一起在本仓能力目录维护；不恢复旧聚合Skill目录或嵌套.git。能力在FactumCore根目录开发；安装方式和已验证版本如实登记。
 
 原始文档只放 `docs-raw/{conventions,chips,storys,specs,protocols}/`，保留原件及必要附件；`sources/` 的 URL 更新不在首发。知识卡只能经候选和确切 final-view 治理后落入 `knowledge/`。纯文档由真实人确认后 stable，免代码 lint；无回复、超时和 Agent 自报不是同意。代码卡本地只读检查通过后 stable，上库再对最新业务代码只读核验，检查不修卡、锁、链接或源码。
 

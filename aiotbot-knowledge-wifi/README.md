@@ -13,8 +13,8 @@
 | `evals/` | 后续验收案例与运行入口，当前为空 |
 | `artifacts/` | 本地派生索引与报告，生成内容不上库 |
 
-FactumCore 承载业务与知识，`main/` 目前仍为空。四个共享 Skill（`hs-workspace-explore`、`hs-knowledge-ingest`、`hs-knowledge-lint`、`hs-knowledge-query`）以及生产、治理 Workflow 归独立能力仓，本仓已移除旧占位。能力仓根、URL、版本和安装状态尚未提供，不能据此运行生产、治理或查询。
+FactumCore 承载业务、知识与能力源码，`main/` 目前仍为空。18个节点Skill（详设v4列明）在根`skills/common/knowledge/`，两个Workflow在根`workflows/common/knowledge/`，与main同级，统一使用当前远端，不放嵌套`.git`。实际运行、安装和发行版本以knowledge-v2验收记录为准。
 
-本轮只完善目录和设计，保留既有 SDD 原字节，后续再重新基线并按任务开发。旧实现、测试和根开发工具已归档，历史成绩只属于当时版本，详见[历史布局记录](docs-llm-wiki/sdd/knowledge-v1/records/workspace-layout-20261020.md)。领域内的 `check.py/check.sh` 仍为待实现检查入口，不生成空壳通过检查。
+本轮按knowledge-v2进入开发；knowledge-v1原字节保留，新节点交付以当前记录为准。旧实现、测试和根开发工具的归档与历史成绩只属于当时版本，详见[历史布局记录](docs-llm-wiki/sdd/knowledge-v1/records/workspace-layout-20261020.md)。领域内的`check.py/check.sh`按当前票据提供薄入口，不以空壳或旧报告宣称通过。
 
-先读 [AGENTS.md](AGENTS.md)、[设计入口](docs-llm-wiki/README.md)与[贡献约定](CONTRIBUTING.md)。六 Target/三 pair 是逻辑登记；业务源码、宏、构建与实际版本在外层 `config.yml` 未提供时保持 unknown。
+先读 [AGENTS.md](AGENTS.md)、[设计入口](docs-llm-wiki/README.md)、[当前SDD](docs-llm-wiki/sdd/knowledge-v2/README.md)与[贡献约定](CONTRIBUTING.md)。六 Target/三 pair 是逻辑登记；业务源码、宏、构建与实际版本在外层 `config.yml` 未提供时保持 unknown。

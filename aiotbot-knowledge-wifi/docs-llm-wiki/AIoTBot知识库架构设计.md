@@ -14,6 +14,32 @@ aiotbot-knowledge知识库仓目录结构如下所示。
   - .build/ · logs/ · evals/ · artifacts/ · docs-llm-wiki/：配套支撑层
 
 ```
+skills/
+└── common/
+    └── knowledge/
+        ├── hs-workspace-explore/  # 绑定项目
+        ├── hs-knowledge-source-capture/  # 固定来源
+        ├── hs-knowledge-change-plan/  # 六决策计划
+        ├── hs-knowledge-view-materialize/  # 物化最终视图
+        ├── hs-knowledge-governance-handoff/  # 移交治理
+        ├── hs-knowledge-candidate-inspect/  # 检查候选身份
+        ├── hs-knowledge-confirmation-prepare/  # 准备真人展示
+        ├── hs-knowledge-confirmation-record/  # 记录真实动作
+        ├── hs-knowledge-local-check/  # 代码本地核验
+        ├── hs-knowledge-candidate-revise/  # 修订或缩窄
+        ├── hs-knowledge-apply/  # 精确事务落位
+        ├── hs-knowledge-recover/  # 恢复事务
+        ├── hs-knowledge-index-build/  # 构建验证和激活索引
+        ├── hs-knowledge-query-regression/  # 回归候选代
+        ├── hs-knowledge-publish-handoff/  # 移交发布
+        ├── hs-knowledge-merge-check/  # 最新代码合入复验
+        ├── hs-knowledge-maintain/  # 维护与阻断复核
+        └── hs-knowledge-query/  # 消费知识
+workflows/
+└── common/
+    └── knowledge/
+        ├── hs-knowledge-ingest/  # 生产：来源到候选与治理交接
+        └── hs-knowledge-lint/    # 治理：分流确认/检查、事务、索引与发布交接
 AGENTS.md                            # 入口：领域/流程路由、卡契约指针、config.yml 说明
 config.yml                           # 代码仓 ↔ 架构元素 ↔ 领域知识实体 ↔ 符号映射
 main/                                # 真实代码工作区
@@ -77,22 +103,11 @@ aiotbot-knowledge-wifi/          # WiFi 领域知识仓；以下展开内部结�
 └── artifacts/                   # 本地派生索引、验证报告，Git 忽略
 ```
 
-knowledge相关skills和workflows（实际实现在skill仓内）：
+knowledge相关节点Skill和Workflow（源码在本仓，与main同级）：
 
-```
-skills/
-└── common/                          # 后续有需要可以下沉进入各领域
-    └── knowledge/
-        ├── hs-workspace-explore/    # 全局入口：按代码路径发现、绑定知识入口
-        ├── hs-knowledge-ingest/        # Agent 建卡、融合和统一收尾流程
-        ├── hs-knowledge-lint/          # 结构、来源检查与语义复核流程
-        └── hs-knowledge-query/         # 初版 SQLite 词面检索与索引工具
-workflows/
-└── common/                          # 后续有需要可以下沉进入各领域
-    └── knowledge/
-        ├── hs-knowledge-ingest/        # Agent 建卡、融合和统一收尾流程工作流
-        └── hs-knowledge-lint/          # 结构、来源检查与语义复核流程工作流
-```
+上述skills/和workflows/直接位于FactumCore根，与main同级，使用当前远端且不放嵌套.git。18个Skill各负责一个可复用节点动作；`hs-knowledge-ingest`、`hs-knowledge-lint`只作为两个Workflow名称，不再注册同名聚合Skill。真实人工批准保留user Gate，由准备/记录Skill桥接可信动作，不能用Skill代替用户决定。
+
+
 
 # 11 AIoTBot知识库架构
 
@@ -158,7 +173,7 @@ flowchart TB
     subgraph S4["④ 治理与工具层"]
         direction LR
         D1["governance/<br />templates · schemas · contracts · specs · sources.lock.yaml"]
-        D2["skills/common/knowledge<br />hs-knowledge-ingest · hs-knowledge-lint · hs-knowledge-query"]
+        D2["skills/common/knowledge<br />节点Skill：source-capture · change-plan · apply · query 等18项"]
         D3["workflows/common/knowledge<br />hs-knowledge-ingest · hs-knowledge-lint"]
     end
 
@@ -211,18 +226,32 @@ device 侧 + host 侧真实代码。`.codegraph/` 是代码图谱索引，**本�
 
 参与链路：生产链路（代码事实作为来源材料之一）+ 消费链路（codegraph 交叉印证）。
 
-#### `skills/common/knowledge`/ —— 全局入口与三个流程技能
+#### `skills/common/knowledge`/ —— 全局入口与节点级能力
 
 知识库的"操作说明书"，不装任何领域事实：
 
 | 技能 | 职责 | 一句话 |
 |------|------|--------|
-| `hs-workspace-explore/` | 全局发现与绑定项目视图、加载知识入口 | 先接入 |
-| `hs-knowledge-ingest/` | Agent 建卡、融合和统一收尾流程 | 怎么进 |
-| `hs-knowledge-lint/` | 结构、来源检查与语义复核流程 | 怎么验 |
-| `hs-knowledge-query/` | 初版 SQLite 词面检索与索引工具 | 怎么找 |
+| `hs-workspace-explore/` | 绑定项目 | bind_project |
+| `hs-knowledge-source-capture/` | 固定来源 | capture_raw |
+| `hs-knowledge-change-plan/` | 六决策计划 | plan_change |
+| `hs-knowledge-view-materialize/` | 物化最终视图 | materialize_view |
+| `hs-knowledge-governance-handoff/` | 移交治理 | governance_handoff |
+| `hs-knowledge-candidate-inspect/` | 检查候选身份 | inspect_candidate |
+| `hs-knowledge-confirmation-prepare/` | 准备真人展示 | prepare_confirmation |
+| `hs-knowledge-confirmation-record/` | 记录真实动作 | record_confirmation |
+| `hs-knowledge-local-check/` | 代码本地核验 | local_check |
+| `hs-knowledge-candidate-revise/` | 修订或缩窄 | revise_candidate |
+| `hs-knowledge-apply/` | 精确事务落位 | apply_view |
+| `hs-knowledge-recover/` | 恢复事务 | recover_transaction |
+| `hs-knowledge-index-build/` | 构建验证和激活索引 | rebuild_index |
+| `hs-knowledge-query-regression/` | 回归候选代 | query_regression |
+| `hs-knowledge-publish-handoff/` | 移交发布 | publish_handoff |
+| `hs-knowledge-merge-check/` | 最新代码合入复验 | verify_merge |
+| `hs-knowledge-maintain/` | 维护与阻断复核 | maintain_knowledge |
+| `hs-knowledge-query/` | 消费知识 | query_knowledge |
 
-参与链路：**三条链路各由一个技能执行**——hs-knowledge-ingest 跑生产、hs-knowledge-lint 跑治理、hs-knowledge-query 跑消费。
+参与链路：生产、治理由两个Workflow编排多个节点Skill；消费由hs-knowledge-query及来源/索引相关节点能力完成。多个节点可复用同一Skill，节点数不等于新增实现份数。
 
 #### `workflows/common/knowledge`/ —— 增量更新与治理工作流
 
@@ -237,7 +266,7 @@ device 侧 + host 侧真实代码。`.codegraph/` 是代码图谱索引，**本�
 
 #### aiot-knowledge/ —— 领域知识仓
 
-一个领域一个仓（platform / bgle / gnss / slp / radar / wifi），**内部目录完全同构**，技能跨仓复用零适配。按域分仓的理由见"AIoTBot目标"章：领域知识差异大、保密要求不同；代码与知识放一个仓会有权限冲突和一致性难题，独立建设各自管内容和权限。
+本次只建设aiotbot-knowledge-wifi，业务代码槽位、知识及节点Skill/Workflow在FactumCore同一Git仓开发和发布；不建立其他领域或中间容器。目录和忽略规则不构成ACL，资料/安装发行仍按实际授权处理。
 
 参与链路：**三条链路全程**——每个领域仓内部跑完整的"生产 → 治理上库 → 消费"。
 
@@ -385,7 +414,7 @@ flowchart LR
 
 ### 链路二：治理上库 —— lint 门禁
 
-输入是 `.build/` 里的候选卡，输出是**合入 Git 的 stable 卡**。`hs-knowledge-lint` 技能定义流程，`governance/` 提供契约，`check.py / check.sh` 是执行入口。两道门禁、一套契约——本地门禁查 `.build/` 候选卡，CI 门禁在上库合入时全库重校验：
+输入是 `.build/` 里的候选卡，输出是**合入 Git 的 stable 卡**。`hs-knowledge-lint` Workflow编排节点能力并定义流程，`governance/` 提供契约，`check.py / check.sh` 是执行入口。两道门禁、一套契约——本地门禁查 `.build/` 候选卡，CI 门禁在上库合入时全库重校验：
 
 ```mermaid
 flowchart LR

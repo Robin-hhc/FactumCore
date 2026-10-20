@@ -728,6 +728,24 @@ def execute(ctx):
             raise NodeError(
                 "NO_ELIGIBLE_CLAIMS", "Card has no eligible claims", blocked=True
             )
+        selected_source_keys = {
+            digest(source)
+            for claim in card["claims"]
+            if claim["id"] in eligible
+            for source in claim["source_records"]
+        }
+        sources = [
+            source
+            for source in sources
+            if digest(source["source_ref"]) in selected_source_keys
+        ]
+        gaps = [
+            gap
+            for gap in gaps
+            if not isinstance(gap, dict)
+            or not gap.get("claim_id")
+            or gap["claim_id"] in eligible
+        ]
         data = {
             "card_id": card["metadata"]["id"],
             "claims": [

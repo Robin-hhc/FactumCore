@@ -2,6 +2,9 @@
 
 import importlib.util
 from pathlib import Path
+import copy
+
+import yaml
 
 
 ROOT = Path(__file__).resolve().parents[5]
@@ -177,3 +180,79 @@ def test_formal_search_receipt_keeps_generation_and_rejects_changed_scope_or_eva
     )["data"]
     assert history_read["generation_ref"] == history_search["generation_ref"]
     assert "explicit synthetic rule" in history_read["claims"][0]["text"]
+
+
+def test_receipt_read_claim_subset_excludes_other_claim_source_text(tmp_path):
+    p = FIXTURE.Pipeline(tmp_path)
+    first = p.write(
+        "docs-raw/specs/first.md", b"# First\nCapture first synthetic statement.\n"
+    )
+    second = p.write(
+        "docs-raw/specs/second.md", b"# Second\nEXCLUDED_C2_SOURCE_ONLY.\n"
+    )
+    bundle_ref = p.call(
+        "knowledge-source-capture",
+        {
+            "operation_id": "subset-create",
+            "source_path": first,
+            "source_id": "first",
+            "attachments": [second],
+        },
+    )["data"]["bundle_ref"]
+    bundle = p.record(bundle_ref)
+    _, front, body = p.card("two-claims", bundle).decode().split("---", 2)
+    metadata = yaml.safe_load(front)
+    snapshot = bundle["snapshots"][1]
+    metadata["sources"].append(
+        {
+            "evidence_ref": "e2",
+            "source_id": snapshot["source_id"],
+            "snapshot_id": snapshot["snapshot_id"],
+            "locator": {"kind": "lines", "start": 1, "end": 2},
+        }
+    )
+    second_claim = copy.deepcopy(metadata["claims"][0])
+    second_claim.update(id="c2", text_ref="#c2", source_refs=["e2"])
+    metadata["claims"].append(second_claim)
+    body += '\n<a id="c2"></a>\nExcluded second synthetic statement.\n'
+    card_bytes = (
+        "---\n" + yaml.safe_dump(metadata, sort_keys=False) + "---" + body
+    ).encode()
+    view_ref = p.view("subset-create", bundle_ref, "two-claims", card_bytes)
+    p.apply("subset-create", view_ref)
+    generation = p.call("knowledge-index-build", {"operation_id": "subset-build"})[
+        "data"
+    ]
+    p.call(
+        "knowledge-index-build",
+        {
+            "operation_id": "subset-activate",
+            "generation_ref": generation["generation_ref"],
+            "expected_active": None,
+        },
+        "activate",
+    )
+    search = p.call(
+        "knowledge-query",
+        {"operation_id": "subset-search", "query": "capture"},
+        "search",
+    )["data"]
+    assert set(search["matches"][0]["claim_ids"]) == {"c1", "c2"}
+    read = p.call(
+        "knowledge-query",
+        {
+            "operation_id": "subset-read",
+            "receipt_ref": search["receipt_ref"],
+            "card_id": "two-claims",
+            "claim_ids": ["c1"],
+        },
+        "read",
+    )["data"]
+    assert {claim["id"] for claim in read["claims"]} == {"c1"}
+    assert {source["source_ref"]["source_id"] for source in read["sources"]} == {
+        "first"
+    }
+    assert all(
+        "EXCLUDED_C2_SOURCE_ONLY" not in source.get("text", "")
+        for source in read["sources"]
+    )

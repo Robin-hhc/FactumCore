@@ -27,7 +27,7 @@ def current_digest(ctx, path):
     return digest(target.read_bytes()) if target.is_file() else None
 
 
-def invoke_checker(ctx, request):
+def invoke_checker(ctx, request, purpose="current", allow_merge=False, card_path=None):
     spec = ctx.catalog.get("skills", {}).get("hs-knowledge-local-check")
     if not spec:
         raise Blocked("trusted code checker is not installed")
@@ -40,14 +40,16 @@ def invoke_checker(ctx, request):
     ):
         raise Invalid("code checker package identity mismatch")
     op = ctx.operation(request)
-    req_ref = f".build/operations/{op}/apply-code-proof-request.json"
-    request_bytes = canonical(
-        {
-            "operation_id": op,
-            "view_ref": request["view_ref"],
-            "proof_ref": request["proof_ref"],
-        }
-    )
+    child_request = {
+        "operation_id": op,
+        "view_ref": request["view_ref"],
+        "proof_ref": request["proof_ref"],
+        "purpose": purpose,
+    }
+    if card_path:
+        child_request["card_path"] = card_path
+    request_bytes = canonical(child_request)
+    req_ref = f".build/operations/{op}/apply-code-proof-request-{digest(child_request)[:24]}.json"
     target = ctx.path(req_ref)
     if target.exists() and target.read_bytes() != request_bytes:
         raise Blocked("code proof request already frozen")
@@ -82,11 +84,17 @@ def invoke_checker(ctx, request):
         != spec["package_digest"]
         or response.get("status") != "ok"
         or response.get("data", {}).get("proof_verified") is not True
+        or response.get("data", {}).get("purpose") != purpose
+        or (not allow_merge and response.get("data", {}).get("mode") != "local")
+        or response.get("data", {}).get("card_path") != card_path
     ):
         raise Blocked("code proof is incomplete or unsupported")
+    return response["data"]
 
 
-def validate_proof(ctx, request, view):
+def validate_proof(
+    ctx, request, view, purpose="current", allow_merge=False, card_path=None
+):
     proof_ref = request.get("proof_ref")
     ctx.path(
         proof_ref,
@@ -125,9 +133,11 @@ def validate_proof(ctx, request, view):
             raise Blocked("human rejected this view")
     elif view.get("review_mode") == "code_gate":
         if (
-            proof.get("record_kind") != "local_check"
+            proof.get("record_kind")
+            not in (("local_check", "merge_check") if allow_merge else ("local_check",))
             or proof.get("status") != "passed"
-            or proof.get("mode") != "local"
+            or proof.get("mode")
+            not in (("local", "merge") if allow_merge else ("local",))
         ):
             raise Blocked("code view requires a passing local code proof")
         claims = proof.get("claims")
@@ -136,7 +146,7 @@ def validate_proof(ctx, request, view):
             for row in claims
         ):
             raise Blocked("every code Claim requires positive evidence")
-        invoke_checker(ctx, request)
+        invoke_checker(ctx, request, purpose, allow_merge, card_path)
     else:
         raise Invalid("unknown review mode")
     return proof
@@ -231,7 +241,7 @@ def preflight_recovery(ctx, journal):
             raise Blocked("external edit preserved; recovery conflict: " + row["path"])
 
 
-def validate_journal(ctx, journal, op):
+def validate_journal(ctx, journal, op, purpose="current", card_path=None):
     """A resealed Agent-written journal is not authority to mutate files."""
     if (
         journal.get("record_kind") != "transaction_journal"
@@ -244,7 +254,7 @@ def validate_journal(ctx, journal, op):
         "proof_ref": journal.get("proof_ref"),
     }
     view = checked_view(ctx, request)
-    proof = validate_proof(ctx, request, view)
+    proof = validate_proof(ctx, request, view, purpose=purpose, card_path=card_path)
     if view["digest"] != journal.get("view_digest") or proof["digest"] != journal.get(
         "proof_digest"
     ):
@@ -350,11 +360,16 @@ def mutate(ctx, journal, fault_after=None):
 def execute(ctx, request, action="run"):
     op = ctx.operation(request)
     if action == "verify-result":
+        purpose = request.get("purpose", "current")
+        if purpose not in ("current", "historical"):
+            raise Invalid("unknown content verification purpose")
         result_ref = request.get("apply_result_ref")
         ctx.path(result_ref, (f"logs/operations/{op}",))
         result = ctx.read(result_ref)
         journal = ctx.read(f"logs/operations/{op}/journal.json")
-        view, proof = validate_journal(ctx, journal, op)
+        view, proof = validate_journal(
+            ctx, journal, op, purpose="historical", card_path=request.get("card_path")
+        )
         if (
             journal.get("status") != "committed"
             or journal.get("result_ref") != result_ref
@@ -373,12 +388,44 @@ def execute(ctx, request, action="run"):
         ):
             raise Invalid("apply result write set was changed")
         eligible, historical = [], []
+        current_proof_ref = (
+            request.get("current_code_proof_ref") or journal["proof_ref"]
+        )
+        if purpose == "current" and view["review_mode"] == "code_gate":
+            validate_proof(
+                ctx,
+                {
+                    "operation_id": op,
+                    "view_ref": journal["view_ref"],
+                    "proof_ref": current_proof_ref,
+                },
+                view,
+                purpose="current",
+                allow_merge=True,
+                card_path=request.get("card_path"),
+            )
+        source_overlay = None
+        for write in view["writes"]:
+            if write["path"] == "governance/sources.lock.yaml":
+                source_overlay = (
+                    ctx.domain.load_yaml(
+                        base64.b64decode(write["bytes_b64"], validate=True)
+                    )
+                    if ctx.domain
+                    else None
+                )
         for row in view["writes"]:
             if not row["path"].startswith("knowledge/") or pathlib.PurePosixPath(
                 row["path"]
             ).name in ("index.md", "AGENTS.md", "README.md"):
                 continue
-            if current_digest(ctx, row["path"]) != row["final_digest"]:
+            if request.get("card_path") and row["path"] != request["card_path"]:
+                continue
+            actual_matches = (
+                purpose == "historical"
+                or current_digest(ctx, row["path"]) == row["final_digest"]
+            )
+            if purpose == "current" and not actual_matches:
                 continue
             if ctx.domain:
                 knowledge = importlib.import_module(
@@ -387,24 +434,45 @@ def execute(ctx, request, action="run"):
                 sources = importlib.import_module(
                     ctx.domain.__package__ + ".source_resources"
                 )
-                card = knowledge.parse_card(
-                    ctx.path(row["path"]).read_bytes(), row["path"], ctx.rules
+                card_raw = (
+                    base64.b64decode(row["bytes_b64"], validate=True)
+                    if purpose == "historical"
+                    else ctx.path(row["path"]).read_bytes()
                 )
-                knowledge.validate_card(card, None, ctx.rules)
-                source_lock = sources.read_source_lock(ctx.root)
+                card_rules = {
+                    **ctx.rules,
+                    **(
+                        {"source_lock": source_overlay}
+                        if purpose == "historical" and source_overlay
+                        else {}
+                    ),
+                }
+                card = knowledge.parse_card(card_raw, row["path"], card_rules)
+                knowledge.validate_card(card, None, card_rules)
+                source_lock = (
+                    source_overlay
+                    if purpose == "historical" and source_overlay
+                    else sources.read_source_lock(ctx.root)
+                )
                 for ref in card["metadata"]["sources"]:
                     snapshot = sources.validate_source_ref(ref, source_lock)
                     sources.recover_snapshot(ctx.root, snapshot)
-                if card["metadata"]["lifecycle"] == "deprecated":
+                if (
+                    purpose == "historical"
+                    or card["metadata"]["lifecycle"] == "deprecated"
+                ):
                     historical.append(
                         {"path": row["path"], "sha256": row["final_digest"]}
                     )
                     continue
-            eligible.append({"path": row["path"], "sha256": row["final_digest"]})
+            if purpose == "historical":
+                historical.append({"path": row["path"], "sha256": row["final_digest"]})
+            else:
+                eligible.append({"path": row["path"], "sha256": row["final_digest"]})
         if request.get("card_path") and not any(
             row["path"] == request["card_path"]
             and row["sha256"] == request.get("card_digest")
-            for row in eligible
+            for row in (historical if purpose == "historical" else eligible)
         ):
             raise Blocked(
                 "requested card has no current authenticated exact-content eligibility"
@@ -412,11 +480,15 @@ def execute(ctx, request, action="run"):
         return {
             "result_verified": True,
             "verification_scope": "authenticated_content_eligibility",
+            "purpose": purpose,
             "eligible_files": eligible,
             "historical_files": historical,
             "view_ref": journal["view_ref"],
             "view_digest": view["digest"],
             "proof_ref": journal["proof_ref"],
+            "current_code_proof_ref": current_proof_ref
+            if purpose == "current" and view["review_mode"] == "code_gate"
+            else None,
             "verification_tier": proof.get("verification_tier", "code_gate"),
             "phase": "verified",
         }

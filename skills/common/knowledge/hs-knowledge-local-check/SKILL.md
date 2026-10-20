@@ -11,3 +11,5 @@ Use a fresh workflow attempt ID when retrying with new prerequisite evidence. A 
 
 For final deprecated cards, a trusted reviewer may sign each Claim as `retired` with the exact deprecation reason and replacement mapping. Validate its original immutable evidence; do not require an obsolete assertion to remain supported by current code. Stable cards still require `supported` for every Claim. Retired cards never receive current-content eligibility.
 
+Public `verify-proof` accepts local and merge proofs and an explicit `purpose`. Historical verification checks the signed original context and retained original/checked snapshots without reading today's checkout. Current verification rechecks the registered current code identity. A delegated merge handoff must resolve to the exact signed engine proof. Historical qualification cannot authorize apply.
+

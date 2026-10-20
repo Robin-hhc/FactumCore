@@ -366,6 +366,7 @@ class PublicCodeGateTests(unittest.TestCase):
         request = request or {
             "operation_id": "op",
             "view_ref": self.view_ref,
+            "context_ref": self.context_ref,
             "semantic_report_ref": self.report_ref,
         }
         inp, out = (
@@ -450,6 +451,17 @@ class PublicCodeGateTests(unittest.TestCase):
         )
 
     def test_changed_latest_code_can_pass_with_independent_signed_check_snapshot(self):
+        checked = self.invoke()
+        applied = self.invoke(
+            skill="hs-knowledge-apply",
+            request={
+                "operation_id": "op",
+                "view_ref": self.view_ref,
+                "proof_ref": checked["data"]["local_check_ref"],
+            },
+        )
+        card_path = "knowledge/flows/fixture-code-flow.md"
+        card_digest = digest((self.root / card_path).read_bytes())
         newer = b"/* a harmless fixture comment */\n" + self.source
         self.code.joinpath("src/wifi.c").write_bytes(newer)
         self.git("add", "src/wifi.c")
@@ -471,6 +483,7 @@ class PublicCodeGateTests(unittest.TestCase):
         )
         context["target"]["revision"] = latest
         context["build_evidence"]["source_revision"] = latest
+        self.context_ref = ".build/operations/op/latest-context.json"
         self.save(self.context_ref, seal(context))
         self.evidence[0]["evidence"][0]["checked_snapshot"] = {
             "repo_id": "wifi-code",
@@ -481,6 +494,7 @@ class PublicCodeGateTests(unittest.TestCase):
             "commit": latest,
             "bytes": len(newer),
         }
+        self.report_ref = ".build/operations/op/latest-report.json"
         self.sign_report("merge")
         frozen = {
             ref: (self.root / ref).read_bytes()
@@ -500,6 +514,79 @@ class PublicCodeGateTests(unittest.TestCase):
             ).read_bytes(),
             newer,
         )
+        qualification = {
+            "operation_id": "op",
+            "apply_result_ref": applied["data"]["apply_result_ref"],
+            "current_code_proof_ref": result["data"]["merge_check_ref"],
+            "card_path": card_path,
+            "card_digest": card_digest,
+        }
+        current = self.invoke(
+            skill="hs-knowledge-apply", action="verify-result", request=qualification
+        )
+        self.assertEqual(
+            current["data"]["eligible_files"],
+            [{"path": card_path, "sha256": card_digest}],
+        )
+        self.code.joinpath("src/wifi.c").write_bytes(b"/* another change */\n" + newer)
+        self.git("add", "src/wifi.c")
+        self.git(
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "-qm",
+            "a later unchecked commit",
+        )
+        self.invoke(
+            skill="hs-knowledge-apply",
+            action="verify-result",
+            request=qualification,
+            expected=3,
+        )
+        (self.root / card_path).write_bytes(b"a later working-tree replacement")
+        history = self.invoke(
+            skill="hs-knowledge-apply",
+            action="verify-result",
+            request={**qualification, "purpose": "historical"},
+        )
+        self.assertEqual(history["data"]["eligible_files"], [])
+        self.assertEqual(
+            history["data"]["historical_files"],
+            [{"path": card_path, "sha256": card_digest}],
+        )
+
+    def test_historical_purpose_cannot_bypass_current_apply_gate(self):
+        checked = self.invoke()
+        self.code.joinpath("src/wifi.c").write_bytes(
+            b"int fixture_wifi_ready(void) { return 2; }\n"
+        )
+        self.git("add", "src/wifi.c")
+        self.git(
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "-qm",
+            "changed before apply",
+        )
+        self.invoke(
+            skill="hs-knowledge-apply",
+            request={
+                "operation_id": "op",
+                "view_ref": self.view_ref,
+                "proof_ref": checked["data"]["local_check_ref"],
+                "purpose": "historical",
+            },
+            expected=3,
+        )
+        self.assertFalse((self.root / "knowledge/flows/fixture-code-flow.md").exists())
 
     def test_signed_retirement_applies_without_claiming_obsolete_code_is_current(self):
         checked = self.invoke()

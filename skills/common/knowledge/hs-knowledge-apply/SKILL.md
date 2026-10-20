@@ -9,3 +9,5 @@ The public CLI supports `run`, `inspect`, `resume`, `rollback` through `--action
 
 The OS lock coordinates cooperating writers; it does not make directories an access-control boundary. See [artifact contract](artifacts/result.yaml) for durable output. Fault injection is available only in catalog-pinned synthetic fixture roots.
 
+`--action verify-result` verifies signed content eligibility. With `purpose: historical`, it checks the original exact view and retained evidence, returns only `historical_files`, and never promotes old content to current. The current path also requires actual card bytes; a fresh `current_code_proof_ref` may supply a verified latest local/merge code check without rewriting the original card or source lock. Actual apply always requires a current local proof, regardless of a payload purpose field.
+

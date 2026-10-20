@@ -251,6 +251,7 @@ def claims_and_sources(ctx, view):
                 raise Invalid("duplicate Claim in code view")
             claims[key] = {
                 **claim,
+                "card_path": row["path"],
                 "card_lifecycle": card["metadata"]["lifecycle"],
                 "replacement": card["metadata"].get("replacement") or [],
                 "deprecation_reason": card["metadata"].get("deprecation_reason"),
@@ -311,7 +312,67 @@ def verify_report(ctx, report, view, context, mode):
     ) else "authenticated_code_reviewer"
 
 
-def evaluate(ctx, request, view, mode, report_override=None, record_snapshots=False):
+def frozen_identity(ctx, context, mode):
+    """Validate persisted signed context/evidence without reading today's checkout."""
+    target, build, repos = (
+        context.get("target"),
+        context.get("build_evidence"),
+        context.get("repos"),
+    )
+    if (
+        not isinstance(target, dict)
+        or not isinstance(build, dict)
+        or not isinstance(repos, dict)
+        or not repos
+        or build.get("profile") != target.get("build_profile")
+        or build.get("source_revision") != target.get("revision")
+        or not re.fullmatch(r"[0-9a-f]{64}", str(build.get("macro_digest", "")))
+    ):
+        raise Incomplete("historical context/build identity is incomplete")
+    result = {
+        "repos": {},
+        "target": target,
+        "build_files": {},
+        "macro_digest": build["macro_digest"],
+    }
+    if not build.get("artifacts"):
+        raise Incomplete("historical build evidence is missing")
+    for item in build["artifacts"]:
+        raw = ctx.path(item.get("path"), ("logs/evidence",)).read_bytes()
+        if digest(raw) != item.get("sha256"):
+            raise Incomplete("historical build evidence bytes changed")
+        result["build_files"][item["path"]] = item["sha256"]
+    for repo_id, item in repos.items():
+        if (
+            not isinstance(item.get("files"), dict)
+            or not item["files"]
+            or not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", str(item.get("head", "")))
+        ):
+            raise Incomplete("historical repository manifest is incomplete")
+        for relative, expected in item["files"].items():
+            safe_path(ctx.root, relative)
+            if not re.fullmatch(r"[0-9a-f]{64}", str(expected)):
+                raise Incomplete("historical code byte identity is incomplete")
+        result["repos"][repo_id] = {
+            "root": str(pathlib.Path(item["root"])),
+            "head": item["head"],
+            "files": item["files"],
+            "checked_files_dirty": bool(item.get("dirty"))
+            if mode == "local"
+            else False,
+        }
+    return result
+
+
+def evaluate(
+    ctx,
+    request,
+    view,
+    mode,
+    report_override=None,
+    record_snapshots=False,
+    historical=False,
+):
     context_ref = request.get("context_ref") or view.get("context_ref")
     if not context_ref:
         raise Incomplete("fixed real code context is missing")
@@ -324,12 +385,23 @@ def evaluate(ctx, request, view, mode, report_override=None, record_snapshots=Fa
     if (
         context.get("record_kind") != "project_context"
         or context.get("state") != "loaded"
-        or pathlib.Path(context.get("knowledge_root", "")).resolve() != ctx.root
+        or (
+            not historical
+            and pathlib.Path(context.get("knowledge_root", "")).resolve() != ctx.root
+        )
     ):
         raise Incomplete("code context is not a project context")
-    config, policy, config_raw = read_configuration(ctx, context)
-    before = code_identity(ctx, context, config, policy, mode)
+    if historical:
+        before = frozen_identity(ctx, context, mode)
+    else:
+        config, policy, config_raw = read_configuration(ctx, context)
+        before = code_identity(ctx, context, config, policy, mode)
     claims, source_lock, resources = claims_and_sources(ctx, view)
+    selected_card = request.get("card_path")
+    if selected_card and selected_card not in {
+        claim["card_path"] for claim in claims.values()
+    }:
+        raise Invalid("requested card is not in the signed code view")
     report_ref = request.get("semantic_report_ref")
     if report_override is None and not report_ref:
         raise Incomplete("positive signed semantic evidence is missing")
@@ -375,6 +447,9 @@ def evaluate(ctx, request, view, mode, report_override=None, record_snapshots=Fa
                 )
         elif row.get("status") != "supported":
             raise Failed("semantic reviewer did not support every Claim")
+        if selected_card and claims[key]["card_path"] != selected_card:
+            verified_claims.append(row)
+            continue
         evidence = row.get("evidence")
         if not isinstance(evidence, list) or not evidence:
             raise Incomplete("zero findings do not constitute positive evidence")
@@ -431,15 +506,21 @@ def evaluate(ctx, request, view, mode, report_override=None, record_snapshots=Fa
                         raise Incomplete(
                             "checked snapshot is not bound to the latest authorized context"
                         )
-                    source_path = safe_path(repo["root"], relative)
-                    current = (
-                        git_read(
-                            repo["root"],
-                            ["cat-file", "blob", repo["head"] + ":" + relative],
-                        )
-                        if mode == "merge"
-                        else source_path.read_bytes()
+                    recovery_ref = (
+                        "logs/evidence/checked-code/" + checked["sha256"] + ".bin"
                     )
+                    if historical:
+                        current = ctx.path(recovery_ref).read_bytes()
+                    else:
+                        source_path = safe_path(repo["root"], relative)
+                        current = (
+                            git_read(
+                                repo["root"],
+                                ["cat-file", "blob", repo["head"] + ":" + relative],
+                            )
+                            if mode == "merge"
+                            else source_path.read_bytes()
+                        )
                     location = checked.get("locator")
                     if (
                         not isinstance(location, dict)
@@ -477,10 +558,17 @@ def evaluate(ctx, request, view, mode, report_override=None, record_snapshots=Fa
         if not code_support:
             raise Incomplete("code Claims require positive code-snapshot support")
         verified_claims.append(row)
-    after = code_identity(ctx, context, config, policy, mode)
+    after = (
+        frozen_identity(ctx, context, mode)
+        if historical
+        else code_identity(ctx, context, config, policy, mode)
+    )
     if (
         before != after
-        or (ctx.root.parent / "config.yml").read_bytes() != config_raw
+        or (
+            not historical
+            and (ctx.root.parent / "config.yml").read_bytes() != config_raw
+        )
         or ctx.read(context_ref)["digest"] != context["digest"]
         or checked_view(ctx, request)["digest"] != view["digest"]
     ):
@@ -506,10 +594,29 @@ def local_check(ctx, request, action="run"):
     if action == "verify-proof":
         ctx.path(request.get("proof_ref"), (f"logs/operations/{op}",))
         proof = ctx.read(request.get("proof_ref"))
+        if proof.get("delegated_proof_ref"):
+            delegated_ref = proof["delegated_proof_ref"]
+            ctx.path(delegated_ref, (f"logs/operations/{op}",))
+            delegated = ctx.read(delegated_ref)
+            if (
+                proof.get("record_kind") != "merge_check"
+                or proof.get("mode") != "merge"
+                or proof.get("status") != "passed"
+                or proof.get("view_digest") != view["digest"]
+                or delegated.get("digest") != proof.get("delegated_proof_digest")
+                or delegated.get("claims") != proof.get("claims")
+            ):
+                raise Invalid("merge handoff differs from its exact engine proof")
+            proof = delegated
+        mode = proof.get("mode")
+        purpose = request.get("purpose", "current")
+        if purpose not in ("current", "historical"):
+            raise Invalid("unknown proof purpose")
         if (
-            proof.get("record_kind") != "local_check"
+            proof.get("record_kind")
+            != ("merge_check" if mode == "merge" else "local_check")
             or proof.get("status") != "passed"
-            or proof.get("mode") != "local"
+            or mode not in ("local", "merge")
             or proof.get("view_digest") != view["digest"]
         ):
             raise Blocked("proof is not a passing local check for this view")
@@ -517,19 +624,25 @@ def local_check(ctx, request, action="run"):
             ctx,
             {**request, "context_ref": proof.get("context_ref")},
             view,
-            "local",
+            mode,
             proof.get("semantic_report"),
+            historical=purpose == "historical",
         )
         if (
             verified["claims"] != proof.get("claims")
             or verified["context_digest"] != proof.get("context_digest")
             or verified["code_identity"] != proof.get("code_identity")
-            or verified["checked_snapshots"] != proof.get("checked_snapshots", [])
+            or any(
+                snapshot not in proof.get("checked_snapshots", [])
+                for snapshot in verified["checked_snapshots"]
+            )
         ):
             raise Invalid("code proof differs from current authenticated evidence")
         return {
             "proof_verified": True,
-            "mode": "local",
+            "mode": mode,
+            "purpose": purpose,
+            "card_path": request.get("card_path"),
             "view_digest": view["digest"],
             "verification_tier": verified["verification_tier"],
             "phase": "verified",

@@ -107,7 +107,7 @@ def validate_final_cards(ctx, view):
         if key in cards:
             raise Invalid("duplicate card ID in final view")
         cards[key] = card
-        if path in {row["path"] for row in view["writes"]} and (card["metadata"]["review_mode"] != view["review_mode"] or card["metadata"]["lifecycle"] != "stable"):
+        if path in {row["path"] for row in view["writes"]} and (card["metadata"]["review_mode"] != view["review_mode"] or card["metadata"]["lifecycle"] not in ("stable", "deprecated")):
             raise Invalid("final card review mode/lifecycle mismatches approved view")
     for card in cards.values():
         knowledge.validate_card(card, cards, rules)

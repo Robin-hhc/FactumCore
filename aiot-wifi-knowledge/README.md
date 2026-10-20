@@ -1,9 +1,18 @@
-# WiFi knowledge v1
+# WiFi 知识库
 
-本领域根直接位于 FactumCore 的 `aiot-wifi-knowledge/`，是单仓内的普通目录，Git 操作统一在 FactumCore 根执行。当前首批已有治理 Schema、七 Profile、公共枚举和固定摘要的框架契约锁；尚未导入原件、技术卡、实际来源锁或代码验证结果。
+这是 FactumCore 单仓内唯一的领域目录，Git 操作统一在 FactumCore 根执行。整体布局遵循[总体设计 §5.3](docs-llm-wiki/AIoTBot知识库架构.md#53-aiotbot-knowledge目录架构)。
 
-源码、宏、构建和 Host/Device pair 的真实映射由外层 config.yml 单独登记。六 Target 是逻辑槽位，null/unknown 不代表已接入。后续只在获授权且具备真实输入时记录业务覆盖。
+| 目录 | 存放内容 |
+|---|---|
+| `docs-raw/` | 五类已落地原件；`sources/` 仅后续来源登记占位 |
+| `governance/` | Schema、受控枚举、模板、规范及来源锁 |
+| `knowledge/` | 七类正式知识卡及导航，当前无业务卡 |
+| `.build/` | 本地候选与转换暂存，生成内容不上库 |
+| `logs/` | 已发生操作的持久记录，当前为空 |
+| `docs-llm-wiki/` | 四个平铺设计/入口文件及 SDD 工件 |
+| `evals/` | 后续验收案例与运行入口，当前为空 |
+| `artifacts/` | 本地派生索引与报告，生成内容不上库 |
 
-开发 SDD 由仓根 `docs-llm-wiki/sdd/knowledge-v1/` 管理。正式文档原件将置 docs-raw 的五类目录；来源登记链接、仓外映射、网页和 3ms 不在首发。代码卡两门禁、文档卡真实人工确认路径待相应任务实现。
+当前只保留目录骨架及已有治理资产，外层 `main/`、四个 Skill、两个 Workflow 均为空占位。旧执行实现、测试及根开发工具已归档仓外；历史测试通过不代表当前仓可调用相应能力，详见[布局记录](docs-llm-wiki/sdd/knowledge-v1/records/workspace-layout-20261020.md)。`check.py/check.sh` 等程序仍须按 SDD 开发，不生成空壳通过检查。
 
-Schema/锁只检验格式、版本和本地规则字节，不代表语义正确或人工动作真实。库中没有可供查询的 WiFi 技术卡。
+先读 [AGENTS.md](AGENTS.md)、[设计入口](docs-llm-wiki/README.md)与[贡献约定](CONTRIBUTING.md)。六 Target/三 pair 是逻辑登记；业务源码、宏、构建与实际版本在外层 `config.yml` 未提供时保持 unknown。

@@ -1,12 +1,10 @@
-# Preserve the exact approved design bytes across checkouts.
-/docs-llm-wiki/AIoTBot知识库架构.md -text
-/docs-llm-wiki/知识库详细设计.md -text
-/docs-llm-wiki/sdd/** text eol=lf
-
-# Shared execution and locked domain rules need stable bytes across checkouts.
+# Keep domain rules and future Skill/Workflow text stable across checkouts.
 /skills/** text eol=lf
-/tools/** text eol=lf
+/workflows/** text eol=lf
 /aiot-wifi-knowledge/** text eol=lf
 /config.yml text eol=lf
-/requirements-dev*.txt text eol=lf
-/pyproject.toml text eol=lf
+
+# Preserve approved design bytes; SDD records use LF.
+/aiot-wifi-knowledge/docs-llm-wiki/AIoTBot知识库架构.md -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+/aiot-wifi-knowledge/docs-llm-wiki/知识库详细设计.md -text
+/aiot-wifi-knowledge/docs-llm-wiki/sdd/** text eol=lf

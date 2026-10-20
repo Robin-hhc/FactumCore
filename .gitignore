@@ -1,14 +1,26 @@
-.worktrees/
-.cac/
+# Local development state; outside the versioned section 5.3 layout.
+/.worktrees/
+/.scratch/
+/analysis/
+/artifacts/
+/.cac/
 .venv/
 __pycache__/
 .pytest_cache/
 .ruff_cache/
 *.pyc
 config.local.yml
-artifacts/
-aiot-wifi-knowledge/.build/
-aiot-wifi-knowledge/artifacts/
 
-# Legacy independent checkout; the current domain root above remains versioned.
-aiot-knowledge/
+# Business sources are registered separately; keep the slot only.
+/main/*
+!/main/.gitkeep
+**/.codegraph/
+
+# Domain runtime products: publish empty slots, never generated contents.
+/aiot-wifi-knowledge/.build/*
+!/aiot-wifi-knowledge/.build/.gitkeep
+/aiot-wifi-knowledge/artifacts/*
+!/aiot-wifi-knowledge/artifacts/.gitkeep
+
+# Retired independent checkout, if still present locally.
+/aiot-knowledge/

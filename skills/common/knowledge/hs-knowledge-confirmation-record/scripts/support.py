@@ -164,6 +164,7 @@ class Context:
         self.rules_digest = rules_digest
         self.identity = tool_identity
         self.catalog = catalog or {}
+        self.catalog_path = None
         self.domain = domain
         self.rules = rules
 
@@ -324,7 +325,9 @@ def load_context(args, package_root):
     catalog = json.loads(pathlib.Path(args.catalog).read_text(encoding="utf-8")) if args.catalog else {}
     if catalog and catalog.get("schema_version") != "2.0":
         raise Invalid("invalid installed catalog version")
-    return Context(root, args.rules_digest, identity(package_root), catalog, domain, rules)
+    context = Context(root, args.rules_digest, identity(package_root), catalog, domain, rules)
+    context.catalog_path = str(pathlib.Path(args.catalog).resolve()) if args.catalog else None
+    return context
 
 
 def run_cli(handler, package_root):

@@ -3,6 +3,7 @@ import base64
 import importlib
 import json
 import pathlib
+import secrets
 import subprocess
 import sys
 
@@ -21,6 +22,8 @@ def invoke_checker(ctx, request):
     spec = ctx.catalog.get("skills", {}).get("hs-knowledge-local-check")
     if not spec:
         raise Blocked("trusted code checker is not installed")
+    if not ctx.catalog_path:
+        raise Blocked("trusted installed catalog path is required")
     root = pathlib.Path(spec["root"]).resolve()
     entry = root / spec.get("entry", "scripts/cli.py")
     if entry.resolve() != root / "scripts/cli.py" or package_digest(root) != spec.get("package_digest"):
@@ -33,20 +36,13 @@ def invoke_checker(ctx, request):
         raise Blocked("code proof request already frozen")
     if not target.exists():
         atomic_bytes(target, request_bytes)
-    response_ref = f".build/operations/{op}/apply-code-proof-response.json"
+    response_ref = f".build/operations/{op}/apply-code-proof-response-{secrets.token_hex(12)}.json"
     response_path = ctx.path(response_ref)
-    if response_path.exists():
-        response = ctx.read(response_ref)
-    else:
-        catalog_ref = f".build/operations/{op}/apply-catalog.json"
-        # The trusted catalog is supplied by process argument, never source content.
-        # A transient child catalog is confined to the operation; it is not committed.
-        atomic_bytes(ctx.path(catalog_ref), canonical(ctx.catalog))
-        command = [spec["python"], str(entry), "--input", str(target), "--output", str(response_path), "--knowledge-root", str(ctx.root), "--rules-digest", ctx.rules_digest, "--catalog", str(ctx.path(catalog_ref)), "--action", "verify-proof"]
-        completed = subprocess.run(command, check=False, capture_output=True, timeout=120)
-        if completed.returncode not in (0, 3) or not response_path.is_file():
-            raise Blocked("trusted code checker did not verify proof")
-        response = ctx.read(response_ref)
+    command = [spec["python"], str(entry), "--input", str(target), "--output", str(response_path), "--knowledge-root", str(ctx.root), "--rules-digest", ctx.rules_digest, "--catalog", ctx.catalog_path, "--action", "verify-proof"]
+    completed = subprocess.run(command, check=False, capture_output=True, timeout=120)
+    if completed.returncode != 0 or not response_path.is_file():
+        raise Blocked("trusted code checker did not verify proof")
+    response = ctx.read(response_ref)
     if response.get("tool_identity", {}).get("package_digest") != spec["package_digest"] or response.get("status") != "ok" or response.get("data", {}).get("proof_verified") is not True:
         raise Blocked("code proof is incomplete or unsupported")
 
@@ -205,6 +201,19 @@ def mutate(ctx, journal, fault_after=None):
 
 def execute(ctx, request, action="run"):
     op = ctx.operation(request)
+    if action == "verify-result":
+        result_ref = request.get("apply_result_ref")
+        ctx.path(result_ref, (f"logs/operations/{op}",))
+        result = ctx.read(result_ref)
+        journal = ctx.read(f"logs/operations/{op}/journal.json")
+        view, proof = validate_journal(ctx, journal, op)
+        if journal.get("status") != "committed" or journal.get("result_ref") != result_ref or result.get("record_kind") != "apply_result" or result.get("status") != "committed" or result.get("operation_id") != op or result.get("view_digest") != view["digest"] or result.get("proof_digest") != proof["digest"]:
+            raise Invalid("apply result is not an authenticated committed transaction")
+        expected_writes = [row["path"] for row in view["writes"]]
+        expected_deletes = [row["path"] for row in view.get("deletes", [])]
+        if result.get("writes") != expected_writes or result.get("deletes") != expected_deletes:
+            raise Invalid("apply result write set was changed")
+        return {"result_verified": True, "view_ref": journal["view_ref"], "view_digest": view["digest"], "proof_ref": journal["proof_ref"], "verification_tier": proof.get("verification_tier", "code_gate"), "phase": "verified"}
     if action not in ("run", "inspect", "resume", "rollback"):
         raise Invalid("unsupported transaction action")
     journal_ref = f"logs/operations/{op}/journal.json"

@@ -17,6 +17,8 @@ FactumCore 承载业务代码与 WiFi 知识，目录以主设计 §5.3 目录�
 
 当前按详设v4与knowledge-v2实施节点化SDD开发；18个Skill和两个Workflow逐票交付，不把规划文件当运行成功。能力在本仓根skills/和workflows/开发，与main同级；发行和安装身份按实际记录，个人路径不写入公开配置。knowledge-v1只保留历史，不重置其任务状态。
 
+当前详设为v4.1，T201–T210开发已完成。见[实际验收](sdd/knowledge-v2/records/development-acceptance-20261021.json)、[源码身份](sdd/knowledge-v2/records/implementation-manifest.json)和[发布](sdd/knowledge-v2/records/publication-20261021.md)；T211真实外部环境仍pending。
+
 首版覆盖 chip12/chip08/chip07c 的 Host/Device 六逻辑 Target。文档只处理五类 raw 目录内已落地原件，真人确认后 stable；代码相关卡本地通过后 stable，上库按最新业务代码只读二次检查。业务路径、构建和版本未登记时保留 unknown。
 
 T01/T02 及 raw 捕获 → 候选 → 真人确认 → stable 事务曾完成合成机制验证，相关实现、工具和依赖已归档仓外。当前节点是否可运行按knowledge-v2记录核实；历史230项合成测试不代表当前部署可用。[历史布局记录](sdd/knowledge-v1/records/workspace-layout-20261020.md)、`traceability.json.current_deployment`、[任务入口](sdd/knowledge-v1/tasks.md)和[验收记录](sdd/knowledge-v1/records/README.md)保留原版本身份，其中的旧路径不作为当前落点。[raw 手工操作说明](sdd/knowledge-v1/document-chain-usage.md)仅供历史接口参考。

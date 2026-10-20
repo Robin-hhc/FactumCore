@@ -2,7 +2,7 @@
 
 设计真源：[详设v4](../../知识库详细设计.md)。K保存知识/规则/运行状态，W根skills/和workflows/保存节点包与编排；节点间只用固定包摘要的公开JSON CLI。所有领域字段/范围/来源/记录规则由K/governance/contracts单点解释，不复制到节点。
 
-18Skill在[节点映射](traceability.json)逐项绑定T201–T211；两个Workflow ID为hs-knowledge-ingest/hs-knowledge-lint，不注册同名聚合Skill。每包初期文件为SKILL.md、scripts/cli.py、scripts/support.py、tests/test_cli.py、requirements.lock.txt、requirements-dev.lock.txt及artifacts/result.yaml/templates/result.md/writing-guide.md/review-guide.md。实现深化可新增本包模块，必须同步文件追踪，不恢复_shared。
+18Skill在[节点映射](traceability.json)逐项绑定T201–T211；两个Workflow ID为hs-knowledge-ingest/hs-knowledge-lint，不注册同名聚合Skill。每包有SKILL.md、scripts/cli.py、scripts/support.py、本包业务模块、tests/test*.py、requirements.lock.txt、requirements-dev.lock.txt及artifacts/result.yaml/templates/result.md/writing-guide.md/review-guide.md；实际逐文件职责与路径见详设和files追踪。跨节点只调用受信公开CLI，不恢复_shared。
 
 公开请求--input/--output，领域动作显式--knowledge-root/--rules-digest，可选可信--catalog/--action。对象用产品2.0和特定record_kind，摘要排除自身digest；ResultEnvelope包含status/phase/真实工具与规则身份。0仅已处理、2非法输入、3前提阻断。
 

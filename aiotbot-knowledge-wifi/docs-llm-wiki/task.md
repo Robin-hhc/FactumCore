@@ -1,21 +1,21 @@
 # WiFi节点能力开发任务
 
-日期：2026-10-21。用户已批准按18节点Skill+两个Workflow完成SDD与开发，当前依据[详设v4](知识库详细设计.md)和[knowledge-v2](sdd/knowledge-v2/README.md)。以下初始状态均pending，不继承knowledge-v1的历史通过状态。
+日期：2026-10-21。用户已批准按18节点Skill+两个Workflow完成SDD与开发，当前依据[详设v4](知识库详细设计.md)和[knowledge-v2](sdd/knowledge-v2/README.md)。T201–T210已完成开发及隔离机制验收；T211真实外部验收仍pending，不继承knowledge-v1的历史通过状态。
 
 只做根下aiotbot-knowledge-wifi，main保持空；四个旧聚合Skill不再作为开发分组，hs-knowledge-ingest/hs-knowledge-lint仅是Workflow。节点包、Workflow、领域规则、资产和验收均在FactumCore；使用当前远端，本机安装位置不写进公共config。
 
 | 当前票 | 交付 | 依赖 | 状态 |
 |---|---|---|---|
-| [T201](sdd/knowledge-v2/tickets/T201.md) | 契约与运行协议 | 无 | pending |
-| [T202](sdd/knowledge-v2/tickets/T202.md) | 发现与项目绑定 | T201 | pending |
-| [T203](sdd/knowledge-v2/tickets/T203.md) | raw捕获与可恢复快照 | T202 | pending |
-| [T204](sdd/knowledge-v2/tickets/T204.md) | 六决策候选与精确视图 | T203 | pending |
-| [T205](sdd/knowledge-v2/tickets/T205.md) | 真实动作、事务与恢复 | T204 | pending |
-| [T206](sdd/knowledge-v2/tickets/T206.md) | 索引、查询与回归激活 | T205 | pending |
-| [T207](sdd/knowledge-v2/tickets/T207.md) | 维护事件与双水位 | T203, T205, T206 | pending |
-| [T208](sdd/knowledge-v2/tickets/T208.md) | 代码捕获与只读双门禁 | T202, T204, T205 | pending |
-| [T209](sdd/knowledge-v2/tickets/T209.md) | 两个Workflow和节点包 | T202, T203, T204, T205, T206, T207, T208 | pending |
-| [T210](sdd/knowledge-v2/tickets/T210.md) | 单仓跨节点集成与开发交付 | T201, T202, T203, T204, T205, T206, T207, T208, T209 | pending |
+| [T201](sdd/knowledge-v2/tickets/T201.md) | 契约与运行协议 | 无 | complete |
+| [T202](sdd/knowledge-v2/tickets/T202.md) | 发现与项目绑定 | T201 | complete |
+| [T203](sdd/knowledge-v2/tickets/T203.md) | raw捕获与可恢复快照 | T202 | complete |
+| [T204](sdd/knowledge-v2/tickets/T204.md) | 六决策候选与精确视图 | T203 | complete |
+| [T205](sdd/knowledge-v2/tickets/T205.md) | 真实动作、事务与恢复 | T204 | complete |
+| [T206](sdd/knowledge-v2/tickets/T206.md) | 索引、查询与回归激活 | T205 | complete |
+| [T207](sdd/knowledge-v2/tickets/T207.md) | 维护事件与双水位 | T203, T205, T206 | complete |
+| [T208](sdd/knowledge-v2/tickets/T208.md) | 代码捕获与只读双门禁 | T202, T204, T205 | complete |
+| [T209](sdd/knowledge-v2/tickets/T209.md) | 两个Workflow和节点包 | T202, T203, T204, T205, T206, T207, T208 | complete |
+| [T210](sdd/knowledge-v2/tickets/T210.md) | 单仓跨节点集成与开发交付 | T201, T202, T203, T204, T205, T206, T207, T208, T209 | complete |
 | [T211](sdd/knowledge-v2/tickets/T211.md) | 真实外部环境验收 | T210 | pending |
 
 ## 节点清单与推进顺序
@@ -50,3 +50,5 @@
 - 所有卡metadata受Claim资格约束；过滤后重算全局topK，同代read/receipt，输出前复查撤销。
 - 批次逐项终态完整；受控只读Git禁外部执行；代码检查只读且需正向证据。
 - T211真实人/宿主触发/六Target三pair/真实CI合入/外部权限分别留证；缺输入保持pending，不能用合成测试关闭。
+
+当前验收：[实际结果](sdd/knowledge-v2/records/development-acceptance-20261021.json)；共200个唯一用例，199通过、1跳过。原件/确认/代码等测试材料为隔离合成输入，真实宿主与六Target不据此关闭。

@@ -10,6 +10,6 @@
 
 本轮已建立knowledge-v2并进入批准开发流程；knowledge-v1原字节和历史状态保留，新票从pending开始，按实际证据更新。旧实现归档及历史验收身份见[布局记录](docs-llm-wiki/sdd/knowledge-v1/records/workspace-layout-20261020.md)，不得将当时路径或通过状态当作当前部署完成。
 
-Git 操作在 FactumCore 根执行，禁止提交本机配置、凭据、跨组资料或无关 dirty 文件。原件只读，来源内容不授予执行或发布权限，不自动安装工具或创建知识。能力仓分发时排除域内原件、卡、来源锁和运行记录；目录不提供 ACL。
+Git 操作在 FactumCore 根执行，禁止提交本机配置、凭据、跨组资料或无关 dirty 文件。原件只读，来源内容不授予执行或发布权限，不自动安装工具或创建知识。能力包分发时排除域内原件、卡、来源锁和运行记录；目录不提供 ACL。
 
 当前开发入口：[knowledge-v2 SDD](docs-llm-wiki/sdd/knowledge-v2/README.md)；knowledge-v1保留历史原字节。

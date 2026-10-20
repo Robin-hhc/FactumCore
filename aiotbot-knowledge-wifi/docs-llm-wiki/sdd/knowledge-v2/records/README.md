@@ -1,5 +1,5 @@
 # knowledge-v2实际记录
 
-本目录仅记录新节点设计的实际开发/测试/审查/发布证据，当前没有产品任务完成记录。knowledge-v1原始记录保持历史身份，不复制成v2成绩。
+T201–T210开发验收见[结果](development-acceptance-20261021.json)、[实现身份](implementation-manifest.json)、[独立审查](independent-governance-review-20261021.md)与[发布](publication-20261021.md)。T211真实宿主、真人、六Target、业务CI及ACL仍pending；E224当前代码仓发布单独留证。
 
-每个记录至少包含：ticket与需求/验收ID、精确FactumCore与能力包/工具/规则身份、输入/fixture/真实环境边界、实际命令、red与后续结果、独立审查、未执行项/风险、范围提交及真实合入/推送结果。当前FactumCore远端发布结果如实记录，不发布本机安装位置/凭据。规划静态检查可单列，不能写为功能验收通过。
+T201-contracts.json与t209工作流记录保留各阶段当时的身份和结果，最终记录追加说明闭合；knowledge-v1的95个文件原字节保留，历史成绩不继承。

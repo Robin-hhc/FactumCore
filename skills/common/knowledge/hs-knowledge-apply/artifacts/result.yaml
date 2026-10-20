@@ -1,22 +1,16 @@
-id: knowledge-apply-result
-name: Reviewed transaction result
-version: 2.0.0
-type: file
-format: json
-path: logs/operations/{operation_id}/apply-result.json
+id: hs-knowledge-apply-result
+title: hs-knowledge-apply result
+required: true
+applies_to:
+  node_ids:
+  - apply_view
+required_on:
+  exit_ids:
+  - applied
 template: templates/result.md
-writing-guide: writing-guide.md
-review-guide: review-guide.md
-required-fields:
-  - schema_version
-  - record_kind
-  - operation_id
-  - rules_digest
-  - tool_identity
-  - digest
-  - status
-  - view_digest
-  - proof_digest
-  - writes
-  - deletes
+writing_guide: writing-guide.md
+review_guide: review-guide.md
+default_location:
+  kind: markdown_file
+  path: node-result.md
 

@@ -1,20 +1,16 @@
-id: knowledge-confirmation-prepare-result
-name: Exact human confirmation display
-version: 2.0.0
-type: file
-format: json
-path: .build/operations/{operation_id}/confirmation-display.json
+id: hs-knowledge-confirmation-prepare-result
+title: hs-knowledge-confirmation-prepare result
+required: true
+applies_to:
+  node_ids:
+  - prepare_confirmation
+required_on:
+  exit_ids:
+  - await_user
 template: templates/result.md
-writing-guide: writing-guide.md
-review-guide: review-guide.md
-required-fields:
-  - schema_version
-  - record_kind
-  - operation_id
-  - rules_digest
-  - tool_identity
-  - digest
-  - view_digest
-  - challenge
-  - display_text
+writing_guide: writing-guide.md
+review_guide: review-guide.md
+default_location:
+  kind: markdown_file
+  path: node-result.md
 

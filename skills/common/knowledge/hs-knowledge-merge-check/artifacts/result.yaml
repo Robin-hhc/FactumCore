@@ -1,23 +1,15 @@
-id: knowledge-merge-check-result
-name: Latest authorized code recheck
-version: 2.0.0
-type: file
-format: json
-path: logs/operations/{operation_id}/merge-check-handoff.json
+id: hs-knowledge-merge-check-result
+title: hs-knowledge-merge-check result
+required: true
+applies_to:
+  node_ids:
+  - verify_merge
+required_on:
+  exit_ids: []
 template: templates/result.md
-writing-guide: writing-guide.md
-review-guide: review-guide.md
-required-fields:
-  - schema_version
-  - record_kind
-  - operation_id
-  - rules_digest
-  - tool_identity
-  - digest
-  - status
-  - mode
-  - view_digest
-  - claims
-  - delegated_proof_ref
-  - delegated_proof_digest
+writing_guide: writing-guide.md
+review_guide: review-guide.md
+default_location:
+  kind: markdown_file
+  path: node-result.md
 

@@ -1,22 +1,16 @@
-id: knowledge-confirmation-record-result
-name: Authenticated human decision
-version: 2.0.0
-type: file
-format: json
-path: logs/operations/{operation_id}/manual-review.json
+id: hs-knowledge-confirmation-record-result
+title: hs-knowledge-confirmation-record result
+required: true
+applies_to:
+  node_ids:
+  - record_confirmation
+required_on:
+  exit_ids:
+  - accepted
 template: templates/result.md
-writing-guide: writing-guide.md
-review-guide: review-guide.md
-required-fields:
-  - schema_version
-  - record_kind
-  - operation_id
-  - rules_digest
-  - tool_identity
-  - digest
-  - status
-  - host_event
-  - view_digest
-  - display_digest
-  - verification_tier
+writing_guide: writing-guide.md
+review_guide: review-guide.md
+default_location:
+  kind: markdown_file
+  path: node-result.md
 

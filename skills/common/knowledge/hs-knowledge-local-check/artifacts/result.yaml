@@ -1,21 +1,17 @@
-id: knowledge-local-check-result
-name: Signed positive code evidence check
-version: 2.0.0
-type: file
-format: json
-path: logs/operations/{operation_id}/local-check.json
+id: hs-knowledge-local-check-result
+title: hs-knowledge-local-check result
+required: true
+applies_to:
+  node_ids:
+  - local_check
+required_on:
+  exit_ids:
+  - code_passed
+  - needs_revision
 template: templates/result.md
-writing-guide: writing-guide.md
-review-guide: review-guide.md
-required-fields:
-  - schema_version
-  - record_kind
-  - operation_id
-  - rules_digest
-  - tool_identity
-  - digest
-  - status
-  - mode
-  - view_digest
-  - claims
+writing_guide: writing-guide.md
+review_guide: review-guide.md
+default_location:
+  kind: markdown_file
+  path: node-result.md
 

@@ -1,22 +1,16 @@
-id: knowledge-publish-handoff-result
-name: Verified local publishing handoff
-version: 2.0.0
-type: file
-format: json
-path: logs/operations/{operation_id}/publish-handoff.json
+id: hs-knowledge-publish-handoff-result
+title: hs-knowledge-publish-handoff result
+required: true
+applies_to:
+  node_ids:
+  - publish_handoff
+required_on:
+  exit_ids:
+  - ready_to_publish
 template: templates/result.md
-writing-guide: writing-guide.md
-review-guide: review-guide.md
-required-fields:
-  - schema_version
-  - record_kind
-  - operation_id
-  - rules_digest
-  - tool_identity
-  - digest
-  - status
-  - apply_result_digest
-  - view_digest
-  - external_obligations
-  - verification_tier
+writing_guide: writing-guide.md
+review_guide: review-guide.md
+default_location:
+  kind: markdown_file
+  path: node-result.md
 

@@ -1,21 +1,17 @@
-id: knowledge-recover-result
-name: Delegated transaction recovery
-version: 2.0.0
-type: file
-format: json
-path: .build/operations/{operation_id}/recover-{mode}-{attempt_id}-result.json
+id: hs-knowledge-recover-result
+title: hs-knowledge-recover result
+required: true
+applies_to:
+  node_ids:
+  - recover_transaction
+required_on:
+  exit_ids:
+  - recovered
+  - rolled_back
 template: templates/result.md
-writing-guide: writing-guide.md
-review-guide: review-guide.md
-required-fields:
-  - schema_version
-  - record_kind
-  - operation_id
-  - rules_digest
-  - tool_identity
-  - digest
-  - mode
-  - delegated_result_ref
-  - delegated_result_digest
-  - apply_tool_identity
+writing_guide: writing-guide.md
+review_guide: review-guide.md
+default_location:
+  kind: markdown_file
+  path: node-result.md
 

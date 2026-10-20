@@ -245,6 +245,19 @@ def test_meaningful_tests_need_not_be_named_test_cli(tmp_path):
     ).is_file()
 
 
+@pytest.mark.parametrize("key_type", ["OPENSSH", "EC", "ENCRYPTED"])
+def test_private_key_in_an_allowed_text_resource_is_rejected(tmp_path, key_type):
+    source = fixture_source(tmp_path)
+    path = source / "skills/common/knowledge/hs-knowledge-apply/artifacts/leaked.md"
+    path.write_text(
+        f"-----BEGIN {key_type} PRIVATE KEY-----\nfixture-only\n", encoding="utf-8"
+    )
+    destination = tmp_path / "install"
+    result = install(source, destination)
+    assert result.returncode != 0 and "PRIVATE_KEY" in result.stderr
+    assert not destination.exists()
+
+
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows junction boundary")
 def test_junction_package_directory_rejected(tmp_path):
     import _winapi

@@ -76,6 +76,12 @@ def sha(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def public_bytes(data, relative):
+    if re.search(rb"-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----", data):
+        raise InstallError(f"PRIVATE_KEY_IN_PACKAGE: {relative}")
+    return data
+
+
 def no_links(path):
     for part in (path, *path.parents):
         if part.is_symlink() or (
@@ -108,21 +114,16 @@ def package_files(package):
             len(rel.parts) == 1
             and re.fullmatch(r"requirements(?:-dev)?\.lock\.txt", path.name)
         ):
-            files[rel.as_posix()] = path.read_bytes()
+            files[rel.as_posix()] = public_bytes(path.read_bytes(), rel)
         elif rel.parts[0] in DIRECTORIES:
             if path.suffix.lower() not in SUFFIXES or any(
                 p.startswith(".")
                 or p.lower() in {"credentials", "secrets", "config.local.yml"}
+                or Path(p).stem.lower() in {"credentials", "secrets"}
                 for p in rel.parts
             ):
                 raise InstallError(f"UNPUBLISHABLE_PACKAGE_FILE: {rel}")
-            data = path.read_bytes()
-            if (
-                b"-----BEGIN PRIVATE KEY-----" in data
-                or b"-----BEGIN RSA PRIVATE KEY-----" in data
-            ):
-                raise InstallError(f"PRIVATE_KEY_IN_PACKAGE: {rel}")
-            files[rel.as_posix()] = data
+            files[rel.as_posix()] = public_bytes(path.read_bytes(), rel)
     missing = set(REQUIRED) - files.keys()
     if not any(ref.startswith("tests/test") and ref.endswith(".py") for ref in files):
         missing.add("tests/test*.py")
@@ -342,7 +343,7 @@ def install(source_root, destination, python_path, workspace_config=None):
         for name in ("workflow.yaml", "layouts.yaml"):
             path = package / name
             no_links(path)
-            templates[identity][name] = path.read_bytes()
+            templates[identity][name] = public_bytes(path.read_bytes(), path.name)
     validate_interpreter(python, pins)
     validate_metadata(python, packages, templates)
     workspaces, registry = workspace_registration(workspace_config, python)

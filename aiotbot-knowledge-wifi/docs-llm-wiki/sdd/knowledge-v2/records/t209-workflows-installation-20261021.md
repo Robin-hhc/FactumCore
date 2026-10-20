@@ -19,11 +19,11 @@
 ```powershell
 $env:FACTUM_OPENFLOW_SOURCE = '<已核验固定源码目录>'
 $env:FACTUM_POSIX_SHELL = '<显式选择的 Git Bash>'
-<PYTHON> -m pytest aiotbot-knowledge-wifi/evals/tests/test_workflows.py skills/common/knowledge/hs-workspace-explore/tests/test_install.py --basetemp aiotbot-knowledge-wifi/artifacts/test-tmp/t209-final-3 -q
+<PYTHON> -m pytest aiotbot-knowledge-wifi/evals/tests/test_workflows.py skills/common/knowledge/hs-workspace-explore/tests/test_install.py --basetemp aiotbot-knowledge-wifi/artifacts/test-tmp/t209-final-4 -q
 <PYTHON> -m ruff check aiotbot-knowledge-wifi/evals/validate_design.py aiotbot-knowledge-wifi/evals/tests/test_workflows.py aiotbot-knowledge-wifi/check.py skills/common/knowledge/hs-workspace-explore/scripts/install_catalog.py skills/common/knowledge/hs-workspace-explore/tests/test_install.py
 ```
 
-结果：**22 passed，1 skipped**；ruff 通过。skip 为本账号不能创建普通符号链接；Windows junction 逃逸拒绝测试已实际通过。另已复核 T201 的 6 个定向反例（无约束 context、无绑定记录、重复 Target、跨芯片 pair、未锁 profiles）全部通过；该复核不代表本票执行了领域业务链。
+结果：**25 passed，1 skipped**；ruff 通过。skip 为本账号不能创建普通符号链接；Windows junction 逃逸拒绝测试已实际通过。另已复核 T201 的 6 个定向反例（无约束 context、无绑定记录、重复 Target、跨芯片 pair、未锁 profiles）全部通过；该复核不代表本票执行了领域业务链。
 
 固定兼容性检查实际执行 [OpenFlow 的 Workflow loader](https://github.com/Robin-hhc/OpenFlow/blob/1901a463efca222542a4634d7ce50c7b244b2bab/src/config/workflow-template-loader.js)、validator、registry、artifact loader 和 layout loader，源码身份为 `1901a463efca222542a4634d7ce50c7b244b2bab`。通过 GitHub contents base64 内容核 Git blob 身份后保存原字节；11 个传递源码文件的 SHA-256 固定在验证器中。使用两个真实模板与 18 个明确标记 synthetic 的完整合法包，结果 2 workflows / 18 skills / 18 artifact contracts。没有替换或模拟上游校验器。
 
@@ -36,3 +36,5 @@ $env:FACTUM_POSIX_SHELL = '<显式选择的 Git Bash>'
 独立审查：**pending**。真实 18 包首轮联检识别到 7 个治理包仍采用旧自定义 artifact YAML，已交作者按固定 loader 标准修正；该次联检如实为 integration blocked，不算真实全包通过。完整代码包复制、真实仓外触发/人动作、六 Target、真实 CI/合入/跨组 ACL 及远端推送均未由本次静态/合成测试关闭。
 
 此子范围测试结果为 tested；T209 全票暂为 in_progress，待作者合同修复、真实 18 包联检及独立审查后更新。提交 SHA 由本记录所属 Git commit 定位；实际合入与推送由 root 发布记录登记。
+
+安装器自查补充：OpenSSH、EC、ENCRYPTED 私钥伪装为允许的 Markdown 资源时，3 条反例先实际失败（原实现返回 installed），随后改为统一拒绝所有标准 PRIVATE KEY 头，未发布任何目标目录；对应 3 条回归及完整范围重新通过。该反例使用 fixture-only 假密钥。

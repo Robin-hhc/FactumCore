@@ -290,8 +290,10 @@ flowchart TB
         direction LR
         A0["hs-common-workspace-explore<br />全局 Skill · 自动发现与绑定"]
         A1["AGENTS.md<br />消费路由契约"]
-        A2["config.yml<br />四张映射表"]
+        A2["config.yml<br />四张映射表<br />Target / pair / local-shared 渠道"]
         A3["领域仓根四件套<br />README · CONTRIBUTING · check.py/check.sh"]
+        A4["用户级 AGENTS.md<br />workspace-registry.json<br />发现提示与有限路径登记（本机）"]
+        A5["config.local.yml<br />可选本机位置覆盖（不提交）"]
     end
 
     subgraph S2["② 源事实层 · 证据底座"]
@@ -310,31 +312,39 @@ flowchart TB
         C5["knowledge/commands/<br />命令卡"]
         C6["knowledge/runbooks/<br />诊断卡"]
         C7["knowledge/glossaries/<br />术语卡"]
+        C8["knowledge/AGENTS.md · 逐层 index.md<br />规则与人读导航，不作为技术卡召回"]
     end
 
     subgraph S4["④ 治理与工具层"]
         direction LR
-        D1["governance/<br />templates · schemas · contracts · specs · sources.lock.yaml"]
+        D1["governance/<br />templates · schemas · contracts · specs · sources.lock.yaml<br />framework.lock.yaml · Profiles / Registries"]
         D2["skills/common/knowledge<br />hs-common-knowledge-ingest · hs-common-knowledge-lint · hs-common-knowledge-query"]
         D3["workflows/common/<br />hs-common-knowledge-ingest · hs-common-knowledge-lint"]
         D3 -->|"阶段编排"| D2
+        D4["skills/common/knowledge/_shared/<br />cli.py 与公共执行程序<br />发现 · 捕获 · 候选 · 确认 · 事务 · 查询/维护"]
+        D2 -->|"调用公共程序"| D4
+        D1 -.->|"版本与契约约束"| D4
     end
 
     subgraph S5["⑤ 配套支撑层"]
         direction LR
-        E1[".build/<br />候选暂存（Git 忽略）"]
-        E2["evals/<br />回归门禁"]
-        E3["logs/<br />留痕"]
-        E4["artifacts/<br />派生索引（Git 忽略）"]
-        E5["docs-llm-wiki/<br />系统说明"]
+        E1[".build/<br />候选暂存（Git 忽略）<br />plan · ChangeSet · review-package<br />candidates · final-view"]
+        E2["evals/<br />回归门禁<br />配合 _shared/tests/ 机制测试"]
+        E3["logs/<br />留痕<br />operations · evidence · document-reviews<br />核验 / Workflow / 维护记录"]
+        E4["artifacts/<br />派生索引（Git 忽略）<br />local/shared 代次 · manifest / active<br />同代正文 · 检索收据"]
+        E5["docs-llm-wiki/<br />系统说明<br />SDD · 操作手册 · 实际验收"]
     end
 
     U --> A0 --> A1 --> A2
     A2 --> S2
+    A4 -.->|"发现提示 / 有限定位"| A0
+    A5 -.->|"受限覆盖"| A2
     B1 & B3 -->|"ingest 蒸馏建卡"| S3
     S4 -.->|"契约约束 · 流程执行"| S3
     S5 -.->|"质量保障"| S3
 ```
+
+图中保留原五层及七类知识卡，只补入口配置、共享程序、版本锁、人读导航和运行文件形态。它描述目标架构；用户级托管与 Skill/Workflow 自动编排、代码门禁、索引及维护仍按 SDD 后续任务验收，不能由文件名推断已部署。`_shared/confirmations.py`、`transactions.py` 是既有公共入口内部的实现拆分，具体补项见[详设 §1.1](知识库详细设计.md#11-要实现的闭环)。
 
 各层与目录的对应关系：
 
@@ -533,7 +543,13 @@ flowchart LR
     I -->|"结论错误 / 不再推荐"| C5["ingest-deprecate<br />拟废弃 + 替代关系"]
     I -->|"来源不可获取 / 证据不足"| C6["ingest-defer<br />不建卡，登记 backlog"]
     C1 & C2 & C3 & C4 & C5 --> B["③ 候选与最终视图暂存 .build/<br />交治理 Workflow 确认后落位"]
+    CODE["已登记代码 / 导出<br />独立 Target / 构建上下文"] --> I
+    SNAP["固定来源快照<br />实际字节 · 版本 · 附件 · 定位 · 恢复依据"] -.->|"生产前提"| I
+    I -->|"无变化"| NC["no_change<br />记录依据，正常结束"]
+    B -.->|"固定交接内容"| HAND["ChangeSet + 确切 stable final-view<br />同一 operation_id · 来源 / scope / 基线摘要"]
 ```
+
+新增的快照节点是六决策的来源前提；候选交接仍由原③阶段完成，正式文件在治理确认/检查并 apply 前不变。代码与 raw 各自固定上下文；首发文档只读五类 raw 已落地原件，`sources/` 不接入。
 
 ### 链路二：治理上库 —— lint 门禁
 
@@ -543,17 +559,28 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    A["候选卡 draft<br />暂存 .build/"] --> B["① 模板套用<br />governance/templates/ + specs/"]
+    A["候选卡 draft<br />暂存 .build/"] -->|"仅代码相关"| B["① 模板套用<br />governance/templates/ + specs/"]
     B --> C["② 字段 / 来源校验<br />governance/schemas/ + contracts/"]
     C --> D{"③ 本地门禁执行<br />check.py / check.sh"}
     D -->|"违规 · 打回修复"| B
     D -->|"通过"| E["④ 候选卡 draft移入knowledge/"]
     E --> F["⑤ 留痕与回归<br />logs/ + artifacts/ + evals/"]
-    F --> G["⑥ 代码托管平台上库"]
-    G --> H{"⑦ CI 构建门禁<br />增量检查改动后知识卡<br />check.py / check.sh"}
+    F -->|"已有上库授权"| G["⑥ 代码托管平台上库"]
+    G -->|"仅代码相关"| H{"⑦ CI 构建门禁<br />增量检查改动后知识卡<br />check.py / check.sh"}
     H -->|"违规 · 打回"| D
     H -->|"通过"| I["⑧ committer 评审<br />合入 Git"]
+    A -->|"纯文档 · 不调用 lint"| HUMAN{"真人确认确切最终卡与来源"}
+    HUMAN -->|"明确确认"| E
+    HUMAN -->|"无回复 / 暂缓"| WAIT["保持候选，等待人工处理"]
+    HUMAN -->|"修订 / 部分接受"| A
+    E -.->|"落位约束"| STABLE["确切 final-view → stable<br />事务 apply · 锁 / CAS / journal<br />不保留正式 draft"]
+    F -.->|"本地消费"| LOCAL["完整 local 索引代次激活<br />允许未合入 stable；不自动上库"]
+    G -->|"纯文档：沿用确切人工确认<br />跳过 CI 代码门禁"| I
+    H -.->|"二次检查补充"| CURRENT["固定最新业务代码及完整依赖，只读复核<br />不修卡 / 锁 / 链接 / 源码<br />失败回贡献者本地重固来源再提交"]
+    I --> SHARED["按实际合入身份与相符证明 / 确认<br />完整构建并激活 shared 索引代次"]
 ```
+
+新增支路不改变原①–⑧阶段：B/C/D/H 只用于代码，纯文档由真人确认后进入落位，并从上库节点直达普通评审；文档在 F 仅留痕和构建索引，不调用 lint 或要求代码门禁记录。④的正式落位必须是 stable（与下文既定规则相同）；原节点中的 draft 表示候选来源，原文案修正待讨论。F 的 local 构建与授权上库均从已落位 stable 出发，上库不以 local 激活成功为前提；H 的打回连线表示贡献者回本地修订，不是 CI 修改输入。
 
 **①② 是"查"不是"改"**：契约校验只判定卡是否合规，不改写内容——违规卡的修复由 Agent 按 lint 违规清单改，改完重新走门禁。
 
@@ -580,7 +607,14 @@ flowchart TB
     end
 
     R -->|"设计意图 / 动态语义"| C
+    GEN["artifacts/indexes/active.json<br />local / shared → 固定已激活代次"] -.->|"查询上下文"| C
+    BODY["同代 manifest + bodies/ 正文<br />摘要一致，不切回实时文件"] -.->|"正文身份"| E
+    VALID["维护事件与当前有效性<br />受影响 claim 跨代次持久阻断"] -.->|"召回前硬过滤"| C
+    VALID -.->|"最终交付前再检"| H
+    D -->|"无合格命中"| GAP["授权范围内回源码 / 原文<br />记录覆盖缺口，不自动建卡或上库"]
 ```
+
+新增节点只补查询身份与失败出口：local 可以引用本地未合入 stable；shared 必须绑定确切合入身份和相符证明/确认。正文固定在同一代次，当前维护阻断在召回和交付前都要核对；无命中不自动转生产。
 
 入口 Skill 不装领域事实；全局薄规则提醒首次接入、换仓及绑定失效时自动重载，触发与加载以回执和评测确认，不能把安装成功视为必然触发。具体设计见 [知识库详细设计 §3.2](知识库详细设计.md#32-能力-skill)。
 

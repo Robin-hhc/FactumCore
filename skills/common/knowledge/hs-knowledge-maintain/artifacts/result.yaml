@@ -1,0 +1,17 @@
+id: hs-knowledge-maintain-result
+title: maintain result
+required: true
+applies_to:
+  node_ids:
+  - maintain_knowledge
+required_on:
+  exit_ids:
+  - registered
+  - inspected
+  - advanced
+template: templates/result.md
+writing_guide: writing-guide.md
+review_guide: review-guide.md
+default_location:
+  kind: markdown_file
+  path: node-result.md

@@ -220,7 +220,7 @@ def _has_condition(group):
 
 
 def match_scope(claim, context, purpose="current"):
-    if purpose == "current" and claim.get("usage") != "current":
+    if purpose in ("current", "implementation") and claim.get("usage") != "current":
         return False
     if purpose == "implementation" and claim.get("evidence_kind") not in (
         "implementation",
@@ -241,7 +241,9 @@ def match_scope(claim, context, purpose="current"):
             for k in ("target_id", "chip", "side", "build_profile", "pairing_id")
         ):
             continue
-        features = set(context.get("features", []))
+        if (group.get("features_all") or group.get("features_none")) and not isinstance(context.get("features"), list):
+            continue
+        features = set(context.get("features") or [])
         if (
             not set(group.get("features_all", [])).issubset(features)
             or set(group.get("features_none", [])) & features
@@ -249,7 +251,7 @@ def match_scope(claim, context, purpose="current"):
             continue
         if group.get("protocol_versions") and not set(
             group["protocol_versions"]
-        ).issubset(context.get("protocol_versions", [])):
+        ).issubset(context.get("protocol_versions") or []):
             continue
         if group.get("revision_policy") == "pinned" and (
             not group.get("revision") or context.get("revision") != group["revision"]

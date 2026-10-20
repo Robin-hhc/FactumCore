@@ -7,7 +7,7 @@ files:
     sha256: ccc90c8e3b38e19264e3c6843099880b6f293779fc7222051ea5a47c3316c8db
   contracts/knowledge.py:
     path: governance/contracts/knowledge.py
-    sha256: fed02fd5e6b379095516718d2432d634db29651a03cd410da4ca8bd6fad39908
+    sha256: b8c6f54cc34db19361c14e6e7a28f00164121ed07a4355c7a988fd8cb4725a77
   contracts/records.py:
     path: governance/contracts/records.py
     sha256: 3896f79880396e640016911f5fa9746b9d570d790d8e0818188ec7a3c5fefea8

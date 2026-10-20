@@ -22,5 +22,11 @@ config.local.yml
 /aiotbot-knowledge-wifi/artifacts/*
 !/aiotbot-knowledge-wifi/artifacts/.gitkeep
 
+# Keep audit metadata versionable; never publish copied original/code bytes or writer state.
+/aiotbot-knowledge-wifi/logs/evidence/objects/
+/aiotbot-knowledge-wifi/logs/evidence/checked-code/
+/aiotbot-knowledge-wifi/logs/operations/.writer.lock
+/aiotbot-knowledge-wifi/logs/operations/*/backups/
+
 # Retired independent checkout, if still present locally.
 /aiot-knowledge/

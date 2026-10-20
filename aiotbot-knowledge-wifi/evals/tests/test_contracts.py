@@ -211,6 +211,17 @@ def test_empty_context_never_grants_current_scope():
     assert not knowledge.match_scope(claim, {}, "current")
 
 
+def test_unknown_features_cannot_prove_required_or_excluded_features():
+    claim = {"usage": "current", "scope": {"applicability": "constrained", "contexts": [{"chip": "chip12", "features_none": ["A"]}]}}
+    assert not knowledge.match_scope(claim, {"chip": "chip12", "features": None})
+    assert knowledge.match_scope(claim, {"chip": "chip12", "features": []})
+
+
+def test_guidance_only_implementation_text_never_becomes_current_implementation():
+    claim = {"usage": "guidance", "evidence_kind": "implementation", "scope": {"applicability": "universal", "contexts": []}}
+    assert not knowledge.match_scope(claim, {}, "implementation")
+
+
 @pytest.mark.parametrize("kind", ["manual_review", "final_view", "local_check", "apply_result", "index_manifest"])
 def test_record_kind_requires_its_actual_payload(rules, kind):
     with pytest.raises(v.ContractError, match="SCHEMA_INVALID"):

@@ -105,7 +105,10 @@ class PublicGovernanceTests(unittest.TestCase):
         completed = subprocess.run(
             [
                 sys.executable,
-                str(SKILLS / skill / "scripts/cli.py"),
+                str(
+                    pathlib.Path(self.catalog["skills"][skill]["root"])
+                    / "scripts/cli.py"
+                ),
                 "--input",
                 str(inp),
                 "--output",
@@ -350,6 +353,32 @@ class PublicGovernanceTests(unittest.TestCase):
             + marshal.dumps(code)
         )
         self.prepare_and_approve("hostile-cache")
+
+    def test_own_support_and_business_pyc_are_never_executed(self):
+        name = "hs-knowledge-confirmation-prepare"
+        copied = self.root / "isolated-installed" / name
+        shutil.copytree(
+            SKILLS / name, copied, ignore=shutil.ignore_patterns("__pycache__")
+        )
+        for module in ("support", "prepare"):
+            source = copied / "scripts" / (module + ".py")
+            cached = pathlib.Path(importlib.util.cache_from_source(str(source)))
+            cached.parent.mkdir(parents=True, exist_ok=True)
+            code = compile(
+                "raise RuntimeError('UNPINNED PACKAGE CACHE EXECUTED')",
+                str(source),
+                "exec",
+            )
+            metadata = source.stat()
+            cached.write_bytes(
+                importlib.util.MAGIC_NUMBER
+                + struct.pack("<III", 0, int(metadata.st_mtime), metadata.st_size)
+                + marshal.dumps(code)
+            )
+        self.catalog["skills"][name]["root"] = str(copied)
+        self.catalog["skills"][name]["package_digest"] = package_digest(copied)
+        self.catalog_path.write_bytes(canonical(self.catalog))
+        self.prepare_and_approve("hostile-package-cache")
 
 
 if __name__ == "__main__":

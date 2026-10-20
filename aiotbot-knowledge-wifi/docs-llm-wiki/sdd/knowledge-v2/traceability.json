@@ -349,8 +349,10 @@
         "E202",
         "E218"
       ],
-      "status": "pending",
-      "completion_records": []
+      "status": "in_progress",
+      "completion_records": [
+        "records/T201-contracts.json"
+      ]
     },
     {
       "id": "T202",

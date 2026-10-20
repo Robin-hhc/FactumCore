@@ -1,5 +1,5 @@
 ---
-schema_version: '1.0'
+schema_version: '2.0'
 id: "{{card_id}}"
 profile: protocol
 title: "{{title}}"
@@ -12,13 +12,16 @@ scope:
   contexts: []
 aliases: []
 sources:
-- "{{snapshot_id}}"
+- evidence_ref: "{{evidence_ref}}"
+  source_id: "{{source_id}}"
+  snapshot_id: "{{snapshot_id}}"
+  locator: {kind: lines, start: 1, end: 1}
 claims:
 - id: "{{claim_id}}"
   text_ref: "#{{claim_id}}"
   evidence_kind: design
-  source_ids:
-  - "{{source_id}}"
+  source_refs:
+  - "{{evidence_ref}}"
   context_ids: []
   usage: guidance
   verification_requirements: []

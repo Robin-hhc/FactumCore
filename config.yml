@@ -1,5 +1,5 @@
 # FactumCore code/knowledge workspace; capability packages are provided separately.
-schema_version: '1.0'
+schema_version: '2.0'
 workspace_id: aiotbot-wifi-v1
 knowledge_roots:
   wifi: aiotbot-knowledge-wifi

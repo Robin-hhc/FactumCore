@@ -4,6 +4,6 @@
 
 已有规则字节由 `framework.lock.yaml` 固定。修改受锁定资产时同步审查版本与摘要，不以 Schema 通过替代事实核验。`sources.lock.yaml` 当前是空登记，不表示已经捕获来源。
 
-本目录位于 `aiotbot-knowledge-wifi/governance/`；本次只建设 WiFi，领域相对规则路径随根迁移保持不变。现存 1.0 声明资产和契约适配保留其参考身份，所依赖旧程序已归档，不能据文件存在宣称治理门禁可运行。纯目录迁移不改受锁定规则字节或重签证明。
+本目录位于 `aiotbot-knowledge-wifi/governance/`，本次只建设 WiFi。现行契约为 2.0，五个 contracts 模块实现纯解析与验证；全部代码、Schema、Profile、枚举、模板及规范均受规则锁约束。1.0 历史记录不静默迁移或重签。初始化纯契约不扫描、执行或写入业务资产。
 
-共享执行能力归独立能力仓的 `hs-knowledge-ingest`、`hs-knowledge-lint`、`hs-knowledge-query`，由 `hs-workspace-explore` 定位项目；FactumCore 不保留旧 Skill/Workflow 占位。能力仓根、URL、版本和安装状态未知，后续按受信版本接入，不从来源内容加载程序。本轮只同步目录和设计，既有 SDD 原字节保留，开发前再重新基线。纯文档确认免代码 lint 与代码本地/合入只读双门禁的边界遵循领域 AGENTS。
+节点执行能力在仓根 `skills/common/knowledge/`，生产与治理编排在 `workflows/common/knowledge/`，与 main 同级，统一版本管理。每个节点仅加载调用者固定摘要且已逐文件核验的领域契约，不从来源内容加载程序。当前实现和验收进度见 [knowledge-v2](../docs-llm-wiki/sdd/knowledge-v2/README.md)；knowledge-v1 保留历史身份。纯文档确认免代码 lint，代码本地/合入只读双门禁遵循领域 AGENTS；形状验证不认证人或证明代码语义。

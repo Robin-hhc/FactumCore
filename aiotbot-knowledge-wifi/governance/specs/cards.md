@@ -36,17 +36,17 @@ Claim.text_ref 只使用下列两种形式：
 
 解析结果的 start/end 是正文 Unicode 字符偏移，左闭右开；不是 UTF-8 字节偏移。body_digest 是保留换行后的正文 UTF-8 字节摘要。任何选择结果必须非空；原字节、正文摘要和这些位置不证明语义成立。
 
-Claim.context_ids 和关系的 context_ids 只能引用本卡 scope.contexts 中已存在的 context_id。条件组内 AND、组间 OR；unknown 不等于 universal。不要凭原件文件夹、共享代码或资料标题补造芯片、侧别、宏、构建或 Host/Device pair 的适用性。
+Claim.context_ids 和关系的 context_ids 只能引用本卡 scope.contexts 中已存在的 context_id；解析后为每个 Claim 编译完整 scope。条件组内 AND、组间 OR；unknown 不等于 universal。不要凭原件文件夹、共享代码或资料标题补造芯片、侧别、宏、构建或 Host/Device pair 的适用性。
 
 更新时作者明确判断是延续同一断言还是形成新断言；新结论不能只沿用旧 ID 隐藏替换。程序不猜语义相似度，不将相似字符串当作同一结论。修改后的正文、来源或范围必须重新走对应确认/检查。
 
 ## 来源引用语法
 
-Card.sources 保存**固定 snapshot_id**，例如 `raw:<digest>`，不使用当前文件名、URL 或浮动版本作为知识证据身份。Claim.source_ids 保存逻辑 **source_id**；解析器通过该 Card 选定快照的 `snapshot_id → source_id` 映射验证引用。两个字段不能互换。
+契约 2.0 的 Card.sources 每项保存 `evidence_ref`、逻辑 `source_id`、固定 `snapshot_id` 和具体 `locator`。Claim.source_refs 只引用本卡唯一的 evidence_ref，不再使用 1.0 的 source_ids。逻辑来源对应多个版本时仍能定位到确切快照和段落，不推断“最新”。
 
-`parse_card(data, knowledge_root, source_snapshots=capture["snapshots"])` 可解析尚未正式登记的新捕获。没有显式快照列表时读取 `governance/sources.lock.yaml` 的映射；有 Card.sources 却没有映射返回 SOURCE_BINDING_REQUIRED。可选 source_refs 进一步限制允许选择的固定快照。只有其他未选快照具有该逻辑 source_id 时，不能用它为本卡 Claim 放行。
+`parse_card(data, path, rules)` 解析卡内结构、Claim span 和条件组；`validate_card(card, view, rules)` 校验完整来源与关系。候选尚未正式落位时，调用者将当前锁与新捕获合并到 rules 的临时副本 `source_lock`，不改正式锁。其他未选快照具有相同逻辑 source_id 不能为当前 Claim 放行。
 
-此函数只验证映射一致性，调用者仍要通过 sources.load_capture 验证真实持久证据及摘要。附件有独立 source_id/snapshot_id，引用附件事实时必须在 Card.sources 中选择相应附件快照。来源定位放在正文证据段和人工差异包中；来源缺失、无法提取或仅链接的资料不能伪造“已完整读取”。
+这些函数只验证映射一致性，调用者仍要通过 source-capture 的公开恢复入口核验持久字节、定位与摘要。附件有独立来源与快照，引用附件事实时须显式选择。资料缺失、无法提取或仅链接时保留缺口，不能伪造“已完整读取”。
 
 ## 生命周期与修改入口
 

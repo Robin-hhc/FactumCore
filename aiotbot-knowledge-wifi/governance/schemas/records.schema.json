@@ -1,1071 +1,821 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "AIoT WiFi persistent record shapes v1",
-  "oneOf": [
-    {
-      "$ref": "#/$defs/local_check"
-    },
-    {
-      "$ref": "#/$defs/manual_review"
-    },
-    {
-      "$ref": "#/$defs/merge_gate"
-    },
-    {
-      "$ref": "#/$defs/maintenance_event"
-    },
-    {
-      "$ref": "#/$defs/operation"
-    },
-    {
-      "$ref": "#/$defs/workflow"
-    },
-    {
-      "$ref": "#/$defs/project_context"
-    },
-    {
-      "$ref": "#/$defs/search_receipt"
-    },
-    {
-      "$ref": "#/$defs/index_manifest"
-    }
+  "type": "object",
+  "required": [
+    "schema_version",
+    "record_kind"
   ],
-  "$defs": {
-    "local_check": {
-      "type": "object",
-      "properties": {
-        "schema_version": {
-          "const": "1.0"
-        },
-        "record_kind": {
-          "const": "local_check"
-        },
-        "extensions": {
-          "type": "object"
-        },
-        "check_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "operation_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "input_view_digest": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "target_file_digests": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string",
-            "pattern": "^[0-9a-f]{64}$"
-          }
-        },
-        "source_set_digest": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "scope_digest": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "contract_digest": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "tool_digest": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "validation_context": {
-          "type": "object"
-        },
-        "checks": {
-          "type": "array",
-          "items": {
-            "type": "object"
-          }
-        },
-        "claim_results": {
-          "type": "array",
-          "items": {
-            "type": "object"
-          }
-        },
-        "result": {
-          "enum": [
-            "pass",
-            "fail",
-            "incomplete"
-          ]
-        },
-        "finished_at": {
-          "type": "string",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "schema_version",
-        "record_kind",
-        "check_id",
-        "operation_id",
-        "input_view_digest",
-        "target_file_digests",
-        "source_set_digest",
-        "scope_digest",
-        "contract_digest",
-        "tool_digest",
-        "validation_context",
-        "checks",
-        "claim_results",
+  "properties": {
+    "schema_version": {
+      "const": "2.0"
+    },
+    "record_kind": {
+      "enum": [
         "result",
-        "finished_at"
-      ],
-      "additionalProperties": false
+        "project_context",
+        "source_bundle",
+        "change_plan",
+        "final_view",
+        "handoff",
+        "candidate_inspection",
+        "display",
+        "manual_review",
+        "local_check",
+        "merge_check",
+        "apply_result",
+        "transaction_journal",
+        "index_manifest",
+        "query_regression",
+        "search_receipt",
+        "maintenance_event",
+        "maintenance_state",
+        "publish_handoff",
+        "host_event",
+        "recovery_result",
+        "source_resolution",
+        "workflow_manifest",
+        "display_receipt",
+        "confirmation_display",
+        "confirmation_review",
+        "generation",
+        "event",
+        "operation_status",
+        "semantic_review",
+        "artifact_manifest"
+      ]
     },
-    "manual_review": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "operation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rules_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "tool_identity": {
       "type": "object",
-      "properties": {
-        "schema_version": {
-          "const": "1.0"
-        },
-        "record_kind": {
-          "const": "manual_review"
-        },
-        "extensions": {
-          "type": "object"
-        },
-        "review_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "operation_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "review_mode": {
-          "const": "manual_document"
-        },
-        "baseline_digest": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "target_file_digests": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string",
-            "pattern": "^[0-9a-f]{64}$"
-          }
-        },
-        "card_ids": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "claim_decisions": {
-          "type": "array",
-          "items": {
-            "type": "object"
-          }
-        },
-        "source_snapshot_refs": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "source_set_digest": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "scope_digest": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "decision": {
-          "enum": [
-            "accepted",
-            "confirmed_no_impact",
-            "partially_accepted",
-            "returned",
-            "deferred",
-            "deprecated",
-            "awaiting_confirmation"
-          ]
-        },
-        "confirmed_by": {
-          "type": "string",
-          "minLength": 1
-        },
-        "confirmed_at": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "confirmation_ref": {
-          "type": "string",
-          "minLength": 1
-        },
-        "limitations": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        }
-      },
       "required": [
-        "schema_version",
-        "record_kind",
-        "review_id",
-        "operation_id",
-        "review_mode",
-        "baseline_digest",
-        "target_file_digests",
-        "card_ids",
-        "claim_decisions",
-        "source_snapshot_refs",
-        "source_set_digest",
-        "scope_digest",
-        "decision",
-        "confirmed_by",
-        "confirmed_at",
-        "confirmation_ref",
-        "limitations"
+        "skill",
+        "package_digest",
+        "runtime",
+        "requirements_digest"
       ],
-      "additionalProperties": false
-    },
-    "merge_gate": {
-      "type": "object",
       "properties": {
-        "schema_version": {
-          "const": "1.0"
+        "skill": {
+          "type": "string",
+          "pattern": "^hs-"
         },
-        "record_kind": {
-          "const": "merge_gate"
+        "package_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
         },
-        "extensions": {
-          "type": "object"
-        },
-        "gate_id": {
+        "runtime": {
           "type": "string",
           "minLength": 1
         },
-        "proposed_head": {
-          "type": "string",
-          "minLength": 1
-        },
-        "knowledge_base": {
-          "type": "string",
-          "minLength": 1
-        },
-        "integration_tree_digest": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "input_file_digests": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string",
-            "pattern": "^[0-9a-f]{64}$"
-          }
-        },
-        "latest_code_policy_digest": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "resolved_code_snapshots": {
-          "type": "array",
-          "items": {
-            "type": "object"
-          }
-        },
-        "validation_context": {
-          "type": "object"
-        },
-        "evidence_snapshots": {
-          "type": "array",
-          "items": {
-            "type": "object"
-          }
-        },
-        "card_digest_set": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string",
-            "pattern": "^[0-9a-f]{64}$"
-          }
-        },
-        "source_set_digest": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "scope_digest": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "contract_digest": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "tool_digest": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "checks": {
-          "type": "array",
-          "items": {
-            "type": "object"
-          }
-        },
-        "claim_results": {
-          "type": "array",
-          "items": {
-            "type": "object"
-          }
-        },
-        "input_unchanged": {
-          "type": "boolean"
-        },
-        "validity_watermark": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "started_at": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "finished_at": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "result": {
-          "enum": [
-            "pass",
-            "fail",
-            "incomplete"
-          ]
-        },
-        "evidence_bundle_ref": {
-          "type": "string",
-          "minLength": 1
-        },
-        "evidence_bundle_digest": {
+        "requirements_digest": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
         }
       },
-      "required": [
-        "schema_version",
-        "record_kind",
-        "gate_id",
-        "proposed_head",
-        "knowledge_base",
-        "integration_tree_digest",
-        "input_file_digests",
-        "latest_code_policy_digest",
-        "resolved_code_snapshots",
-        "validation_context",
-        "evidence_snapshots",
-        "card_digest_set",
-        "source_set_digest",
-        "scope_digest",
-        "contract_digest",
-        "tool_digest",
-        "checks",
-        "claim_results",
-        "input_unchanged",
-        "validity_watermark",
-        "started_at",
-        "finished_at",
-        "result",
-        "evidence_bundle_ref",
-        "evidence_bundle_digest"
-      ],
-      "additionalProperties": false
-    },
-    "maintenance_event": {
-      "type": "object",
-      "properties": {
-        "schema_version": {
-          "const": "1.0"
-        },
-        "record_kind": {
-          "const": "maintenance_event"
-        },
-        "extensions": {
-          "type": "object"
-        },
-        "event_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "sequence": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "authority_domain": {
-          "type": "string",
-          "minLength": 1
-        },
-        "source_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "old_snapshot": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "new_snapshot": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "event_kind": {
-          "type": "string",
-          "minLength": 1
-        },
-        "affected_claims": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "scope_digest": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "reason": {
-          "type": "string",
-          "minLength": 1
-        },
-        "detected_at": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "producer_identity": {
-          "type": "string",
-          "minLength": 1
-        },
-        "status": {
-          "enum": [
-            "detected",
-            "blocked",
-            "reconciled",
-            "deferred"
-          ]
-        }
-      },
-      "required": [
-        "schema_version",
-        "record_kind",
-        "event_id",
-        "sequence",
-        "authority_domain",
-        "source_id",
-        "old_snapshot",
-        "new_snapshot",
-        "event_kind",
-        "affected_claims",
-        "scope_digest",
-        "reason",
-        "detected_at",
-        "producer_identity",
-        "status"
-      ],
-      "additionalProperties": false
-    },
-    "operation": {
-      "type": "object",
-      "properties": {
-        "schema_version": {
-          "const": "1.0"
-        },
-        "record_kind": {
-          "const": "operation"
-        },
-        "extensions": {
-          "type": "object"
-        },
-        "operation_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "operation_kind": {
-          "type": "string",
-          "minLength": 1
-        },
-        "review_mode": {
-          "enum": [
-            "code_gate",
-            "manual_document"
-          ]
-        },
-        "status": {
-          "type": "string",
-          "minLength": 1
-        },
-        "changeset_digest": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "baseline_digest": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "target_file_digests": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string",
-            "pattern": "^[0-9a-f]{64}$"
-          }
-        },
-        "record_refs": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "commit_ref": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "input_digests": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string",
-            "pattern": "^[0-9a-f]{64}$"
-          }
-        },
-        "output_refs": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "diagnostics": {
-          "type": "array",
-          "items": {
-            "type": "object"
-          }
-        }
-      },
-      "required": [
-        "schema_version",
-        "record_kind",
-        "operation_id",
-        "operation_kind",
-        "review_mode",
-        "status",
-        "changeset_digest",
-        "baseline_digest",
-        "target_file_digests",
-        "record_refs"
-      ],
-      "additionalProperties": false
-    },
-    "workflow": {
-      "type": "object",
-      "properties": {
-        "schema_version": {
-          "const": "1.0"
-        },
-        "record_kind": {
-          "const": "workflow"
-        },
-        "extensions": {
-          "type": "object"
-        },
-        "workflow_run_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "operation_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "workflow_type": {
-          "type": "string",
-          "minLength": 1
-        },
-        "workflow_version": {
-          "type": "string",
-          "minLength": 1
-        },
-        "parent_run_id": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "stage": {
-          "type": "string",
-          "minLength": 1
-        },
-        "status": {
-          "enum": [
-            "running",
-            "awaiting_confirmation",
-            "needs_revision",
-            "completed"
-          ]
-        },
-        "input_digests": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string",
-            "pattern": "^[0-9a-f]{64}$"
-          }
-        },
-        "output_refs": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "pause_reason": {
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "schema_version",
-        "record_kind",
-        "workflow_run_id",
-        "operation_id",
-        "workflow_type",
-        "workflow_version",
-        "parent_run_id",
-        "stage",
-        "status",
-        "input_digests",
-        "output_refs",
-        "pause_reason"
-      ],
-      "additionalProperties": false
-    },
-    "project_context": {
-      "type": "object",
-      "properties": {
-        "schema_version": {
-          "const": "1.0"
-        },
-        "record_kind": {
-          "const": "project_context"
-        },
-        "extensions": {
-          "type": "object"
-        },
-        "receipt_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "binding_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "status": {
-          "enum": [
-            "resolved",
-            "context_loaded"
-          ]
-        },
-        "requested_path": {
-          "type": "string",
-          "minLength": 1
-        },
-        "canonical_path": {
-          "type": "string",
-          "minLength": 1
-        },
-        "checkout_identity": {
-          "type": "object"
-        },
-        "workspace_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "config_digest": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "knowledge_bindings": {
-          "type": "array",
-          "items": {
-            "type": "object"
-          }
-        },
-        "required_entry_files": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "entry_reads": {
-          "type": "array",
-          "items": {
-            "type": "object"
-          }
-        },
-        "resolved_context": {
-          "type": "object"
-        },
-        "unknown_fields": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "authorization_epoch": {
-          "type": "string",
-          "minLength": 1
-        },
-        "tool_digest": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "skill_digest": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "rule_digest": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "diagnostics": {
-          "type": "array",
-          "items": {
-            "type": "object"
-          }
-        },
-        "workspace_root": {
-          "type": "string"
-        },
-        "config": {
-          "type": "object"
-        },
-        "registry": {
-          "type": "object"
-        },
-        "tool": {
-          "type": "object"
-        }
-      },
-      "required": [
-        "schema_version",
-        "record_kind",
-        "receipt_id",
-        "binding_id",
-        "status",
-        "requested_path",
-        "canonical_path",
-        "checkout_identity",
-        "workspace_id",
-        "config_digest",
-        "knowledge_bindings",
-        "required_entry_files",
-        "entry_reads",
-        "authorization_epoch"
-      ],
-      "additionalProperties": false
-    },
-    "search_receipt": {
-      "type": "object",
-      "properties": {
-        "schema_version": {
-          "const": "1.0"
-        },
-        "record_kind": {
-          "const": "search_receipt"
-        },
-        "extensions": {
-          "type": "object"
-        },
-        "request_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "channel": {
-          "enum": [
-            "local",
-            "shared"
-          ]
-        },
-        "integration": {
-          "enum": [
-            "local",
-            "proposed",
-            "merged"
-          ]
-        },
-        "generation_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "knowledge_identity": {
-          "type": "object"
-        },
-        "query": {
-          "type": "string"
-        },
-        "resolved_context": {
-          "type": "object"
-        },
-        "authorization_epoch": {
-          "type": "string",
-          "minLength": 1
-        },
-        "validity_watermark": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "tokenizer_digest": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "dictionary_digest": {
-          "anyOf": [
-            {
-              "type": "string",
-              "pattern": "^[0-9a-f]{64}$"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "channels": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "hits": {
-          "type": "array",
-          "items": {
-            "type": "object"
-          }
-        },
-        "source_reads": {
-          "type": "array",
-          "items": {
-            "type": "object"
-          }
-        },
-        "claim_results": {
-          "type": "array",
-          "items": {
-            "type": "object"
-          }
-        },
-        "gaps": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "budget_used": {
-          "type": "object"
-        },
-        "finished_at": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "binding_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "context_receipt_ref": {
-          "type": "string",
-          "minLength": 1
-        },
-        "code_checkout_identity": {
-          "type": "object"
-        },
-        "workspace_config_digest": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        }
-      },
-      "required": [
-        "schema_version",
-        "record_kind",
-        "request_id",
-        "channel",
-        "integration",
-        "generation_id",
-        "knowledge_identity",
-        "query",
-        "resolved_context",
-        "authorization_epoch",
-        "validity_watermark",
-        "tokenizer_digest",
-        "dictionary_digest",
-        "channels",
-        "hits",
-        "source_reads",
-        "claim_results",
-        "gaps",
-        "budget_used",
-        "finished_at"
-      ],
-      "additionalProperties": false
-    },
-    "index_manifest": {
-      "type": "object",
-      "properties": {
-        "schema_version": {
-          "const": "1.0"
-        },
-        "record_kind": {
-          "const": "index_manifest"
-        },
-        "extensions": {
-          "type": "object"
-        },
-        "generation_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "index_schema_version": {
-          "type": "string",
-          "minLength": 1
-        },
-        "channel": {
-          "enum": [
-            "local",
-            "shared"
-          ]
-        },
-        "knowledge_identity": {
-          "type": "object"
-        },
-        "input_tree_digest": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "card_digest_set": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string",
-            "pattern": "^[0-9a-f]{64}$"
-          }
-        },
-        "source_set_digest": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "contract_digest": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "tool_digest": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "tokenizer_digest": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "dictionary_digest": {
-          "anyOf": [
-            {
-              "type": "string",
-              "pattern": "^[0-9a-f]{64}$"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "alias_digest": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "config_digest": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
-        "sqlite_runtime": {
-          "type": "string",
-          "minLength": 1
-        },
-        "verification_record_refs": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "validity_watermark": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "file_digests": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string",
-            "pattern": "^[0-9a-f]{64}$"
-          }
-        },
-        "card_count": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "claim_count": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "built_at": {
-          "type": "string",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "schema_version",
-        "record_kind",
-        "generation_id",
-        "index_schema_version",
-        "channel",
-        "knowledge_identity",
-        "input_tree_digest",
-        "card_digest_set",
-        "source_set_digest",
-        "contract_digest",
-        "tool_digest",
-        "tokenizer_digest",
-        "dictionary_digest",
-        "alias_digest",
-        "config_digest",
-        "sqlite_runtime",
-        "verification_record_refs",
-        "validity_watermark",
-        "file_digests",
-        "card_count",
-        "claim_count",
-        "built_at"
-      ],
-      "additionalProperties": false
+      "additionalProperties": true
     }
-  }
+  },
+  "additionalProperties": true,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "not": {
+              "enum": [
+                "result",
+                "host_event",
+                "semantic_review"
+              ]
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "operation_id",
+          "rules_digest",
+          "tool_identity",
+          "digest"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "project_context"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "state",
+          "workspace_id",
+          "knowledge_root",
+          "config_digest",
+          "entries"
+        ],
+        "properties": {
+          "entries": {
+            "type": "array"
+          },
+          "config_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "source_bundle"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "resources",
+          "snapshots",
+          "extractions",
+          "limitations"
+        ],
+        "properties": {
+          "resources": {
+            "type": "array"
+          },
+          "snapshots": {
+            "type": "array"
+          },
+          "extractions": {
+            "type": "array"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "change_plan"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "bundle_ref",
+          "bundle_digest",
+          "candidate_ids",
+          "decisions",
+          "writes",
+          "deletes",
+          "baseline",
+          "review_mode"
+        ],
+        "properties": {
+          "candidate_ids": {
+            "type": "array"
+          },
+          "decisions": {
+            "type": "array"
+          },
+          "writes": {
+            "type": "array"
+          },
+          "deletes": {
+            "type": "array"
+          },
+          "bundle_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "final_view"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "writes",
+          "deletes",
+          "baseline_digest",
+          "review_mode",
+          "plan_ref",
+          "plan_digest",
+          "source_refs"
+        ],
+        "properties": {
+          "writes": {
+            "type": "array"
+          },
+          "deletes": {
+            "type": "array"
+          },
+          "source_refs": {
+            "type": "array"
+          },
+          "baseline_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "plan_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "handoff"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "view_ref",
+          "view_digest",
+          "plan_ref",
+          "review_mode",
+          "target_workflow"
+        ],
+        "properties": {
+          "view_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "candidate_inspection"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "view_ref",
+          "view_digest",
+          "review_mode"
+        ],
+        "properties": {
+          "view_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "confirmation_display"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "view_ref",
+          "view_digest",
+          "challenge",
+          "display_text",
+          "created_at",
+          "expires_at",
+          "writes",
+          "deletes"
+        ],
+        "properties": {
+          "writes": {
+            "type": "array"
+          },
+          "deletes": {
+            "type": "array"
+          },
+          "view_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "display"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "view_ref",
+          "view_digest",
+          "challenge"
+        ],
+        "properties": {
+          "view_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "display_receipt"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "view_ref",
+          "view_digest",
+          "challenge"
+        ],
+        "properties": {
+          "view_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "manual_review"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "view_ref",
+          "view_digest",
+          "display_ref",
+          "display_digest",
+          "host_event",
+          "status",
+          "verification_tier"
+        ],
+        "properties": {
+          "view_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "display_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "local_check"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "view_ref",
+          "view_digest",
+          "status",
+          "mode",
+          "claims"
+        ],
+        "properties": {
+          "claims": {
+            "type": "array"
+          },
+          "view_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "merge_check"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "view_ref",
+          "view_digest",
+          "status",
+          "mode",
+          "claims"
+        ],
+        "properties": {
+          "claims": {
+            "type": "array"
+          },
+          "view_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "apply_result"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "status",
+          "view_ref",
+          "view_digest",
+          "proof_ref",
+          "proof_digest",
+          "writes",
+          "deletes",
+          "verification_tier"
+        ],
+        "properties": {
+          "writes": {
+            "type": "array"
+          },
+          "deletes": {
+            "type": "array"
+          },
+          "view_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "proof_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "transaction_journal"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "status",
+          "view_ref",
+          "view_digest",
+          "proof_ref",
+          "proof_digest",
+          "entries"
+        ],
+        "properties": {
+          "entries": {
+            "type": "array"
+          },
+          "view_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "proof_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "query_regression"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "generation_ref",
+          "cases_digest",
+          "outcomes",
+          "passed"
+        ],
+        "properties": {
+          "outcomes": {
+            "type": "array"
+          },
+          "cases_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "search_receipt"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "generation_ref",
+          "generation_id",
+          "channel",
+          "validity_epoch",
+          "evaluation",
+          "request_digest",
+          "result_digest"
+        ],
+        "properties": {
+          "request_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "result_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "maintenance_event"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "event_id",
+          "change",
+          "affected_claims"
+        ],
+        "properties": {
+          "affected_claims": {
+            "type": "array"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "maintenance_state"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "validity_epoch",
+          "blocked_claims",
+          "impact_scan_watermark",
+          "knowledge_apply_watermark"
+        ],
+        "properties": {
+          "blocked_claims": {
+            "type": "array"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "publish_handoff"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "status",
+          "apply_result_ref",
+          "apply_result_digest",
+          "view_ref",
+          "view_digest",
+          "external_obligations",
+          "git_merge_verified",
+          "remote_push_verified"
+        ],
+        "properties": {
+          "external_obligations": {
+            "type": "array"
+          },
+          "apply_result_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "view_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "recovery_result"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "mode",
+          "status",
+          "delegated_result_ref",
+          "delegated_result_digest"
+        ],
+        "properties": {
+          "delegated_result_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "workflow_manifest"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "workflow",
+          "phase",
+          "request_digest",
+          "result_digest"
+        ],
+        "properties": {
+          "request_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "result_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "operation_status"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "view_ref",
+          "view_digest"
+        ],
+        "properties": {
+          "view_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "result"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "status",
+          "phase",
+          "data",
+          "diagnostics",
+          "tool_identity",
+          "rules_digest"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "ok",
+              "blocked",
+              "error"
+            ]
+          },
+          "data": {
+            "type": "object"
+          },
+          "diagnostics": {
+            "type": "array"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "index_manifest"
+          }
+        }
+      },
+      "then": {
+        "anyOf": [
+          {
+            "required": [
+              "database_ref",
+              "database_digest",
+              "documents",
+              "qualifications",
+              "knowledge_baseline",
+              "validity_epoch",
+              "channel",
+              "generation_id"
+            ]
+          },
+          {
+            "required": [
+              "generation_ref",
+              "generation_id",
+              "channel",
+              "manifest_digest"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "enum": [
+              "host_event",
+              "semantic_review"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "payload",
+          "signature_b64"
+        ],
+        "properties": {
+          "payload": {
+            "type": "object"
+          },
+          "signature_b64": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  ]
 }

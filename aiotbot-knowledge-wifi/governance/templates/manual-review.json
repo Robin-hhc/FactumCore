@@ -1,7 +1,8 @@
 {
   "template_only": true,
   "record_kind": "manual_review",
-  "instruction": "Do not fill this template to manufacture approval. Run document confirm in a human-controlled terminal; it creates the real locked record after the exact-view action.",
+  "schema_version": "2.0",
+  "instruction": "Do not fill this template to manufacture approval. Prepare the exact view, wait for a real user action from the trusted host adapter, then verify and record that signed action. A terminal flag or Agent JSON does not authenticate a human.",
   "decisions": ["accepted", "confirmed_no_impact", "partially_accepted", "returned", "deferred", "deprecated"],
   "waiting_state": "No ManualReviewRecord exists until a real supported human action is received."
 }

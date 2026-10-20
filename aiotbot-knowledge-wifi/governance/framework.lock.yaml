@@ -1,22 +1,76 @@
-schema_version: '1.0'
+schema_version: '2.0'
 contract_family: aiot-wifi
-tool_version: 0.1.0
+tool_version: 0.2.0
 files:
-  workspace:
-    path: governance/schemas/workspace.schema.json
-    sha256: 66521da5892fde6b3b0e35fea42954c33f6215cd6c49b0f12821cba3ecfb8872
-  card:
+  contracts/__init__.py:
+    path: governance/contracts/__init__.py
+    sha256: ccc90c8e3b38e19264e3c6843099880b6f293779fc7222051ea5a47c3316c8db
+  contracts/knowledge.py:
+    path: governance/contracts/knowledge.py
+    sha256: fed02fd5e6b379095516718d2432d634db29651a03cd410da4ca8bd6fad39908
+  contracts/records.py:
+    path: governance/contracts/records.py
+    sha256: 3896f79880396e640016911f5fa9746b9d570d790d8e0818188ec7a3c5fefea8
+  contracts/source_resources.py:
+    path: governance/contracts/source_resources.py
+    sha256: 29b478ce2f269171a10dd341eb75890d66c534dfd2b361eab573c9d3826e6e1f
+  contracts/validation.py:
+    path: governance/contracts/validation.py
+    sha256: ea27b1cd15ba9e3748119595733125ac1c405696081be5f866b228f82ec3168b
+  schemas/frontmatter.schema.json:
     path: governance/schemas/frontmatter.schema.json
-    sha256: 0bda0125bd99c604dcf7c16fc85964eb51de24020f460f08d7c501bcdbf70243
-  sources:
-    path: governance/schemas/sources.schema.json
-    sha256: 181e8c5b3fee33880dc7a8bb148e5ad4eccb0483202f1c1de23f5dc7ce701681
-  record:
-    path: governance/schemas/records.schema.json
-    sha256: 864f5a6136376ffddf3ee5d107aa43d00fcb5650f02f33779d3bb2c1e56cde1a
-  profiles:
+    sha256: 796f5032fb764b95cc24c76b468120646a23d090506b00eac0e77101c17b08f8
+  schemas/profiles.yaml:
     path: governance/schemas/profiles.yaml
-    sha256: a6a3d5d908d3d44f5241aded086db8023b8ad97d6ab556914b728871db3f98cc
-  registries:
+    sha256: ec9eae684e484dd79cfe0f546a336d95d68ba5da7345f88e93733483d0d638be
+  schemas/records.schema.json:
+    path: governance/schemas/records.schema.json
+    sha256: 7fc4155bc669a19eeb0830eba044a01bc1ceaeb6b4787971da5267e7206803fb
+  schemas/registries.yaml:
     path: governance/schemas/registries.yaml
-    sha256: b39d21a720268cfa3dc02b9cbca6a70ca9a9deaa4c383d218e9183a0da07b932
+    sha256: c9825adb48789efa89b2ed2745f65cf06f8ca867f4155c588dd7f725a8c0d75b
+  schemas/sources.schema.json:
+    path: governance/schemas/sources.schema.json
+    sha256: 4eb46e8b8b6592308ce229f5f91553e0e1d50c3f90d0affef75bb5da3432134e
+  schemas/workspace.schema.json:
+    path: governance/schemas/workspace.schema.json
+    sha256: 20309635895697ffc68b4e7f5414e28b18ec381394d7b45100df10bfed916569
+  templates/command.md:
+    path: governance/templates/command.md
+    sha256: 6cd22b3a431ce7794956efabbb53c8ba783e430c2f86c1bbc87707b18dda01be
+  templates/entity.md:
+    path: governance/templates/entity.md
+    sha256: 6f0c7424c3a032e8d7298d1226ba42a5fbba4b1833d96152b91bd0d82a13afc1
+  templates/flow.md:
+    path: governance/templates/flow.md
+    sha256: a8d65ce8ecd5533f9af791259ebfc9639ef4c9680b21cadf86d80b1fb055e85b
+  templates/glossary.md:
+    path: governance/templates/glossary.md
+    sha256: 2cdf781386240d7b33c36bf5c6d74756eace5596fcff323d3c1d4e9eed601b47
+  templates/index.md:
+    path: governance/templates/index.md
+    sha256: 63d8664b725a4d764b96be2fe4351c5e95ea7e0407c1e2c25edcdff6a9c85943
+  templates/manual-review.json:
+    path: governance/templates/manual-review.json
+    sha256: 1d4dead1db4ee652edc82812ed26a5733f1b0e0037604dba35271f86693e19a0
+  templates/protocol.md:
+    path: governance/templates/protocol.md
+    sha256: fa26dd503111165b53c805e8294aa5d4df5776e20eddf60d8fc793716a4e0781
+  templates/rule.md:
+    path: governance/templates/rule.md
+    sha256: f4cdd7bf3e431b6fc6119b89a618770e2afa1e2f9fd2ac23368baa10086c647c
+  templates/runbook.md:
+    path: governance/templates/runbook.md
+    sha256: 45e465c2b5725c85addad44b17c44ea70db2515a5d21fbe976fa54a7b0ec7fdf
+  specs/cards.md:
+    path: governance/specs/cards.md
+    sha256: ea9f81c1080504420d86dc65a09ea33d94ab6f7ec450c80596b3d6245ef9ddf4
+  specs/lifecycle.md:
+    path: governance/specs/lifecycle.md
+    sha256: edc54814f62977c6e9e04b5285a0acdc55277383828d86c3600588e5ddd8c048
+  specs/records.md:
+    path: governance/specs/records.md
+    sha256: 550a50e2f46826c4ebfde10575ac1617212621c473859dc4363025eb75b0d11f
+  specs/sources.md:
+    path: governance/specs/sources.md
+    sha256: 332960e7c606e1a4c0b86d6d49773ffc0e35f976c4434448bc11ed13900d9588

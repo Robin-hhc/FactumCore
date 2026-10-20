@@ -1,13 +1,28 @@
-"""Domain adapters to the one shared implementation; no second validation engine."""
+"""Record integrity; a public digest seal never authenticates human consent."""
+
+from .validation import ContractError, digest_payload, validate_shape
 
 
-def validate_shape(record, knowledge_root):
-    from _shared.contracts import validate_document
+def seal(record):
+    result = dict(record)
+    result["digest"] = digest_payload(result)
+    return result
 
-    return validate_document("record", record, knowledge_root)
+
+def verify(record, expected=None):
+    if not isinstance(record, dict) or record.get("digest") != digest_payload(record):
+        raise ContractError("RECORD_DIGEST_MISMATCH", "Record fields changed")
+    if record.get("schema_version") != "2.0":
+        raise ContractError("UNSUPPORTED_RECORD_VERSION", "Expected 2.0")
+    for field, value in (expected or {}).items():
+        if record.get(field) != value:
+            raise ContractError("RECORD_BINDING_MISMATCH", field)
+    return record
 
 
-def validate_confirmation(knowledge_root, operation_id, review_ref):
-    from _shared.changes import validate_review
+def validate_record_shape(record, rules):
+    return validate_shape("record", record, rules)
 
-    return validate_review(knowledge_root, operation_id, review_ref)
+
+def validate_record_binding(record, expected):
+    return verify(record, expected)

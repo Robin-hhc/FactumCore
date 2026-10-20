@@ -1,13 +1,15 @@
-# 人工文档确认记录（T06）
+# 2.0 运行记录与真人确认
 
-ManualReviewRecord 以锁定的 records.schema.json 为字段真源。候选等待状态放在 ChangeSet，不生成 confirmed_by、confirmed_at 或虚假人工记录。贡献者本人可确认，无额外审批人要求；无回复、超时、Agent 名字或普通 JSON 都不是本工具支持的真人动作。
+所有机器记录使用 schema_version 2.0、准确 record_kind 和规范对象摘要。节点记录绑定 operation、规则摘要、实际 Skill 包及运行依赖身份。摘要只检测内容和绑定变化，不认证人，不提供权限。
 
-`document confirm --knowledge-root K --operation-id ID --decision accepted --confirmed-by 本人` 展示确切 final-view 文件、固定来源文本和未提取附件限制，再要求人操作终端输入 `accepted <最终视图摘要前12位>`。也支持 confirmed_no_impact、partially_accepted、returned、deferred、deprecated；后四种不授权 apply。非交互输入返回 HUMAN_ACTION_REQUIRED，无记录。无 --yes、自动同意或确认 JSON 导入开关。整条文档分支不调用代码 lint，也不产 LocalCheckRecord/MergeGateRecord。
+纯文档的 confirmation-prepare 生成 exact final-view 全部拟写文件、来源说明、限制及新 challenge 的展示包。Workflow 的 user Gate 等待真实人操作；confirmation-record 只接受安装清单中受信宿主适配器签名的原始事件，检查 public key、actor_type、decision、challenge、display/view 摘要、时效和旧操作状态。未接入可信适配器时保持 awaiting，不能退回自填 confirmed_by、TTY 或普通 JSON 自动认可。
 
-记录在 logs/document-reviews/<review_id>.json，绑定 operation、确切文件/最终视图、ChangeSet、来源集/快照、范围、相关旧基线、计划与工具/契约。输入在读前和人动作后均复核，旧决定不能覆盖变化后的视图。记录自含摘要会循环，因此 review_digest 保存于外层回执，事务 journal 再固定实际记录字节。
+贡献者本人可以确认，不额外要求第二审批人。无回复、超时、Agent 自报、退回、暂缓和部分接受均不放行。部分接受经 revise 生成新 operation、精确 view 和新展示后重新确认。文档分支不调用 local-check/merge-check。
 
-终端 adapter 的身份是贡献者自述；宿主负责保证由真实人操作终端和写记录的权限。TTY/摘要/字段本身不认证自然人，也不防拥有同一文件写权限者伪造记录。本批实际开发验证使用测试专属合成终端；没有为真实业务卡制造确认。聊天中用户回复的可信宿主 adapter 尚未接入，不能宣称已经支持自动将聊天回复转换为确认；在该能力完成前，由用户亲自在其终端执行确认。后续接入须带真实对话动作及宿主凭证，不能仅接受 Agent 自报的 turn ID。
+ManualReview 持久保存原签名事件及 exact-view 绑定，apply 时再次验证宿主签名与当前输入，不能仅相信可重新计算的记录摘要。生产包不包含签名私钥。合成适配器只对受信安装清单明确指定、含专用隔离标记的测试根有效，相关记录必须声明 synthetic，不能当作真实人验收。
 
-部分接受先记录选择。`document narrow --knowledge-root K --operation-id 原ID --review-ref REF --new-operation-id 新ID --candidate 显式缩窄卡.md` 只允许保留同卡的严格 Claim 子集，保留 Claim 正文/元数据和范围不变，不引入新来源。若需改结论或范围，另建明确修订计划。缩窄后的 exact final-view 必须再展示并得到新真人动作；原部分接受或整包决定不能 apply 新操作。
+代码卡使用受信语义审查证据和逐 Claim 正支持生成 LocalCheck；MergeCheck 按最新获授权业务快照只读复验。缺路径、Target、宏、构建、固定版本或正支持证据返回 incomplete；零 finding 不等于通过。apply 通过受信 local-check 公开 verify-proof 入口复核证据，不接受任意自报 passed。
 
-纯文档确认是语义责任所在，技术校验只防止错对象、陈旧绑定和并发覆盖；不证明代码当前行为、资料权威性或知识检索已可用。模板中的占位身份和时间不能作为完成记录。
+事务 journal 记录完整 writes/deletes、expected-old/最终摘要、持久备份及每步结果。committed 重入返回原结果；非终态先受控恢复。发生外部新编辑时停止并保留现场，不覆盖编辑来“完成恢复”。索引和维护记录独立绑定代次、当前事件 epoch 及两水位，索引回滚不能撤销当前阻断。
+
+真实宿主动作桥接、自动触发、六 Target、CI 合入与权限部署各有独立验收；Schema、包测试或合成签名不能代替。

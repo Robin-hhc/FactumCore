@@ -568,9 +568,24 @@ def run(handler, package):
                 + "/".join(pieces[1:])
                 + "/result.json"
             )
+            references = set()
+            for key, value in data.items():
+                if key.endswith("_ref") and isinstance(value, str):
+                    references.add(value)
+                elif key.endswith("_refs") and isinstance(value, list):
+                    references.update(item for item in value if isinstance(item, str))
+            artifact_digests = {
+                item: sha(
+                    fixed_bytes(
+                        context.root, item, [".build", "logs", "artifacts/indexes"]
+                    )
+                )
+                for item in sorted(references)
+            }
             manifest = context.seal(
                 {
                     "workflow": workflow,
+                    "artifact_digests": artifact_digests,
                     "phase": phase,
                     "result": data,
                     "request_digest": digest(request),
@@ -583,6 +598,20 @@ def run(handler, package):
                 "# Node result\n\n```json\n" + canonical(manifest).decode() + "\n```\n"
             )
             write_bytes(context.root, ref[:-5] + ".md", markdown.encode())
+            for item, expected in artifact_digests.items():
+                if (
+                    sha(
+                        fixed_bytes(
+                            context.root, item, [".build", "logs", "artifacts/indexes"]
+                        )
+                    )
+                    != expected
+                ):
+                    raise NodeError(
+                        "ARTIFACT_CHANGED",
+                        "Returned file changed during workflow manifest publication",
+                        item,
+                    )
             envelope["data"]["artifact_manifest_ref"] = ref[:-5] + ".md"
         code = 0
     except Exception as exc:

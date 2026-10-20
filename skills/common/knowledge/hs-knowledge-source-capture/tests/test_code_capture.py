@@ -321,3 +321,122 @@ def test_machine_byte_locator_handles_empty_or_opaque_code_without_interpreted_t
     request["source_ref"]["locator"]["end"] += 1
     invalid = harness.run("source-capture", request, "resolve-source", expected=2)
     assert invalid["diagnostics"][0]["code"] == "INVALID_SOURCE_LOCATOR"
+
+
+def rewrite_configuration(harness, context_ref, change):
+    config_path = harness.root.parent / "config.yml"
+    config = yaml.safe_load(config_path.read_bytes())
+    change(config)
+    raw = yaml.safe_dump(config).encode()
+    config_path.write_bytes(raw)
+    receipt = harness.record(context_ref)
+    receipt["config_digest"] = hashlib.sha256(raw).hexdigest()
+    receipt.pop("digest")
+    receipt["digest"] = hashlib.sha256(canonical(receipt)).hexdigest()
+    harness.write(context_ref, canonical(receipt))
+
+
+@pytest.mark.parametrize("field", ["knowledge_root", "binding_domain"])
+def test_code_capture_enforces_current_wifi_domain_mapping(harness, field):
+    _, context = setup_code(harness)
+
+    def change(config):
+        if field == "knowledge_root":
+            config["knowledge_roots"]["wifi"] = "another-knowledge"
+        else:
+            config["architecture"][0]["knowledge_domain"] = "another-domain"
+
+    rewrite_configuration(harness, context, change)
+    result = harness.run(
+        "source-capture",
+        {
+            "operation_id": "wrong-domain",
+            "kind": "code",
+            "repo_id": "code",
+            "relative_path": "sample.c",
+            "source_id": "synthetic",
+            "context_ref": context,
+        },
+        expected=2 if field == "binding_domain" else 3,
+    )
+    assert result["diagnostics"][0]["code"] == (
+        "SCHEMA_INVALID" if field == "binding_domain" else "CODE_DOMAIN_MISMATCH"
+    )
+    assert not (harness.root / "logs/evidence").exists()
+
+
+def test_code_capture_honors_actual_explore_commit_field(harness):
+    _, context_ref = setup_code(harness, git=True)
+    receipt = harness.record(context_ref)
+    receipt["repos"]["code"].pop("head")
+    receipt["repos"]["code"]["commit"] = "0" * 40
+    receipt.pop("digest")
+    receipt["digest"] = hashlib.sha256(canonical(receipt)).hexdigest()
+    harness.write(context_ref, canonical(receipt))
+    result = harness.run(
+        "source-capture",
+        {
+            "operation_id": "stale-context",
+            "kind": "code",
+            "repo_id": "code",
+            "relative_path": "sample.c",
+            "source_id": "synthetic",
+            "context_ref": context_ref,
+        },
+        expected=3,
+    )
+    assert result["diagnostics"][0]["code"] == "CODE_CONTEXT_STALE"
+
+
+def test_history_survives_origin_mismatch_and_invalid_current_config(harness):
+    repo, context_ref = setup_code(harness, git=True)
+    expected_origin = "https://example.invalid/synthetic/code.git"
+    subprocess.run(
+        ["git", "-C", str(repo), "config", "remote.origin.url", expected_origin],
+        check=True,
+    )
+    rewrite_configuration(
+        harness,
+        context_ref,
+        lambda config: config["repos"][0].update(expected_identity=expected_origin),
+    )
+    result = harness.run(
+        "source-capture",
+        {
+            "operation_id": "fixed-code",
+            "kind": "code",
+            "repo_id": "code",
+            "relative_path": "sample.c",
+            "source_id": "synthetic",
+            "context_ref": context_ref,
+        },
+    )
+    bundle = harness.record(result["data"]["bundle_ref"])
+    request = {
+        "operation_id": "replay-code",
+        "bundle_ref": result["data"]["bundle_ref"],
+        "source_ref": {
+            "evidence_ref": "e1",
+            "source_id": "synthetic",
+            "snapshot_id": bundle["snapshots"][0]["snapshot_id"],
+            "locator": {"kind": "lines", "start": 1, "end": 1},
+        },
+    }
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo),
+            "config",
+            "remote.origin.url",
+            "https://example.invalid/other.git",
+        ],
+        check=True,
+    )
+    mismatched = harness.run("source-capture", request, "resolve-source")["data"]
+    assert mismatched["text"].startswith("int synthetic")
+    assert mismatched["current_source_matches"] is None
+    (harness.root.parent / "config.yml").write_bytes(b"invalid: true\n")
+    unavailable = harness.run("source-capture", request, "resolve-source")["data"]
+    assert unavailable["text"] == mismatched["text"]
+    assert unavailable["current_source_matches"] is None

@@ -310,6 +310,38 @@ def test_invalid_workflow_context_has_no_capture_side_effects(harness, workflow)
     assert not (harness.root / ".build/operations/op").exists()
 
 
+def test_workflow_manifest_binds_actual_capture_bundle_bytes(harness):
+    import hashlib
+
+    harness.write("docs-raw/specs/source.md", b"Synthetic evidence.\n")
+    response = harness.run(
+        "source-capture",
+        {
+            "operation_id": "capture",
+            "source_id": "synthetic",
+            "source_path": "docs-raw/specs/source.md",
+            "workflow": {
+                "run_id": "run",
+                "node_id": "capture_raw",
+                "attempt_id": "attempt1",
+            },
+        },
+    )
+    reference = response["data"]["bundle_ref"]
+    manifest = harness.record(
+        "logs/workflows/run/nodes/capture_raw/attempt1/result.json"
+    )
+    assert manifest["workflow"] == {
+        "run_id": "run",
+        "node_id": "capture_raw",
+        "attempt_id": "attempt1",
+    }
+    assert (
+        manifest["artifact_digests"][reference]
+        == hashlib.sha256((harness.root / reference).read_bytes()).hexdigest()
+    )
+
+
 @pytest.mark.parametrize("module", ["support", "capture"])
 def test_unpinned_package_pyc_is_never_executed(harness, tmp_path, module):
     import importlib.util

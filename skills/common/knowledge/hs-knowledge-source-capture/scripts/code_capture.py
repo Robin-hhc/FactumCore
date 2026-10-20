@@ -6,6 +6,8 @@ import os
 from pathlib import Path, PurePosixPath
 import subprocess
 
+import yaml
+
 from support import (
     NodeError,
     canonical,
@@ -88,6 +90,16 @@ def authorized_repo(context, repo_id, receipt=None):
     config_bytes = config_path.read_bytes()
     config = load_yaml(config_bytes)
     context.modules["validation"].validate_shape("workspace", config, context.rules)
+    if safe(
+        context.root.parent, config["knowledge_roots"]["wifi"]
+    ).resolve() != context.root or any(
+        row["knowledge_domain"] != "wifi" for row in config["architecture"]
+    ):
+        raise NodeError(
+            "CODE_DOMAIN_MISMATCH",
+            "Code registration must bind the selected WiFi knowledge root and domain",
+            blocked=True,
+        )
     if not policy or config.get("code_policy") != policy:
         raise NodeError(
             "CODE_AUTHORIZATION_REQUIRED",
@@ -121,6 +133,7 @@ def authorized_repo(context, repo_id, receipt=None):
     if receipt is not None:
         if (
             receipt.get("state") != "context_loaded"
+            or receipt.get("workspace_id") != config["workspace_id"]
             or receipt.get("config_digest") != sha(config_bytes)
             or Path(receipt.get("knowledge_root", "")).resolve() != context.root
             or Path(receipt.get("workspace_root", "")).resolve() != context.root.parent
@@ -236,7 +249,10 @@ def metadata(root, registered, relative, receipt=None):
         )
     head = git_read(root, ["rev-parse", "--verify", "HEAD^{commit}"], optional=True)
     head = head.decode("ascii").strip() if head is not None else None
-    if receipt and receipt.get("head") and receipt["head"] != head:
+    if receipt and any(
+        receipt.get(field) not in (None, "", "unknown") and receipt[field] != head
+        for field in ("head", "commit")
+    ):
         raise NodeError(
             "CODE_CONTEXT_STALE", "Git HEAD changed after context loading", blocked=True
         )
@@ -250,10 +266,17 @@ def metadata(root, registered, relative, receipt=None):
 
 def current_code_hash(context, resource):
     try:
-        root, _, _, _, _ = authorized_repo(context, resource["repo_id"])
+        root, registered, _, _, config_digest = authorized_repo(
+            context, resource["repo_id"]
+        )
+        before = metadata(root, registered, resource["path"])
         raw, _ = read_code(root, resource["path"])
+        after = metadata(root, registered, resource["path"])
+        _, _, _, _, after_config = authorized_repo(context, resource["repo_id"])
+        if before != after or config_digest != after_config:
+            return None
         return sha(raw)
-    except (OSError, NodeError):
+    except (OSError, NodeError, ValueError, yaml.YAMLError):
         return None
 
 

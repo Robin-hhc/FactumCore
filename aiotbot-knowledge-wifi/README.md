@@ -19,4 +19,4 @@ FactumCore 承载业务、知识与能力源码，`main/` 目前仍为空。18�
 
 T201–T210已完成开发及隔离机制验收，实际结果见[开发验收](docs-llm-wiki/sdd/knowledge-v2/records/development-acceptance-20261021.json)。200个唯一用例中199通过、1跳过；真实人动作、实际宿主隐式触发、业务六Target/三pair、业务CI与权限仍由T211独立验收。
 
-先读 [AGENTS.md](AGENTS.md)、[设计入口](docs-llm-wiki/README.md)、[当前SDD](docs-llm-wiki/sdd/knowledge-v2/README.md)与[贡献约定](CONTRIBUTING.md)。六 Target/三 pair 是逻辑登记；业务源码、宏、构建与实际版本在外层 `config.yml` 未提供时保持 unknown。
+第一次使用先看[初始化与使用教程](docs-llm-wiki/使用说明.md)。其他入口：[AGENTS.md](AGENTS.md)、[设计入口](docs-llm-wiki/README.md)、[当前SDD](docs-llm-wiki/sdd/knowledge-v2/README.md)与[贡献约定](CONTRIBUTING.md)。六 Target/三 pair 是逻辑登记；业务源码、宏、构建与实际版本在外层 `config.yml` 未提供时保持 unknown。

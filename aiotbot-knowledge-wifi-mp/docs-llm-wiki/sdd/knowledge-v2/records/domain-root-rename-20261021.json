@@ -1,0 +1,331 @@
+{
+  "record_kind": "domain_root_rename_verification",
+  "recorded_on": "2026-10-21",
+  "before_commit": "368a37ae6fa28a7d5ed0007eb7d8ec0c11a2214e",
+  "old_root": "aiotbot-knowledge-wifi",
+  "new_root": "aiotbot-knowledge-wifi-mp",
+  "tracked_domain_files_moved": 194,
+  "current_modified_files_sha256": {
+    ".gitattributes": "7ff79fab83274e8aac322fb3a71300632a4a8aabe77975ab67b31267dd9fc7e3",
+    ".gitignore": "fd25a9da3abb7cfa5eeef9a2adf3b4ffc2bbf6e3517d6c78ed852fcbd38e0a97",
+    "AGENTS.md": "788830887f54f332e3f12ac615cad4c2cdc6ee0b12027a13bf8fa2462be5748f",
+    "aiotbot-knowledge-wifi-mp/AGENTS.md": "e712b09b93622ca89d6d628cc7411739d0c80bafe908de1462826524a3b2f44d",
+    "aiotbot-knowledge-wifi-mp/CONTRIBUTING.md": "ec522c9fb6c9ae771d500cbaca37ed8110580de696c985d6fba6605778ff5f85",
+    "aiotbot-knowledge-wifi-mp/README.md": "3c77a7873611ebf9b7443ed5936aea911e78469cc51aba750fcc3fa8e8c3f797",
+    "aiotbot-knowledge-wifi-mp/docs-llm-wiki/AGENTS.md": "9bdd8ebba6fb5dbb9c06b9f0157746fbb3b4a7b437efbddb152fc55a12cc791c",
+    "aiotbot-knowledge-wifi-mp/docs-llm-wiki/AIoTBot知识库架构设计.md": "85a4098578e365ea793644a218f0f2176fddcf00d30c9917e848c9195864046c",
+    "aiotbot-knowledge-wifi-mp/docs-llm-wiki/README.md": "a54473b7f2503e7463cd0c6bc1f4d41be9cdf9cb125c2a2bbc095448ebc6bbb1",
+    "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/README.md": "c961f44b706c7f364366c4859e1f5c379c6de3d2632a9de6134c473416e8053b",
+    "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/records/README.md": "a8dca1ea83a2978d992e78c37cb2c58cfe5e9b4c17b7dd68b5dfd5225bfd3c8a",
+    "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/records/domain-root-rename-20261021.md": "172b812e02967dc5c0c5774f7e402f87cc5346c7e7ddd592b2cd304820700116",
+    "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/traceability.json": "ad47a56129fffe52d4a45aa47f13728c416cc6dcffad8f6c6bcf758c7145c570",
+    "aiotbot-knowledge-wifi-mp/docs-llm-wiki/task.md": "e035916144ed4eae760b4cb459f6b0a039dbec9ea465a541825ef083db5e66ba",
+    "aiotbot-knowledge-wifi-mp/docs-llm-wiki/使用说明.md": "d12a1b0f968f39ae594bd98322ff3b0699633f6ef2cea2c0005cf9bc82e7f238",
+    "aiotbot-knowledge-wifi-mp/docs-llm-wiki/知识库详细设计.md": "847f2bf2bdffbd93ccaded11ae2b818252677e68016ffd82a2db0007bcf1be79",
+    "aiotbot-knowledge-wifi-mp/docs-raw/AGENTS.md": "f44e287163242520c52cbb26edcebe4b0772d5c13ba257e6a1a1d10ef3e64d60",
+    "aiotbot-knowledge-wifi-mp/evals/pipeline_harness.py": "d88f8dad7de883eb5e2d01a7a16d15fabce005f736ec8b4ea2a713a0de62e8af",
+    "aiotbot-knowledge-wifi-mp/evals/run_acceptance.py": "58d413110c0cb612f22d01e9e6456fa08e9c9489203d6f9357d4593ce5957d7a",
+    "aiotbot-knowledge-wifi-mp/evals/tests/test_workflows.py": "633471eb6d65c34b1f67fc58175dc9f38748ef821409d89e4908c7d00785cfbf",
+    "aiotbot-knowledge-wifi-mp/governance/AGENTS.md": "7405d66ad51fc661932d7813abaeb926498d4cb018f93c8e03461fb5526096a1",
+    "config.yml": "71acb58a2da8236d406a81bb0773014afae6db70730fd14a3ad5711402af129f",
+    "skills/common/knowledge/hs-knowledge-apply/tests/test_public_governance.py": "83989ec470c1b54a807597183fb8aa48a1cf33bf096b9e02da1b92235b97ce8f",
+    "skills/common/knowledge/hs-knowledge-candidate-inspect/tests/conftest.py": "dd2882f10e59710b3f81512f24c505c9b26983eb55a1d0dc66ed7c35ed1103c0",
+    "skills/common/knowledge/hs-knowledge-candidate-revise/tests/conftest.py": "dd2882f10e59710b3f81512f24c505c9b26983eb55a1d0dc66ed7c35ed1103c0",
+    "skills/common/knowledge/hs-knowledge-change-plan/tests/conftest.py": "dd2882f10e59710b3f81512f24c505c9b26983eb55a1d0dc66ed7c35ed1103c0",
+    "skills/common/knowledge/hs-knowledge-governance-handoff/tests/conftest.py": "dd2882f10e59710b3f81512f24c505c9b26983eb55a1d0dc66ed7c35ed1103c0",
+    "skills/common/knowledge/hs-knowledge-index-build/tests/test_cli.py": "35644d4cfa27863dab8f15c18cec0ac58e1962daa4030e2e4d93a4b61d52b8e6",
+    "skills/common/knowledge/hs-knowledge-index-build/tests/test_public_qualification.py": "5f6f1f11b94c5aeb4fe16ceec27603dbd554e1ed9de546c7bab8324532e4212c",
+    "skills/common/knowledge/hs-knowledge-index-build/tests/test_qualification.py": "3796190cf01da168a9b3347282c0003ab9229a7e1a99242894d74f0ccfe6c804",
+    "skills/common/knowledge/hs-knowledge-local-check/tests/test_public_code_gate.py": "912d134b190e852b531813a92157912507cf8e2f020b680935e02315296bc588",
+    "skills/common/knowledge/hs-knowledge-maintain/tests/conftest.py": "dd2882f10e59710b3f81512f24c505c9b26983eb55a1d0dc66ed7c35ed1103c0",
+    "skills/common/knowledge/hs-knowledge-query-regression/tests/test_cli.py": "138c8fffb8155a19a6821416bb9e8747b951cae23767c622c939913cfc2a29e1",
+    "skills/common/knowledge/hs-knowledge-query/tests/test_public_receipt.py": "72bfb6f0f1238256890b7ee3b934e8b22f5046596136495a9b854603bbc7a83f",
+    "skills/common/knowledge/hs-knowledge-source-capture/tests/conftest.py": "dd2882f10e59710b3f81512f24c505c9b26983eb55a1d0dc66ed7c35ed1103c0",
+    "skills/common/knowledge/hs-knowledge-view-materialize/tests/conftest.py": "dd2882f10e59710b3f81512f24c505c9b26983eb55a1d0dc66ed7c35ed1103c0",
+    "skills/common/knowledge/hs-workspace-explore/scripts/install_catalog.py": "345216e40a70ca59f078fb5d295f4e716a8d1c53f11b1b3a6170b8bee53739b9",
+    "skills/common/knowledge/hs-workspace-explore/tests/test_cli.py": "8bd690cf682f5415f065a15a704b6a41bace09ff10ae82e92fa04d79d53d5f25",
+    "skills/common/knowledge/hs-workspace-explore/tests/test_install.py": "99910cc25a4599750f5c5ff6b0e24812a90bf213ecd45731dade5419f90b5432"
+  },
+  "file_digest_basis": "staged Git blob bytes; runtime package and rule digests use actual files",
+  "history": {
+    "knowledge_v1_files": 95,
+    "v2_baseline_files": 1,
+    "prior_records": 6,
+    "all_102_files_byte_identical": true,
+    "relative_path_sha256_manifest": "7616018a8dd1aaf929234a50eedd57c131e116db7ecdf1c44112b13ae3bc0ccb",
+    "old_paths_retain_original_commit_identity": true
+  },
+  "installation": {
+    "status": "verified",
+    "package_count": 18,
+    "workflow_count": 2,
+    "workspace_registration": "aiotbot-wifi-v1",
+    "new_knowledge_root": "aiotbot-knowledge-wifi-mp",
+    "rules_digest": "06b24f9c5059cac9600978297a1dacf9c4c0353a0fde73302f16d493a2f8529b",
+    "framework_lock_unchanged": true,
+    "explore_package_digest": "55e390e30597e44665fb930d5b7da0b444a8e76d87af98cc65b67f776beee39f",
+    "historical_files_unchanged": 102
+  },
+  "checks": {
+    "pre_rename_baseline": {
+      "tests": 52,
+      "passed": 51,
+      "skipped": 1
+    },
+    "static_design": {
+      "status": "static_valid",
+      "errors": []
+    },
+    "ruff": "passed",
+    "acceptance_attempts": [
+      {
+        "attempt": "domain-root-rename-full-20261021",
+        "passed": false,
+        "totals": {
+          "tests": 200,
+          "failures": 7,
+          "errors": 0,
+          "skipped": 3
+        },
+        "summary_sha256": "d05752e500105d77a2c97fd97c9c1a95de2bcb063561a64fa7e6d4a5185240f1"
+      },
+      {
+        "attempt": "rmp1",
+        "passed": false,
+        "totals": {
+          "tests": 200,
+          "failures": 5,
+          "errors": 0,
+          "skipped": 3
+        },
+        "summary_sha256": "65cda3efd718189c0addac2471092ff1c770b5625b545152e66a546258de1d96"
+      },
+      {
+        "attempt": "r2",
+        "passed": true,
+        "totals": {
+          "tests": 200,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 3
+        },
+        "summary_sha256": "be19ad2cd088273a843bb06e8f76b4f7628c81511e699fa838d6528f56bb7196"
+      }
+    ],
+    "final_acceptance": {
+      "schema_version": "2.0",
+      "verification_tier": "isolated_synthetic_mechanisms",
+      "groups": [
+        {
+          "group": "hs-knowledge-apply",
+          "exit_code": 0,
+          "seconds": 27.844,
+          "tests": 19,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "group": "hs-knowledge-candidate-inspect",
+          "exit_code": 0,
+          "seconds": 39.031,
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "group": "hs-knowledge-candidate-revise",
+          "exit_code": 0,
+          "seconds": 21.734,
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "group": "hs-knowledge-change-plan",
+          "exit_code": 0,
+          "seconds": 93.485,
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "group": "hs-knowledge-confirmation-prepare",
+          "exit_code": 0,
+          "seconds": 0.469,
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "group": "hs-knowledge-confirmation-record",
+          "exit_code": 0,
+          "seconds": 0.609,
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "group": "hs-knowledge-governance-handoff",
+          "exit_code": 0,
+          "seconds": 15.172,
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "group": "hs-knowledge-index-build",
+          "exit_code": 0,
+          "seconds": 55.047,
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "group": "hs-knowledge-local-check",
+          "exit_code": 0,
+          "seconds": 37.812,
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "group": "hs-knowledge-maintain",
+          "exit_code": 0,
+          "seconds": 7.469,
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "group": "hs-knowledge-merge-check",
+          "exit_code": 0,
+          "seconds": 0.375,
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "group": "hs-knowledge-publish-handoff",
+          "exit_code": 0,
+          "seconds": 0.359,
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "group": "hs-knowledge-query",
+          "exit_code": 0,
+          "seconds": 68.079,
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "group": "hs-knowledge-query-regression",
+          "exit_code": 0,
+          "seconds": 1.641,
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "group": "hs-knowledge-recover",
+          "exit_code": 0,
+          "seconds": 0.375,
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "group": "hs-knowledge-source-capture",
+          "exit_code": 0,
+          "seconds": 39.515,
+          "tests": 34,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "group": "hs-knowledge-view-materialize",
+          "exit_code": 0,
+          "seconds": 24.859,
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "group": "hs-workspace-explore",
+          "exit_code": 0,
+          "seconds": 9.25,
+          "tests": 20,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 1
+        },
+        {
+          "group": "domain-and-integration",
+          "exit_code": 0,
+          "seconds": 89.844,
+          "tests": 47,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 2
+        }
+      ],
+      "passed": true,
+      "totals": {
+        "tests": 200,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 3
+      },
+      "limitations": [
+        "No real human or implicit host acceptance",
+        "No real six Target or CI/publication/ACL acceptance",
+        "No restricted gold accessed"
+      ]
+    },
+    "skipped": [
+      {
+        "test": "test_linked_package_file_rejected",
+        "reason": "symlink creation unavailable for this user"
+      },
+      {
+        "test": "test_real_pinned_openflow_loader",
+        "reason": "set FACTUM_OPENFLOW_SOURCE to verified OpenFlow@1901a4 checkout for upstream integration"
+      },
+      {
+        "test": "test_shell_wrapper_preserves_spaces_and_incomplete_exit",
+        "reason": "explicit FACTUM_POSIX_SHELL required to test POSIX wrapper"
+      }
+    ],
+    "spec_review": "no findings",
+    "standards_review": "record inventory finding corrected; no remaining findings",
+    "tasks_unchanged": true,
+    "active_old_root_references": []
+  },
+  "limitations": [
+    "Historical evidence and framework lock were not rewritten or re-signed.",
+    "Only directory references and isolated synthetic mechanisms were verified.",
+    "No real host, human, six Target, business CI or ACL acceptance was added; T211 remains pending.",
+    "Existing private installations were not updated; new isolated installation only.",
+    "Windows long-path support was not added; only test temporary paths were shortened.",
+    "This record excludes its own digest; the final Git commit identifies the complete saved record."
+  ]
+}

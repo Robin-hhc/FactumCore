@@ -14,7 +14,7 @@ import yaml
 
 
 ROOT = Path(__file__).resolve().parents[3]
-VALIDATOR = ROOT / "aiotbot-knowledge-wifi/evals/validate_design.py"
+VALIDATOR = ROOT / "aiotbot-knowledge-wifi-mp/evals/validate_design.py"
 INSTALLER = (
     ROOT / "skills/common/knowledge/hs-workspace-explore/scripts/install_catalog.py"
 )
@@ -170,7 +170,7 @@ def test_real_pinned_openflow_loader(tmp_path):
 
 
 def test_merge_wrapper_missing_input_is_incomplete(tmp_path):
-    wrapper = ROOT / "aiotbot-knowledge-wifi/check.py"
+    wrapper = ROOT / "aiotbot-knowledge-wifi-mp/check.py"
     result = subprocess.run(
         [sys.executable, str(wrapper)], cwd=tmp_path, capture_output=True, text=True
     )
@@ -233,7 +233,7 @@ def test_wrapper_handles_results_without_treating_exit_zero_as_pass(
     result = subprocess.run(
         [
             sys.executable,
-            str(ROOT / "aiotbot-knowledge-wifi/check.py"),
+            str(ROOT / "aiotbot-knowledge-wifi-mp/check.py"),
             "--catalog",
             str(catalog),
             "--input",
@@ -250,7 +250,7 @@ def test_wrapper_handles_results_without_treating_exit_zero_as_pass(
     assert result.returncode == expected, result.stdout + result.stderr
     assert json.loads(result.stdout)["data"]["check_status"] == status
     assert json.loads(output.read_bytes())["data"]["knowledge_root"] == str(
-        ROOT / "aiotbot-knowledge-wifi"
+        ROOT / "aiotbot-knowledge-wifi-mp"
     )
     assert json.loads(output.read_bytes())["data"]["rules_digest"] == "a" * 64
 
@@ -266,7 +266,7 @@ def test_wrapper_rejects_changed_installed_code_before_execution(tmp_path):
     result = subprocess.run(
         [
             sys.executable,
-            str(ROOT / "aiotbot-knowledge-wifi/check.py"),
+            str(ROOT / "aiotbot-knowledge-wifi-mp/check.py"),
             "--catalog",
             str(catalog),
             "--input",
@@ -295,7 +295,7 @@ def test_wrapper_refuses_an_existing_result_instead_of_reusing_it(tmp_path):
     result = subprocess.run(
         [
             sys.executable,
-            str(ROOT / "aiotbot-knowledge-wifi/check.py"),
+            str(ROOT / "aiotbot-knowledge-wifi-mp/check.py"),
             "--catalog",
             str(catalog),
             "--input",
@@ -320,7 +320,7 @@ def test_shell_wrapper_preserves_spaces_and_incomplete_exit(tmp_path):
     cwd.mkdir()
     env = dict(os.environ, FACTUM_PYTHON=Path(sys.executable).as_posix())
     result = subprocess.run(
-        [shell, (ROOT / "aiotbot-knowledge-wifi/check.sh").as_posix()],
+        [shell, (ROOT / "aiotbot-knowledge-wifi-mp/check.sh").as_posix()],
         cwd=cwd,
         env=env,
         capture_output=True,

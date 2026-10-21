@@ -2,7 +2,7 @@
 schema_version: '2.0'
 workspace_id: aiotbot-wifi-v1
 knowledge_roots:
-  wifi: aiotbot-knowledge-wifi
+  wifi: aiotbot-knowledge-wifi-mp
 repos:
 - repo_id: wifi-code
   kind: git

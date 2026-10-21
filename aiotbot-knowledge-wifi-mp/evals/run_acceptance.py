@@ -29,7 +29,7 @@ def run_group(item, output, environment):
         str(path),
         "-q",
         "--basetemp",
-        str(output / "tmp" / f"group-{number:02d}"),
+        str(output / "t" / f"{number:02d}"),
         "--junitxml",
         str(xml),
     ]
@@ -59,10 +59,10 @@ def main():
         if path.is_symlink():
             parser.error("Linked output paths are not accepted")
     output.mkdir(parents=True)
-    (output / "tmp").mkdir()
+    (output / "t").mkdir()
     packages = sorted((ROOT / "skills/common/knowledge").glob("hs-*/tests"))
     groups = [(i, path.parent.name, path) for i, path in enumerate(packages)]
-    groups.append((len(groups), "domain-and-integration", ROOT / "aiotbot-knowledge-wifi/evals/tests"))
+    groups.append((len(groups), "domain-and-integration", ROOT / "aiotbot-knowledge-wifi-mp/evals/tests"))
     env = dict(os.environ, AIOTBOT_TEST_TMP=str(output / "unittest-tmp"))
     with ThreadPoolExecutor(max_workers=args.jobs) as pool:
         futures = [pool.submit(run_group, item, output, env) for item in groups]

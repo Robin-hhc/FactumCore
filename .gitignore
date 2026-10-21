@@ -17,16 +17,16 @@ config.local.yml
 **/.codegraph/
 
 # Domain runtime products: publish empty slots, never generated contents.
-/aiotbot-knowledge-wifi/.build/*
-!/aiotbot-knowledge-wifi/.build/.gitkeep
-/aiotbot-knowledge-wifi/artifacts/*
-!/aiotbot-knowledge-wifi/artifacts/.gitkeep
+/aiotbot-knowledge-wifi-mp/.build/*
+!/aiotbot-knowledge-wifi-mp/.build/.gitkeep
+/aiotbot-knowledge-wifi-mp/artifacts/*
+!/aiotbot-knowledge-wifi-mp/artifacts/.gitkeep
 
 # Keep audit metadata versionable; never publish copied original/code bytes or writer state.
-/aiotbot-knowledge-wifi/logs/evidence/objects/
-/aiotbot-knowledge-wifi/logs/evidence/checked-code/
-/aiotbot-knowledge-wifi/logs/operations/.writer.lock
-/aiotbot-knowledge-wifi/logs/operations/*/backups/
+/aiotbot-knowledge-wifi-mp/logs/evidence/objects/
+/aiotbot-knowledge-wifi-mp/logs/evidence/checked-code/
+/aiotbot-knowledge-wifi-mp/logs/operations/.writer.lock
+/aiotbot-knowledge-wifi-mp/logs/operations/*/backups/
 
 # Retired independent checkout, if still present locally.
 /aiot-knowledge/

@@ -9,18 +9,18 @@ import sys
 def fixture(tmp_path):
     root = Path(__file__).resolve().parents[5]
     shutil.copytree(
-        root / "aiotbot-knowledge-wifi/governance",
-        tmp_path / "aiotbot-knowledge-wifi/governance",
+        root / "aiotbot-knowledge-wifi-mp/governance",
+        tmp_path / "aiotbot-knowledge-wifi-mp/governance",
     )
     shutil.copyfile(root / "config.yml", tmp_path / "config.yml")
     (tmp_path / "AGENTS.md").write_text("Read project rules", encoding="utf-8")
-    (tmp_path / "aiotbot-knowledge-wifi/AGENTS.md").write_text(
+    (tmp_path / "aiotbot-knowledge-wifi-mp/AGENTS.md").write_text(
         "Read domain rules", encoding="utf-8"
     )
     (tmp_path / "main").mkdir()
     return hashlib.sha256(
         (
-            tmp_path / "aiotbot-knowledge-wifi/governance/framework.lock.yaml"
+            tmp_path / "aiotbot-knowledge-wifi-mp/governance/framework.lock.yaml"
         ).read_bytes()
     ).hexdigest()
 
@@ -66,7 +66,7 @@ def test_pinned_rules_load_actual_entries_from_other_cwd(tmp_path):
     assert response["data"]["state"] == "context_loaded"
     context = json.loads(
         (
-            tmp_path / "aiotbot-knowledge-wifi" / response["data"]["context_ref"]
+            tmp_path / "aiotbot-knowledge-wifi-mp" / response["data"]["context_ref"]
         ).read_bytes()
     )
     assert len(context["entries"]) == 2 and all(
@@ -90,7 +90,7 @@ def test_actual_workflow_artifact_hashes_the_loaded_context(tmp_path):
         {"run_id": "run1", "node_id": "bind_project", "attempt_id": "first"},
     )
     assert process.returncode == 0, response
-    root = tmp_path / "aiotbot-knowledge-wifi"
+    root = tmp_path / "aiotbot-knowledge-wifi-mp"
     manifest = json.loads(
         (root / response["data"]["artifact_manifest_ref"])
         .with_suffix(".json")
@@ -107,4 +107,4 @@ def test_incomplete_workflow_never_creates_context(tmp_path):
     pin = fixture(tmp_path)
     result, response = call(tmp_path, pin, {"attempt_id": "first"})
     assert result.returncode == 2, response
-    assert not (tmp_path / "aiotbot-knowledge-wifi/.build").exists()
+    assert not (tmp_path / "aiotbot-knowledge-wifi-mp/.build").exists()

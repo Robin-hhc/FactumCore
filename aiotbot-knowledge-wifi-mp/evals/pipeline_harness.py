@@ -47,10 +47,10 @@ def package_digest(package):
 
 class Pipeline:
     def __init__(self, base):
-        self.base, self.root = base, base / "workspace/aiotbot-knowledge-wifi"
+        self.base, self.root = base, base / "w/aiotbot-knowledge-wifi-mp"
         self.root.mkdir(parents=True)
         shutil.copytree(
-            REPO / "aiotbot-knowledge-wifi/governance",
+            REPO / "aiotbot-knowledge-wifi-mp/governance",
             self.root / "governance",
             ignore=shutil.ignore_patterns("__pycache__"),
         )

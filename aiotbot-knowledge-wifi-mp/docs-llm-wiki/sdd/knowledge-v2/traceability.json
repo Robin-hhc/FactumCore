@@ -1,7 +1,7 @@
 {
   "schema_version": "2.0",
   "design_version": "4.1",
-  "knowledge_root": "aiotbot-knowledge-wifi",
+  "knowledge_root": "aiotbot-knowledge-wifi-mp",
   "requirements": [
     {
       "id": "R201",
@@ -985,7 +985,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/.build/.gitkeep",
+      "path": "aiotbot-knowledge-wifi-mp/.build/.gitkeep",
       "kind": "F",
       "responsibility": "当前空目录占位",
       "development": "保持当前骨架，实施该目录固定文件时按同一模块提交移除占位",
@@ -999,7 +999,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/.build/operations/<operation-id>/<action>-<nonce>-request.json",
+      "path": "aiotbot-knowledge-wifi-mp/.build/operations/<operation-id>/<action>-<nonce>-request.json",
       "kind": "R",
       "responsibility": "治理辅助调用请求",
       "development": "prepare/recover/publish/merge/apply按action创建实际独立文件名",
@@ -1012,7 +1012,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/.build/operations/<operation-id>/<action>-<nonce>-response.json",
+      "path": "aiotbot-knowledge-wifi-mp/.build/operations/<operation-id>/<action>-<nonce>-response.json",
       "kind": "R",
       "responsibility": "治理辅助调用响应",
       "development": "对应公开子CLI返回原始ResultEnvelope",
@@ -1025,7 +1025,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/.build/operations/<operation-id>/calls/<call-id>/request.json",
+      "path": "aiotbot-knowledge-wifi-mp/.build/operations/<operation-id>/calls/<call-id>/request.json",
       "kind": "R",
       "responsibility": "公开子调用请求",
       "development": "父节点固定catalog后序列化独立请求",
@@ -1038,7 +1038,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/.build/operations/<operation-id>/calls/<call-id>/response.json",
+      "path": "aiotbot-knowledge-wifi-mp/.build/operations/<operation-id>/calls/<call-id>/response.json",
       "kind": "R",
       "responsibility": "公开子调用响应",
       "development": "被调用公开CLI生成并封存结果",
@@ -1051,7 +1051,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/.build/operations/<operation-id>/candidates/<card-id>.md",
+      "path": "aiotbot-knowledge-wifi-mp/.build/operations/<operation-id>/candidates/<card-id>.md",
       "kind": "R",
       "responsibility": "显式候选输入",
       "development": "用户或Agent按七Profile写待计划候选",
@@ -1064,7 +1064,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/.build/operations/<operation-id>/capture.json",
+      "path": "aiotbot-knowledge-wifi-mp/.build/operations/<operation-id>/capture.json",
       "kind": "R",
       "responsibility": "固定SourceBundle",
       "development": "source-capture保存resources/snapshots/extractions/context/limitations",
@@ -1077,7 +1077,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/.build/operations/<operation-id>/confirmation-display.json",
+      "path": "aiotbot-knowledge-wifi-mp/.build/operations/<operation-id>/confirmation-display.json",
       "kind": "R",
       "responsibility": "确切真人展示对象",
       "development": "prepare封存完整最终写删、来源展示/附件/缺口、challenge/有效期",
@@ -1090,7 +1090,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/.build/operations/<operation-id>/final-view.json",
+      "path": "aiotbot-knowledge-wifi-mp/.build/operations/<operation-id>/final-view.json",
       "kind": "R",
       "responsibility": "确切FinalView记录",
       "development": "materialize封存view/plan/source/context/完整基线与bytes_b64",
@@ -1103,7 +1103,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/.build/operations/<operation-id>/final-view/<relative-path>",
+      "path": "aiotbot-knowledge-wifi-mp/.build/operations/<operation-id>/final-view/<relative-path>",
       "kind": "R",
       "responsibility": "拟落位确切文件",
       "development": "按FinalView写K相对路径的原始最终字节",
@@ -1116,7 +1116,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/.build/operations/<operation-id>/handoff.json",
+      "path": "aiotbot-knowledge-wifi-mp/.build/operations/<operation-id>/handoff.json",
       "kind": "R",
       "responsibility": "治理交接记录",
       "development": "固定生产计划/视图/context与下一节点职责",
@@ -1129,7 +1129,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/.build/operations/<operation-id>/index-tmp/<temporary-file>",
+      "path": "aiotbot-knowledge-wifi-mp/.build/operations/<operation-id>/index-tmp/<temporary-file>",
       "kind": "R",
       "responsibility": "索引构建临时对象",
       "development": "index-build在隔离操作区建临时SQLite再发布不可变代次",
@@ -1142,7 +1142,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/.build/operations/<operation-id>/plan.json",
+      "path": "aiotbot-knowledge-wifi-mp/.build/operations/<operation-id>/plan.json",
       "kind": "R",
       "responsibility": "可重推导六决策计划",
       "development": "固定原请求、每候选处置、完整writes/deletes与source-lock增量",
@@ -1155,7 +1155,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/.build/operations/<operation-id>/receipts/<digest>.json",
+      "path": "aiotbot-knowledge-wifi-mp/.build/operations/<operation-id>/receipts/<digest>.json",
       "kind": "R",
       "responsibility": "同代查询收据",
       "development": "query封存generation/context/request/result与有效性epoch",
@@ -1168,7 +1168,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/.build/operations/<operation-id>/regression/<digest>.json",
+      "path": "aiotbot-knowledge-wifi-mp/.build/operations/<operation-id>/regression/<digest>.json",
       "kind": "R",
       "responsibility": "候选同代回归报告",
       "development": "query-regression记录cases摘要、实际IDs与receipt引用",
@@ -1181,7 +1181,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/.build/operations/<operation-id>/revision.json",
+      "path": "aiotbot-knowledge-wifi-mp/.build/operations/<operation-id>/revision.json",
       "kind": "R",
       "responsibility": "修订交接记录",
       "development": "revise固定退回范围、旧对象及新operation的plan/view引用",
@@ -1194,7 +1194,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/.build/project-context/<digest>.json",
+      "path": "aiotbot-knowledge-wifi-mp/.build/project-context/<digest>.json",
       "kind": "R",
       "responsibility": "实际已加载项目回执",
       "development": "explore固定config与实际AGENTS读取轨迹，repo/Target/build缺口显式",
@@ -1207,7 +1207,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/AGENTS.md",
+      "path": "aiotbot-knowledge-wifi-mp/AGENTS.md",
       "kind": "F",
       "responsibility": "领域入口",
       "development": "指知识/原件/治理/18节点Skill/两 Workflow",
@@ -1220,7 +1220,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/CONTRIBUTING.md",
+      "path": "aiotbot-knowledge-wifi-mp/CONTRIBUTING.md",
       "kind": "F",
       "responsibility": "贡献与上库规则",
       "development": "raw人工流程、代码双门禁、Scoped Git提交",
@@ -1233,7 +1233,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/README.md",
+      "path": "aiotbot-knowledge-wifi-mp/README.md",
       "kind": "F",
       "responsibility": "人读定位/现状/安装入口",
       "development": "真实可用能力与未实现边界，指系统文档与验收",
@@ -1246,7 +1246,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/artifacts/.gitkeep",
+      "path": "aiotbot-knowledge-wifi-mp/artifacts/.gitkeep",
       "kind": "F",
       "responsibility": "当前空目录占位",
       "development": "保持当前骨架，实施该目录固定文件时按同一模块提交移除占位",
@@ -1259,7 +1259,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/artifacts/indexes/<channel>/<generation-id>/cards/<sha256>.md",
+      "path": "aiotbot-knowledge-wifi-mp/artifacts/indexes/<channel>/<generation-id>/cards/<sha256>.md",
       "kind": "R",
       "responsibility": "同代完整卡字节",
       "development": "构建时保存每张卡确切blob，manifest绑定路径/hash",
@@ -1272,7 +1272,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/artifacts/indexes/<channel>/<generation-id>/index.sqlite",
+      "path": "aiotbot-knowledge-wifi-mp/artifacts/indexes/<channel>/<generation-id>/index.sqlite",
       "kind": "R",
       "responsibility": "普通表词面索引",
       "development": "index-build建documents/claims/postings/relations/metadata",
@@ -1285,7 +1285,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/artifacts/indexes/<channel>/<generation-id>/manifest.json",
+      "path": "aiotbot-knowledge-wifi-mp/artifacts/indexes/<channel>/<generation-id>/manifest.json",
       "kind": "R",
       "responsibility": "不可变索引代次身份",
       "development": "固定knowledge baseline/epoch、SQLite/card blobs、逐卡资格与publication",
@@ -1298,7 +1298,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/artifacts/indexes/<channel>/active.json",
+      "path": "aiotbot-knowledge-wifi-mp/artifacts/indexes/<channel>/active.json",
       "kind": "R",
       "responsibility": "激活代次指针",
       "development": "回归通过后按writer锁和expected_active/epoch/baseline CAS切换",
@@ -1311,7 +1311,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/artifacts/test-tmp/<run-id>/<runner-output>",
+      "path": "aiotbot-knowledge-wifi-mp/artifacts/test-tmp/<run-id>/<runner-output>",
       "kind": "R",
       "responsibility": "隔离验收派生输出",
       "development": "run_acceptance保存summary/JUnit/stdout/stderr和独立临时根",
@@ -1324,7 +1324,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/check.py",
+      "path": "aiotbot-knowledge-wifi-mp/check.py",
       "kind": "F",
       "responsibility": "治理构建薄包装",
       "development": "从自身位置识别K/W；从受信安装清单按local/merge解析hs-knowledge-local-check或hs-knowledge-merge-check的已安装CLI，以argv转发明确K/context/view或merge参数",
@@ -1337,7 +1337,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/check.sh",
+      "path": "aiotbot-knowledge-wifi-mp/check.sh",
       "kind": "F",
       "responsibility": "Unix兼容入口",
       "development": "精确定位脚本目录后 exec python check.py \"$@\"",
@@ -1350,7 +1350,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/AGENTS.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/AGENTS.md",
       "kind": "F",
       "responsibility": "系统文档维护规则",
       "development": "主设计→详设→SDD阅读与修改方向",
@@ -1363,7 +1363,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/AIoTBot知识库架构设计.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/AIoTBot知识库架构设计.md",
       "kind": "F",
       "responsibility": "§5.3/11基线",
       "development": "仅扩展节点能力清单及对应归属/标签，不重构原图",
@@ -1376,7 +1376,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/README.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/README.md",
       "kind": "F",
       "responsibility": "设计、模块任务与SDD导航",
       "development": "准确链接与部署身份",
@@ -1389,7 +1389,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/README.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/README.md",
       "kind": "H",
       "responsibility": "历史SDD工件：README.md",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1400,7 +1400,7 @@
       "ticket_ids": []
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/baseline.json",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/baseline.json",
       "kind": "H",
       "responsibility": "历史SDD工件：baseline.json",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1411,7 +1411,7 @@
       "ticket_ids": []
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/batch-02.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/batch-02.md",
       "kind": "H",
       "responsibility": "历史SDD工件：batch-02.md",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1422,7 +1422,7 @@
       "ticket_ids": []
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/design.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/design.md",
       "kind": "H",
       "responsibility": "历史SDD工件：design.md",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1433,7 +1433,7 @@
       "ticket_ids": []
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/document-chain-usage.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/document-chain-usage.md",
       "kind": "H",
       "responsibility": "历史SDD工件：document-chain-usage.md",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1444,7 +1444,7 @@
       "ticket_ids": []
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/first-slice.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/first-slice.md",
       "kind": "H",
       "responsibility": "历史SDD工件：first-slice.md",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1455,7 +1455,7 @@
       "ticket_ids": []
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/module-map.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/module-map.md",
       "kind": "H",
       "responsibility": "历史SDD工件：module-map.md",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1466,7 +1466,7 @@
       "ticket_ids": []
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/M01/design.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/modules/M01/design.md",
       "kind": "H",
       "responsibility": "历史M01模块设计",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1477,7 +1477,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/M01/spec.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/modules/M01/spec.md",
       "kind": "H",
       "responsibility": "历史M01模块规格",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1488,7 +1488,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/M01/tasks.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/modules/M01/tasks.md",
       "kind": "H",
       "responsibility": "历史M01模块任务",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1499,7 +1499,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/M02/design.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/modules/M02/design.md",
       "kind": "H",
       "responsibility": "历史M02模块设计",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1510,7 +1510,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/M02/spec.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/modules/M02/spec.md",
       "kind": "H",
       "responsibility": "历史M02模块规格",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1521,7 +1521,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/M02/tasks.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/modules/M02/tasks.md",
       "kind": "H",
       "responsibility": "历史M02模块任务",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1532,7 +1532,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/M03/design.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/modules/M03/design.md",
       "kind": "H",
       "responsibility": "历史M03模块设计",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1543,7 +1543,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/M03/spec.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/modules/M03/spec.md",
       "kind": "H",
       "responsibility": "历史M03模块规格",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1554,7 +1554,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/M03/tasks.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/modules/M03/tasks.md",
       "kind": "H",
       "responsibility": "历史M03模块任务",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1565,7 +1565,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/M04/design.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/modules/M04/design.md",
       "kind": "H",
       "responsibility": "历史M04模块设计",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1576,7 +1576,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/M04/spec.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/modules/M04/spec.md",
       "kind": "H",
       "responsibility": "历史M04模块规格",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1587,7 +1587,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/M04/tasks.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/modules/M04/tasks.md",
       "kind": "H",
       "responsibility": "历史M04模块任务",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1598,7 +1598,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/M05/design.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/modules/M05/design.md",
       "kind": "H",
       "responsibility": "历史M05模块设计",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1609,7 +1609,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/M05/spec.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/modules/M05/spec.md",
       "kind": "H",
       "responsibility": "历史M05模块规格",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1620,7 +1620,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/M05/tasks.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/modules/M05/tasks.md",
       "kind": "H",
       "responsibility": "历史M05模块任务",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1631,7 +1631,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/M06/design.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/modules/M06/design.md",
       "kind": "H",
       "responsibility": "历史M06模块设计",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1642,7 +1642,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/M06/spec.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/modules/M06/spec.md",
       "kind": "H",
       "responsibility": "历史M06模块规格",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1653,7 +1653,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/M06/tasks.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/modules/M06/tasks.md",
       "kind": "H",
       "responsibility": "历史M06模块任务",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1664,7 +1664,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/M07/design.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/modules/M07/design.md",
       "kind": "H",
       "responsibility": "历史M07模块设计",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1675,7 +1675,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/M07/spec.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/modules/M07/spec.md",
       "kind": "H",
       "responsibility": "历史M07模块规格",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1686,7 +1686,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/M07/tasks.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/modules/M07/tasks.md",
       "kind": "H",
       "responsibility": "历史M07模块任务",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1697,7 +1697,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/M08/design.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/modules/M08/design.md",
       "kind": "H",
       "responsibility": "历史M08模块设计",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1708,7 +1708,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/M08/spec.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/modules/M08/spec.md",
       "kind": "H",
       "responsibility": "历史M08模块规格",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1719,7 +1719,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/M08/tasks.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/modules/M08/tasks.md",
       "kind": "H",
       "responsibility": "历史M08模块任务",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1730,7 +1730,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/M09/design.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/modules/M09/design.md",
       "kind": "H",
       "responsibility": "历史M09模块设计",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1741,7 +1741,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/M09/spec.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/modules/M09/spec.md",
       "kind": "H",
       "responsibility": "历史M09模块规格",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1752,7 +1752,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/modules/M09/tasks.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/modules/M09/tasks.md",
       "kind": "H",
       "responsibility": "历史M09模块任务",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1763,7 +1763,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/README.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/records/README.md",
       "kind": "H",
       "responsibility": "历史执行/布局/测试留痕：README.md",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1774,7 +1774,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/T01-development.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/records/T01-development.md",
       "kind": "H",
       "responsibility": "历史执行/布局/测试留痕：T01-development.md",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1785,7 +1785,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/T01-red.txt",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/records/T01-red.txt",
       "kind": "H",
       "responsibility": "历史执行/布局/测试留痕：T01-red.txt",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1796,7 +1796,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/T02-development.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/records/T02-development.md",
       "kind": "H",
       "responsibility": "历史执行/布局/测试留痕：T02-development.md",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1807,7 +1807,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/T03-clean-junit.xml",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/records/T03-clean-junit.xml",
       "kind": "H",
       "responsibility": "历史执行/布局/测试留痕：T03-clean-junit.xml",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1818,7 +1818,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/T03-development.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/records/T03-development.md",
       "kind": "H",
       "responsibility": "历史执行/布局/测试留痕：T03-development.md",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1829,7 +1829,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/T03-verification.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/records/T03-verification.md",
       "kind": "H",
       "responsibility": "历史执行/布局/测试留痕：T03-verification.md",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1840,7 +1840,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/T05-clean-junit.xml",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/records/T05-clean-junit.xml",
       "kind": "H",
       "responsibility": "历史执行/布局/测试留痕：T05-clean-junit.xml",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1851,7 +1851,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/T05-verification.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/records/T05-verification.md",
       "kind": "H",
       "responsibility": "历史执行/布局/测试留痕：T05-verification.md",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1862,7 +1862,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/T06-clean-junit.xml",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/records/T06-clean-junit.xml",
       "kind": "H",
       "responsibility": "历史执行/布局/测试留痕：T06-clean-junit.xml",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1873,7 +1873,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/T06-verification.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/records/T06-verification.md",
       "kind": "H",
       "responsibility": "历史执行/布局/测试留痕：T06-verification.md",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1884,7 +1884,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/T07-clean-junit.xml",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/records/T07-clean-junit.xml",
       "kind": "H",
       "responsibility": "历史执行/布局/测试留痕：T07-clean-junit.xml",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1895,7 +1895,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/T07-verification.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/records/T07-verification.md",
       "kind": "H",
       "responsibility": "历史执行/布局/测试留痕：T07-verification.md",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1906,7 +1906,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/design-diagram-20261020.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/records/design-diagram-20261020.md",
       "kind": "H",
       "responsibility": "历史执行/布局/测试留痕：design-diagram-20261020.md",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1917,7 +1917,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/docs-layout-20261020.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/records/docs-layout-20261020.md",
       "kind": "H",
       "responsibility": "历史执行/布局/测试留痕：docs-layout-20261020.md",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1928,7 +1928,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/entry-scope-shared-20261020.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/records/entry-scope-shared-20261020.md",
       "kind": "H",
       "responsibility": "历史执行/布局/测试留痕：entry-scope-shared-20261020.md",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1939,7 +1939,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/first-batch-junit.xml",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/records/first-batch-junit.xml",
       "kind": "H",
       "responsibility": "历史执行/布局/测试留痕：first-batch-junit.xml",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1950,7 +1950,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/first-batch-verification.json",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/records/first-batch-verification.json",
       "kind": "H",
       "responsibility": "历史执行/布局/测试留痕：first-batch-verification.json",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1961,7 +1961,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/naming-paths-20261020.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/records/naming-paths-20261020.md",
       "kind": "H",
       "responsibility": "历史执行/布局/测试留痕：naming-paths-20261020.md",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1972,7 +1972,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/naming-paths-verification.json",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/records/naming-paths-verification.json",
       "kind": "H",
       "responsibility": "历史执行/布局/测试留痕：naming-paths-verification.json",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1983,7 +1983,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/original-diagrams-additions-20261020.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/records/original-diagrams-additions-20261020.md",
       "kind": "H",
       "responsibility": "历史执行/布局/测试留痕：original-diagrams-additions-20261020.md",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -1994,7 +1994,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/publication.json",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/records/publication.json",
       "kind": "H",
       "responsibility": "历史执行/布局/测试留痕：publication.json",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2005,7 +2005,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/review.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/records/review.md",
       "kind": "H",
       "responsibility": "历史执行/布局/测试留痕：review.md",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2016,7 +2016,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/second-batch-verification.json",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/records/second-batch-verification.json",
       "kind": "H",
       "responsibility": "历史执行/布局/测试留痕：second-batch-verification.json",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2027,7 +2027,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/single-repo-baseline-junit.xml",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/records/single-repo-baseline-junit.xml",
       "kind": "H",
       "responsibility": "历史执行/布局/测试留痕：single-repo-baseline-junit.xml",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2038,7 +2038,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/single-repo-migration.json",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/records/single-repo-migration.json",
       "kind": "H",
       "responsibility": "历史执行/布局/测试留痕：single-repo-migration.json",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2049,7 +2049,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/single-repo-migration.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/records/single-repo-migration.md",
       "kind": "H",
       "responsibility": "历史执行/布局/测试留痕：single-repo-migration.md",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2060,7 +2060,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/workspace-layout-20261020.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/records/workspace-layout-20261020.md",
       "kind": "H",
       "responsibility": "历史执行/布局/测试留痕：workspace-layout-20261020.md",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2071,7 +2071,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/records/workspace-layout-verification.json",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/records/workspace-layout-verification.json",
       "kind": "H",
       "responsibility": "历史执行/布局/测试留痕：workspace-layout-verification.json",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2082,7 +2082,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/requirements.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/requirements.md",
       "kind": "H",
       "responsibility": "历史SDD工件：requirements.md",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2093,7 +2093,7 @@
       "ticket_ids": []
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tasks.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/tasks.md",
       "kind": "H",
       "responsibility": "历史SDD工件：tasks.md",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2104,7 +2104,7 @@
       "ticket_ids": []
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/test-plan.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/test-plan.md",
       "kind": "H",
       "responsibility": "历史SDD工件：test-plan.md",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2115,7 +2115,7 @@
       "ticket_ids": []
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tickets/T01.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/tickets/T01.md",
       "kind": "H",
       "responsibility": "历史T01任务票",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2126,7 +2126,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tickets/T02.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/tickets/T02.md",
       "kind": "H",
       "responsibility": "历史T02任务票",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2137,7 +2137,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tickets/T03.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/tickets/T03.md",
       "kind": "H",
       "responsibility": "历史T03任务票",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2148,7 +2148,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tickets/T04.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/tickets/T04.md",
       "kind": "H",
       "responsibility": "历史T04任务票",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2159,7 +2159,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tickets/T05.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/tickets/T05.md",
       "kind": "H",
       "responsibility": "历史T05任务票",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2170,7 +2170,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tickets/T06.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/tickets/T06.md",
       "kind": "H",
       "responsibility": "历史T06任务票",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2181,7 +2181,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tickets/T07.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/tickets/T07.md",
       "kind": "H",
       "responsibility": "历史T07任务票",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2192,7 +2192,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tickets/T08.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/tickets/T08.md",
       "kind": "H",
       "responsibility": "历史T08任务票",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2203,7 +2203,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tickets/T09.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/tickets/T09.md",
       "kind": "H",
       "responsibility": "历史T09任务票",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2214,7 +2214,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tickets/T10.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/tickets/T10.md",
       "kind": "H",
       "responsibility": "历史T10任务票",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2225,7 +2225,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tickets/T11.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/tickets/T11.md",
       "kind": "H",
       "responsibility": "历史T11任务票",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2236,7 +2236,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tickets/T12.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/tickets/T12.md",
       "kind": "H",
       "responsibility": "历史T12任务票",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2247,7 +2247,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tickets/T13.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/tickets/T13.md",
       "kind": "H",
       "responsibility": "历史T13任务票",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2258,7 +2258,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tickets/T14.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/tickets/T14.md",
       "kind": "H",
       "responsibility": "历史T14任务票",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2269,7 +2269,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tickets/T15.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/tickets/T15.md",
       "kind": "H",
       "responsibility": "历史T15任务票",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2280,7 +2280,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tickets/T16.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/tickets/T16.md",
       "kind": "H",
       "responsibility": "历史T16任务票",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2291,7 +2291,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tickets/T17.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/tickets/T17.md",
       "kind": "H",
       "responsibility": "历史T17任务票",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2302,7 +2302,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tickets/T18.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/tickets/T18.md",
       "kind": "H",
       "responsibility": "历史T18任务票",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2313,7 +2313,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tickets/T19.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/tickets/T19.md",
       "kind": "H",
       "responsibility": "历史T19任务票",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2324,7 +2324,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tickets/T20.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/tickets/T20.md",
       "kind": "H",
       "responsibility": "历史T20任务票",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2335,7 +2335,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tickets/T21.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/tickets/T21.md",
       "kind": "H",
       "responsibility": "历史T21任务票",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2346,7 +2346,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tickets/T22.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/tickets/T22.md",
       "kind": "H",
       "responsibility": "历史T22任务票",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2357,7 +2357,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tickets/T23.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/tickets/T23.md",
       "kind": "H",
       "responsibility": "历史T23任务票",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2368,7 +2368,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tickets/T24.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/tickets/T24.md",
       "kind": "H",
       "responsibility": "历史T24任务票",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2379,7 +2379,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tickets/T25.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/tickets/T25.md",
       "kind": "H",
       "responsibility": "历史T25任务票",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2390,7 +2390,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tickets/T26.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/tickets/T26.md",
       "kind": "H",
       "responsibility": "历史T26任务票",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2401,7 +2401,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tickets/T27.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/tickets/T27.md",
       "kind": "H",
       "responsibility": "历史T27任务票",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2412,7 +2412,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/tickets/T28.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/tickets/T28.md",
       "kind": "H",
       "responsibility": "历史T28任务票",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2423,7 +2423,7 @@
       "delivery_state": "historical_unchanged"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v1/traceability.json",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v1/traceability.json",
       "kind": "H",
       "responsibility": "历史SDD工件：traceability.json",
       "development": "保留knowledge-v1原始字节及当时路径/摘要/状态，仅作历史追溯",
@@ -2434,7 +2434,7 @@
       "ticket_ids": []
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/README.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/README.md",
       "kind": "F",
       "responsibility": "本轮SDD导航入口",
       "development": "按需求/设计/模块/票据/记录引导当前开发和验收",
@@ -2447,7 +2447,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/baseline.json",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/baseline.json",
       "kind": "F",
       "responsibility": "规划基线快照",
       "development": "保留规划时设计来源路径、SHA和SDD身份，当前实现身份另由实现manifest留证",
@@ -2460,7 +2460,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/design.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/design.md",
       "kind": "F",
       "responsibility": "本轮模块接口和依赖设计",
       "development": "定义模块边界、公开对象与链路，更新需同步对应票据/追踪",
@@ -2473,7 +2473,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/implementation-protocol.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/implementation-protocol.md",
       "kind": "F",
       "responsibility": "产品2.0公开实施协议",
       "development": "从本轮冻结协议完整保留；作为18节点公开JSON/API边界",
@@ -2486,7 +2486,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/module-map.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/module-map.md",
       "kind": "F",
       "responsibility": "模块到票据/需求映射",
       "development": "保持M01–M09、T201–T211与当前文件边界可追踪",
@@ -2499,7 +2499,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/records/<acceptance-id>.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/records/<acceptance-id>.md",
       "kind": "R",
       "responsibility": "后续实际验收记录实例",
       "development": "最终实现/审查/发布后追加记录，维护源码清单快照身份",
@@ -2512,7 +2512,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/records/README.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/records/README.md",
       "kind": "F",
       "responsibility": "本轮实际实施/审查记录：README.md",
       "development": "记录对应模块源码身份、命令、结果、独立审查和真实发布事实",
@@ -2525,7 +2525,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/records/T201-contracts.json",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/records/T201-contracts.json",
       "kind": "F",
       "responsibility": "本轮实际实施/审查记录：T201-contracts.json",
       "development": "记录对应模块源码身份、命令、结果、独立审查和真实发布事实",
@@ -2538,7 +2538,7 @@
       "delivery_state": "implemented"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/records/development-acceptance-20261021.json",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/records/development-acceptance-20261021.json",
       "kind": "F",
       "responsibility": "本轮实际实施/审查记录：development-acceptance-20261021.json",
       "development": "记录对应模块源码身份、命令、结果、独立审查和真实发布事实",
@@ -2551,7 +2551,7 @@
       "delivery_state": "implemented"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/records/implementation-manifest.json",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/records/implementation-manifest.json",
       "kind": "F",
       "responsibility": "本轮实际实施/审查记录：implementation-manifest.json",
       "development": "记录对应模块源码身份、命令、结果、独立审查和真实发布事实",
@@ -2564,7 +2564,7 @@
       "delivery_state": "implemented"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/records/independent-governance-review-20261021.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/records/independent-governance-review-20261021.md",
       "kind": "F",
       "responsibility": "本轮实际实施/审查记录：independent-governance-review-20261021.md",
       "development": "记录对应模块源码身份、命令、结果、独立审查和真实发布事实",
@@ -2577,7 +2577,7 @@
       "delivery_state": "implemented"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/records/publication-20261021.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/records/publication-20261021.md",
       "kind": "F",
       "responsibility": "本轮实际实施/审查记录：publication-20261021.md",
       "development": "记录对应模块源码身份、命令、结果、独立审查和真实发布事实",
@@ -2590,7 +2590,7 @@
       "delivery_state": "implemented"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/records/t209-workflows-installation-20261021.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/records/t209-workflows-installation-20261021.md",
       "kind": "F",
       "responsibility": "本轮实际实施/审查记录：t209-workflows-installation-20261021.md",
       "development": "记录对应模块源码身份、命令、结果、独立审查和真实发布事实",
@@ -2603,7 +2603,7 @@
       "delivery_state": "implemented"
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/requirements.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/requirements.md",
       "kind": "F",
       "responsibility": "本轮R201–R218需求与验收",
       "development": "逐需求明确用户行为、正反例与真实外部验收边界",
@@ -2616,7 +2616,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/test-plan.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/test-plan.md",
       "kind": "F",
       "responsibility": "机制和真实外部验收计划",
       "development": "定义单包/跨节点/真实人/宿主/六Target/CI/ACL分别需要的证据",
@@ -2629,7 +2629,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/tickets/T201.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/tickets/T201.md",
       "kind": "F",
       "responsibility": "实施票：T201 契约与运行协议",
       "development": "定义本票需求/公开接口/依赖/红绿任务与验收，证据就绪后由实际负责人更新状态",
@@ -2642,7 +2642,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/tickets/T202.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/tickets/T202.md",
       "kind": "F",
       "responsibility": "实施票：T202 发现与项目绑定",
       "development": "定义本票需求/公开接口/依赖/红绿任务与验收，证据就绪后由实际负责人更新状态",
@@ -2655,7 +2655,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/tickets/T203.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/tickets/T203.md",
       "kind": "F",
       "responsibility": "实施票：T203 raw捕获与可恢复快照",
       "development": "定义本票需求/公开接口/依赖/红绿任务与验收，证据就绪后由实际负责人更新状态",
@@ -2668,7 +2668,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/tickets/T204.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/tickets/T204.md",
       "kind": "F",
       "responsibility": "实施票：T204 六决策候选与精确视图",
       "development": "定义本票需求/公开接口/依赖/红绿任务与验收，证据就绪后由实际负责人更新状态",
@@ -2681,7 +2681,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/tickets/T205.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/tickets/T205.md",
       "kind": "F",
       "responsibility": "实施票：T205 真实动作、事务与恢复",
       "development": "定义本票需求/公开接口/依赖/红绿任务与验收，证据就绪后由实际负责人更新状态",
@@ -2694,7 +2694,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/tickets/T206.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/tickets/T206.md",
       "kind": "F",
       "responsibility": "实施票：T206 索引、查询与回归激活",
       "development": "定义本票需求/公开接口/依赖/红绿任务与验收，证据就绪后由实际负责人更新状态",
@@ -2707,7 +2707,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/tickets/T207.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/tickets/T207.md",
       "kind": "F",
       "responsibility": "实施票：T207 维护事件与双水位",
       "development": "定义本票需求/公开接口/依赖/红绿任务与验收，证据就绪后由实际负责人更新状态",
@@ -2720,7 +2720,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/tickets/T208.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/tickets/T208.md",
       "kind": "F",
       "responsibility": "实施票：T208 代码捕获与只读双门禁",
       "development": "定义本票需求/公开接口/依赖/红绿任务与验收，证据就绪后由实际负责人更新状态",
@@ -2733,7 +2733,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/tickets/T209.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/tickets/T209.md",
       "kind": "F",
       "responsibility": "实施票：T209 两个Workflow和节点包",
       "development": "定义本票需求/公开接口/依赖/红绿任务与验收，证据就绪后由实际负责人更新状态",
@@ -2746,7 +2746,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/tickets/T210.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/tickets/T210.md",
       "kind": "F",
       "responsibility": "实施票：T210 节点集成与开发交付",
       "development": "定义本票需求/公开接口/依赖/红绿任务与验收，证据就绪后由实际负责人更新状态",
@@ -2759,7 +2759,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/tickets/T211.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/tickets/T211.md",
       "kind": "F",
       "responsibility": "实施票：T211 真实外部环境验收",
       "development": "定义本票需求/公开接口/依赖/红绿任务与验收，证据就绪后由实际负责人更新状态",
@@ -2772,7 +2772,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/sdd/knowledge-v2/traceability.json",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/traceability.json",
       "kind": "F",
       "responsibility": "需求/票据/文件机器追踪",
       "development": "逐文件保留职责、开发、约束、验收与模块/票据映射；状态由最终验收维护",
@@ -2785,7 +2785,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/task.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/task.md",
       "kind": "F",
       "responsibility": "当前模块任务粗排",
       "development": "按九模块列任务、依赖、完成条件与推进顺序，后续交接SDD细拆",
@@ -2798,7 +2798,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-llm-wiki/知识库详细设计.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/知识库详细设计.md",
       "kind": "F",
       "responsibility": "具体文件/接口/链路/验收",
       "development": "采用此文件manifest并嵌原图",
@@ -2811,7 +2811,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-raw/AGENTS.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-raw/AGENTS.md",
       "kind": "F",
       "responsibility": "原件只读边界",
       "development": "五允许类、sources延期、控制文件排除、真实格式缺口",
@@ -2824,7 +2824,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-raw/chips/.gitkeep",
+      "path": "aiotbot-knowledge-wifi-mp/docs-raw/chips/.gitkeep",
       "kind": "F",
       "responsibility": "当前空目录占位",
       "development": "保持当前骨架，实施该目录固定文件时按同一模块提交移除占位",
@@ -2837,7 +2837,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-raw/chips/<document-id>/<version-or-digest>/<attachment-file>",
+      "path": "aiotbot-knowledge-wifi-mp/docs-raw/chips/<document-id>/<version-or-digest>/<attachment-file>",
       "kind": "D",
       "responsibility": "芯片图表附件",
       "development": "固定hash/页图定位",
@@ -2850,7 +2850,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-raw/chips/<document-id>/<version-or-digest>/<original-file>",
+      "path": "aiotbot-knowledge-wifi-mp/docs-raw/chips/<document-id>/<version-or-digest>/<original-file>",
       "kind": "D",
       "responsibility": "芯片原件",
       "development": "真实版本及芯片范围",
@@ -2863,7 +2863,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-raw/conventions/.gitkeep",
+      "path": "aiotbot-knowledge-wifi-mp/docs-raw/conventions/.gitkeep",
       "kind": "F",
       "responsibility": "当前空目录占位",
       "development": "保持当前骨架，实施该目录固定文件时按同一模块提交移除占位",
@@ -2876,7 +2876,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-raw/conventions/<document-id>/<version-or-digest>/<attachment-file>",
+      "path": "aiotbot-knowledge-wifi-mp/docs-raw/conventions/<document-id>/<version-or-digest>/<attachment-file>",
       "kind": "D",
       "responsibility": "规范附件",
       "development": "必要附件分别登记",
@@ -2889,7 +2889,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-raw/conventions/<document-id>/<version-or-digest>/<original-file>",
+      "path": "aiotbot-knowledge-wifi-mp/docs-raw/conventions/<document-id>/<version-or-digest>/<original-file>",
       "kind": "D",
       "responsibility": "规范原件",
       "development": "用户放入真实不可变原件",
@@ -2902,7 +2902,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-raw/index.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-raw/index.md",
       "kind": "F",
       "responsibility": "原件导航",
       "development": "按类别列 document_id、版本、相对落点、source引用",
@@ -2915,7 +2915,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-raw/protocols/.gitkeep",
+      "path": "aiotbot-knowledge-wifi-mp/docs-raw/protocols/.gitkeep",
       "kind": "F",
       "responsibility": "当前空目录占位",
       "development": "保持当前骨架，实施该目录固定文件时按同一模块提交移除占位",
@@ -2928,7 +2928,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-raw/protocols/<document-id>/<version-or-digest>/<attachment-file>",
+      "path": "aiotbot-knowledge-wifi-mp/docs-raw/protocols/<document-id>/<version-or-digest>/<attachment-file>",
       "kind": "D",
       "responsibility": "协议勘误/附录",
       "development": "固定主版本关联",
@@ -2941,7 +2941,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-raw/protocols/<document-id>/<version-or-digest>/<original-file>",
+      "path": "aiotbot-knowledge-wifi-mp/docs-raw/protocols/<document-id>/<version-or-digest>/<original-file>",
       "kind": "D",
       "responsibility": "协议原件",
       "development": "标准版本/章节/原页",
@@ -2954,7 +2954,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-raw/sources/3ms/.gitkeep",
+      "path": "aiotbot-knowledge-wifi-mp/docs-raw/sources/3ms/.gitkeep",
       "kind": "F",
       "responsibility": "当前空目录占位",
       "development": "保持当前骨架，实施该目录固定文件时按同一模块提交移除占位",
@@ -2967,7 +2967,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-raw/sources/3ms/<source-id>.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-raw/sources/3ms/<source-id>.md",
       "kind": "P",
       "responsibility": "3ms登记页",
       "development": "未来可行性与权限确认后设计",
@@ -2980,7 +2980,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-raw/sources/dbox/.gitkeep",
+      "path": "aiotbot-knowledge-wifi-mp/docs-raw/sources/dbox/.gitkeep",
       "kind": "F",
       "responsibility": "当前空目录占位",
       "development": "保持当前骨架，实施该目录固定文件时按同一模块提交移除占位",
@@ -2993,7 +2993,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-raw/sources/dbox/<source-id>.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-raw/sources/dbox/<source-id>.md",
       "kind": "P",
       "responsibility": "dbox登记页",
       "development": "未来链接/版本/hash/密级/授权登记",
@@ -3006,7 +3006,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-raw/sources/wiki/.gitkeep",
+      "path": "aiotbot-knowledge-wifi-mp/docs-raw/sources/wiki/.gitkeep",
       "kind": "F",
       "responsibility": "当前空目录占位",
       "development": "保持当前骨架，实施该目录固定文件时按同一模块提交移除占位",
@@ -3019,7 +3019,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-raw/sources/wiki/<source-id>.md",
+      "path": "aiotbot-knowledge-wifi-mp/docs-raw/sources/wiki/<source-id>.md",
       "kind": "P",
       "responsibility": "wiki登记页",
       "development": "未来网页授权/取回/固定快照后设计",
@@ -3032,7 +3032,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-raw/specs/.gitkeep",
+      "path": "aiotbot-knowledge-wifi-mp/docs-raw/specs/.gitkeep",
       "kind": "F",
       "responsibility": "当前空目录占位",
       "development": "保持当前骨架，实施该目录固定文件时按同一模块提交移除占位",
@@ -3045,7 +3045,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-raw/specs/<document-id>/<version-or-digest>/<attachment-file>",
+      "path": "aiotbot-knowledge-wifi-mp/docs-raw/specs/<document-id>/<version-or-digest>/<attachment-file>",
       "kind": "D",
       "responsibility": "SDD必要附表",
       "development": "独立hash/locator",
@@ -3058,7 +3058,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-raw/specs/<document-id>/<version-or-digest>/<original-file>",
+      "path": "aiotbot-knowledge-wifi-mp/docs-raw/specs/<document-id>/<version-or-digest>/<original-file>",
       "kind": "D",
       "responsibility": "SDD原件",
       "development": "固定规格/设计版本",
@@ -3071,7 +3071,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-raw/storys/.gitkeep",
+      "path": "aiotbot-knowledge-wifi-mp/docs-raw/storys/.gitkeep",
       "kind": "F",
       "responsibility": "当前空目录占位",
       "development": "保持当前骨架，实施该目录固定文件时按同一模块提交移除占位",
@@ -3084,7 +3084,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-raw/storys/<document-id>/<version-or-digest>/<attachment-file>",
+      "path": "aiotbot-knowledge-wifi-mp/docs-raw/storys/<document-id>/<version-or-digest>/<attachment-file>",
       "kind": "D",
       "responsibility": "迭代附件",
       "development": "独立快照与主文关系",
@@ -3097,7 +3097,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/docs-raw/storys/<document-id>/<version-or-digest>/<original-file>",
+      "path": "aiotbot-knowledge-wifi-mp/docs-raw/storys/<document-id>/<version-or-digest>/<original-file>",
       "kind": "D",
       "responsibility": "迭代设计原件",
       "development": "保留计划/实现/实测身份",
@@ -3110,7 +3110,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/evals/.gitkeep",
+      "path": "aiotbot-knowledge-wifi-mp/evals/.gitkeep",
       "kind": "F",
       "responsibility": "当前空目录占位",
       "development": "保持当前骨架，实施该目录固定文件时按同一模块提交移除占位",
@@ -3123,7 +3123,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/evals/README.md",
+      "path": "aiotbot-knowledge-wifi-mp/evals/README.md",
       "kind": "F",
       "responsibility": "验收运行入口与层级",
       "development": "说明开发依赖、单组/全组命令及输出目录，区分机制验证和T211真实验收",
@@ -3136,7 +3136,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/evals/pipeline_harness.py",
+      "path": "aiotbot-knowledge-wifi-mp/evals/pipeline_harness.py",
       "kind": "F",
       "responsibility": "跨节点公开协议合成夹具",
       "development": "冻结临时raw/候选/context/catalog/合成适配器，按公开CLI串起18节点",
@@ -3149,7 +3149,7 @@
       "delivery_state": "implemented"
     },
     {
-      "path": "aiotbot-knowledge-wifi/evals/pyproject.toml",
+      "path": "aiotbot-knowledge-wifi-mp/evals/pyproject.toml",
       "kind": "F",
       "responsibility": "pytest/ruff范围配置",
       "development": "只配置域内evals检查范围、报告与专用tmp；Skill自有tests由能力仓各自执行",
@@ -3162,7 +3162,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/evals/requirements-dev.lock.txt",
+      "path": "aiotbot-knowledge-wifi-mp/evals/requirements-dev.lock.txt",
       "kind": "F",
       "responsibility": "验收专用依赖锁",
       "development": "精确固定pytest及静态检查所需开发依赖，与节点运行锁分层",
@@ -3175,7 +3175,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/evals/run_acceptance.py",
+      "path": "aiotbot-knowledge-wifi-mp/evals/run_acceptance.py",
       "kind": "F",
       "responsibility": "分包隔离验收调度器",
       "development": "18包及领域/集成组分进程运行，输出各组JUnit/stdout/stderr及summary",
@@ -3188,7 +3188,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/evals/tests/test_contracts.py",
+      "path": "aiotbot-knowledge-wifi-mp/evals/tests/test_contracts.py",
       "kind": "F",
       "responsibility": "跨Skill共用契约回归",
       "development": "对本地Schema/卡/来源/records API的外部输入验证",
@@ -3201,7 +3201,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/evals/tests/test_node_pipeline.py",
+      "path": "aiotbot-knowledge-wifi-mp/evals/tests/test_node_pipeline.py",
       "kind": "F",
       "responsibility": "公开节点纵向验收",
       "development": "用pipeline_harness串raw→计划→展示→确认→apply→索引→查询与维护/代码分支",
@@ -3214,7 +3214,7 @@
       "delivery_state": "implemented"
     },
     {
-      "path": "aiotbot-knowledge-wifi/evals/tests/test_process_recovery.py",
+      "path": "aiotbot-knowledge-wifi-mp/evals/tests/test_process_recovery.py",
       "kind": "F",
       "responsibility": "独立进程中断/恢复验收",
       "development": "在隔离fixture启动真实公开CLI并模拟进程中断，再inspect/resume/rollback核journal与实际文件",
@@ -3227,7 +3227,7 @@
       "delivery_state": "implemented"
     },
     {
-      "path": "aiotbot-knowledge-wifi/evals/tests/test_workflows.py",
+      "path": "aiotbot-knowledge-wifi-mp/evals/tests/test_workflows.py",
       "kind": "F",
       "responsibility": "两Workflow结构和产物义务验收",
       "development": "核模板node/owner/exit/Gate/布局及节点artifact合同",
@@ -3240,7 +3240,7 @@
       "delivery_state": "implemented"
     },
     {
-      "path": "aiotbot-knowledge-wifi/evals/validate_design.py",
+      "path": "aiotbot-knowledge-wifi-mp/evals/validate_design.py",
       "kind": "F",
       "responsibility": "18节点包/Workflow静态与上游loader校验",
       "development": "核实际包文件、Skill元数据、锁、artifact资源、模板引用；显式--openflow-source运行固定OpenFlow loader",
@@ -3253,7 +3253,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/governance/AGENTS.md",
+      "path": "aiotbot-knowledge-wifi-mp/governance/AGENTS.md",
       "kind": "F",
       "responsibility": "规则改动入口",
       "development": "说明声明规则/契约/模板/锁/测试位置",
@@ -3266,7 +3266,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/governance/contracts/__init__.py",
+      "path": "aiotbot-knowledge-wifi-mp/governance/contracts/__init__.py",
       "kind": "F",
       "responsibility": "契约公开接口",
       "development": "仅导出版本及五模块需要的稳定纯函数",
@@ -3279,7 +3279,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/governance/contracts/knowledge.py",
+      "path": "aiotbot-knowledge-wifi-mp/governance/contracts/knowledge.py",
       "kind": "F",
       "responsibility": "卡片完整解释",
       "development": "Markdown frontmatter/claim text_ref/七Profile/ID/关系/适用范围纯函数",
@@ -3292,7 +3292,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/governance/contracts/records.py",
+      "path": "aiotbot-knowledge-wifi-mp/governance/contracts/records.py",
       "kind": "F",
       "responsibility": "记录绑定验证",
       "development": "用本层validation实现canonical seal/verify及record-kind摘要和对象绑定；无_shared依赖",
@@ -3305,7 +3305,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/governance/contracts/source_resources.py",
+      "path": "aiotbot-knowledge-wifi-mp/governance/contracts/source_resources.py",
       "kind": "F",
       "responsibility": "来源资源/快照契约",
       "development": "来源锁解析、引用/locator/恢复元数据、实际字节hash验证",
@@ -3318,7 +3318,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/governance/contracts/validation.py",
+      "path": "aiotbot-knowledge-wifi-mp/governance/contracts/validation.py",
       "kind": "F",
       "responsibility": "通用本地规则加载",
       "development": "Schema/Profile/枚举加载、canonical摘要、诊断类型、safe路径读",
@@ -3331,7 +3331,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/governance/framework.lock.yaml",
+      "path": "aiotbot-knowledge-wifi-mp/governance/framework.lock.yaml",
       "kind": "F",
       "responsibility": "锁定领域契约与外部工具兼容身份",
       "development": "产品2.0以相对路径和SHA256锁定全部领域contracts/schema/profile/registry/template/spec，导入前验证",
@@ -3344,7 +3344,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/governance/index.md",
+      "path": "aiotbot-knowledge-wifi-mp/governance/index.md",
       "kind": "F",
       "responsibility": "治理导航",
       "development": "链接下列固定文件",
@@ -3357,7 +3357,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/governance/schemas/frontmatter.schema.json",
+      "path": "aiotbot-knowledge-wifi-mp/governance/schemas/frontmatter.schema.json",
       "kind": "F",
       "responsibility": "卡/Claim字段",
       "development": "产品2.0定义七Profile、scope、sources、claims、relations与退役义务，旧1.0只作历史迁移输入",
@@ -3370,7 +3370,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/governance/schemas/profiles.yaml",
+      "path": "aiotbot-knowledge-wifi-mp/governance/schemas/profiles.yaml",
       "kind": "F",
       "responsibility": "七类章节义务",
       "development": "保持现有entity/flow/protocol/rule/command/runbook/glossary",
@@ -3383,7 +3383,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/governance/schemas/records.schema.json",
+      "path": "aiotbot-knowledge-wifi-mp/governance/schemas/records.schema.json",
       "kind": "F",
       "responsibility": "记录字段",
       "development": "ProjectContext/SourceSnapshot/ChangeSet/人工/代码检查/事务/索引/收据统一判形",
@@ -3396,7 +3396,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/governance/schemas/registries.yaml",
+      "path": "aiotbot-knowledge-wifi-mp/governance/schemas/registries.yaml",
       "kind": "F",
       "responsibility": "受控公共枚举",
       "development": "登记受控枚举、五类raw允许根及来源类别；真实Target/代码位置仍只在config.yml；不放凭据或本机私有路径",
@@ -3409,7 +3409,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/governance/schemas/sources.schema.json",
+      "path": "aiotbot-knowledge-wifi-mp/governance/schemas/sources.schema.json",
       "kind": "F",
       "responsibility": "来源/快照字段",
       "development": "Git、导出、raw来源与定位、hash/bytes/恢复",
@@ -3422,7 +3422,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/governance/schemas/workspace.schema.json",
+      "path": "aiotbot-knowledge-wifi-mp/governance/schemas/workspace.schema.json",
       "kind": "F",
       "responsibility": "config字段/引用",
       "development": "四映射表、Target/pair、覆盖边界",
@@ -3435,7 +3435,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/governance/sources.lock.yaml",
+      "path": "aiotbot-knowledge-wifi-mp/governance/sources.lock.yaml",
       "kind": "F",
       "responsibility": "SourceResource/快照SSOT",
       "development": "保留旧合法记录；实际导入时追加固定source/snapshot及恢复信息",
@@ -3448,7 +3448,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/governance/specs/cards.md",
+      "path": "aiotbot-knowledge-wifi-mp/governance/specs/cards.md",
       "kind": "F",
       "responsibility": "卡编写规范",
       "development": "七Profile/四要素/Claim/证据/scope/关系规则",
@@ -3461,7 +3461,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/governance/specs/lifecycle.md",
+      "path": "aiotbot-knowledge-wifi-mp/governance/specs/lifecycle.md",
       "kind": "F",
       "responsibility": "生命周期与共享资格",
       "development": "draft→stable；deprecated/替代；local/shared与manual/code分支",
@@ -3474,7 +3474,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/governance/specs/records.md",
+      "path": "aiotbot-knowledge-wifi-mp/governance/specs/records.md",
       "kind": "F",
       "responsibility": "记录信任与绑定",
       "development": "终端真人确认、摘要、代码双检、事务/收据、schema迁移",
@@ -3487,7 +3487,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/governance/specs/sources.md",
+      "path": "aiotbot-knowledge-wifi-mp/governance/specs/sources.md",
       "kind": "F",
       "responsibility": "来源与人工更新规范",
       "development": "五raw、不可变版本、附件、恢复、设计与实现区分",
@@ -3500,7 +3500,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/governance/templates/command.md",
+      "path": "aiotbot-knowledge-wifi-mp/governance/templates/command.md",
       "kind": "F",
       "responsibility": "命令候选模板",
       "development": "语法/参数/前置条件/输出判读/误用/验证/证据",
@@ -3513,7 +3513,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/governance/templates/entity.md",
+      "path": "aiotbot-knowledge-wifi-mp/governance/templates/entity.md",
       "kind": "F",
       "responsibility": "实体候选模板",
       "development": "职责/边界/接口/依赖/证据",
@@ -3526,7 +3526,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/governance/templates/flow.md",
+      "path": "aiotbot-knowledge-wifi-mp/governance/templates/flow.md",
       "kind": "F",
       "responsibility": "流程候选模板",
       "development": "起终点/步骤/调用与消息/异常/条件/证据",
@@ -3539,7 +3539,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/governance/templates/glossary.md",
+      "path": "aiotbot-knowledge-wifi-mp/governance/templates/glossary.md",
       "kind": "F",
       "responsibility": "术语候选模板",
       "development": "定义/别名/歧义/范围/证据",
@@ -3552,7 +3552,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/governance/templates/index.md",
+      "path": "aiotbot-knowledge-wifi-mp/governance/templates/index.md",
       "kind": "F",
       "responsibility": "导航模板",
       "development": "层级/卡ID/短用途/状态",
@@ -3565,7 +3565,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/governance/templates/manual-review.json",
+      "path": "aiotbot-knowledge-wifi-mp/governance/templates/manual-review.json",
       "kind": "F",
       "responsibility": "人工记录形状样例",
       "development": "无真实姓名/时间/接受状态的占位样例",
@@ -3578,7 +3578,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/governance/templates/protocol.md",
+      "path": "aiotbot-knowledge-wifi-mp/governance/templates/protocol.md",
       "kind": "F",
       "responsibility": "协议候选模板",
       "development": "机制/字段与状态/约束/标准版本/产品支持边界/证据",
@@ -3591,7 +3591,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/governance/templates/rule.md",
+      "path": "aiotbot-knowledge-wifi-mp/governance/templates/rule.md",
       "kind": "F",
       "responsibility": "规范候选模板",
       "development": "规则对象/约束/例外/批准身份/检查办法/证据",
@@ -3604,7 +3604,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/governance/templates/runbook.md",
+      "path": "aiotbot-knowledge-wifi-mp/governance/templates/runbook.md",
       "kind": "F",
       "responsibility": "诊断候选模板",
       "development": "现象/信号/分支/步骤/根因状态/解法/验证/证据",
@@ -3617,7 +3617,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/knowledge/AGENTS.md",
+      "path": "aiotbot-knowledge-wifi-mp/knowledge/AGENTS.md",
       "kind": "F",
       "responsibility": "知识读取与写入规则",
       "development": "七 Profile、stable/范围/来源/复核边界",
@@ -3631,7 +3631,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/knowledge/commands/<card-id>.md",
+      "path": "aiotbot-knowledge-wifi-mp/knowledge/commands/<card-id>.md",
       "kind": "D",
       "responsibility": "command卡",
       "development": "真实命令/参数/输出/误用",
@@ -3645,7 +3645,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/knowledge/commands/index.md",
+      "path": "aiotbot-knowledge-wifi-mp/knowledge/commands/index.md",
       "kind": "F",
       "responsibility": "命令卡导航",
       "development": "工具/命令入口",
@@ -3659,7 +3659,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/knowledge/concepts/entities/<card-id>.md",
+      "path": "aiotbot-knowledge-wifi-mp/knowledge/concepts/entities/<card-id>.md",
       "kind": "D",
       "responsibility": "entity卡",
       "development": "entity模板与4要素/Claims",
@@ -3673,7 +3673,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/knowledge/concepts/entities/index.md",
+      "path": "aiotbot-knowledge-wifi-mp/knowledge/concepts/entities/index.md",
       "kind": "F",
       "responsibility": "实体卡导航",
       "development": "实体ID/职责入口",
@@ -3687,7 +3687,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/knowledge/concepts/flows/<card-id>.md",
+      "path": "aiotbot-knowledge-wifi-mp/knowledge/concepts/flows/<card-id>.md",
       "kind": "D",
       "responsibility": "flow卡",
       "development": "flow模板，边/条件/跨侧证据",
@@ -3701,7 +3701,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/knowledge/concepts/flows/index.md",
+      "path": "aiotbot-knowledge-wifi-mp/knowledge/concepts/flows/index.md",
       "kind": "F",
       "responsibility": "流程卡导航",
       "development": "场景/起终点入口",
@@ -3715,7 +3715,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/knowledge/concepts/index.md",
+      "path": "aiotbot-knowledge-wifi-mp/knowledge/concepts/index.md",
       "kind": "F",
       "responsibility": "概念导航",
       "development": "指entities/flows/protocols",
@@ -3729,7 +3729,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/knowledge/concepts/protocols/<card-id>.md",
+      "path": "aiotbot-knowledge-wifi-mp/knowledge/concepts/protocols/<card-id>.md",
       "kind": "D",
       "responsibility": "protocol卡",
       "development": "标准机制与产品支持独立Claim",
@@ -3743,7 +3743,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/knowledge/concepts/protocols/index.md",
+      "path": "aiotbot-knowledge-wifi-mp/knowledge/concepts/protocols/index.md",
       "kind": "F",
       "responsibility": "协议卡导航",
       "development": "协议版本/机制入口",
@@ -3757,7 +3757,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/knowledge/glossaries/<card-id>.md",
+      "path": "aiotbot-knowledge-wifi-mp/knowledge/glossaries/<card-id>.md",
       "kind": "D",
       "responsibility": "glossary卡",
       "development": "定义/别名/歧义/范围",
@@ -3771,7 +3771,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/knowledge/glossaries/index.md",
+      "path": "aiotbot-knowledge-wifi-mp/knowledge/glossaries/index.md",
       "kind": "F",
       "responsibility": "术语卡导航",
       "development": "词/别名/歧义入口",
@@ -3785,7 +3785,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/knowledge/index.md",
+      "path": "aiotbot-knowledge-wifi-mp/knowledge/index.md",
       "kind": "F",
       "responsibility": "正式知识总导航",
       "development": "分类入口、卡ID和简短用途",
@@ -3799,7 +3799,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/knowledge/rules/<card-id>.md",
+      "path": "aiotbot-knowledge-wifi-mp/knowledge/rules/<card-id>.md",
       "kind": "D",
       "responsibility": "rule卡",
       "development": "可检查规则/例外/批准身份",
@@ -3813,7 +3813,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/knowledge/rules/index.md",
+      "path": "aiotbot-knowledge-wifi-mp/knowledge/rules/index.md",
       "kind": "F",
       "responsibility": "规范卡导航",
       "development": "规则对象/状态入口",
@@ -3827,7 +3827,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/knowledge/runbooks/<card-id>.md",
+      "path": "aiotbot-knowledge-wifi-mp/knowledge/runbooks/<card-id>.md",
       "kind": "D",
       "responsibility": "runbook卡",
       "development": "现象/信号/分支/根因状态/解法/验证",
@@ -3841,7 +3841,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/knowledge/runbooks/index.md",
+      "path": "aiotbot-knowledge-wifi-mp/knowledge/runbooks/index.md",
       "kind": "F",
       "responsibility": "诊断卡导航",
       "development": "症状/环境入口",
@@ -3855,7 +3855,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/logs/.gitkeep",
+      "path": "aiotbot-knowledge-wifi-mp/logs/.gitkeep",
       "kind": "F",
       "responsibility": "当前空目录占位",
       "development": "保持当前骨架，实施该目录固定文件时按同一模块提交移除占位",
@@ -3868,7 +3868,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/logs/contexts/<context-id>.json",
+      "path": "aiotbot-knowledge-wifi-mp/logs/contexts/<context-id>.json",
       "kind": "R",
       "responsibility": "受控完整代码上下文",
       "development": "固定真实repo/head/dirty/文件hash、Target/build/macros/config",
@@ -3881,7 +3881,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/logs/events/<event-id>.json",
+      "path": "aiotbot-knowledge-wifi-mp/logs/events/<event-id>.json",
       "kind": "R",
       "responsibility": "不可变来源变化事件",
       "development": "maintain固定change/新snapshot/受影响Claim，event_id幂等",
@@ -3894,7 +3894,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/logs/events/state.json",
+      "path": "aiotbot-knowledge-wifi-mp/logs/events/state.json",
       "kind": "R",
       "responsibility": "当前有效性与双水位",
       "development": "durable pending_events/blocked_claims/epoch与scan/apply水位",
@@ -3907,7 +3907,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/logs/evidence/<build-artifact>",
+      "path": "aiotbot-knowledge-wifi-mp/logs/evidence/<build-artifact>",
       "kind": "R",
       "responsibility": "真实构建/宏证据输入",
       "development": "受控构建适配器保存真实结果，context引用digest",
@@ -3920,7 +3920,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/logs/evidence/checked-code/<sha256>.bin",
+      "path": "aiotbot-knowledge-wifi-mp/logs/evidence/checked-code/<sha256>.bin",
       "kind": "R",
       "responsibility": "本次最新代码检查快照",
       "development": "代码gate单独保留当前复验确切字节",
@@ -3933,7 +3933,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/logs/evidence/extractions/<sha256>.txt",
+      "path": "aiotbot-knowledge-wifi-mp/logs/evidence/extractions/<sha256>.txt",
       "kind": "R",
       "responsibility": "固定提取文本",
       "development": "保留受支持文本提取结果，bundle记录提取版本/限制",
@@ -3946,7 +3946,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/logs/evidence/locators/<digest>.json",
+      "path": "aiotbot-knowledge-wifi-mp/logs/evidence/locators/<digest>.json",
       "kind": "R",
       "responsibility": "提取定位映射",
       "development": "固定原页/段/行与提取片段映射及提取器身份",
@@ -3959,7 +3959,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/logs/evidence/objects/<sha256>.bin",
+      "path": "aiotbot-knowledge-wifi-mp/logs/evidence/objects/<sha256>.bin",
       "kind": "R",
       "responsibility": "原件/附件/代码固定字节",
       "development": "capture按内容hash原子保存不可变原件对象",
@@ -3972,7 +3972,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/logs/host-events/<event-id>.json",
+      "path": "aiotbot-knowledge-wifi-mp/logs/host-events/<event-id>.json",
       "kind": "R",
       "responsibility": "受信宿主原始人动作",
       "development": "宿主adapter生成签名actor/decision/display/view/challenge/time",
@@ -3985,7 +3985,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/logs/operations/.writer.lock",
+      "path": "aiotbot-knowledge-wifi-mp/logs/operations/.writer.lock",
       "kind": "R",
       "responsibility": "合作正式写者OS锁",
       "development": "apply/maintain/index snapshot/activate共享msvcrt或fcntl锁",
@@ -3998,7 +3998,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/logs/operations/<operation-id>/apply-result.json",
+      "path": "aiotbot-knowledge-wifi-mp/logs/operations/<operation-id>/apply-result.json",
       "kind": "R",
       "responsibility": "已提交事务结果",
       "development": "完整落位后封存view/proof/writes/deletes与journal终态",
@@ -4011,7 +4011,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/logs/operations/<operation-id>/backups/<old-sha256>.bin",
+      "path": "aiotbot-knowledge-wifi-mp/logs/operations/<operation-id>/backups/<old-sha256>.bin",
       "kind": "R",
       "responsibility": "事务旧字节备份",
       "development": "修改前固定旧内容并fsync，journal引用摘要",
@@ -4024,7 +4024,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/logs/operations/<operation-id>/journal.json",
+      "path": "aiotbot-knowledge-wifi-mp/logs/operations/<operation-id>/journal.json",
       "kind": "R",
       "responsibility": "持久事务进度",
       "development": "prepared/applying/recovery_required/committed/rolled_back与exact entries/attempted/backups",
@@ -4037,7 +4037,7 @@
       ]
     },
     {
-      "path": "aiotbot-knowledge-wifi/logs/operations/<operation-id>/local-check<proof-suffix>.json",
+      "path": "aiotbot-knowledge-wifi-mp/logs/operations/<operation-id>/local-check<proof-suffix>.json",
       "kind": "R",
       "responsibility": "本地代码检查证明",
       "development": "local-check保存passed/failed/incomplete及语义签名和固定检查对象",
@@ -4050,7 +4050,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/logs/operations/<operation-id>/manual-review.json",
+      "path": "aiotbot-knowledge-wifi-mp/logs/operations/<operation-id>/manual-review.json",
       "kind": "R",
       "responsibility": "已认证真人决定",
       "development": "record保存原事件及确切display/view绑定，apply重验签名",
@@ -4063,7 +4063,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/logs/operations/<operation-id>/merge-check-handoff<proof-suffix>.json",
+      "path": "aiotbot-knowledge-wifi-mp/logs/operations/<operation-id>/merge-check-handoff<proof-suffix>.json",
       "kind": "R",
       "responsibility": "最新门禁公开包装结果",
       "development": "merge-check绑定已安装引擎的真正merge证明",
@@ -4076,7 +4076,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/logs/operations/<operation-id>/merge-check<proof-suffix>.json",
+      "path": "aiotbot-knowledge-wifi-mp/logs/operations/<operation-id>/merge-check<proof-suffix>.json",
       "kind": "R",
       "responsibility": "最新代码门禁引擎证明",
       "development": "同一check引擎mode=merge只读复验授权最新ref",
@@ -4089,7 +4089,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/logs/operations/<operation-id>/publish-handoff.json",
+      "path": "aiotbot-knowledge-wifi-mp/logs/operations/<operation-id>/publish-handoff.json",
       "kind": "R",
       "responsibility": "外部Git发布交接",
       "development": "核本地结果后列确切对象、缺口与发布责任",
@@ -4102,7 +4102,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/logs/publication/<receipt-id>.json",
+      "path": "aiotbot-knowledge-wifi-mp/logs/publication/<receipt-id>.json",
       "kind": "R",
       "responsibility": "真实合入/发布签名回执",
       "development": "受信committer/CI adapter签exact cards/rules/knowledge_commit及merge proofs",
@@ -4115,7 +4115,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/logs/semantic-reviews/<review-id>.json",
+      "path": "aiotbot-knowledge-wifi-mp/logs/semantic-reviews/<review-id>.json",
       "kind": "R",
       "responsibility": "受信语义reviewer报告",
       "development": "签名绑定exact view/context/mode及逐Claim原证据/checked_snapshot",
@@ -4128,7 +4128,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/logs/workflows/<run-id>/nodes/<node-id>/<attempt-id>/result.json",
+      "path": "aiotbot-knowledge-wifi-mp/logs/workflows/<run-id>/nodes/<node-id>/<attempt-id>/result.json",
       "kind": "R",
       "responsibility": "不可变节点机器manifest",
       "development": "节点程序从实际请求/结果及引用对象hash生成",
@@ -4141,7 +4141,7 @@
       "delivery_state": "runtime_instance"
     },
     {
-      "path": "aiotbot-knowledge-wifi/logs/workflows/<run-id>/nodes/<node-id>/<attempt-id>/result.md",
+      "path": "aiotbot-knowledge-wifi-mp/logs/workflows/<run-id>/nodes/<node-id>/<attempt-id>/result.md",
       "kind": "R",
       "responsibility": "宿主可见节点产物",
       "development": "由同一程序据真实manifest生成markdown，result.yaml关联此资源",
@@ -7467,6 +7467,28 @@
       "ticket_ids": [
         "T209"
       ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/records/domain-root-rename-20261021.md",
+      "kind": "F",
+      "responsibility": "领域根改名与历史路径迁移说明",
+      "development": "记录本次路径改名、源码摘要、历史保留与实际验证结果",
+      "constraints": "不重写旧基线或历史验收，不增加功能任务或Demo范围",
+      "acceptance": "新路径及摘要与实际文件一致；102个历史文件保留原字节；仅报告本次验证层级",
+      "delivery_state": "implemented",
+      "module": "M09",
+      "ticket_ids": []
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/records/domain-root-rename-20261021.json",
+      "kind": "F",
+      "responsibility": "本次改名的源码与验证身份",
+      "development": "记录本次路径改名、源码摘要、历史保留与实际验证结果",
+      "constraints": "不重写旧基线或历史验收，不增加功能任务或Demo范围",
+      "acceptance": "新路径及摘要与实际文件一致；102个历史文件保留原字节；仅报告本次验证层级",
+      "delivery_state": "implemented",
+      "module": "M09",
+      "ticket_ids": []
     }
   ],
   "verification_boundary": "T201-T210 development verified; T211 actual host/human/six-Target/business-CI/ACL remains pending. Historical v1 bytes unchanged.",

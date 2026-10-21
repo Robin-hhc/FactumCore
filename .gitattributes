@@ -1,10 +1,10 @@
 # Keep domain rules and installed capability source bytes stable.
-/aiotbot-knowledge-wifi/** text eol=lf
+/aiotbot-knowledge-wifi-mp/** text eol=lf
 /config.yml text eol=lf
 /skills/** text eol=lf
 /workflows/** text eol=lf
 
 # Preserve approved design bytes; SDD records use LF.
-/aiotbot-knowledge-wifi/docs-llm-wiki/AIoTBot知识库架构设计.md -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
-/aiotbot-knowledge-wifi/docs-llm-wiki/知识库详细设计.md -text
-/aiotbot-knowledge-wifi/docs-llm-wiki/sdd/** text eol=lf
+/aiotbot-knowledge-wifi-mp/docs-llm-wiki/AIoTBot知识库架构设计.md -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+/aiotbot-knowledge-wifi-mp/docs-llm-wiki/知识库详细设计.md -text
+/aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/** text eol=lf

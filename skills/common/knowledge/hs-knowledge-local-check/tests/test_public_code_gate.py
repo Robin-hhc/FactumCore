@@ -25,7 +25,7 @@ class PublicCodeGateTests(unittest.TestCase):
             pathlib.Path(configured)
             if configured
             else pathlib.Path(__file__).resolve().parents[5]
-            / "aiotbot-knowledge-wifi/governance"
+            / "aiotbot-knowledge-wifi-mp/governance"
         )
         if not domain.joinpath("contracts/validation.py").is_file():
             self.skipTest("2.0 domain fixture path not supplied")
@@ -36,7 +36,7 @@ class PublicCodeGateTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory(prefix="code-gate-", dir=str(scratch))
         self.addCleanup(self.tmp.cleanup)
         self.workspace = pathlib.Path(self.tmp.name)
-        self.root = self.workspace / "aiotbot-knowledge-wifi"
+        self.root = self.workspace / "aiotbot-knowledge-wifi-mp"
         shutil.copytree(
             domain,
             self.root / "governance",

@@ -59,7 +59,7 @@ main/                                # 真实代码工作区
 │       ├── .codegraph/              # [新增]代码图谱db文件，本地生成不上库
 │       └── …
 └── …
-aiotbot-knowledge-wifi/          # WiFi 领域知识仓；以下展开内部结构
+aiotbot-knowledge-wifi-mp/          # WiFi 领域知识仓；以下展开内部结构
 ├── AGENTS.md                    # 知识边界、规则指针与技能入口
 ├── README.md                    # 定位、实际能力、资料导航
 ├── CONTRIBUTING.md              # 生产、核验和贡献流程
@@ -266,7 +266,7 @@ device 侧 + host 侧真实代码。`.codegraph/` 是代码图谱索引，**本�
 
 #### aiot-knowledge/ —— 领域知识仓
 
-本次只建设aiotbot-knowledge-wifi，业务代码槽位、知识及节点Skill/Workflow在FactumCore同一Git仓开发和发布；不建立其他领域或中间容器。目录和忽略规则不构成ACL，资料/安装发行仍按实际授权处理。
+本次只建设aiotbot-knowledge-wifi-mp，业务代码槽位、知识及节点Skill/Workflow在FactumCore同一Git仓开发和发布；不建立其他领域或中间容器。目录和忽略规则不构成ACL，资料/安装发行仍按实际授权处理。
 
 参与链路：**三条链路全程**——每个领域仓内部跑完整的"生产 → 治理上库 → 消费"。
 

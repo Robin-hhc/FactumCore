@@ -118,7 +118,7 @@ def install(source, destination, *extra):
 def test_install_complete_isolated_catalog_without_domain_assets(tmp_path):
     source = fixture_source(tmp_path)
     (source / "private.pem").write_text("PRIVATE KEY", encoding="utf-8")
-    raw = source / "aiotbot-knowledge-wifi/docs-raw/specs/private.md"
+    raw = source / "aiotbot-knowledge-wifi-mp/docs-raw/specs/private.md"
     raw.parent.mkdir(parents=True)
     raw.write_text("not capability material", encoding="utf-8")
     destination = tmp_path / "installed capabilities"
@@ -143,7 +143,7 @@ def test_install_complete_isolated_catalog_without_domain_assets(tmp_path):
     ).encode()
     assert entry["package_digest"] == hashlib.sha256(canonical).hexdigest()
     assert not list(destination.rglob("*.pem"))
-    assert not (destination / "aiotbot-knowledge-wifi").exists()
+    assert not (destination / "aiotbot-knowledge-wifi-mp").exists()
     assert (
         len(list((destination / "config/workflow-templates").glob("*/workflow.yaml")))
         == 2
@@ -202,11 +202,11 @@ def test_workspace_registration_pins_local_paths_and_rule_bytes(tmp_path):
     source = fixture_source(tmp_path)
     workspace = tmp_path / "business workspace"
     config = workspace / "config.yml"
-    lock = workspace / "aiotbot-knowledge-wifi/governance/framework.lock.yaml"
+    lock = workspace / "aiotbot-knowledge-wifi-mp/governance/framework.lock.yaml"
     lock.parent.mkdir(parents=True)
     lock.write_bytes(b"schema_version: '2.0'\n")
     config.write_text(
-        "schema_version: '2.0'\nworkspace_id: fixture-wifi\nknowledge_roots:\n  wifi: aiotbot-knowledge-wifi\n",
+        "schema_version: '2.0'\nworkspace_id: fixture-wifi\nknowledge_roots:\n  wifi: aiotbot-knowledge-wifi-mp\n",
         encoding="utf-8",
     )
     destination = tmp_path / "install"

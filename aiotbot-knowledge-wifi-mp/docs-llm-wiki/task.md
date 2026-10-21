@@ -163,7 +163,7 @@
 
 ## 6. 范围与状态更新规则
 
-- 只建设根下 `aiotbot-knowledge-wifi/`；节点与 Workflow 在根下 `skills/`、`workflows/`，与 `main/` 同级，同当前远端发布，无嵌套 Git。本机配置、凭据和跨组资料不提交。
+- 只建设根下 `aiotbot-knowledge-wifi-mp/`；节点与 Workflow 在根下 `skills/`、`workflows/`，与 `main/` 同级，同当前远端发布，无嵌套 Git。本机配置、凭据和跨组资料不提交。
 - 首发文档只接受 `docs-raw/{conventions,chips,storys,specs,protocols}/` 已落地原件。网页、`sources/` 链接、仓外映射及 3ms 继续延期，不列为当前缺陷；不扩展到其他领域。
 - 真人确认完整精确最终字节后纯文档 stable，免代码 lint；无回复、超时、Agent 自报不是同意。代码卡本地通过后 stable，上库按最新业务代码只读复验，不修卡、锁、链接或源码。
 - 索引和 Schema 不证明语义正确；metadata 同样受 Claim 资格约束，过滤后重算全局 topK，同代 read / receipt，输出前复查有效性。代码来源存在、签名存在和合成测试通过不等于真实业务正确。

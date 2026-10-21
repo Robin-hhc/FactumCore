@@ -1,6 +1,6 @@
 # WiFi 领域知识入口
 
-此目录是 FactumCore 根下的 `aiotbot-knowledge-wifi/`，无中间目录，不包含嵌套 `.git`。治理与契约在 `governance/`；原件在 `docs-raw/`；正式卡在 `knowledge/`；系统设计和既有 SDD 在 `docs-llm-wiki/` 与其中的 `sdd/`，不作为知识事实。现行路径以[总体设计 §5.3](docs-llm-wiki/AIoTBot知识库架构设计.md#53-aiotbot-knowledge目录架构)目录树为准。
+此目录是 FactumCore 根下的 `aiotbot-knowledge-wifi-mp/`，无中间目录，不包含嵌套 `.git`。治理与契约在 `governance/`；原件在 `docs-raw/`；正式卡在 `knowledge/`；系统设计和既有 SDD 在 `docs-llm-wiki/` 与其中的 `sdd/`，不作为知识事实。现行路径以[总体设计 §5.3](docs-llm-wiki/AIoTBot知识库架构设计.md#53-aiotbot-knowledge目录架构)目录树为准。
 
 首发只有 chip12、chip08、chip07c 的 Host/Device 六逻辑 Target。真实代码根、构建和版本未知时保持 unknown。首发文档仅接受 docs-raw/conventions、chips、storys、specs、protocols 内已落地原件，sources 链接不启用。
 

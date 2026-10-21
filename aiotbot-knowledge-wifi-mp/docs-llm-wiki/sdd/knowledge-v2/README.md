@@ -1,6 +1,8 @@
 # WiFi节点能力 SDD v2
 
-本轮批准18个节点Skill与两个Workflow，当前设计基线为[详设v4](../../知识库详细设计.md)。本SDD独立于[knowledge-v1](../knowledge-v1/README.md)，不改其字节、路径、记录或通过身份。
+本轮批准18个节点Skill与两个Workflow，当前设计基线为[详设v4](../../知识库详细设计.md)。本SDD独立于[knowledge-v1](../knowledge-v1/README.md)，保留其文件字节、领域根内相对路径、记录和通过身份。
+
+领域根现为`aiotbot-knowledge-wifi-mp/`；原领域根名称只保留在冻结历史记录中。目录迁移、现行引用及本次源码/验证身份见[改名记录](records/domain-root-rename-20261021.md)。baseline及既有验收manifest保持原字节和原提交身份，不把历史路径替换成新名称后沿用旧成绩。
 
 公开运行合同：[implementation-protocol.md](implementation-protocol.md)。
 

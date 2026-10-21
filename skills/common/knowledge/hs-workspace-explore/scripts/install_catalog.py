@@ -291,10 +291,10 @@ def workspace_registration(config_path, python):
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,95}", identity):
         raise InstallError("INVALID_WORKSPACE_ID")
     if value.get("schema_version") != "2.0" or value.get("knowledge_roots") != {
-        "wifi": "aiotbot-knowledge-wifi"
+        "wifi": "aiotbot-knowledge-wifi-mp"
     }:
         raise InstallError("INVALID_WORKSPACE_MAPPING")
-    lock = config.parent / "aiotbot-knowledge-wifi/governance/framework.lock.yaml"
+    lock = config.parent / "aiotbot-knowledge-wifi-mp/governance/framework.lock.yaml"
     no_links(lock)
     lock_bytes = lock.read_bytes()
     if config.read_bytes() != before or lock.read_bytes() != lock_bytes:

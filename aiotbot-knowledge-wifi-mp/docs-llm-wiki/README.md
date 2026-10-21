@@ -12,7 +12,7 @@
 | [sdd/knowledge-v2/](sdd/knowledge-v2/README.md) | 当前节点化需求、设计、T201–T211任务与验收 |
 | [sdd/knowledge-v1/](sdd/knowledge-v1/README.md) | 原字节保留的历史需求、任务和验收身份，不继承成绩 |
 
-FactumCore 承载业务代码与 WiFi 知识，目录以主设计 §5.3 目录树为准：`main/` 保持空目录；唯一领域根为 `aiotbot-knowledge-wifi/`，直接位于仓根，无中间目录或其他领域目录。本目录为 `aiotbot-knowledge-wifi/docs-llm-wiki/`，承载系统设计与既有 SDD，不存放正式业务知识卡。
+FactumCore 承载业务代码与 WiFi 知识，目录以主设计 §5.3 目录树为准：`main/` 保持空目录；唯一领域根为 `aiotbot-knowledge-wifi-mp/`，直接位于仓根，无中间目录或其他领域目录。本目录为 `aiotbot-knowledge-wifi-mp/docs-llm-wiki/`，承载系统设计与既有 SDD，不存放正式业务知识卡。
 
 18个节点Skill（完整清单见详设v4），与hs-knowledge-ingest、hs-knowledge-lint两个Workflow 在本仓能力目录实现，保留其 `skills/common/knowledge/` 与 `workflows/common/knowledge/` 归属。原四聚合Skill已拆为18节点包；能力在FactumCore根目录开发/发布，实际包版本与安装状态以当前验收记录为准。
 

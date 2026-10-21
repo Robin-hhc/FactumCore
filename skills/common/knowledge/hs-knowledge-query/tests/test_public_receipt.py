@@ -9,7 +9,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[5]
 SPEC = importlib.util.spec_from_file_location(
-    "query_receipt_fixture", ROOT / "aiotbot-knowledge-wifi/evals/pipeline_harness.py"
+    "query_receipt_fixture", ROOT / "aiotbot-knowledge-wifi-mp/evals/pipeline_harness.py"
 )
 FIXTURE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(FIXTURE)

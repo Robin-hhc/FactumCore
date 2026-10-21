@@ -30,7 +30,7 @@ class PublicGovernanceTests(unittest.TestCase):
             pathlib.Path(configured)
             if configured
             else pathlib.Path(__file__).resolve().parents[5]
-            / "aiotbot-knowledge-wifi/governance"
+            / "aiotbot-knowledge-wifi-mp/governance"
         )
         if not domain.joinpath("contracts/validation.py").is_file():
             self.skipTest("2.0 domain fixture path not supplied")

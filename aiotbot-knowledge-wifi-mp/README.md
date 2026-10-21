@@ -2,6 +2,8 @@
 
 这是 FactumCore 根下的 `aiotbot-knowledge-wifi-mp/`，本次唯一领域目录，无中间目录，不创建其他领域占位。Git 操作统一在 FactumCore 根执行，整体布局遵循[总体设计 §5.3](docs-llm-wiki/AIoTBot知识库架构设计.md#53-aiotbot-knowledge目录架构)目录树。
 
+业务环境首选将知识库部署在repo根目录，与CI同级并随代码共同拉取；仓外手动部署以用户本地`config.env`的`project_root`解析代码相对引用。项目manifest视图由各项目自行适配，具体方案留待手工补充，见[部署与视图配置说明](docs-llm-wiki/知识库详细设计.md#7-部署方式与manifest视图配置)。本次仅更新文档，不增加WiFi Demo开发范围。
+
 | 目录 | 存放内容 |
 |---|---|
 | `docs-raw/` | 五类已落地原件；`sources/` 仅后续来源登记占位 |

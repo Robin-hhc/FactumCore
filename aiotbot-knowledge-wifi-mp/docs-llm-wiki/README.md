@@ -14,6 +14,8 @@
 
 FactumCore 承载业务代码与 WiFi 知识，目录以主设计 §5.3 目录树为准：`main/` 保持空目录；唯一领域根为 `aiotbot-knowledge-wifi-mp/`，直接位于仓根，无中间目录或其他领域目录。本目录为 `aiotbot-knowledge-wifi-mp/docs-llm-wiki/`，承载系统设计与既有 SDD，不存放正式业务知识卡。
 
+业务部署与视图配置见[详细设计第7章](知识库详细设计.md#7-部署方式与manifest视图配置)：首选repo根内与CI同级、随代码共同拉取；受限部门可仓外手动拉取，以本地`config.env`的`project_root`定位代码。项目manifest适配由项目方负责，具体方案留白；此说明不新增task或WiFi Demo范围。
+
 18个节点Skill（完整清单见详设v4），与hs-knowledge-ingest、hs-knowledge-lint两个Workflow 在本仓能力目录实现，保留其 `skills/common/knowledge/` 与 `workflows/common/knowledge/` 归属。原四聚合Skill已拆为18节点包；能力在FactumCore根目录开发/发布，实际包版本与安装状态以当前验收记录为准。
 
 当前按详设v4与knowledge-v2实施节点化SDD开发；18个Skill和两个Workflow逐票交付，不把规划文件当运行成功。能力在本仓根skills/和workflows/开发，与main同级；发行和安装身份按实际记录，个人路径不写入公开配置。knowledge-v1只保留历史，不重置其任务状态。

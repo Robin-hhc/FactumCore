@@ -16,3 +16,44 @@ usage:
 - current
 - historical
 - guidance
+allowed_raw_roots:
+- docs-raw/conventions
+- docs-raw/chips
+- docs-raw/storys
+- docs-raw/specs
+- docs-raw/protocols
+allowed_knowledge_roots:
+- knowledge
+locator_kinds:
+- lines
+- page
+- pages
+- paragraph
+- paragraphs
+- section
+- table
+- attachment
+scan_change:
+- new
+- changed
+- missing
+- unchanged
+- unfinished
+- read_failed
+disposition_action:
+- create
+- update
+- merge
+- split
+- deprecate
+- defer
+- skip
+- failed
+- uncovered
+processing_progress:
+- pending
+- blocked
+- partial
+- completed
+- skipped
+- withdrawn

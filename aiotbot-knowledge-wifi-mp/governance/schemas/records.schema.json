@@ -41,7 +41,13 @@
         "event",
         "operation_status",
         "semantic_review",
-        "artifact_manifest"
+        "artifact_manifest",
+        "source_inventory",
+        "ingest_record",
+        "semantic_plan",
+        "content_review",
+        "check_report",
+        "source_materials"
       ]
     },
     "digest": {
@@ -813,6 +819,154 @@
           "signature_b64": {
             "type": "string",
             "minLength": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "source_inventory"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "scope",
+          "full_scan",
+          "complete",
+          "units"
+        ],
+        "properties": {
+          "scope": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "full_scan": {
+            "type": "boolean"
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "units": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "unit_id",
+                "path",
+                "source_id",
+                "observed_fingerprint",
+                "previous_fingerprint",
+                "change",
+                "read_error",
+                "progress"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "ingest_record"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "scan_ref",
+          "scan_digest",
+          "dispositions"
+        ],
+        "properties": {
+          "scan_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scan_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "dispositions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "unit_id",
+                "action",
+                "reason",
+                "observed_fingerprint",
+                "adopted_fingerprint",
+                "progress",
+                "card_refs",
+                "claim_refs"
+              ]
+            }
+          },
+          "pending": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "semantic_plan"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "scan_ref",
+          "material_ref",
+          "units",
+          "card_actions",
+          "target_queries"
+        ],
+        "properties": {
+          "units": {
+            "type": "array"
+          },
+          "card_actions": {
+            "type": "array"
+          },
+          "target_queries": {
+            "type": "array"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "content_review"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "passed",
+              "failed",
+              "incomplete",
+              "awaiting_human"
+            ]
           }
         }
       }

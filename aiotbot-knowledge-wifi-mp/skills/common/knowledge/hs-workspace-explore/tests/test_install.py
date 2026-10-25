@@ -1,0 +1,316 @@
+"""Public installation boundary over isolated synthetic capability packages."""
+
+import hashlib
+import json
+from pathlib import Path
+import subprocess
+import sys
+
+import pytest
+import yaml
+
+
+SCRIPT = Path(__file__).parents[1] / "scripts/install_catalog.py"
+IDS = ["hs-workspace-explore"] + [
+    "hs-knowledge-" + name
+    for name in (
+        "source-capture",
+        "change-plan",
+        "view-materialize",
+        "governance-handoff",
+        "candidate-inspect",
+        "confirmation-prepare",
+        "confirmation-record",
+        "local-check",
+        "candidate-revise",
+        "apply",
+        "recover",
+        "index-build",
+        "query-regression",
+        "publish-handoff",
+        "merge-check",
+        "maintain",
+        "query",
+        "source-scan",
+        "lint",
+    )
+]
+
+
+def test_catalog_declares_logical_commands_and_only_one_ingest_workflow(tmp_path):
+    source = fixture_source(tmp_path)
+    destination = tmp_path / "installed"
+    result = install(source, destination)
+    assert result.returncode == 0, result.stderr
+    catalog = json.loads((destination / "catalog.json").read_text(encoding="utf-8"))
+    assert catalog["commands"]["ingest"] == {"kind": "workflow", "target": "hs-knowledge-ingest", "entry_node": "scan_sources"}
+    assert catalog["commands"]["lint"]["target"] == "hs-knowledge-lint"
+    assert "hs-knowledge-source-scan" in catalog["skills"]
+    assert [p.name for p in (destination / "config/workflow-templates").iterdir()] == ["hs-knowledge-ingest"]
+
+
+def test_installer_validates_additional_native_artifact_contracts(tmp_path):
+    source = fixture_source(tmp_path)
+    artifacts = source / "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-source-scan/artifacts"
+    contract = yaml.safe_load((artifacts / "result.yaml").read_bytes())
+    contract.update(id="hs-knowledge-source-scan-prepare-result", template="../outside.md")
+    (artifacts / "prepare-result.yaml").write_text(yaml.safe_dump(contract), encoding="utf-8")
+    result = install(source, tmp_path / "installed")
+    assert result.returncode != 0
+    assert "INVALID_ARTIFACT_REFERENCE" in result.stderr
+
+
+def fixture_source(tmp_path):
+    source = tmp_path / "source workspace"
+    for skill in IDS:
+        package = source / "aiotbot-knowledge-wifi-mp/skills/common/knowledge" / skill
+        files = {
+            "SKILL.md": f"---\nname: {skill}\ndescription: fixture only\n---\n# fixture\n",
+            "scripts/cli.py": "print('fixture')\n",
+            "scripts/support.py": "# fixture\n",
+            "tests/test_cli.py": "# fixture\n",
+            "requirements.lock.txt": "# stdlib fixture\n",
+            "requirements-dev.lock.txt": "# fixture\n",
+            "artifacts/result.yaml": yaml.safe_dump(
+                {
+                    "id": skill + "-result",
+                    "title": skill,
+                    "required": True,
+                    "template": "templates/result.md",
+                    "writing_guide": "writing-guide.md",
+                    "review_guide": "review-guide.md",
+                    "default_location": {"kind": "markdown_file"},
+                    "applies_to": {"node_ids": []},
+                    "required_on": {"exit_ids": []},
+                }
+            ),
+            "artifacts/templates/result.md": "# Result\n",
+            "artifacts/writing-guide.md": "# Write\n",
+            "artifacts/review-guide.md": "# Review\n",
+        }
+        for relative, content in files.items():
+            path = package / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+    for workflow in ("hs-knowledge-ingest", "hs-knowledge-lint"):
+        package = source / "aiotbot-knowledge-wifi-mp/workflows/common/knowledge" / workflow
+        package.mkdir(parents=True)
+        (package / "workflow.yaml").write_text(
+            yaml.safe_dump(
+                {
+                    "version": 1,
+                    "id": workflow,
+                    "kind": "custom",
+                    "name": workflow,
+                    "entry_node": "bind_project",
+                    "nodes": [
+                        {
+                            "id": "bind_project",
+                            "type": "skill",
+                            "owner": "coder",
+                            "skill": "hs-workspace-explore",
+                            "exits": [{"id": "bound", "target": "__end__"}],
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        (package / "layouts.yaml").write_text(
+            f"template_id: {workflow}\n", encoding="utf-8"
+        )
+    return source
+
+
+def install(source, destination, *extra):
+    return subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--source-root",
+            str(source),
+            "--destination",
+            str(destination),
+            "--python",
+            sys.executable,
+            *extra,
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_install_complete_isolated_catalog_without_domain_assets(tmp_path):
+    source = fixture_source(tmp_path)
+    (source / "private.pem").write_text("PRIVATE KEY", encoding="utf-8")
+    raw = source / "aiotbot-knowledge-wifi-mp/docs-raw/specs/private.md"
+    raw.parent.mkdir(parents=True)
+    raw.write_text("not capability material", encoding="utf-8")
+    destination = tmp_path / "installed capabilities"
+    result = install(source, destination)
+    assert result.returncode == 0, result.stderr
+    catalog = json.loads((destination / "catalog.json").read_text(encoding="utf-8"))
+    assert catalog["schema_version"] == "2.0"
+    assert set(catalog["skills"]) == set(IDS)
+    assert catalog["workspaces"] == {}
+    entry = catalog["skills"]["hs-knowledge-apply"]
+    assert entry["entry"] == "scripts/cli.py"
+    assert Path(entry["python"]).is_absolute()
+    assert Path(entry["root"]) == destination / "config/skills/hs-knowledge-apply"
+    files = {}
+    for path in Path(entry["root"]).rglob("*"):
+        if path.is_file() and "tests" not in path.relative_to(entry["root"]).parts:
+            files[path.relative_to(entry["root"]).as_posix()] = hashlib.sha256(
+                path.read_bytes()
+            ).hexdigest()
+    canonical = json.dumps(
+        files, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode()
+    assert entry["package_digest"] == hashlib.sha256(canonical).hexdigest()
+    assert not list(destination.rglob("*.pem"))
+    assert not (destination / "aiotbot-knowledge-wifi-mp").exists()
+    assert (
+        len(list((destination / "config/workflow-templates").glob("*/workflow.yaml")))
+        == 1
+    )
+
+
+def test_install_refuses_existing_destination_and_preserves_contents(tmp_path):
+    source = fixture_source(tmp_path)
+    destination = tmp_path / "install"
+    destination.mkdir()
+    marker = destination / "user-owned"
+    marker.write_bytes(b"unchanged")
+    result = install(source, destination)
+    assert result.returncode != 0
+    assert marker.read_bytes() == b"unchanged"
+    assert not (destination / "catalog.json").exists()
+
+
+@pytest.mark.parametrize(
+    "broken",
+    ["scripts/cli.py", "artifacts/templates/result.md", "requirements.lock.txt"],
+)
+def test_missing_package_part_publishes_nothing(tmp_path, broken):
+    source = fixture_source(tmp_path)
+    (source / "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-apply" / broken).unlink()
+    destination = tmp_path / "install"
+    result = install(source, destination)
+    assert result.returncode != 0
+    assert not destination.exists()
+
+
+def test_wrong_dependency_blocks_without_installing(tmp_path):
+    source = fixture_source(tmp_path)
+    lock = source / "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-apply/requirements.lock.txt"
+    lock.write_text("factumcore-definitely-absent-fixture==0.0.0\n", encoding="utf-8")
+    destination = tmp_path / "install"
+    result = install(source, destination)
+    assert result.returncode != 0
+    assert "DEPENDENCY" in result.stderr
+    assert not destination.exists()
+
+
+def test_linked_package_file_rejected(tmp_path):
+    source = fixture_source(tmp_path)
+    link = source / "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-apply/scripts/escape.py"
+    try:
+        link.symlink_to(SCRIPT)
+    except OSError:
+        pytest.skip("symlink creation unavailable for this user")
+    destination = tmp_path / "install"
+    assert install(source, destination).returncode != 0
+    assert not destination.exists()
+
+
+def test_workspace_registration_pins_local_paths_and_rule_bytes(tmp_path):
+    source = fixture_source(tmp_path)
+    workspace = tmp_path / "business workspace"
+    config = workspace / "config.yml"
+    lock = workspace / "aiotbot-knowledge-wifi-mp/governance/framework.lock.yaml"
+    lock.parent.mkdir(parents=True)
+    lock.write_bytes(b"schema_version: '2.0'\n")
+    config.write_text(
+        "schema_version: '2.0'\nworkspace_id: fixture-wifi\nknowledge_roots:\n  wifi: aiotbot-knowledge-wifi-mp\n",
+        encoding="utf-8",
+    )
+    destination = tmp_path / "install"
+    result = install(source, destination, "--workspace-config", str(config))
+    assert result.returncode == 0, result.stderr
+    catalog = json.loads((destination / "catalog.json").read_bytes())
+    assert catalog["workspaces"]["fixture-wifi"] == {
+        "config": str(config.resolve()),
+        "rules_digest": hashlib.sha256(lock.read_bytes()).hexdigest(),
+    }
+    registry = json.loads((destination / "workspace-registry.json").read_bytes())
+    assert registry["workspaces"][0]["config_path"] == str(config.resolve())
+
+
+def test_broken_artifact_reference_publishes_nothing(tmp_path):
+    source = fixture_source(tmp_path)
+    path = source / "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-apply/artifacts/result.yaml"
+    contract = yaml.safe_load(path.read_bytes())
+    contract["template"] = "../SKILL.md"
+    path.write_text(yaml.safe_dump(contract), encoding="utf-8")
+    destination = tmp_path / "install"
+    result = install(source, destination)
+    assert result.returncode != 0 and "ARTIFACT_REFERENCE" in result.stderr
+    assert not destination.exists()
+
+
+def test_meaningful_tests_need_not_be_named_test_cli(tmp_path):
+    source = fixture_source(tmp_path)
+    tests = source / "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-apply/tests"
+    (tests / "test_cli.py").rename(tests / "test_public_governance.py")
+    destination = tmp_path / "install"
+    result = install(source, destination)
+    assert result.returncode == 0, result.stderr
+    assert (
+        destination / "config/skills/hs-knowledge-apply/tests/test_public_governance.py"
+    ).is_file()
+
+
+def test_unicode_metadata_uses_utf8_across_isolated_python(tmp_path):
+    source = fixture_source(tmp_path)
+    skill = source / "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-workspace-explore/SKILL.md"
+    skill.write_text(
+        skill.read_text(encoding="utf-8").replace(
+            "fixture only", "从中文路径加载 WiFi 规则"
+        ),
+        encoding="utf-8",
+    )
+    destination = tmp_path / "中文安装目录"
+    result = install(source, destination)
+    assert result.returncode == 0, result.stderr
+    assert "中文路径" in (
+        destination / "config/skills/hs-workspace-explore/SKILL.md"
+    ).read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("key_type", ["OPENSSH", "EC", "ENCRYPTED"])
+def test_private_key_in_an_allowed_text_resource_is_rejected(tmp_path, key_type):
+    source = fixture_source(tmp_path)
+    path = source / "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-apply/artifacts/leaked.md"
+    path.write_text(
+        f"-----BEGIN {key_type} PRIVATE KEY-----\nfixture-only\n", encoding="utf-8"
+    )
+    destination = tmp_path / "install"
+    result = install(source, destination)
+    assert result.returncode != 0 and "PRIVATE_KEY" in result.stderr
+    assert not destination.exists()
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows junction boundary")
+def test_junction_package_directory_rejected(tmp_path):
+    import _winapi
+
+    source = fixture_source(tmp_path)
+    link = source / "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-apply/scripts/escape"
+    target = tmp_path / "external"
+    target.mkdir()
+    (target / "private.py").write_text("# outside\n", encoding="utf-8")
+    _winapi.CreateJunction(str(target), str(link))
+    destination = tmp_path / "install"
+    result = install(source, destination)
+    assert result.returncode != 0 and "LINKED_PATH" in result.stderr
+    assert not destination.exists()

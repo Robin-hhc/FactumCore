@@ -1,0 +1,849 @@
+{
+  "files": [
+    {
+      "path": "aiotbot-knowledge-wifi-mp/evals/pipeline_harness.py",
+      "sha256": "cb96da828ed8154e7a6bea851435fc66ccad494226083d17dd769d852b94daf5",
+      "bytes": 8144
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/evals/pyproject.toml",
+      "sha256": "edf62575de75f68af128fc643756acb265821980e9e91fa4422fed07e6f9f05c",
+      "bytes": 140
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/evals/requirements-dev.lock.txt",
+      "sha256": "c7048b2b40a2846194c3d2e527de4ba29f0c5fdccf0c9415524dede91644e37e",
+      "bytes": 269
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/evals/run_acceptance.py",
+      "sha256": "18c8c7df919af035442bf7d5045ba1973aecbadc348bacc0791c4c59ab0ccc0d",
+      "bytes": 3353
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/evals/tests/test_contracts.py",
+      "sha256": "90af2563c3798949279dba192df14b345c0b6067b6a3ad3537b6d1b7a2919c5d",
+      "bytes": 10377
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/evals/tests/test_node_pipeline.py",
+      "sha256": "81e6a8e77a6cdef7f24f63eedbd016893535d9de88c4eea483f27e71fee67dee",
+      "bytes": 6409
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/evals/tests/test_process_recovery.py",
+      "sha256": "b530fa70cdc07bdb4df2e42257e7ebc8ad21aeb70d970667776710e56d1cf16f",
+      "bytes": 7826
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/evals/tests/test_workflows.py",
+      "sha256": "bb8d546aac654813195ea29d46866dc9a82054937170082eb0c8398c39eb3dae",
+      "bytes": 12510
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/evals/validate_design.py",
+      "sha256": "67a82f0fcfb3853a7948ddaf03208f15222f4d7c47683632c45f02ea838361de",
+      "bytes": 17699
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/governance/contracts/__init__.py",
+      "sha256": "ccc90c8e3b38e19264e3c6843099880b6f293779fc7222051ea5a47c3316c8db",
+      "bytes": 320
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/governance/contracts/knowledge.py",
+      "sha256": "b8c6f54cc34db19361c14e6e7a28f00164121ed07a4355c7a988fd8cb4725a77",
+      "bytes": 9709
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/governance/contracts/records.py",
+      "sha256": "3896f79880396e640016911f5fa9746b9d570d790d8e0818188ec7a3c5fefea8",
+      "bytes": 937
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/governance/contracts/source_resources.py",
+      "sha256": "29b478ce2f269171a10dd341eb75890d66c534dfd2b361eab573c9d3826e6e1f",
+      "bytes": 3016
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/governance/contracts/validation.py",
+      "sha256": "ea27b1cd15ba9e3748119595733125ac1c405696081be5f866b228f82ec3168b",
+      "bytes": 10415
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/governance/framework.lock.yaml",
+      "sha256": "06b24f9c5059cac9600978297a1dacf9c4c0353a0fde73302f16d493a2f8529b",
+      "bytes": 3584
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/governance/schemas/frontmatter.schema.json",
+      "sha256": "796f5032fb764b95cc24c76b468120646a23d090506b00eac0e77101c17b08f8",
+      "bytes": 7204
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/governance/schemas/profiles.yaml",
+      "sha256": "ec9eae684e484dd79cfe0f546a336d95d68ba5da7345f88e93733483d0d638be",
+      "bytes": 899
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/governance/schemas/records.schema.json",
+      "sha256": "7fc4155bc669a19eeb0830eba044a01bc1ceaeb6b4787971da5267e7206803fb",
+      "bytes": 16557
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/governance/schemas/registries.yaml",
+      "sha256": "c9825adb48789efa89b2ed2745f65cf06f8ca867f4155c588dd7f725a8c0d75b",
+      "bytes": 231
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/governance/schemas/sources.schema.json",
+      "sha256": "4eb46e8b8b6592308ce229f5f91553e0e1d50c3f90d0affef75bb5da3432134e",
+      "bytes": 1564
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/governance/schemas/workspace.schema.json",
+      "sha256": "20309635895697ffc68b4e7f5414e28b18ec381394d7b45100df10bfed916569",
+      "bytes": 5517
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/governance/sources.lock.yaml",
+      "sha256": "a175f32aff1abf6cb6617a5337a4478587ced98f8bf5fac520deb07c3d1add59",
+      "bytes": 50
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-apply/SKILL.md",
+      "sha256": "c83b2f056a74fbc4a4a4763ec7fffe5e53763aae0b18a526a4d64c49b5ca941e",
+      "bytes": 1966
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-apply/requirements-dev.lock.txt",
+      "sha256": "d742fe35f10d5bada5ce772c56c93780dde4971fa959aa305dac56730b625fc8",
+      "bytes": 26
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-apply/requirements.lock.txt",
+      "sha256": "05c2b86cbc3161ddd8f330cbc26a38ac7638fa11fc33a57489ef7ea3746f3836",
+      "bytes": 197
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-apply/scripts/cli.py",
+      "sha256": "340db117e4d8ff1a3c2e48447fc32544dc674af2b85c1d4d4be28a590dfd68e0",
+      "bytes": 443
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-apply/scripts/support.py",
+      "sha256": "6b0f4f8b1587e2831c9ed3f5fb0ec5c8a52f29e2b124149bed8be4ed9bf9b48b",
+      "bytes": 22687
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-apply/scripts/transaction.py",
+      "sha256": "841b5e425128a01076083b395d8751b84e65d7d80ed338e9fceb6f92f2e31e70",
+      "bytes": 27196
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-apply/tests/test_apply.py",
+      "sha256": "e7748b3687b627929fcd5aa3c18b777725d96aff2d23d59f66d3fcea4edf3dbb",
+      "bytes": 12147
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-apply/tests/test_public_governance.py",
+      "sha256": "182c7153cea013e9f1e8270604cb445f47f64c37571b4c275dd5f342d1a2599f",
+      "bytes": 17785
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-candidate-inspect/SKILL.md",
+      "sha256": "6838b01f310b0cad3b9791d1aff180e4b7a33fd3bc2bf63378456438e292a712",
+      "bytes": 1056
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-candidate-inspect/requirements-dev.lock.txt",
+      "sha256": "675a545c4bd56c6af715ed69e65e825907e6f94608ed572c0ae4d6a88cc330f0",
+      "bytes": 108
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-candidate-inspect/requirements.lock.txt",
+      "sha256": "2ceae39895982f06f941e99910f1c6ce225aabf9b510f83dc0d97ddc2a1c3660",
+      "bytes": 147
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-candidate-inspect/scripts/cli.py",
+      "sha256": "5486b9d511272b11685a2dcd5a26d4afb34750c9ba582736091774282e7df666",
+      "bytes": 482
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-candidate-inspect/scripts/inspect_candidate.py",
+      "sha256": "53f111985b8f566155ab4c590db168293f417767962fa305572da9a7a8011178",
+      "bytes": 6473
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-candidate-inspect/scripts/support.py",
+      "sha256": "ad3b514d2c8178b5597ca3cad713e3772ea748fde04407b52b6527117099454b",
+      "bytes": 22440
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-candidate-inspect/tests/conftest.py",
+      "sha256": "54befee3a5896d5f241d453a0fc0ce61c3a94e6d00caafe5816f756a7f5699b4",
+      "bytes": 7136
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-candidate-inspect/tests/test_cli.py",
+      "sha256": "91fd157b24d7bc4c089eb85eeae62f18fcc11ad51206cc5c9e55918d7be967c8",
+      "bytes": 2874
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-candidate-revise/SKILL.md",
+      "sha256": "589c186ab8f3ef96a215fc61cd1c7cdb2156bb9af3f03bc016b1f36b4b6baf85",
+      "bytes": 1067
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-candidate-revise/requirements-dev.lock.txt",
+      "sha256": "675a545c4bd56c6af715ed69e65e825907e6f94608ed572c0ae4d6a88cc330f0",
+      "bytes": 108
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-candidate-revise/requirements.lock.txt",
+      "sha256": "2ceae39895982f06f941e99910f1c6ce225aabf9b510f83dc0d97ddc2a1c3660",
+      "bytes": 147
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-candidate-revise/scripts/cli.py",
+      "sha256": "afa3825c3deec70041991ea68702d3bd8d4cc34fb23f4e7b039faac5d60e96b2",
+      "bytes": 471
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-candidate-revise/scripts/revise.py",
+      "sha256": "c7e2c8065665f2924391d7598f47d63af63b40a37d43d33c5c505a973dede44c",
+      "bytes": 2837
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-candidate-revise/scripts/support.py",
+      "sha256": "ad3b514d2c8178b5597ca3cad713e3772ea748fde04407b52b6527117099454b",
+      "bytes": 22440
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-candidate-revise/tests/conftest.py",
+      "sha256": "54befee3a5896d5f241d453a0fc0ce61c3a94e6d00caafe5816f756a7f5699b4",
+      "bytes": 7136
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-candidate-revise/tests/test_cli.py",
+      "sha256": "7dcf447e0b41b6c5fccb8a24539eab8b8934472f6d9908a978262fe6f3d375c6",
+      "bytes": 2415
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-change-plan/SKILL.md",
+      "sha256": "ec1380b42b613f0cc427cb73e2d5c8716598750e0ac14203398171e8c32ea740",
+      "bytes": 1058
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-change-plan/requirements-dev.lock.txt",
+      "sha256": "675a545c4bd56c6af715ed69e65e825907e6f94608ed572c0ae4d6a88cc330f0",
+      "bytes": 108
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-change-plan/requirements.lock.txt",
+      "sha256": "2ceae39895982f06f941e99910f1c6ce225aabf9b510f83dc0d97ddc2a1c3660",
+      "bytes": 147
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-change-plan/scripts/cli.py",
+      "sha256": "6eb3fa6e33cedbeb6ffd00b843fcf43639fa9c81822fa8254baa6b479857edbf",
+      "bytes": 473
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-change-plan/scripts/planning.py",
+      "sha256": "8b8fd7f00ee7d645864ec3a0be72fb895c7aee4b9716ff2c2b4af1e76255f6e9",
+      "bytes": 18217
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-change-plan/scripts/support.py",
+      "sha256": "ad3b514d2c8178b5597ca3cad713e3772ea748fde04407b52b6527117099454b",
+      "bytes": 22440
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-change-plan/tests/conftest.py",
+      "sha256": "54befee3a5896d5f241d453a0fc0ce61c3a94e6d00caafe5816f756a7f5699b4",
+      "bytes": 7136
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-change-plan/tests/test_cli.py",
+      "sha256": "460efdef2ddbdf292b61071f0e4c2b9353174a714c6d71b569d5447c5d60ef0a",
+      "bytes": 9123
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-confirmation-prepare/SKILL.md",
+      "sha256": "c3ef17d286f92a94ca1cdb69e614ffa10cbdd5b8e467d343ebcfaadb1a5dc649",
+      "bytes": 1197
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-confirmation-prepare/requirements-dev.lock.txt",
+      "sha256": "d742fe35f10d5bada5ce772c56c93780dde4971fa959aa305dac56730b625fc8",
+      "bytes": 26
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-confirmation-prepare/requirements.lock.txt",
+      "sha256": "05c2b86cbc3161ddd8f330cbc26a38ac7638fa11fc33a57489ef7ea3746f3836",
+      "bytes": 197
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-confirmation-prepare/scripts/cli.py",
+      "sha256": "33385460d8c184b4d6cc6975572840e6f3d9ecb410517a0bdc01e2a355a1f001",
+      "bytes": 584
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-confirmation-prepare/scripts/prepare.py",
+      "sha256": "fb82b53a637ace026ccc2e0760d96a359bfd2fd3bd02e2286ad7d519c02b2049",
+      "bytes": 7696
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-confirmation-prepare/scripts/support.py",
+      "sha256": "6b0f4f8b1587e2831c9ed3f5fb0ec5c8a52f29e2b124149bed8be4ed9bf9b48b",
+      "bytes": 22687
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-confirmation-prepare/tests/test_prepare.py",
+      "sha256": "d9bc94965174cca8e938a306824c060fa086490e3b7557d604d37cfff5428c2a",
+      "bytes": 3680
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-confirmation-record/SKILL.md",
+      "sha256": "ddb560c8dd52d99e80bbdeebcdc31fcb19b90c76abca6bf4e36e84daddd53316",
+      "bytes": 1314
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-confirmation-record/requirements-dev.lock.txt",
+      "sha256": "d742fe35f10d5bada5ce772c56c93780dde4971fa959aa305dac56730b625fc8",
+      "bytes": 26
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-confirmation-record/requirements.lock.txt",
+      "sha256": "05c2b86cbc3161ddd8f330cbc26a38ac7638fa11fc33a57489ef7ea3746f3836",
+      "bytes": 197
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-confirmation-record/scripts/cli.py",
+      "sha256": "eed9cb8e71f51309efe3dff0cda78e962c6f69b471ccc50e7fcefdd7cb853c8c",
+      "bytes": 613
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-confirmation-record/scripts/confirmation.py",
+      "sha256": "0b8f7e9df1a4e3076d09bf2ac133216d4f4c2d9c844bf0829933e21b5377ba67",
+      "bytes": 2036
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-confirmation-record/scripts/support.py",
+      "sha256": "6b0f4f8b1587e2831c9ed3f5fb0ec5c8a52f29e2b124149bed8be4ed9bf9b48b",
+      "bytes": 22687
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-confirmation-record/tests/test_confirmation_record.py",
+      "sha256": "855965cc186642bf3ce95770c1203233627f18356278ba93ba24ad9d055042fd",
+      "bytes": 5991
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-governance-handoff/SKILL.md",
+      "sha256": "8acff89d15cd0c2dd0073fea9a7c2fd5fde50bd7586884cff8f965a324af9b8b",
+      "bytes": 1047
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-governance-handoff/requirements-dev.lock.txt",
+      "sha256": "675a545c4bd56c6af715ed69e65e825907e6f94608ed572c0ae4d6a88cc330f0",
+      "bytes": 108
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-governance-handoff/requirements.lock.txt",
+      "sha256": "2ceae39895982f06f941e99910f1c6ce225aabf9b510f83dc0d97ddc2a1c3660",
+      "bytes": 147
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-governance-handoff/scripts/cli.py",
+      "sha256": "1456cdd4c794b7d452929afb01eab913e478a23ff5e0e11fbaa4d801ff36b06f",
+      "bytes": 472
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-governance-handoff/scripts/handoff.py",
+      "sha256": "43559856affc259f86a3eb941ca7717d6470a52dee6828f60cdead0c1e34164e",
+      "bytes": 1596
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-governance-handoff/scripts/support.py",
+      "sha256": "ad3b514d2c8178b5597ca3cad713e3772ea748fde04407b52b6527117099454b",
+      "bytes": 22440
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-governance-handoff/tests/conftest.py",
+      "sha256": "54befee3a5896d5f241d453a0fc0ce61c3a94e6d00caafe5816f756a7f5699b4",
+      "bytes": 7136
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-governance-handoff/tests/test_cli.py",
+      "sha256": "165088e0be4e9e121249096a7bb428a4151635f09de7c8310effafca5c41e6af",
+      "bytes": 1493
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-index-build/SKILL.md",
+      "sha256": "8bf2cb7f5960d841a5ff9a994231052b6f9ee6556ef4e0c65a8f0f3cff85b661",
+      "bytes": 1021
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-index-build/requirements-dev.lock.txt",
+      "sha256": "5d34500c1b9c1efd804d4bbca4fb6946ae1e095121ce9f930e836ba5e10738b1",
+      "bytes": 53
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-index-build/requirements.lock.txt",
+      "sha256": "dd6ae5af5dfe8cf10356b3b9d4fc2263723378b43644c038bb95fdcfa42523b6",
+      "bytes": 196
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-index-build/scripts/cli.py",
+      "sha256": "3172665176df42b2787bfa6a2e843cd63e5655535c7c00bdb1dc80244be8981f",
+      "bytes": 451
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-index-build/scripts/node.py",
+      "sha256": "c0ddd72a654b00b1287e7ce6150d2ad2d2b4597acaabec7587870da33eefb750",
+      "bytes": 24229
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-index-build/scripts/support.py",
+      "sha256": "f721d187bc55d3ccf3a86c991fb18640a772a3a21f060aebddd02fd7f9c7369e",
+      "bytes": 22741
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-index-build/tests/test_cli.py",
+      "sha256": "6d35721ff7b656b5fd5f8eee16b5410b01775004a9d84ecf3942040514922549",
+      "bytes": 1369
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-index-build/tests/test_public_qualification.py",
+      "sha256": "4b481650dad349e303533a0baa1fcda01922154fd81fe87c3d5b690e1173c425",
+      "bytes": 6088
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-index-build/tests/test_qualification.py",
+      "sha256": "3796190cf01da168a9b3347282c0003ab9229a7e1a99242894d74f0ccfe6c804",
+      "bytes": 9681
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-local-check/SKILL.md",
+      "sha256": "c9b6775e44625ee1bf0a5bf1556f585d354f385c7aeb8670a066166d293701c8",
+      "bytes": 2410
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-local-check/requirements-dev.lock.txt",
+      "sha256": "d742fe35f10d5bada5ce772c56c93780dde4971fa959aa305dac56730b625fc8",
+      "bytes": 26
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-local-check/requirements.lock.txt",
+      "sha256": "05c2b86cbc3161ddd8f330cbc26a38ac7638fa11fc33a57489ef7ea3746f3836",
+      "bytes": 197
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-local-check/scripts/check.py",
+      "sha256": "25a74cdecdf47787e67acff37a8662909d618ea0c5537eb8ddae724f9dadc4d7",
+      "bytes": 28904
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-local-check/scripts/cli.py",
+      "sha256": "2da73b00f3ba6c7d9addf876e7a488b17fb7334ec41cf327bd511633adcd6ee1",
+      "bytes": 445
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-local-check/scripts/support.py",
+      "sha256": "6b0f4f8b1587e2831c9ed3f5fb0ec5c8a52f29e2b124149bed8be4ed9bf9b48b",
+      "bytes": 22687
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-local-check/tests/test_local_check.py",
+      "sha256": "39fa4d9eeb9ec245aaa136c9b4b4b02a512fb5690743d92372c8af7b8b7f41cd",
+      "bytes": 2371
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-local-check/tests/test_public_code_gate.py",
+      "sha256": "4041fee1882a816873c91a75c3607b313436a681e22d294f146c259aa330dc34",
+      "bytes": 28320
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-maintain/SKILL.md",
+      "sha256": "b53ac390e8bd7e6e25d8dd3008df2e09095ed5430d83ba24fe0aca1f4277cf81",
+      "bytes": 948
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-maintain/requirements-dev.lock.txt",
+      "sha256": "675a545c4bd56c6af715ed69e65e825907e6f94608ed572c0ae4d6a88cc330f0",
+      "bytes": 108
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-maintain/requirements.lock.txt",
+      "sha256": "2ceae39895982f06f941e99910f1c6ce225aabf9b510f83dc0d97ddc2a1c3660",
+      "bytes": 147
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-maintain/scripts/cli.py",
+      "sha256": "3e92a96fa6818208eec50ccbf545d1b21198dc1705e315e96090d235736c1c23",
+      "bytes": 473
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-maintain/scripts/maintain.py",
+      "sha256": "45aa77f592f5d1c4a3fa4cdfc0397e2e645760ee7d8402c42bcce985a0b5afc2",
+      "bytes": 23386
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-maintain/scripts/support.py",
+      "sha256": "ad3b514d2c8178b5597ca3cad713e3772ea748fde04407b52b6527117099454b",
+      "bytes": 22440
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-maintain/tests/conftest.py",
+      "sha256": "54befee3a5896d5f241d453a0fc0ce61c3a94e6d00caafe5816f756a7f5699b4",
+      "bytes": 7136
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-maintain/tests/test_cli.py",
+      "sha256": "2877c5a32f4be4ff01c97ffe9092178e43e86274fac08766283522032afa7464",
+      "bytes": 6178
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-merge-check/SKILL.md",
+      "sha256": "f5322ccb6f7c25d030cafe73d658066568e00ef6697be7ac9a7ea4b711769baa",
+      "bytes": 1551
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-merge-check/requirements-dev.lock.txt",
+      "sha256": "d742fe35f10d5bada5ce772c56c93780dde4971fa959aa305dac56730b625fc8",
+      "bytes": 26
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-merge-check/requirements.lock.txt",
+      "sha256": "05c2b86cbc3161ddd8f330cbc26a38ac7638fa11fc33a57489ef7ea3746f3836",
+      "bytes": 197
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-merge-check/scripts/cli.py",
+      "sha256": "fe15cf2fcf4bfd51a99fa198a16f4ee2c5d9a9cf71ed2ca1f243d6019802e6a5",
+      "bytes": 602
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-merge-check/scripts/merge.py",
+      "sha256": "8b7b80c66002d352c35f1be5cdfd96546fe08e168d93f2abe661dec0f1ea143c",
+      "bytes": 4182
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-merge-check/scripts/support.py",
+      "sha256": "6b0f4f8b1587e2831c9ed3f5fb0ec5c8a52f29e2b124149bed8be4ed9bf9b48b",
+      "bytes": 22687
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-merge-check/tests/test_merge_check.py",
+      "sha256": "117152e7e089d9873a8d85cc54b16d8f6ee61848d9d93ad5e0ef477ec74766df",
+      "bytes": 1690
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-publish-handoff/SKILL.md",
+      "sha256": "ef27a20d48662ea99d8c6d01fd568d3228edef95ec6aeef84ed4a9abc05ee116",
+      "bytes": 1149
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-publish-handoff/requirements-dev.lock.txt",
+      "sha256": "d742fe35f10d5bada5ce772c56c93780dde4971fa959aa305dac56730b625fc8",
+      "bytes": 26
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-publish-handoff/requirements.lock.txt",
+      "sha256": "05c2b86cbc3161ddd8f330cbc26a38ac7638fa11fc33a57489ef7ea3746f3836",
+      "bytes": 197
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-publish-handoff/scripts/cli.py",
+      "sha256": "5e28ff20ba7fc4dfde979878be43f7651458cbdcfefac59a26170c2b801f184d",
+      "bytes": 600
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-publish-handoff/scripts/publish.py",
+      "sha256": "7d9087c5f0ad6ded7c287efff12b457bd65c044c5256d5cc8932664f6b447acb",
+      "bytes": 4650
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-publish-handoff/scripts/support.py",
+      "sha256": "6b0f4f8b1587e2831c9ed3f5fb0ec5c8a52f29e2b124149bed8be4ed9bf9b48b",
+      "bytes": 22687
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-publish-handoff/tests/test_publish_handoff.py",
+      "sha256": "a7b723e7ee30c2d9e4303596b89c56d6d4d1a7443bcca6c9e4bd1cd1967014bd",
+      "bytes": 1011
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-query-regression/SKILL.md",
+      "sha256": "c43185bf7abe42396c04da01b084814ba8b2242105b8ee8cdbb94aa361e98a53",
+      "bytes": 1027
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-query-regression/requirements-dev.lock.txt",
+      "sha256": "5d34500c1b9c1efd804d4bbca4fb6946ae1e095121ce9f930e836ba5e10738b1",
+      "bytes": 53
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-query-regression/requirements.lock.txt",
+      "sha256": "2ceae39895982f06f941e99910f1c6ce225aabf9b510f83dc0d97ddc2a1c3660",
+      "bytes": 147
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-query-regression/scripts/cli.py",
+      "sha256": "3172665176df42b2787bfa6a2e843cd63e5655535c7c00bdb1dc80244be8981f",
+      "bytes": 451
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-query-regression/scripts/node.py",
+      "sha256": "2050cb1089deb97d4f905971f08b6cf6dba941a3b117b69f19844e29eb535917",
+      "bytes": 3759
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-query-regression/scripts/support.py",
+      "sha256": "ad3b514d2c8178b5597ca3cad713e3772ea748fde04407b52b6527117099454b",
+      "bytes": 22440
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-query-regression/tests/test_cli.py",
+      "sha256": "dc23f3c17ea95fefe48817c856572b6e3b5adf516aae20d48fa47ae6f7581f5a",
+      "bytes": 2437
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-query/SKILL.md",
+      "sha256": "c25b1894c6121b871ad3ea57766e510913bec8004bb1d173cedee04903b22e71",
+      "bytes": 1041
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-query/requirements-dev.lock.txt",
+      "sha256": "5d34500c1b9c1efd804d4bbca4fb6946ae1e095121ce9f930e836ba5e10738b1",
+      "bytes": 53
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-query/requirements.lock.txt",
+      "sha256": "2ceae39895982f06f941e99910f1c6ce225aabf9b510f83dc0d97ddc2a1c3660",
+      "bytes": 147
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-query/scripts/cli.py",
+      "sha256": "3172665176df42b2787bfa6a2e843cd63e5655535c7c00bdb1dc80244be8981f",
+      "bytes": 451
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-query/scripts/node.py",
+      "sha256": "5bb37f3de603138fad691760e4450c3ffd2320b2f481d94c5fb778dbf07eb550",
+      "bytes": 30120
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-query/scripts/support.py",
+      "sha256": "ad3b514d2c8178b5597ca3cad713e3772ea748fde04407b52b6527117099454b",
+      "bytes": 22440
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-query/tests/test_cli.py",
+      "sha256": "ceb98dc9291781e0292e82496cad99a336a81883b112573e3b720eecd277729f",
+      "bytes": 2086
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-query/tests/test_public_receipt.py",
+      "sha256": "83a1170c1230dabffff6dfb632dec19878bd4fc68c4706f7aa5e6bd2971d7e78",
+      "bytes": 8340
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-query/tests/test_qualification.py",
+      "sha256": "71aad156aa5bdfb55d913058a3e0808ce9e48d9547b49f9e73b8f04ffd068d0f",
+      "bytes": 10035
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-recover/SKILL.md",
+      "sha256": "f2bbac5b6d61145c8c50c2dc33d2405b56addd6841c34540afe2acd88ebbab6b",
+      "bytes": 1229
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-recover/requirements-dev.lock.txt",
+      "sha256": "d742fe35f10d5bada5ce772c56c93780dde4971fa959aa305dac56730b625fc8",
+      "bytes": 26
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-recover/requirements.lock.txt",
+      "sha256": "05c2b86cbc3161ddd8f330cbc26a38ac7638fa11fc33a57489ef7ea3746f3836",
+      "bytes": 197
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-recover/scripts/cli.py",
+      "sha256": "fa9e6667defcf468ca6ec1eaa17d1ca498dbe35351142c3fa5fe50809f103f8f",
+      "bytes": 439
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-recover/scripts/recover.py",
+      "sha256": "2099e9627f4a5da241a01d9e9e047e3ab5f4f0233845d69112a5feff5c2177d5",
+      "bytes": 3955
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-recover/scripts/support.py",
+      "sha256": "6b0f4f8b1587e2831c9ed3f5fb0ec5c8a52f29e2b124149bed8be4ed9bf9b48b",
+      "bytes": 22687
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-recover/tests/test_recover.py",
+      "sha256": "4588c91f9dd985543340b6c048e77089b68be0cd73f6a012cf41f822bf32d2d3",
+      "bytes": 1852
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-source-capture/SKILL.md",
+      "sha256": "30d139bace5f233be063776dedfd11672f53d8f156d819ca0cf554aeebe466e9",
+      "bytes": 1133
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-source-capture/requirements-dev.lock.txt",
+      "sha256": "675a545c4bd56c6af715ed69e65e825907e6f94608ed572c0ae4d6a88cc330f0",
+      "bytes": 108
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-source-capture/requirements.lock.txt",
+      "sha256": "6bbf50956d018ed1d5249d07ec029e16cc0338bac8ff8df42b6e1ee486955c16",
+      "bytes": 192
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-source-capture/scripts/capture.py",
+      "sha256": "bc3ee5827d137199d91be3b5c3d22a7b074103d2a91d49f79e85737a7d12876b",
+      "bytes": 22155
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-source-capture/scripts/cli.py",
+      "sha256": "dbf088e0c9ded4e16dcc2709f96f0c5e38646942eb1c1f248e7fd5e57aeb80c5",
+      "bytes": 472
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-source-capture/scripts/code_capture.py",
+      "sha256": "0d5f77399e9988ed89055a01aa24307aaf958be106b29497bf71360b638ed6d3",
+      "bytes": 15049
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-source-capture/scripts/support.py",
+      "sha256": "ad3b514d2c8178b5597ca3cad713e3772ea748fde04407b52b6527117099454b",
+      "bytes": 22440
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-source-capture/tests/conftest.py",
+      "sha256": "54befee3a5896d5f241d453a0fc0ce61c3a94e6d00caafe5816f756a7f5699b4",
+      "bytes": 7136
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-source-capture/tests/test_cli.py",
+      "sha256": "7c59c2316bd9cb1e9565c66aa944f7cee754db58870016375d9de1dae757776f",
+      "bytes": 12411
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-source-capture/tests/test_code_capture.py",
+      "sha256": "8e1bc888272f4ced5f61c9f8c64d665de8e87e5cf60f535356253f308a1fe089",
+      "bytes": 16132
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-view-materialize/SKILL.md",
+      "sha256": "80e8659661f6099135e2b46c3b6bad8d2a265821c392d209a5aea49d29582ee4",
+      "bytes": 1073
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-view-materialize/requirements-dev.lock.txt",
+      "sha256": "675a545c4bd56c6af715ed69e65e825907e6f94608ed572c0ae4d6a88cc330f0",
+      "bytes": 108
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-view-materialize/requirements.lock.txt",
+      "sha256": "2ceae39895982f06f941e99910f1c6ce225aabf9b510f83dc0d97ddc2a1c3660",
+      "bytes": 147
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-view-materialize/scripts/cli.py",
+      "sha256": "fe66e7b2c93c11de02dca528670ecc17f9baeb83350fcdb829d9842042e2e81e",
+      "bytes": 476
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-view-materialize/scripts/materialize.py",
+      "sha256": "4312efe4431d2a92ef74508fd6d042e140afb9822a15779812ad52ee9115ea15",
+      "bytes": 4449
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-view-materialize/scripts/support.py",
+      "sha256": "ad3b514d2c8178b5597ca3cad713e3772ea748fde04407b52b6527117099454b",
+      "bytes": 22440
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-view-materialize/tests/conftest.py",
+      "sha256": "54befee3a5896d5f241d453a0fc0ce61c3a94e6d00caafe5816f756a7f5699b4",
+      "bytes": 7136
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-view-materialize/tests/test_cli.py",
+      "sha256": "ba5b98128f95902145e57172f491974956cc1a7f984306ddb7fcde19fe2b328f",
+      "bytes": 3340
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-workspace-explore/SKILL.md",
+      "sha256": "09d84d859c40e53e37f1102e224ddc05943731e33fa982b39acd7bdf934c795e",
+      "bytes": 1075
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-workspace-explore/requirements-dev.lock.txt",
+      "sha256": "5d34500c1b9c1efd804d4bbca4fb6946ae1e095121ce9f930e836ba5e10738b1",
+      "bytes": 53
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-workspace-explore/requirements.lock.txt",
+      "sha256": "2ceae39895982f06f941e99910f1c6ce225aabf9b510f83dc0d97ddc2a1c3660",
+      "bytes": 147
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-workspace-explore/scripts/cli.py",
+      "sha256": "5969f96f07729c3e2c56df5c9e163b55343a5b2648e127fc5ee8edd2347c1f75",
+      "bytes": 4797
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-workspace-explore/scripts/install_catalog.py",
+      "sha256": "1274cb3391f4db5bc9a2a3458fc919e0ed39b7ea726bc728f98b85753ae819e6",
+      "bytes": 15582
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-workspace-explore/scripts/node.py",
+      "sha256": "6771d5d4ca919b1aae5aedf9783a75444d77fd942e665ac4c224e8c27b0f27e5",
+      "bytes": 8173
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-workspace-explore/scripts/support.py",
+      "sha256": "ad3b514d2c8178b5597ca3cad713e3772ea748fde04407b52b6527117099454b",
+      "bytes": 22440
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-workspace-explore/tests/test_cli.py",
+      "sha256": "a2e575e8a42d7166436b9d60ae1df106e6e44fbb378c6d0d65081ce44036b006",
+      "bytes": 3567
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-workspace-explore/tests/test_install.py",
+      "sha256": "87fdbc6fdf68e0954dc8b815575463855b9590b193806c92c1aac49b8f5764d7",
+      "bytes": 11396
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/workflows/common/knowledge/hs-knowledge-ingest/layouts.yaml",
+      "sha256": "ef8cdbbf9541e14be068bed665b17d06edd3a62709ed65076297f5ec9411e6ea",
+      "bytes": 267
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/workflows/common/knowledge/hs-knowledge-ingest/workflow.yaml",
+      "sha256": "a98fa60c4309b41125db4afb4be56555f1348143ddcbf8f3cb91f4cb72172aa0",
+      "bytes": 6952
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/workflows/common/knowledge/hs-knowledge-lint/layouts.yaml",
+      "sha256": "a2b4f427c9db6d70920ab747571fc76cad8f1eb23f69a15f9fd634bd4942e734",
+      "bytes": 609
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/workflows/common/knowledge/hs-knowledge-lint/workflow.yaml",
+      "sha256": "b67b605630f4738441d6b3f0037fe6added3539bf6fe679dd7e49d43363a9912",
+      "bytes": 18220
+    }
+  ]
+}

@@ -56,7 +56,7 @@ class Pipeline:
         )
         self.rules = sha((self.root / "governance/framework.lock.yaml").read_bytes())
         self.root.joinpath(".isolated-knowledge-fixture").write_text("AIOTBOT_SYNTHETIC_FIXTURE_V2", encoding="utf-8")
-        self.skills = REPO / "skills/common/knowledge"
+        self.skills = REPO / "aiotbot-knowledge-wifi-mp/skills/common/knowledge"
         self.key = Ed25519PrivateKey.generate()
         self.catalog = {
             "schema_version": "2.0",
@@ -92,7 +92,11 @@ class Pipeline:
         return ref
 
     def record(self, ref):
-        return json.loads((self.root / ref).read_bytes())
+        import os
+        path = str((self.root / ref).absolute())
+        if os.name == "nt" and not path.startswith("\\\\?\\"):
+            path = "\\\\?\\UNC\\" + path[2:] if path.startswith("\\\\") else "\\\\?\\" + path
+        return json.loads(Path(path).read_bytes())
 
     def call(self, slug, request, action=None, expected=0):
         self.sequence += 1

@@ -1,0 +1,56 @@
+{
+  "status": "passed",
+  "verification_tier": "isolated_synthetic_mechanisms",
+  "design_sha256": "32df6c9505f3f7c6e8220f90a02a030641d5c9f39d0402ac80154b6556ad2f54",
+  "rules_digest": "b3ffb8a84e3009dd4cb87fdba7fe3c9a9ab9886fdf9c0172caf87a0ed73f3873",
+  "full_regression": {
+    "tests": 290,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 1
+  },
+  "groups": 21,
+  "skips": [
+    {
+      "case": "test_linked_package_file_rejected",
+      "reason": "symlink creation unavailable for this user"
+    }
+  ],
+  "full_result_path": "aiotbot-knowledge-wifi-mp/artifacts/test-tmp/v3-final-20261025-03",
+  "ruff": "passed",
+  "verification_method": "Full 21-group regression plus entire local-check rerun after test-only native cleanup fix; cases are replaced, not added twice",
+  "original_full_run_totals": {
+    "tests": 289,
+    "failures": 1,
+    "errors": 0,
+    "skipped": 1
+  },
+  "correction": {
+    "scope": "test fixture cleanup only",
+    "production_changed": false,
+    "all_original_group_cases_covered": true,
+    "added_cleanup_escape_case": 1,
+    "tests": 16,
+    "junit": "localcheck-native.xml"
+  },
+  "capabilities": {
+    "skills": 20,
+    "workflow_templates": 1,
+    "artifact_contracts": 24,
+    "actual_openflow_revision": "1901a463efca222542a4634d7ce50c7b244b2bab"
+  },
+  "preservation": "preservation.json",
+  "implementation_manifest": "implementation-after.json",
+  "external_pending": [
+    "Real host command registration and implicit selection",
+    "Real human adapter and actual agent reading quality",
+    "Real six Target/three pair integration",
+    "Protected remote CI and merge",
+    "Cross-group OS/tool access control"
+  ],
+  "implementation_limits": [
+    "Portable original restoration in new P7 requires exact Git version; unsupported local/dirty-only origins block",
+    "New-search index freshness remains deferred",
+    "Fixture signing keys and commits are not production acceptance"
+  ]
+}

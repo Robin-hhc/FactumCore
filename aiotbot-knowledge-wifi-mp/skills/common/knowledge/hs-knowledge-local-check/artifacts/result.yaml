@@ -1,0 +1,16 @@
+id: hs-knowledge-local-check-result
+title: hs-knowledge-local-check result
+required: true
+applies_to:
+  node_ids:
+  - local_check
+required_on:
+  exit_ids:
+  - code_passed
+  - needs_revision
+template: templates/result.md
+writing_guide: writing-guide.md
+review_guide: review-guide.md
+default_location:
+  kind: markdown_file
+  path: node-result.md

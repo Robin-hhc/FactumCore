@@ -44,11 +44,16 @@ def test_hard_exit_after_card_replace_preserves_journal_and_recovers_exact_view(
 import os,pathlib,runpy,sys
 cli,target,incoming,outgoing,knowledge,rules,catalog=sys.argv[1:]
 expected=pathlib.Path(target).resolve()
+if os.name=='nt' and not str(expected).startswith('\\\\?\\'):
+    expected=pathlib.Path('\\\\?\\'+str(expected))
 replace=os.replace
 def hard_exit_after_exact_replace(source,destination,*args,**kwargs):
     result=replace(source,destination,*args,**kwargs)
-    if pathlib.Path(destination).resolve()==expected:
-        os._exit(73)
+    try:
+        if pathlib.Path(destination).samefile(expected):
+            os._exit(73)
+    except FileNotFoundError:
+        pass
     return result
 os.replace=hard_exit_after_exact_replace
 sys.path.insert(0,str(pathlib.Path(cli).parent))

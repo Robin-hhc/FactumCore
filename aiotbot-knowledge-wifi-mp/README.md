@@ -1,24 +1,30 @@
 # WiFi 知识库
 
-这是 FactumCore 根下的 `aiotbot-knowledge-wifi-mp/`，本次唯一领域目录，无中间目录，不创建其他领域占位。Git 操作统一在 FactumCore 根执行，整体布局遵循[总体设计 §5.3](docs-llm-wiki/AIoTBot知识库架构设计.md#53-aiotbot-knowledge目录架构)目录树。
+WiFi 知识库将原始材料提炼为可追溯知识卡，通过确认、核验和检索回归后供 Agent 使用。目录为 FactumCore 根下的 `aiotbot-knowledge-wifi-mp/`，Git 操作统一在 FactumCore 根执行；布局见[总体设计 §5.3](docs-llm-wiki/AIoTBot知识库架构设计.md#53-aiotbot-knowledge目录架构)。
 
-业务环境首选将知识库部署在repo根目录，与CI同级并随代码共同拉取；仓外手动部署以用户本地`config.env`的`project_root`解析代码相对引用。项目manifest视图由各项目自行适配，具体方案留待手工补充，见[部署与视图配置说明](docs-llm-wiki/知识库详细设计.md#7-部署方式与manifest视图配置)。本次仅更新文档，不增加WiFi Demo开发范围。
+```mermaid
+flowchart LR
+    R["docs-raw/ 原件"] --> P["生产<br/>提炼、查重、固定候选"]
+    P --> G["治理<br/>文档确认 / 代码核验"]
+    G --> K["knowledge/ 正式卡"]
+    K --> Q["消费<br/>检索、精读、溯源"]
+```
 
 | 目录 | 存放内容 |
 |---|---|
-| `docs-raw/` | 五类已落地原件；`sources/` 仅后续来源登记占位 |
-| `governance/` | Schema、受控枚举、模板、规范及来源锁 |
-| `knowledge/` | 七类正式知识卡及导航，当前无业务卡 |
+| `docs-raw/` | conventions、chips、storys、specs、protocols 五类原件；`sources/` 留作后续接入 |
+| `knowledge/` | 七类正式知识卡及逐层导航，唯一知识正文根 |
+| `governance/` | Schema、契约、受控枚举、卡模板、规范及来源锁 |
+| `skills/common/knowledge/` | 节点 Skill、执行脚本、参考说明与产物模板 |
+| `workflows/common/knowledge/` | ingest 串起生产与本地入库的编排设计；当前双模板调用见使用说明 |
 | `.build/` | 本地候选与转换暂存，生成内容不上库 |
-| `logs/` | 已发生操作的持久记录，当前为空 |
-| `docs-llm-wiki/` | 平铺设计、模块任务与入口文件及 SDD 工件 |
-| `evals/` | 当前契约、Workflow、跨节点与进程恢复验收及分包运行入口 |
-| `artifacts/` | 本地派生索引与报告，生成内容不上库 |
+| `logs/` | 操作、确认、来源快照及恢复记录 |
+| `evals/` | 检索案例、契约与流程回归 |
+| `artifacts/` | 可重建索引与报告，生成内容不上库 |
+| `docs-llm-wiki/` | 架构、概要与详细设计、使用说明及 SDD 工件 |
 
-FactumCore 承载业务、知识与能力源码，`main/` 目前仍为空。18个节点Skill（详设v4列明）在根`skills/common/knowledge/`，两个Workflow在根`workflows/common/knowledge/`，与main同级，统一使用当前远端，不放嵌套`.git`。实际运行、安装和发行版本以knowledge-v2验收记录为准。
+从[架构设计](docs-llm-wiki/AIoTBot知识库架构设计.md)了解目录与三条链路，从[概要与详细设计](docs-llm-wiki/知识库详细设计.md)了解节点判断和文件分工，操作见[使用说明](docs-llm-wiki/使用说明.md)。贡献规则见 [CONTRIBUTING.md](CONTRIBUTING.md)，实现任务与实际验证记录见 [SDD](docs-llm-wiki/sdd/knowledge-v2/README.md)。
 
-本轮按knowledge-v2进入开发；knowledge-v1原字节保留，新节点交付以当前记录为准。旧实现、测试和根开发工具的归档与历史成绩只属于当时版本，详见[历史布局记录](docs-llm-wiki/sdd/knowledge-v1/records/workspace-layout-20261020.md)。领域内的`check.py/check.sh`按当前票据提供薄入口，不以空壳或旧报告宣称通过。
+业务环境首选将知识库部署在 repo 工作区根目录，与 CI 同级并随代码共同拉取；仓外手动部署以本机 `config.env` 的 `project_root` 解析代码引用。项目 manifest 视图由各项目适配，见[部署与视图配置](docs-llm-wiki/知识库详细设计.md#7-部署方式与manifest视图配置)。
 
-T201–T210已完成开发及隔离机制验收，实际结果见[开发验收](docs-llm-wiki/sdd/knowledge-v2/records/development-acceptance-20261021.json)。200个唯一用例中199通过、1跳过；真实人动作、实际宿主隐式触发、业务六Target/三pair、业务CI与权限仍由T211独立验收。
-
-第一次使用先看[初始化与使用教程](docs-llm-wiki/使用说明.md)。其他入口：[AGENTS.md](AGENTS.md)、[设计入口](docs-llm-wiki/README.md)、[当前SDD](docs-llm-wiki/sdd/knowledge-v2/README.md)与[贡献约定](CONTRIBUTING.md)。六 Target/三 pair 是逻辑登记；业务源码、宏、构建与实际版本在外层 `config.yml` 未提供时保持 unknown。
+六 Target/三 pair 的业务路径、宏、构建与版本由外层 `config.yml` 登记，未知项保持 unknown。纯文档经真人确认确切最终内容后 stable；代码卡在 ingest 内完成本地只读核验，上库 CI 复用确定性检查。目录结构和设计本身不代表真实业务、宿主或权限隔离已接入。

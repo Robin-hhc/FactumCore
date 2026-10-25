@@ -60,7 +60,7 @@ def main():
             parser.error("Linked output paths are not accepted")
     output.mkdir(parents=True)
     (output / "t").mkdir()
-    packages = sorted((ROOT / "skills/common/knowledge").glob("hs-*/tests"))
+    packages = sorted((ROOT / "aiotbot-knowledge-wifi-mp/skills/common/knowledge").glob("hs-*/tests"))
     groups = [(i, path.parent.name, path) for i, path in enumerate(packages)]
     groups.append((len(groups), "domain-and-integration", ROOT / "aiotbot-knowledge-wifi-mp/evals/tests"))
     env = dict(os.environ, AIOTBOT_TEST_TMP=str(output / "unittest-tmp"))

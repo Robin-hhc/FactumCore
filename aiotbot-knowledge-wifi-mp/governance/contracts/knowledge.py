@@ -202,6 +202,54 @@ def validate_relations(view):
     return view
 
 
+def maintenance_candidates(cards, source_ids=(), topics=(), candidate_card_ids=()):
+    """Rebuild reading candidates from canonical cards without answer filtering.
+
+    Reasons are discovery evidence, never a semantic update decision. A requires
+    edge A -> B makes A a downstream reading candidate when B is selected.
+    """
+    values = list(cards.values()) if isinstance(cards, dict) else list(cards)
+    by_id = {card["metadata"]["id"]: card for card in values}
+    selected, source_ids = {}, set(source_ids)
+
+    def add(identity, reason):
+        if identity not in by_id:
+            raise ContractError("UNKNOWN_READING_CANDIDATE", identity)
+        reasons = selected.setdefault(identity, [])
+        if reason not in reasons:
+            reasons.append(reason)
+
+    for card in values:
+        meta = card["metadata"]
+        for source in meta["sources"]:
+            if source["source_id"] in source_ids:
+                claims = [claim["id"] for claim in meta["claims"] if source["evidence_ref"] in claim["source_refs"]]
+                add(meta["id"], {"kind": "source", "source_id": source["source_id"],
+                                  "snapshot_id": source["snapshot_id"], "claim_ids": claims})
+        searchable = "\n".join((meta["title"], meta.get("summary", ""), *meta.get("aliases", []), card["body"])).casefold()
+        for topic in topics:
+            if not isinstance(topic, str) or not topic.strip():
+                raise ContractError("INVALID_AUTHORING_TOPIC", "Nonempty topic text required")
+            if topic.casefold() in searchable:
+                add(meta["id"], {"kind": "topic", "topic": topic})
+    for identity in candidate_card_ids:
+        add(identity, {"kind": "agent_candidate"})
+    changed = True
+    while changed:
+        changed = False
+        for card in values:
+            identity = card["metadata"]["id"]
+            for relation in card["metadata"]["relations"]:
+                if relation["type"] not in {"requires", "derived_from"} or relation["target_card_id"] not in selected:
+                    continue
+                newly_selected = identity not in selected
+                add(identity, {"kind": "dependency", "target_card_id": relation["target_card_id"],
+                               "target_claim_id": relation.get("target_claim_id")})
+                changed = changed or newly_selected
+    return [{"card_id": identity, "card": by_id[identity], "reasons": selected[identity]}
+            for identity in sorted(selected)]
+
+
 def _has_condition(group):
     return any(
         group.get(key)

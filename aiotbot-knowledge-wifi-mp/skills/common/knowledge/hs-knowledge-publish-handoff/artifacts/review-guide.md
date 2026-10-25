@@ -1,0 +1,2 @@
+An Agent-written resealed apply or query JSON alone must not pass. Recheck the exact transaction through the public verifier; v3 content batches must also reverify the full index and plan-bound target searches and same-generation reads. Record-only batches must contain no knowledge writes. `ready_to_submit` is a pending Git action, not completion. `verify-submission` reads actual HEAD objects and the exact batch scope. Do not invent remote push, CI or merge results; fixed CI remains separate from the local semantic and real-human evidence.
+

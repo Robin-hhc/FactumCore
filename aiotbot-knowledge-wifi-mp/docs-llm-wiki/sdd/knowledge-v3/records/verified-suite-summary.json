@@ -1,0 +1,208 @@
+{
+  "schema_version": "2.0",
+  "verification_tier": "isolated_synthetic_mechanisms",
+  "groups": [
+    {
+      "group": "hs-knowledge-apply",
+      "exit_code": 0,
+      "seconds": 35.422,
+      "tests": 21,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-candidate-inspect",
+      "exit_code": 0,
+      "seconds": 38.594,
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-candidate-revise",
+      "exit_code": 0,
+      "seconds": 21.656,
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-change-plan",
+      "exit_code": 0,
+      "seconds": 254.375,
+      "tests": 29,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-confirmation-prepare",
+      "exit_code": 0,
+      "seconds": 0.406,
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-confirmation-record",
+      "exit_code": 0,
+      "seconds": 0.5,
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-governance-handoff",
+      "exit_code": 0,
+      "seconds": 15.0,
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-index-build",
+      "exit_code": 0,
+      "seconds": 140.031,
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-lint",
+      "exit_code": 0,
+      "seconds": 0.484,
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-local-check",
+      "exit_code": 0,
+      "seconds": 79.57,
+      "tests": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "correction": "aiotbot-knowledge-wifi-mp/artifacts/test-tmp/v3-final-20261025-03-localcheck-native/localcheck-native.xml"
+    },
+    {
+      "group": "hs-knowledge-maintain",
+      "exit_code": 0,
+      "seconds": 19.547,
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-merge-check",
+      "exit_code": 0,
+      "seconds": 0.344,
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-publish-handoff",
+      "exit_code": 0,
+      "seconds": 0.359,
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-query",
+      "exit_code": 0,
+      "seconds": 68.75,
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-query-regression",
+      "exit_code": 0,
+      "seconds": 1.922,
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-recover",
+      "exit_code": 0,
+      "seconds": 0.359,
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-source-capture",
+      "exit_code": 0,
+      "seconds": 48.297,
+      "tests": 37,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-source-scan",
+      "exit_code": 0,
+      "seconds": 58.953,
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-view-materialize",
+      "exit_code": 0,
+      "seconds": 24.781,
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-workspace-explore",
+      "exit_code": 0,
+      "seconds": 11.656,
+      "tests": 22,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1
+    },
+    {
+      "group": "domain-and-integration",
+      "exit_code": 0,
+      "seconds": 114.516,
+      "tests": 83,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "passed": true,
+  "totals": {
+    "tests": 290,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 1
+  },
+  "limitations": [
+    "No real human or implicit host acceptance",
+    "No real six Target or CI/publication/ACL acceptance",
+    "No restricted gold accessed"
+  ]
+}

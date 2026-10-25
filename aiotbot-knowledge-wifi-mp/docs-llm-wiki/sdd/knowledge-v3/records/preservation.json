@@ -1,0 +1,10 @@
+{
+  "design_sha256": "32df6c9505f3f7c6e8220f90a02a030641d5c9f39d0402ac80154b6556ad2f54",
+  "design_bytes_unchanged": true,
+  "snapshot_bytes_equal": true,
+  "historical_files_checked": 123,
+  "history_bytes_unchanged": true,
+  "factumcore_head_before": "d7803d12cc4210d7999fdc2a825d84dbd14743fe",
+  "factumcore_head_after": "d7803d12cc4210d7999fdc2a825d84dbd14743fe",
+  "factumcore_git_commit_created": false
+}

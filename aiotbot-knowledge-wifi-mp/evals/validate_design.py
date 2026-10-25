@@ -1,4 +1,4 @@
-"""Validate the approved node packages and two Workflow sources.
+"""Validate the approved node packages and the complete ingest Workflow.
 
 Local structural checks do not prove host triggering, human authentication,
 knowledge semantics or CI permissions. --openflow-source additionally executes
@@ -18,134 +18,162 @@ import subprocess
 import yaml
 
 
-SKILLS = ("hs-workspace-explore",) + tuple(
-    "hs-knowledge-" + name
-    for name in (
-        "source-capture",
-        "change-plan",
-        "view-materialize",
-        "governance-handoff",
-        "candidate-inspect",
-        "confirmation-prepare",
-        "confirmation-record",
-        "local-check",
-        "candidate-revise",
-        "apply",
-        "recover",
-        "index-build",
-        "query-regression",
-        "publish-handoff",
-        "merge-check",
-        "maintain",
-        "query",
-    )
-)
-ARTIFACT_SCOPE = dict(
-    zip(
-        SKILLS,
-        (
-            (["bind_project"], ["bound"]),
-            (["capture_raw"], ["captured"]),
-            (["plan_change"], ["planned", "deferred"]),
-            (["materialize_view"], ["ready"]),
-            (["governance_handoff"], ["handed_off"]),
-            (
-                ["inspect_candidate"],
-                ["manual_ready", "code_ready", "recovery_required"],
-            ),
-            (["prepare_confirmation"], ["await_user"]),
-            (["record_confirmation"], ["accepted"]),
-            (["local_check"], ["code_passed", "needs_revision"]),
-            (["revise_candidate"], ["ready", "deferred"]),
-            (["apply_view"], ["applied"]),
-            (["recover_transaction"], ["recovered"]),
-            (["rebuild_index"], ["built"]),
-            (["query_regression"], ["checked"]),
-            (["publish_handoff"], ["ready_to_publish"]),
-            ([], []),
-            ([], []),
-            ([], []),
-        ),
-        strict=True,
-    )
-)
-OWNERS = {
-    "local_check": "reviewer",
-    "query_regression": "reviewer",
-    "final_view_user_gate": "user",
-}
-NODE_SKILLS = {nodes[0]: skill for skill, (nodes, _) in ARTIFACT_SCOPE.items() if nodes}
-EDGES = {
-    "hs-knowledge-ingest": {
-        "bind_project": {"bound": "capture_raw", "blocked": "__end__"},
-        "capture_raw": {
-            "captured": "plan_change",
-            "deferred": "__end__",
-            "blocked": "__end__",
-        },
-        "plan_change": {
-            "planned": "materialize_view",
-            "deferred": "__end__",
-            "blocked": "__end__",
-        },
-        "materialize_view": {
-            "ready": "governance_handoff",
-            "stale": "plan_change",
-            "blocked": "__end__",
-        },
-        "governance_handoff": {"handed_off": "__end__", "blocked": "__end__"},
-    },
-    "hs-knowledge-lint": {
-        "bind_project": {"bound": "inspect_candidate", "blocked": "__end__"},
-        "inspect_candidate": {
-            "manual_ready": "prepare_confirmation",
-            "code_ready": "local_check",
-            "recovery_required": "recover_transaction",
-            "needs_revision": "revise_candidate",
-            "blocked": "__end__",
-        },
-        "prepare_confirmation": {
-            "await_user": "final_view_user_gate",
-            "stale": "inspect_candidate",
-            "blocked": "__end__",
-        },
-        "final_view_user_gate": {
-            "on_pass": "record_confirmation",
-            "on_fail": "revise_candidate",
-        },
-        "record_confirmation": {
-            "accepted": "apply_view",
-            "stale": "prepare_confirmation",
-            "partial": "revise_candidate",
-            "awaiting_confirmation": "__end__",
-            "blocked": "__end__",
-        },
-        "local_check": {
-            "code_passed": "apply_view",
-            "needs_revision": "revise_candidate",
-            "blocked": "__end__",
-        },
-        "revise_candidate": {
-            "ready": "inspect_candidate",
-            "deferred": "__end__",
-            "blocked": "__end__",
-        },
-        "apply_view": {
-            "applied": "rebuild_index",
-            "recovery_required": "recover_transaction",
-            "stale": "inspect_candidate",
-            "blocked": "__end__",
-        },
-        "recover_transaction": {
-            "recovered": "rebuild_index",
-            "rolled_back": "revise_candidate",
-            "blocked": "__end__",
-        },
-        "rebuild_index": {"built": "query_regression", "blocked": "__end__"},
-        "query_regression": {"checked": "publish_handoff", "blocked": "__end__"},
-        "publish_handoff": {"ready_to_publish": "__end__", "blocked": "__end__"},
-    },
-}
+SKILLS = ('hs-workspace-explore',
+ 'hs-knowledge-source-capture',
+ 'hs-knowledge-change-plan',
+ 'hs-knowledge-view-materialize',
+ 'hs-knowledge-governance-handoff',
+ 'hs-knowledge-candidate-inspect',
+ 'hs-knowledge-confirmation-prepare',
+ 'hs-knowledge-confirmation-record',
+ 'hs-knowledge-local-check',
+ 'hs-knowledge-candidate-revise',
+ 'hs-knowledge-apply',
+ 'hs-knowledge-recover',
+ 'hs-knowledge-index-build',
+ 'hs-knowledge-query-regression',
+ 'hs-knowledge-publish-handoff',
+ 'hs-knowledge-merge-check',
+ 'hs-knowledge-maintain',
+ 'hs-knowledge-query',
+ 'hs-knowledge-source-scan',
+ 'hs-knowledge-lint')
+ARTIFACT_SCOPE = {'hs-workspace-explore': ([], []),
+ 'hs-knowledge-source-capture': ([], []),
+ 'hs-knowledge-change-plan': (['plan_change'], ['planned']),
+ 'hs-knowledge-view-materialize': (['materialize_view'], ['ready']),
+ 'hs-knowledge-governance-handoff': ([], []),
+ 'hs-knowledge-candidate-inspect': (['inspect_candidate'],
+                                    ['manual_ready',
+                                     'mixed_ready',
+                                     'code_ready',
+                                     'recovery_required']),
+ 'hs-knowledge-confirmation-prepare': (['prepare_confirmation'], ['await_user']),
+ 'hs-knowledge-confirmation-record': (['record_confirmation'], ['accepted', 'mixed_ready']),
+ 'hs-knowledge-local-check': (['local_check'], ['code_passed', 'needs_revision']),
+ 'hs-knowledge-candidate-revise': (['revise_candidate'], ['ready', 'deferred']),
+ 'hs-knowledge-apply': (['apply_view'], ['applied', 'record_only']),
+ 'hs-knowledge-recover': (['recover_transaction'], ['recovered', 'record_only']),
+ 'hs-knowledge-index-build': (['rebuild_index'], ['built']),
+ 'hs-knowledge-query-regression': (['query_regression'], ['checked']),
+ 'hs-knowledge-publish-handoff': (['publish_handoff'], ['ready_to_publish']),
+ 'hs-knowledge-merge-check': ([], []),
+ 'hs-knowledge-maintain': ([], []),
+ 'hs-knowledge-query': ([], []),
+ 'hs-knowledge-source-scan': (['scan_sources'], ['scanned']),
+ 'hs-knowledge-lint': (['lint_preflight', 'lint_view'], ['passed'])}
+EXTRA_ARTIFACT_SCOPE = {'hs-knowledge-source-scan': {'prepare-result.yaml': (['prepare_material'], ['prepared']),
+                              'record-result.yaml': (['record_ingest'], ['recorded'])},
+ 'hs-knowledge-change-plan': {'review-result.yaml': (['review_plan', 'review_content'],
+                                                     ['reviewed'])},
+ 'hs-knowledge-publish-handoff': {'submission-result.yaml': (['submit_batch'], ['submitted'])}}
+OWNERS = {'review_plan': 'reviewer',
+ 'review_content': 'reviewer',
+ 'lint_preflight': 'reviewer',
+ 'final_view_user_gate': 'user',
+ 'local_check': 'reviewer',
+ 'lint_view': 'reviewer',
+ 'query_regression': 'reviewer'}
+NODE_SKILLS = {'scan_sources': 'hs-knowledge-source-scan',
+ 'prepare_material': 'hs-knowledge-source-scan',
+ 'plan_change': 'hs-knowledge-change-plan',
+ 'review_plan': 'hs-knowledge-change-plan',
+ 'materialize_view': 'hs-knowledge-view-materialize',
+ 'review_content': 'hs-knowledge-change-plan',
+ 'lint_preflight': 'hs-knowledge-lint',
+ 'inspect_candidate': 'hs-knowledge-candidate-inspect',
+ 'prepare_confirmation': 'hs-knowledge-confirmation-prepare',
+ 'record_confirmation': 'hs-knowledge-confirmation-record',
+ 'local_check': 'hs-knowledge-local-check',
+ 'revise_candidate': 'hs-knowledge-candidate-revise',
+ 'lint_view': 'hs-knowledge-lint',
+ 'record_ingest': 'hs-knowledge-source-scan',
+ 'apply_view': 'hs-knowledge-apply',
+ 'recover_transaction': 'hs-knowledge-recover',
+ 'rebuild_index': 'hs-knowledge-index-build',
+ 'query_regression': 'hs-knowledge-query-regression',
+ 'publish_handoff': 'hs-knowledge-publish-handoff',
+ 'submit_batch': 'hs-knowledge-publish-handoff'}
+EDGES = {'hs-knowledge-ingest': {'scan_sources': {'scanned': 'prepare_material',
+                                          'unchanged': 'record_ingest',
+                                          'resume': 'inspect_candidate',
+                                          'recover': 'recover_transaction',
+                                          'blocked': '__end__'},
+                         'prepare_material': {'prepared': 'plan_change', 'blocked': '__end__'},
+                         'plan_change': {'planned': 'review_plan',
+                                         'needs_material': 'prepare_material',
+                                         'blocked': '__end__'},
+                         'review_plan': {'reviewed': 'materialize_view',
+                                         'record_only': 'record_ingest',
+                                         'needs_material': 'prepare_material',
+                                         'needs_revision': 'plan_change',
+                                         'blocked': '__end__'},
+                         'materialize_view': {'ready': 'review_content',
+                                              'stale': 'prepare_material',
+                                              'blocked': '__end__'},
+                         'review_content': {'reviewed': 'lint_preflight',
+                                            'needs_material': 'prepare_material',
+                                            'needs_plan': 'plan_change',
+                                            'needs_revision': 'revise_candidate',
+                                            'blocked': '__end__'},
+                         'lint_preflight': {'passed': 'inspect_candidate',
+                                            'needs_material': 'prepare_material',
+                                            'needs_plan': 'plan_change',
+                                            'needs_revision': 'revise_candidate',
+                                            'blocked': '__end__'},
+                         'inspect_candidate': {'manual_ready': 'prepare_confirmation',
+                                               'mixed_ready': 'prepare_confirmation',
+                                               'code_ready': 'local_check',
+                                               'recovery_required': 'recover_transaction',
+                                               'needs_revision': 'revise_candidate',
+                                               'blocked': '__end__'},
+                         'prepare_confirmation': {'await_user': 'final_view_user_gate',
+                                                  'stale': 'inspect_candidate',
+                                                  'blocked': '__end__'},
+                         'final_view_user_gate': {'on_pass': 'record_confirmation',
+                                                  'on_fail': 'revise_candidate'},
+                         'record_confirmation': {'accepted': 'lint_view',
+                                                 'mixed_ready': 'local_check',
+                                                 'stale': 'prepare_confirmation',
+                                                 'partial': 'revise_candidate',
+                                                 'awaiting_confirmation': '__end__',
+                                                 'blocked': '__end__'},
+                         'local_check': {'code_passed': 'lint_view',
+                                         'needs_revision': 'revise_candidate',
+                                         'blocked': '__end__'},
+                         'revise_candidate': {'ready': 'review_content',
+                                              'needs_material': 'prepare_material',
+                                              'needs_plan': 'plan_change',
+                                              'deferred': 'record_ingest',
+                                              'blocked': '__end__'},
+                         'lint_view': {'passed': 'record_ingest',
+                                       'needs_material': 'prepare_material',
+                                       'needs_plan': 'plan_change',
+                                       'needs_revision': 'revise_candidate',
+                                       'blocked': '__end__'},
+                         'record_ingest': {'recorded': 'apply_view',
+                                           'needs_record': 'record_ingest',
+                                           'blocked': '__end__'},
+                         'apply_view': {'applied': 'rebuild_index',
+                                        'record_only': 'publish_handoff',
+                                        'recovery_required': 'recover_transaction',
+                                        'stale': 'prepare_material',
+                                        'blocked': '__end__'},
+                         'recover_transaction': {'recovered': 'rebuild_index',
+                                                 'record_only': 'publish_handoff',
+                                                 'rolled_back': 'prepare_material',
+                                                 'blocked': '__end__'},
+                         'rebuild_index': {'built': 'query_regression',
+                                           'content_error': 'plan_change',
+                                           'blocked': '__end__'},
+                         'query_regression': {'checked': 'publish_handoff',
+                                              'content_error': 'plan_change',
+                                              'blocked': '__end__'},
+                         'publish_handoff': {'ready_to_publish': 'submit_batch',
+                                             'blocked': '__end__'},
+                         'submit_batch': {'submitted': '__end__',
+                                          'pending_submission': '__end__',
+                                          'blocked': '__end__'}}}
 OPENFLOW_REVISION = "1901a463efca222542a4634d7ce50c7b244b2bab"
 # Exact bytes retrieved from the upstream revision, including transitive local
 # imports of the real loader. No copied or invented replacement validator.
@@ -195,7 +223,7 @@ def validate(root):
     errors = []
     artifacts = set()
     for skill in SKILLS:
-        package = root / "skills/common/knowledge" / skill
+        package = root / "aiotbot-knowledge-wifi-mp/skills/common/knowledge" / skill
         try:
             text = (package / "SKILL.md").read_text(encoding="utf-8")
             frontmatter = re.match(r"\A---\r?\n(.*?)\r?\n---(?:\r?\n|$)", text, re.S)
@@ -258,17 +286,42 @@ def validate(root):
                 errors.append(f"{skill}: artifact refers to nonexistent exit")
         except (OSError, ValueError, AttributeError, yaml.YAMLError) as exc:
             errors.append(f"{skill}: {exc}")
+    # Native OpenFlow contracts are scoped per node. A multi-node contract's
+    # required exits must exist on every node, not just in their union.
+    for skill, contracts in EXTRA_ARTIFACT_SCOPE.items():
+        package = root / "aiotbot-knowledge-wifi-mp/skills/common/knowledge" / skill
+        for name, (expected_nodes, expected_exits) in contracts.items():
+            try:
+                contract = load(package / "artifacts" / name)
+                identity = skill + "-" + name[:-5]
+                if contract.get("id") != identity or identity in artifacts:
+                    errors.append(f"{skill}/{name}: duplicate or inconsistent artifact identity")
+                artifacts.add(identity)
+                if contract.get("required") is not True or contract.get("default_location", {}).get("kind") != "markdown_file":
+                    errors.append(f"{skill}/{name}: required markdown_file artifact expected")
+                if contract.get("applies_to", {}).get("node_ids") != expected_nodes or contract.get("required_on", {}).get("exit_ids") != expected_exits:
+                    errors.append(f"{skill}/{name}: artifact scope mismatch")
+                for field in ("template", "writing_guide", "review_guide"):
+                    ref = contract.get(field, "")
+                    if not ref or Path(ref).is_absolute() or ".." in Path(ref).parts or "\\" in ref or not (package / "artifacts" / ref).is_file():
+                        errors.append(f"{skill}/{name}: invalid {field} reference")
+                for node_id in expected_nodes:
+                    exits = next((edges[node_id] for edges in EDGES.values() if node_id in edges), {})
+                    if not set(expected_exits).issubset(exits):
+                        errors.append(f"{skill}/{name}: nonexistent node exit")
+            except (OSError, ValueError, AttributeError, yaml.YAMLError) as exc:
+                errors.append(f"{skill}/{name}: {exc}")
     for identity, expected in EDGES.items():
         try:
-            package = root / "workflows/common/knowledge" / identity
+            package = root / "aiotbot-knowledge-wifi-mp/workflows/common/knowledge" / identity
             doc = load(package / "workflow.yaml")
             if (
                 doc.get("version"),
                 doc.get("id"),
                 doc.get("kind"),
                 doc.get("entry_node"),
-            ) != (1, identity, "custom", "bind_project") or doc.get("entry") != {
-                "skill": "hs-workspace-explore"
+            ) != (1, identity, "custom", "scan_sources") or doc.get("entry") != {
+                "skill": "hs-knowledge-source-scan"
             }:
                 errors.append(f"{identity}: invalid template identity/entry")
             nodes = doc.get("nodes", [])
@@ -318,7 +371,7 @@ def validate(root):
                     )
                 ):
                     errors.append(f"{identity}.{node_id}: unsupported runtime field")
-            visited, pending = set(), ["bind_project"]
+            visited, pending = set(), ["scan_sources"]
             while pending:
                 current = pending.pop()
                 if current in visited or current == "__end__":
@@ -358,7 +411,7 @@ const contracts=require(path.join(root,'src/config/skill-artifact-loader')).load
 const loader=require(path.join(root,'src/config/workflow-template-loader'));
 const layoutLoader=require(path.join(root,'src/config/workflow-template-layout-loader'));
 const workflows=loader.loadWorkflowTemplates(installed);
-if(workflows.length!==2||registry.skillIds.length!==18||contracts.length!==18) throw Error('Incomplete packages');
+if(workflows.length!==1||registry.skillIds.length!==20||contracts.length!==24) throw Error('Incomplete packages');
 for(const workflow of workflows){
  const layout=layoutLoader.loadWorkflowTemplateLayoutFromPackageDir(path.dirname(workflow.filePath),workflow.id);
  if(layout.template_id!==workflow.id) throw Error('Wrong layout identity');

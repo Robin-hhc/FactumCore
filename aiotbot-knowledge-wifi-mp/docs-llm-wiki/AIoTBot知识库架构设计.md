@@ -6,114 +6,90 @@ aiotbot-knowledge知识库仓目录结构如下所示。
 
 本节目录树描述FactumCore的开发布局。业务部署首选将`aiotbot-knowledge-wifi-mp/`放在repo工作区根目录，与CI工具等目录同级，纳入代码使用的同一项目视图和拉取入口；执行项目拉取命令时一并取得代码和知识库，不另行手工拉取知识库，因此没有两者独立拉取造成的知识卡指针异步问题。这里的repo根是业务多仓工作区根，可包含多个Git仓。
 
-无法采用根内部署的部门，可在代码仓外手动拉取知识库，由用户本地`config.env`中的`project_root`确定知识卡代码相对路径的基准。项目manifest视图差异由各项目自行适配，根内部署须保证知识库落在代码工作区根目录；具体视图适配方案留白，后续手工补充。部署位置、路径约定和责任边界见[详细设计第7章](知识库详细设计.md#7-部署方式与manifest视图配置)。本次仅更新设计说明，不新增实现、task或WiFi Demo验收范围。
+无法采用根内部署的部门，可在代码仓外手动拉取知识库，由用户本地`config.env`中的`project_root`确定知识卡代码相对路径的基准。项目manifest视图差异由各项目自行适配，根内部署须保证知识库落在代码工作区根目录；具体视图适配方案留白，后续手工补充。部署位置、路径约定和责任边界见[详细设计第7章](知识库详细设计.md#7-部署方式与manifest视图配置)。
 
-- AGENTS.md：项目绑定后的消费路由契约
+- AGENTS.md：本工作区的消费路由契约
 - config.yml：四张映射表，把代码仓、架构元素、领域知识实体、符号别名集中登记为一份配置事实
 - main/：真实代码工作区
-- aiot-knowledge/：领域知识仓根，下一级是 domain，一领域一仓，内部目录完全同构
+- aiotbot-knowledge-wifi-mp/：WiFi 领域根，集中维护原件、知识、治理及节点能力
   - knowledge/：知识卡，唯一检索对象，处理后知识的仓库
   - docs-raw/：源文档，原始证据层（LLM 只读）
   - governance/：治理文件夹，存放契约，模板，规范等
+  - skills/common/knowledge/ · workflows/common/knowledge/：节点能力与生产、治理编排
   - .build/ · logs/ · evals/ · artifacts/ · docs-llm-wiki/：配套支撑层
 
-```
-skills/
-└── common/
-    └── knowledge/
-        ├── hs-workspace-explore/  # 绑定项目
-        ├── hs-knowledge-source-capture/  # 固定来源
-        ├── hs-knowledge-change-plan/  # 六决策计划
-        ├── hs-knowledge-view-materialize/  # 物化最终视图
-        ├── hs-knowledge-governance-handoff/  # 移交治理
-        ├── hs-knowledge-candidate-inspect/  # 检查候选身份
-        ├── hs-knowledge-confirmation-prepare/  # 准备真人展示
-        ├── hs-knowledge-confirmation-record/  # 记录真实动作
-        ├── hs-knowledge-local-check/  # 代码本地核验
-        ├── hs-knowledge-candidate-revise/  # 修订或缩窄
-        ├── hs-knowledge-apply/  # 精确事务落位
-        ├── hs-knowledge-recover/  # 恢复事务
-        ├── hs-knowledge-index-build/  # 构建验证和激活索引
-        ├── hs-knowledge-query-regression/  # 回归候选代
-        ├── hs-knowledge-publish-handoff/  # 移交发布
-        ├── hs-knowledge-merge-check/  # 最新代码合入复验
-        ├── hs-knowledge-maintain/  # 维护与阻断复核
-        └── hs-knowledge-query/  # 消费知识
-workflows/
-└── common/
-    └── knowledge/
-        ├── hs-knowledge-ingest/  # 生产：来源到候选与治理交接
-        └── hs-knowledge-lint/    # 治理：分流确认/检查、事务、索引与发布交接
-AGENTS.md                            # 入口：领域/流程路由、卡契约指针、config.yml 说明
-config.yml                           # 代码仓 ↔ 架构元素 ↔ 领域知识实体 ↔ 符号映射
-main/                                # 真实代码工作区
-├── device/
-│   ├── bfgx/ common/ dpa/ platform/ sensorhub/
-│   └── wifi/
-│       ├── mp1x/
-│       │   ├── .codegraph/          # [新增]代码图谱db文件，本地生成不上库
-│       │   └── …
-│       ├── mp12/
-│       │   ├── .codegraph/          # [新增]代码图谱db文件，本地生成不上库
-│       │   └── …
-│       └── …
-├── drivers/
-│   ├── bfgx/ common/ dpa/ platform/ sensorhub/
-│   └── wifi/
-│       ├── .codegraph/              # [新增]代码图谱db文件，本地生成不上库
-│       └── …
-└── …
-aiotbot-knowledge-wifi-mp/          # WiFi 领域知识仓；以下展开内部结构
-├── AGENTS.md                    # 知识边界、规则指针与技能入口
-├── README.md                    # 定位、实际能力、资料导航
-├── CONTRIBUTING.md              # 生产、核验和贡献流程
-├── check.py / check.sh          # 结构、来源完整性及历史导入快照检查
-├── docs-raw/                    # 知识所在的原始文档
-│   ├── sources/                 # 来源登记表（md）：每条 = 链接 + 版本 + hash + 密级
-│   │   ├── dbox                 # dbox设计文档，链接到dbox，与薪火平台共管理
-│   │   ├── 3ms                  # 3ms文档，链接到3ms，与薪火平台共管理
-│   │   └── wiki                 # wiki文档，链接到wiki，与薪火平台共管理
-│   ├── conventions              # clean code、编码规范等，内部公开，上库git仓
-│   ├── chips                    # 芯片相关文档，内部公开，上库git仓
-│   ├── storys                   # 迭代设计文档，内部公开，上库git仓
-│   ├── specs                    # sdd流程AI生成设计文档，内部公开，上库git仓
-│   └── protocols                # 内部公开协议文档，内部公开，上库git仓
-├── governance/
-│   ├── AGENTS.md / index.md     # 共享治理维护规则与任务导航
-│   ├── templates/               # 9类 draft 卡、目录导航、复核和维护记录模板
-│   ├── sources.lock.yaml        # source → 声明版本/落点/hash/bytes/恢复说明；当前空锁
-│   ├── schemas/
-│   │   ├── frontmatter.schema.json
-│   │   ├── sources.schema.json  # 来源锁字段形状
-│   │   ├── profiles.yaml
-│   │   └── registries.yaml      # 本地来源根等注册项
-│   ├── contracts/               # knowledge、source_resources 与共享 validation
-│   └── specs/                   # 共享契约及编写、复核、生命周期规范
-├── knowledge/                   # 唯一知识正文根；
-│   ├── AGENTS.md                # WiFi 领域规则，不虚构实际模块与 Target
-│   ├── index.md                 # 当前仅入口，无技术卡；以下 Profile 随真实建卡创建
-│   ├── concepts/                # 原理、机制及概念卡
-│   │   ├── entities/            # 实体卡：模块/OPS/回调职责入口（dbox、storys、specs、chips 设计文档蒸馏）
-│   │   ├── flows/               # 流程卡：跨仓消息、收发链路（dbox、storys、specs 设计文档蒸馏）
-│   │   └── protocols/           # 协议卡：802.11 帧格式、状态机、计时器（协议蒸馏）
-│   ├── rules/                   # 规范卡：编码规范、Clean Code、门禁约束（conventions 蒸馏）
-│   ├── commands/                # 命令卡：维测命令语法、参数、典型输出、误用案例（wiki 蒸馏）
-│   ├── runbooks/                # 诊断卡：现象→信号→根因→解法→边界→验证（wiki 经验蒸馏）
-│   └── glossaries/              # 术语卡：组内黑话与缩写
-├── .build/                      # ignored 转换、规范化、候选暂存，按需产生
-├── logs/                        # 按日期记录已发生的导入与维护
-├── docs-llm-wiki/               # LLM WIKI系统说明（design_principles / installation_and_usage）；禁止成为第二份领域事实库
-├── evals/                       # 检索案例、回归执行与接受/拒绝测试
-└── artifacts/                   # 本地派生索引、验证报告，Git 忽略
+```text
+FactumCore/
+├── AGENTS.md                      # 项目入口与消费路由
+├── config.yml                     # 代码、架构、领域实体及符号映射
+├── main/                          # 业务代码工作区；真实布局由 config.yml 登记
+└── aiotbot-knowledge-wifi-mp/       # WiFi 领域根，无嵌套 .git
+    ├── AGENTS.md / README.md / CONTRIBUTING.md
+    ├── check.py / check.sh         # 固定 CI 入口，复用共用检查函数
+    ├── skills/common/knowledge/   # 节点级能力
+    │   ├── hs-workspace-explore/             # E0：缺上下文时前置发现
+    │   ├── hs-knowledge-source-capture/      # 保存本次原文副本与定位
+    │   ├── hs-knowledge-change-plan/         # 六决策计划
+    │   ├── hs-knowledge-view-materialize/    # 物化最终视图
+    │   ├── hs-knowledge-governance-handoff/  # 登记稿件与检查上下文
+    │   ├── hs-knowledge-lint/                # 只读确定性检查 Skill
+    │   ├── hs-knowledge-candidate-inspect/   # 检查候选身份
+    │   ├── hs-knowledge-confirmation-prepare/ # 准备真人展示
+    │   ├── hs-knowledge-confirmation-record/ # 记录真实动作
+    │   ├── hs-knowledge-local-check/         # 代码本地核验
+    │   ├── hs-knowledge-candidate-revise/    # 修订或缩窄
+    │   ├── hs-knowledge-apply/               # 精确事务落位
+    │   ├── hs-knowledge-recover/             # 恢复事务
+    │   ├── hs-knowledge-index-build/         # 构建、验证与激活索引
+    │   ├── hs-knowledge-query-regression/    # 回归候选代
+    │   ├── hs-knowledge-publish-handoff/     # 外部发布材料辅助
+    │   ├── hs-knowledge-merge-check/         # 固定代码视图复核辅助
+    │   ├── hs-knowledge-maintain/            # 变更影响与阻断复核
+    │   └── hs-knowledge-query/               # 消费知识
+    ├── workflows/common/knowledge/
+    │   └── hs-knowledge-ingest/   # P1—P7：原件到 stable 的完整流程
+    ├── docs-raw/                 # 原始证据，Agent 只读
+    │   ├── conventions/          # 编码规范
+    │   ├── chips/                # 芯片材料
+    │   ├── storys/               # 迭代设计和测试材料
+    │   ├── specs/                # 项目需求与设计原件
+    │   ├── protocols/            # 内部协议
+    │   └── sources/              # dbox、3ms、wiki 登记，暂不接入
+    ├── governance/
+    │   ├── AGENTS.md / index.md
+    │   ├── templates/            # 七类卡、导航与人工复核模板
+    │   ├── schemas/              # 字段形状、Profile 和受控枚举
+    │   ├── contracts/            # 共享机器规则
+    │   ├── specs/                # 编写、复核和生命周期规范
+    │   └── sources.lock.yaml     # 逻辑来源、固定版本和恢复信息
+    ├── knowledge/                # 唯一知识正文根
+    │   ├── AGENTS.md / index.md
+    │   ├── concepts/
+    │   │   ├── entities/         # 模块、OPS、回调职责
+    │   │   ├── flows/            # 跨仓消息和收发链路
+    │   │   └── protocols/        # 帧格式、状态机和计时器
+    │   ├── rules/                # 规范
+    │   ├── commands/             # 命令
+    │   ├── runbooks/             # 排障
+    │   └── glossaries/           # 术语
+    ├── .build/                   # 候选暂存，Git 忽略
+    ├── logs/                     # 来源、确认、操作和恢复留痕
+    ├── evals/                    # 检索案例和回归门禁
+    ├── artifacts/                # 可重建索引和报告，Git 忽略
+    └── docs-llm-wiki/             # 系统设计、使用说明与 SDD
 ```
 
-knowledge相关节点Skill和Workflow（源码在本仓，与main同级）：
+节点 Skill 和 Workflow 随 WiFi 知识库维护：
 
-上述skills/和workflows/直接位于FactumCore根，与main同级，使用当前远端且不放嵌套.git。18个Skill各负责一个可复用节点动作；`hs-knowledge-ingest`、`hs-knowledge-lint`只作为两个Workflow名称，不再注册同名聚合Skill。真实人工批准保留user Gate，由准备/记录Skill桥接可信动作，不能用Skill代替用户决定。
+`skills/common/knowledge/` 和 `workflows/common/knowledge/` 均位于 `aiotbot-knowledge-wifi-mp/` 下，由 FactumCore 统一管理，不包含嵌套 `.git`。一条 `hs-knowledge-ingest` Workflow 完成 P1—P7；`hs-knowledge-lint` 位于 Skill 目录，只执行只读检查。真实人工批准保留 user Gate，由准备和记录 Skill 连接可信动作。
 
 
 
 # 11 AIoTBot知识库架构
+
+知识库随代码仓一并拉取，无需独立初始化命令或常驻服务。`ingest` 默认处理五类允许 raw，从提炼 draft 连续完成检查、修订、必要真人确认或代码核验，最后将 stable 卡落位到 `knowledge/`；`lint` 是可单独调用的只读确定性检查入口，供手动修改和 CI 复用，不自动修稿或入库；`query` 消费知识。入库后提交，由固定 CI 脚本检查通过再合入。`ingest --source` 可选限定来源；命令格式见[详细设计 §1.1](知识库详细设计.md#11-从命令进入流程)，实际注册和续办由宿主适配层负责。
+
+ingest 是原件到本地正式知识的完整流程；lint 是可被 ingest、独立命令和 CI 复用的只读检查 Skill，query 负责消费。三者不是必须由用户顺序启动的三个 Workflow。
 
 前文"AIoTBot knowledge目录架构"回答的是"有哪些目录"，本章回答三个问题：**每个目录是干什么的？为什么要有这个目录？目录之间怎么协作？** 阅读顺序：11.1 建立动机认知（为什么需要知识库）→ 11.2 仓库架构（分层模型 + 目录职责）→ 11.3 知识生命周期（三条链路看目录协作）。
 
@@ -129,7 +105,7 @@ AIoT 业务横跨 WiFi、BGLE、定位、雷达、SLP、NFC、NPU、MCU 等十�
 | 结论可溯源 | 每张卡带 sources 锚点，回答可回溯到原始证据，抑制幻觉 |
 | 经验可沉淀 | 一次调试经验固化为 runbook 卡，跨项目、跨 agent 复用 |
 | 质量可治理 | lint 门禁 + 检索回归评测，知识有生命周期而非一次性文档 |
-| 权限可控 | 领域独立建仓，保密要求不同的知识各自管理、互不越界 |
+| 权限可控 | 按授权范围部署原件、知识卡和派生索引，由仓库与运行环境实施访问控制 |
 
 ## 11.2 知识库架构
 
@@ -146,11 +122,12 @@ AIoT 业务横跨 WiFi、BGLE、定位、雷达、SLP、NFC、NPU、MCU 等十�
 
 ```mermaid
 flowchart TB
-    U["用户 / AI Agent 提问"]
+    U["用户 / AI Agent 任务"]
+    C0{"已有适用项目上下文？"}
+    E0["E0 hs-workspace-explore<br />发现知识库、代码图谱入口和规则"]
 
     subgraph S1["① 入口路由层 · 知识库前台"]
         direction LR
-        A1["hs-workspace-explore<br />全局 Skill · 自动发现与绑定项目"]
         A2["AGENTS.md<br />消费路由契约"]
         A3["config.yml<br />四张映射表"]
         A4["领域仓根四件套<br />README · CONTRIBUTING · check.py/check.sh"]
@@ -177,8 +154,8 @@ flowchart TB
     subgraph S4["④ 治理与工具层"]
         direction LR
         D1["governance/<br />templates · schemas · contracts · specs · sources.lock.yaml"]
-        D2["skills/common/knowledge<br />节点Skill：source-capture · change-plan · apply · query 等18项"]
-        D3["workflows/common/knowledge<br />hs-knowledge-ingest · hs-knowledge-lint"]
+        D2["skills/common/knowledge<br />source-capture · change-plan · lint · apply · query"]
+        D3["workflows/common/knowledge<br />hs-knowledge-ingest：完整 P1—P7"]
     end
 
     subgraph S5["⑤ 配套支撑层"]
@@ -190,8 +167,13 @@ flowchart TB
         E5["docs-llm-wiki/<br />系统说明"]
     end
 
-    U --> S1 --> S2
-    S2 -->|"ingest 蒸馏建卡"| S3
+    U --> C0
+    C0 -->|"是：复用"| S1
+    C0 -->|"否"| E0
+    E0 -->|"定位并加载后"| S1
+    S1 --> S2
+    S2 -->|"ingest 生产 draft"| E1
+    E1 -->|"ingest 调用 lint Skill，必要确认 / 核验后入库"| S3
     S4 -.->|"契约约束 · 流程执行"| S3
     S5 -.->|"质量保障"| S3
 ```
@@ -200,47 +182,63 @@ flowchart TB
 
 | 层 | 一句话职责 | 承载目录/文件 |
 |---|---|---|
-| ① 入口路由层 | 自动绑定项目，先路由再消费 | `hs-workspace-explore` · `AGENTS.md` · `config.yml` · 领域仓根四件套（`README.md` · `CONTRIBUTING.md` · `check.py/check.sh`） |
+| ① 入口路由层 | 已知上下文直接路由；缺失时先发现 | `AGENTS.md` · `config.yml` · 领域仓根四件套；`hs-workspace-explore` 作为可选前置 E0 |
 | ② 源事实层 | 证据底座：代码事实 + 原始材料，喂知识层 | `main/` · `docs-raw/` |
 | ③ 知识资产层 | 唯一检索对象：治理后的知识卡 | `knowledge/` |
-| ④ 治理与工具层 | 契约约束知识层，三流程执行体 | `governance/` · `.skills/` · `.workflows/` |
+| ④ 治理与工具层 | 契约约束知识层，三流程执行体 | `governance/` · `skills/` · `workflows/` |
 | ⑤ 配套支撑层 | 候选暂存 · 回归门禁 · 留痕 · 派生索引 | `.build/` · `evals/` · `logs/` · `artifacts/` · `docs-llm-wiki/` |
 
 递进一句话：证据层喂知识层，契约层束知识层，技能层跑知识层，配套层验知识层，入口层路由知识层。
 
 ### 11.2.1 根目录架构
 
+#### hs-workspace-explore —— 会话前置发现 E0
+
+Agent 已加载项目入口、知道知识库和代码图谱入口时，直接复用上下文执行 `ingest`、`lint` 或 `query`。会话尚未加载项目约定、未知这些能力位置，或独立 Workflow 节点只收到代码仓信息时，才先用 E0 补齐上下文；触发取决于信息是否缺失，不取决于当前目录是否在仓内。
+
+```mermaid
+flowchart LR
+    A["会话 / 独立节点<br/>已知代码路径或工作区"] --> B{"适用上下文已加载？"}
+    B -->|"是"| C["直接执行业务命令"]
+    B -->|"否"| E["E0 前置发现<br/>知识库 · 代码图谱入口<br/>AGENTS / config 路径与规则"]
+    E -->|"发现并加载"| C
+    E -->|"不存在或有歧义"| G["返回缺口，保留 unknown"]
+```
+
+发现依据显式配置、有限祖先路径或受信工作区登记，不整盘猜测，不创建图谱、不伪造配置。入口线索与索引、服务实际可用性分别核实；未核实的图谱能力保留缺口。E0 发生在业务命令之前，可由独立节点在缺上下文时复用；它不是生产、治理或消费链路节点，也不是每条命令的必调步骤。用户无需先选项目、执行 `init` 或登记绑定。
+
 #### AGENTS.md —— 消费路由契约
 
 Agent 会话入口。作用是"先路由，再消费"：代码静态事实走 CodeGraph CLI，设计意图/动态语义走知识卡，历史原始材料走 raw，禁止全库扫描。没有这个入口，Agent 每次都要猜路径；有了它，一次会话的上下文预算花在刀刃上。
 
-仓外启动时先由全局 `hs-workspace-explore` 按目标代码路径定位 `config.yml` 与知识仓，再读取适用 `AGENTS.md`；不假定提示词中出现路径就已自动加载项目规则。
+默认复用已打开项目中加载的 `AGENTS.md`、`config.yml` 与知识库、代码图谱位置；只有上下文缺失才调用前置 E0。仓外会话按已有代码路径发现项目，仓外知识库部署仍按详细设计第 7.3 节解析代码根；两种情况均不要求用户另选项目。
 
-参与链路：消费链路（前置路由）。生产、治理链路不经过它——ingest / lint 是显式触发，不走会话路由。
+参与链路：消费以它进行前置路由；生产和治理也读取同一本仓约定。
 
 #### config.yml —— 四张映射表
 
 repos / architecture / wiki_entities / symbol_aliases 四张表，把"代码仓在哪、架构怎么划、卡片页叫什么、符号别名是什么"集中登记。这些内容是**配置事实而非领域知识**，集中一处，人和 Agent 共用同一份真相；决策引擎段（shadow/assist）也在此声明。
 
-参与链路：消费链路——路由的判断依据就是这四张表。
+参与链路：三条链路共用项目与 Target 映射；消费还据此选择检索和代码路由。
 
 #### main/ —— 真实代码工作区
 
 device 侧 + host 侧真实代码。`.codegraph/` 是代码图谱索引，**本地生成不上库**：它是按仓可重建的派生物，且可能包含内部符号信息，保持 Git 干净。知识卡结论必须能锚定到代码（`[函数](路径:行号)`）。首选部署使代码与知识在同一repo工作区可达；仓外手动部署时，代码相对引用以用户本地`config.env`的`project_root`定位，按[部署与视图配置说明](知识库详细设计.md#7-部署方式与manifest视图配置)处理。
 
-参与链路：生产链路（代码事实作为来源材料之一）+ 消费链路（codegraph 交叉印证）。
+参与链路：生产取证、本地代码语义核验、CI 固定身份比对及消费的代码交叉印证。
 
-#### `skills/common/knowledge`/ —— 全局入口与节点级能力
+#### `aiotbot-knowledge-wifi-mp/skills/common/knowledge/` —— 项目入口与节点级能力
 
 知识库的"操作说明书"，不装任何领域事实：
 
 | 技能 | 职责 | 一句话 |
 |------|------|--------|
-| `hs-workspace-explore/` | 绑定项目 | bind_project |
-| `hs-knowledge-source-capture/` | 固定来源 | capture_raw |
+| `hs-workspace-explore/` | E0：缺上下文时发现知识库、代码图谱与入口规则 | 业务命令前可选调用 |
+| `hs-knowledge-source-capture/` | 保存本次原文副本，恢复旧版阅读材料 | capture_raw |
 | `hs-knowledge-change-plan/` | 六决策计划 | plan_change |
 | `hs-knowledge-view-materialize/` | 物化最终视图 | materialize_view |
-| `hs-knowledge-governance-handoff/` | 移交治理 | governance_handoff |
+| `hs-knowledge-governance-handoff/` | 登记稿件与检查上下文 | governance_handoff |
+| `hs-knowledge-lint/` | L1—L5 只读确定性检查 | lint |
 | `hs-knowledge-candidate-inspect/` | 检查候选身份 | inspect_candidate |
 | `hs-knowledge-confirmation-prepare/` | 准备真人展示 | prepare_confirmation |
 | `hs-knowledge-confirmation-record/` | 记录真实动作 | record_confirmation |
@@ -250,29 +248,28 @@ device 侧 + host 侧真实代码。`.codegraph/` 是代码图谱索引，**本�
 | `hs-knowledge-recover/` | 恢复事务 | recover_transaction |
 | `hs-knowledge-index-build/` | 构建验证和激活索引 | rebuild_index |
 | `hs-knowledge-query-regression/` | 回归候选代 | query_regression |
-| `hs-knowledge-publish-handoff/` | 移交发布 | publish_handoff |
-| `hs-knowledge-merge-check/` | 最新代码合入复验 | verify_merge |
+| `hs-knowledge-publish-handoff/` | 外部发布材料辅助 | publish_handoff |
+| `hs-knowledge-merge-check/` | 固定代码视图复核辅助 | verify_merge |
 | `hs-knowledge-maintain/` | 维护与阻断复核 | maintain_knowledge |
 | `hs-knowledge-query/` | 消费知识 | query_knowledge |
 
-参与链路：生产、治理由两个Workflow编排多个节点Skill；消费由hs-knowledge-query及来源/索引相关节点能力完成。多个节点可复用同一Skill，节点数不等于新增实现份数。
+参与流程：ingest 编排 P1—P7，内部调用 lint Skill；query 使用知识、来源和索引能力。上表是能力清单，不表示上库必须逐个执行；固定 CI 复用 lint 的确定性检查函数。hs-workspace-explore 是命令前按需调用的 E0。
 
-#### `workflows/common/knowledge`/ —— 增量更新与治理工作流
+#### `aiotbot-knowledge-wifi-mp/workflows/common/knowledge/` —— 增量更新与治理工作流
 
 知识库的"操作说明书"，不装任何领域事实：
 
 | 技能 | 职责 | 一句话 |
 |------|------|--------|
-| `hs-knowledge-ingest/` | Agent 建卡、融合和统一收尾流程 | 怎么进 |
-| `hs-knowledge-lint/` | 结构、来源检查与语义复核流程 | 怎么验 |
+| `hs-knowledge-ingest/` | P1 扫描或续办→P2 材料→P3 阅读计划→P4 draft 视图→P5 lint→P6 必要确认/核验→P7 入库 | 一次入口完成本地闭环 |
 
-参与链路：hs-knowledge-ingest 跑生产、hs-knowledge-lint 跑治理
+ingest 不另分独立的生产和治理流程；它在 P5 调用 `skills/common/knowledge/hs-knowledge-lint/`，由返回的问题决定补材料、重判或修稿，再继续检查。lint 不建立 Workflow。
 
-#### aiot-knowledge/ —— 领域知识仓
+#### aiotbot-knowledge-wifi-mp/ —— WiFi 领域知识库
 
-本次只建设aiotbot-knowledge-wifi-mp，业务代码槽位、知识及节点Skill/Workflow在FactumCore同一Git仓开发和发布；不建立其他领域或中间容器。这是本仓开发与发布归属；业务部署按第5.3节及详设第7章选择repo根内或仓外方式。目录和忽略规则不构成ACL，资料/安装发行仍按实际授权处理。
+WiFi 原件、知识、治理及节点 Skill/Workflow 集中放在 `aiotbot-knowledge-wifi-mp/`，业务代码工作区通过外层 `config.yml` 关联。业务部署按第5.3节及详细设计第7章选择 repo 根内或仓外方式。目录和忽略规则不构成 ACL，资料与能力分发按实际授权处理。
 
-参与链路：**三条链路全程**——每个领域仓内部跑完整的"生产 → 治理上库 → 消费"。
+参与流程：ingest 负责原件到本地知识，lint 检查固定资产，query 消费合格结论。
 
 ### 11.2.2 各领域仓目录架构（以 wifi 为例）
 
@@ -283,11 +280,11 @@ device 侧 + host 侧真实代码。`.codegraph/` 是代码图谱索引，**本�
 | `AGENTS.md` | 知识边界、规则指针与技能入口 | Agent 会话第一步 |
 | `README.md` | 定位、实际能力、资料导航 | 人 |
 | `CONTRIBUTING.md` | 生产、核验和贡献流程 | 贡献者 |
-| `check.py / check.sh` | 结构、来源完整性及历史导入快照检查 | 本地门禁 + CI 门禁共用入口 |
+| `check.py / check.sh` | 固定 CI 检查入口，复用格式、导航、引用和索引构建规则 | 提交后的 CI 作业 |
 
 四个文件都是"入口与门禁"，不承载知识内容——它们把消费路由到 `knowledge/`，把贡献路由到 `governance/`。
 
-参与链路：`README.md` / `CONTRIBUTING.md` 生产链路贡献者入口；`check.py / check.sh` 治理链路本地门禁 + CI 门禁共用入口；`AGENTS.md` 消费路由。
+参与链路：`README.md` / `CONTRIBUTING.md` 是贡献者入口；`check.py / check.sh` 用于提交后的固定 CI 检查；`AGENTS.md` 提供消费路由，生产、治理也加载同一本仓约定。
 
 #### knowledge/ —— 知识正文根（唯一检索对象）
 
@@ -359,7 +356,7 @@ flowchart LR
     A5 -.->|"帧格式字段"| K2
 ```
 
-实线 = 主路由（材料性质决定的默认去处），虚线 = 兼路由（材料中夹带的其他可蒸内容）——一类材料可蒸多种卡，但路由目标由材料性质唯一决定，不是 Agent 临场发挥。
+实线是默认提炼方向，虚线是兼路由。一类材料可产生多类卡，最终按具体结论的性质选择 Profile；目录分类不能替代对正文、来源和适用范围的判断。
 
 | 影响点 | 链路环节 | 分类错位后果 |
 |--------|----------|--------------|
@@ -373,7 +370,7 @@ flowchart LR
 
 #### governance/ —— 治理规则层（契约 SSOT）
 
-`templates/`（9 类 draft 卡模板）、`schemas/`（frontmatter / sources schema、profiles、registries）、`contracts/`（knowledge、source_resources 与共享 validation）、`specs/`（编写、复核、生命周期规范）、`sources.lock.yaml`（来源锁：声明版本/落点/hash/bytes/恢复说明，当前空锁）。生产、治理、消费**共用同一契约**，Skill 不维护私有例外——这是对 cannbot-knowledge "统一知识契约"优势的直接落地。
+`templates/`（七类卡、导航与人工复核模板）、`schemas/`（frontmatter / sources schema、profiles、registries）、`contracts/`（knowledge、source_resources 与共享 validation）、`specs/`（编写、复核、生命周期规范）、`sources.lock.yaml`（来源锁：声明版本/落点/hash/bytes/恢复说明）。生产、治理、消费**共用同一契约**，Skill 不维护私有例外。
 
 参与链路：生产链路（建卡时套它的模板）+ 治理链路（契约为治理全程供给规则）+ 消费链路（过滤时按它的规范）。
 
@@ -391,54 +388,60 @@ flowchart LR
 
 ## 11.3 知识库使用链路
 
-知识库里所有目录，都是为三条链路服务的。先看链路、再看目录，每个目录"参与哪条链路、卡在哪一环"顺着图就能对上号。
+目录共同支撑完整 ingest、只读 lint 和 query。先看各自的输入、动作与输出，再对应资产位置；提交后的固定 CI 是独立作业。
 
-### 链路一：生产 —— ingest 六决策
+### 流程一：ingest —— 从原件到本地正式知识
 
-输入是来源材料，输出是 `.build/` 里的候选卡：
+Agent 已在命令前读取项目 `AGENTS.md`、获知代码仓与知识库入口后，才执行 ingest；缺上下文时由前置 E0 辅助发现，不作为 ingest 的节点。ingest 从 P1 扫描原件开始，是完整的 P1—P7 Workflow。P4 的 draft 和修改预览是中间产物，登记后直接继续 P5，不要求用户另启动入库流程。
+
+```mermaid
+flowchart TD
+    CMD["执行 knowledge ingest<br/>项目入口已在命令前读取"] --> P1
+    subgraph INGEST["hs-knowledge-ingest Workflow"]
+        P1["P1 扫描 / 续办"] -->|"新变化或输入已失效"| P2["P2 准备本次原文、旧版与关联卡"]
+        P2 --> P3["P3 Agent 阅读与计划"]
+        P3 --> P4["P4 生成 draft 与完整视图<br/>登记操作和稿件"]
+        P4 --> P5["P5 调用 lint Skill 检查"]
+        P5 -->|"通过"| P6["P6 必要真人确认 / 代码核验"]
+        P5 -->|"材料或定位不足"| P2
+        P5 -->|"范围或关系需重判"| P3
+        P5 -->|"格式、导航或视图问题"| P4
+        P6 -->|"退回或结论不支持"| P3
+        P6 -->|"缺代码或配置证据"| P2
+        P6 -->|"无回复：同一操作等待"| P6
+        P6 -->|"全部适用项通过"| P7["P7 本地入库 / 恢复<br/>knowledge/ stable"]
+        P1 -->|"有效待检查稿"| P5
+        P1 -->|"仍有效的确认停点"| P6
+        P1 -->|"未完成入库事务"| P7
+    end
+    P7 --> SUBMIT["提交"]
+    SUBMIT --> C1{"C1 固定 CI 脚本"}
+    C1 -->|"通过"| MERGE["合入"]
+    C1 -->|"失败：按问题返回本地修正"| P1
+```
+
+P1 对照原件处理记录发现新增、修改、缺失与未完成事项，只判断文件变化；P3 读取新旧原文和关联卡，再选择 create、update、merge、split、deprecate 或 defer。原件处理记录分别保留本次看到的版本、正式卡采用的版本及实际停点；保存副本、某卡引用原件均不表示整份原件已全部提炼。记录和阅读材料见[详细设计](知识库详细设计.md)。
+
+续办先核对原件、规则、代码和相关基线，稿件及依据未变才复用原操作与视图，不重新全量扫描或写稿。新视图须重新经过 P5/P6，旧确认不覆盖新内容；无回复停 P6。未完成事务在 P7 恢复，已入库不重复写入。
+
+只有同范围完整扫描成功，才能把原有路径未出现列为缺失；不可读、扫描中断或 `--source` 范围外不推断删除。缺失项读各关联卡实际引用的旧原文，不自动删知识。
+
+### 流程二：lint Skill —— 只读检查并汇总问题
+
+`skills/common/knowledge/hs-knowledge-lint/` 是 Skill 包，内部调用固定脚本。ingest 的 P5、独立 lint 命令及 C1 共用确定性规则；lint 不理解语义、不修稿、不确认、不 apply。
 
 ```mermaid
 flowchart LR
-    M["① 来源材料<br />docs-raw/ 六类"] --> R1["sources/ 链接类<br />dbox / 3ms / wiki<br />仅链接上库 · agent 联网读取更新（首发版本暂不支持）"]
-    M --> R2["conventions/<br />编码规范，上库"]
-    M --> R3["chips/<br />芯片文档，上库"]
-    M --> R4["storys/<br />迭代设计文档，上库"]
-    M --> R5["specs/<br />SDD AI 生成设计文档，上库"]
-    M --> R6["protocols/<br />内部协议文档，上库"]
-    R1 & R2 & R3 & R4 & R5 & R6 --> I{"② ingest 六决策"}
-    I -->|"查重无同主题卡"| C1["ingest-create<br />新建 draft 卡"]
-    I -->|"同主题卡存在且职责不变"| C2["ingest-update<br />补内容 + 追 sources 锚点"]
-    I -->|"多张卡讲同一件事"| C3["ingest-merge<br />合并 + 保留链"]
-    I -->|"一张卡混装多个主题"| C4["ingest-split<br />拆分 + 互链"]
-    I -->|"结论错误 / 不再推荐"| C5["ingest-deprecate<br />置 deprecated + 指替代品"]
-    I -->|"来源不可核验 / 材料未上库"| C6["ingest-defer<br />不建卡，登记 backlog"]
-    C1 & C2 & C3 & C4 --> B["③ 候选卡 draft 暂存 .build/"]
-    C5 --> K["knowledge/ 卡状态变更"]
+    L1["L1 准备检查视图<br/>基线及拟写 / 删除集合"] --> L2["L2 格式结构"]
+    L2 --> L3["L3 来源与代码固定引用"]
+    L3 --> L4["L4 导航关系 / 索引结构"]
+    L4 --> L5["L5 汇总报告<br/>问题位置、类别与检查缺口"]
 ```
 
-### 链路二：治理上库 —— lint 门禁
+L3 核对快照、文件指纹、路径、行页段及范围绑定，能定位不表示支持结论。代码语义支持和文档真人确认由 P6 完成，混合卡不能整体免核验。L4 检查受管导航和派生结构，必要时临时构建验证，不切换活动索引。
 
-输入是 `.build/` 里的候选卡，输出是**合入 Git 的 stable 卡**。`hs-knowledge-lint` Workflow编排节点能力并定义流程，`governance/` 提供契约，`check.py / check.sh` 是执行入口。两道门禁、一套契约——本地门禁查 `.build/` 候选卡，CI 门禁在上库合入时全库重校验：
-
-```mermaid
-flowchart LR
-    A["候选卡 draft<br />暂存 .build/"] --> B["① 模板套用<br />governance/templates/ + specs/"]
-    B --> C["② 字段 / 来源校验<br />governance/schemas/ + contracts/"]
-    C --> D{"③ 本地门禁执行<br />check.py / check.sh"}
-    D -->|"违规 · 打回修复"| B
-    D -->|"通过"| E["④ 候选卡 draft移入knowledge/"]
-    E --> F["⑤ 留痕与回归<br />logs/ + artifacts/ + evals/"]
-    F --> G["⑥ codehub上库"]
-    G --> H{"⑦ CI 构建门禁<br />增量检查改动后知识卡<br />check.py / check.sh"}
-    H -->|"违规 · 打回"| D
-    H -->|"通过"| I["⑧ committer 评审<br />合入 Git"]
-```
-
-**①② 是"查"不是"改"**：契约校验只判定卡是否合规，不改写内容——违规卡的修复由 Agent 按 lint 违规清单改，改完重新走门禁。
-
-**⑥⑦⑧ 两道门禁的分工**：①-⑤ 是本地门禁——查 `.build/` 候选卡，通过后卡片平移到 `knowledge/`（置 stable、`index.md` 回填一行），这只是**本地变更，还不是上库**；⑥⑦⑧ 是 CI 门禁——提 PR 触发 CI，服务器拉取待合入代码，按**改动的 knowledge 卡**重跑同一套契约校验（全库 lint + 索引核验 + 检索回归 + 单测），违规打回，committer 评审后合入 Git。
-
-### 链路三：消费 —— query 五步法
+C1 位于提交之后，复用这些确定性检查及必要的 SQLite 构建验证；代码变化只核已固定文件的 hash、路径和范围。不匹配则失败返回本地修正，不自动修稿或重新组织 Agent 语义复审。
+### 流程三：query —— 知识消费
 
 输入是提问（与目标代码路径），输出是带证据的回答。Agent 收到问题先读 `AGENTS.md` 路由契约，按**问题类型**三选一：
 
@@ -451,7 +454,7 @@ flowchart TB
 
     subgraph KQ["hs-knowledge-query 检索"]
         C["① SQLite 词项召回<br />按知识卡字段重合度（词面匹配）打分<br />召回匹配度高的知识卡"] --> D["② frontmatter 字段过滤<br />过滤范围不符 / 状态不符<br />"]
-        D --> E["③ 精读四要素<br />结论 / 适用条件 / 失效边界 / 验证方法"]
+        D --> E["③ 合格结论重排后精读<br />结论 / 适用条件 / 失效边界 / 验证方法"]
         E --> F["④ 溯源 + 印证<br />卡内 sources 指针 → docs-raw/ · main/"]
         F --> G["⑤ Search Receipt<br />检索留痕：命中 + 证据 + 置信度 + 缺口"]
         G --> H["带证据的回答<br />（结论 + 适用范围 + 依据 + 冲突/缺口）<br />返回主 Agent 交叉印证后答复"]
@@ -462,19 +465,17 @@ flowchart TB
 
 #### 目录 × 链路参与矩阵
 
-| 目录/文件 | 生产（材料 → 候选卡） | 治理上库（候选卡 → 合入） | 消费（卡 → 答案） |
+| 目录/文件 | ingest（原件 → 本地正式知识） | lint / 固定 CI（只读检查） | query（卡 → 答案） |
 |---|---|---|---|
-| `hs-workspace-explore` | 显式流程可复用项目绑定 | 同一绑定上下文 | 前置：自动发现与加载 |
-| `AGENTS.md` | 不参与 | 不参与 | 前置：路由 |
-| `config.yml` | — | — | 前置：路由依据 |
-| `main/` | 来源之一（代码事实） | — | ④ 交叉印证 |
-| `skills/` | ② 六决策执行 | ③ 门禁执行 · ⑦ CI 门禁 | ①-⑤ 全程执行体 |
-| `workflows/` | ② 六决策执行 | ③ 门禁执行 · ⑦ CI 门禁 | — |
-| `knowledge/` | — | ④ 平移落位 | ① 定位 / ③ 精读 |
-| `docs-raw/` | ① 来源材料 | — | ④ 溯源 |
-| `governance/` | — | ①② 契约供给 | — |
-| `.build/` | ③ 候选暂存 | — | — |
-| `evals/` | — | ⑤ 回归 · ⑦ CI 门禁 | — |
-| `logs/` | — | ⑤ 留痕 | — |
-| `artifacts/` | — | ⑤ 索引重建 · ⑦ 全量核验 | ① 机器召回 |
-| `docs-llm-wiki/` | — | — | 人读说明 |
+| `AGENTS.md` / `config.yml` | 项目约定、来源与 Target 映射 | 适用规则和代码上下文 | 路由与范围依据 |
+| `main/` | 代码取证与 P6 语义核验 | 固定引用与文件身份检查 | 源码交叉印证 |
+| `skills/` | P2—P7 的材料、计划、lint、确认、核验及入库能力 | lint Skill 与共用确定性规则 | 查询、精读、来源恢复 |
+| `workflows/` | 一条 ingest 编排 P1—P7 | — | — |
+| `knowledge/` | 查重、关联卡和 P7 精确入库 | 正式卡格式与引用检查 | 唯一正文检索对象 |
+| `docs-raw/` | 只读原件 | 来源一致性复核 | 原件与证据溯源 |
+| `governance/` | 模板、来源和卡契约 | 共同规则、来源锁与记录约束 | 范围、来源、依赖及证明规则 |
+| `.build/` | draft、计划和完整视图 | 只读检查视图 | 检索操作暂存 |
+| `evals/` | — | 索引和检索回归 | 回归用例 |
+| `logs/` | 原文、确认、核验、事务与续办记录 | 只读核对固定记录 | 资格证明及证据恢复 |
+| `artifacts/` | 查重时使用已有索引 | CI 内部构建、验证的派生索引 | 机器召回与同代正文 |
+| `docs-llm-wiki/` | 系统设计与操作说明 | 系统设计与操作说明 | 系统使用说明 |

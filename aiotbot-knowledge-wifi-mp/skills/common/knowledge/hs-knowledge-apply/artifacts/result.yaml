@@ -1,0 +1,16 @@
+id: hs-knowledge-apply-result
+title: hs-knowledge-apply result
+required: true
+applies_to:
+  node_ids:
+  - apply_view
+required_on:
+  exit_ids:
+  - applied
+  - record_only
+template: templates/result.md
+writing_guide: writing-guide.md
+review_guide: review-guide.md
+default_location:
+  kind: markdown_file
+  path: node-result.md

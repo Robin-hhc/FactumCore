@@ -1,206 +1,137 @@
-"""Thin explicit merge-check entry. Pure documents do not invoke this wrapper.
-
-Usage: python check.py --catalog ABS --input ABS --output ABS --rules-digest SHA
-The catalog is an explicitly trusted, private installation file. This wrapper
-does not discover executables beside the workspace or install dependencies.
-"""
-
+"""Fixed CI adapter: execute from the protected trusted baseline, never candidate code."""
 from __future__ import annotations
-
 import argparse
 import hashlib
+import importlib
+import importlib.abc
+import importlib.util
 import json
 from pathlib import Path
-import re
-import stat
-import subprocess
+import sys
+sys.dont_write_bytecode = True
 
 
 def canonical(value):
-    return json.dumps(
-        value,
-        sort_keys=True,
-        ensure_ascii=False,
-        separators=(",", ":"),
-        allow_nan=False,
-    ).encode("utf-8")
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False).encode('utf-8')
 
 
-def read_object(path):
-    def unique(pairs):
+def strict_json(data):
+    def pairs(items):
         result = {}
-        for key, value in pairs:
+        for key, value in items:
             if key in result:
-                raise ValueError("Duplicate JSON key")
+                raise ValueError('Duplicate JSON key')
             result[key] = value
         return result
-
-    raw = path.read_bytes()
-    value = json.loads(raw, object_pairs_hook=unique)
-    if not isinstance(value, dict) or path.read_bytes() != raw:
-        raise ValueError("Changed or invalid JSON object")
-    return value, raw
+    return json.loads(data, object_pairs_hook=pairs, parse_constant=lambda value: (_ for _ in ()).throw(ValueError('Nonfinite JSON')))
 
 
-def package_digest(package):
-    files = {}
-    for path in (package, *package.rglob("*")):
-        if (
-            path.is_symlink()
-            or getattr(path.lstat(), "st_file_attributes", 0)
-            & stat.FILE_ATTRIBUTE_REPARSE_POINT
-        ):
-            raise ValueError("Linked installed package")
-        if not path.is_file():
-            continue
-        relative = path.relative_to(package)
-        if "__pycache__" in relative.parts or "tests" in relative.parts:
-            continue
-        if (
-            relative.as_posix() == "SKILL.md"
-            or relative.parts[0] in {"scripts", "references", "artifacts"}
-            or (
-                len(relative.parts) == 1
-                and path.name.startswith("requirements")
-                and path.name.endswith(".txt")
-            )
-        ):
-            files[relative.as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
-    return hashlib.sha256(canonical(files)).hexdigest()
-
-
-def absolute(value, *, exists=True):
+def absolute(value):
     path = Path(value)
     if not path.is_absolute():
-        raise ValueError("Explicit absolute paths are required")
+        raise ValueError('Explicit absolute job paths are required')
     for part in (path, *path.parents):
-        if part.is_symlink() or (
-            part.exists()
-            and getattr(part.lstat(), "st_file_attributes", 0)
-            & stat.FILE_ATTRIBUTE_REPARSE_POINT
-        ):
-            raise ValueError("Linked catalog, runtime or file path")
-    return path.resolve(strict=exists)
+        if part.is_symlink() or getattr(part.lstat(), 'st_file_attributes', 0) & 0x400:
+            raise ValueError('Linked job roots or inputs are not permitted')
+    return path.resolve(strict=True)
 
 
-def incomplete(message, *, invalid=False):
-    envelope = {
-        "schema_version": "2.0",
-        "record_kind": "result",
-        "status": "error" if invalid else "blocked",
-        "phase": "incomplete",
-        "data": {},
-        "diagnostics": [{"code": "MERGE_CHECK_INCOMPLETE", "message": message}],
-        "tool_identity": {"wrapper": "check.py"},
-        "rules_digest": None,
-    }
-    print(json.dumps(envelope))
-    return 2 if invalid else 3
+def trusted_contracts(root, expected):
+    """Compile manifest-verified bytes only; no candidate imports or cached pyc."""
+    lock_path = root / 'governance/framework.lock.yaml'
+    raw = lock_path.read_bytes()
+    if hashlib.sha256(raw).hexdigest() != expected:
+        raise ValueError('Job-pinned trusted rules differ')
+    import yaml
+    class UniqueLoader(yaml.SafeLoader):
+        pass
+    def mapping(loader, node, deep=False):
+        result = {}
+        for key_node, value_node in node.value:
+            key = loader.construct_object(key_node, deep=deep)
+            if key in result:
+                raise ValueError('Duplicate rule key')
+            result[key] = loader.construct_object(value_node, deep=deep)
+        return result
+    UniqueLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, mapping)
+    lock = yaml.load(raw, Loader=UniqueLoader)
+    verified = {}
+    for entry in lock['files'].values():
+        ref = entry['path']
+        if not ref.startswith('governance/') or any(part in {'', '.', '..'} for part in ref.split('/')) or chr(92) in ref or ':' in ref:
+            raise ValueError('Unsafe trusted rule path')
+        path = absolute(str(root / ref))
+        if not path.is_relative_to(root):
+            raise ValueError('Trusted rule escaped root')
+        data = path.read_bytes()
+        if ref in verified or hashlib.sha256(data).hexdigest() != entry['sha256']:
+            raise ValueError('Trusted rule fingerprint differs')
+        verified[ref] = data
+    name = '_fixed_ci_' + expected
+    class Loader(importlib.abc.Loader):
+        def __init__(self, ref): self.ref = ref
+        def create_module(self, spec): return None
+        def exec_module(self, module):
+            module.__file__ = str(root / self.ref)
+            if self.ref.endswith('/__init__.py'):
+                module.__path__ = []
+            exec(compile(verified[self.ref], module.__file__, 'exec'), module.__dict__)
+    class Finder(importlib.abc.MetaPathFinder):
+        def find_spec(self, fullname, path=None, target=None):
+            if fullname != name and not fullname.startswith(name + '.'):
+                return None
+            relative = '__init__' if fullname == name else fullname[len(name) + 1:].replace('.', '/')
+            ref = 'governance/contracts/' + relative + '.py'
+            if ref not in verified:
+                raise ImportError('Unpinned CI contract: ' + fullname)
+            return importlib.util.spec_from_loader(fullname, Loader(ref), is_package=fullname == name)
+    finder = Finder()
+    sys.meta_path.insert(0, finder)
+    try:
+        importlib.import_module(name)
+        modules = {part: importlib.import_module(name + '.' + part) for part in ('validation', 'knowledge', 'source_resources', 'records', 'indexing', 'checks')}
+        rules = modules['validation'].load_rules(root, expected)
+    finally:
+        sys.meta_path.remove(finder)
+    if lock_path.read_bytes() != raw or any((root / ref).read_bytes() != data for ref, data in verified.items()):
+        raise ValueError('Trusted program changed during loading')
+    return modules, rules
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--catalog")
-    parser.add_argument("--input")
-    parser.add_argument("--output")
-    parser.add_argument("--rules-digest")
+    for name in ('trusted-root', 'candidate-root', 'rules-digest', 'commit', 'input', 'output'):
+        parser.add_argument('--' + name)
     args = parser.parse_args()
-    if not all((args.catalog, args.input, args.output, args.rules_digest)):
-        return incomplete(
-            "Explicit catalog, input, output and pinned rules digest are required; no real check ran."
-        )
     try:
-        if not re.fullmatch(r"[0-9a-f]{64}", args.rules_digest):
-            raise ValueError("Invalid pinned rules digest")
-        catalog_path = absolute(args.catalog)
-        input_path = absolute(args.input)
-        output_path = absolute(args.output, exists=False)
-        if output_path in {catalog_path, input_path}:
-            raise ValueError("Output must not overwrite input or catalog")
-        if output_path.exists():
-            raise ValueError(
-                "Use a fresh job output path; existing evidence cannot stand in for this invocation"
-            )
-        knowledge = Path(__file__).resolve().parent
-        if output_path.is_relative_to(knowledge) and output_path.relative_to(
-            knowledge
-        ).parts[0] not in {"logs", ".build", "artifacts"}:
-            raise ValueError("Output cannot alter domain source/knowledge")
-        catalog, catalog_bytes = read_object(catalog_path)
-        if catalog.get("schema_version") != "2.0":
-            raise ValueError("Catalog schema 2.0 required")
-        entry = catalog.get("skills", {}).get("hs-knowledge-merge-check")
-        if not isinstance(entry, dict) or entry.get("entry") != "scripts/cli.py":
-            return incomplete(
-                "Installed hs-knowledge-merge-check public CLI is unavailable."
-            )
-        package = absolute(entry["root"])
-        python = absolute(entry["python"])
-        cli = package / "scripts/cli.py"
-        if (
-            not cli.is_file()
-            or not python.is_file()
-            or package_digest(package) != entry.get("package_digest")
-        ):
-            raise ValueError("Installed package differs from trusted catalog")
-        _, input_bytes = read_object(input_path)
-        # The public CLI owns code identity, review mode, Claim evidence and all
-        # domain checks. No rule engine or fake merge decision lives here.
-        result = subprocess.run(
-            [
-                str(python),
-                str(cli),
-                "--input",
-                str(input_path),
-                "--output",
-                str(output_path),
-                "--knowledge-root",
-                str(knowledge),
-                "--rules-digest",
-                args.rules_digest,
-                "--catalog",
-                str(catalog_path),
-            ],
-            capture_output=True,
-            text=True,
-            timeout=180,
-        )
-        if (
-            catalog_path.read_bytes() != catalog_bytes
-            or input_path.read_bytes() != input_bytes
-            or package_digest(package) != entry["package_digest"]
-        ):
-            raise ValueError(
-                "Catalog, request or installed code changed during merge check"
-            )
-        if not output_path.is_file():
-            return incomplete(
-                "Public merge-check produced no result; no success is inferred."
-            )
-        envelope, _ = read_object(output_path)
-        if (
-            envelope.get("schema_version") != "2.0"
-            or envelope.get("record_kind") != "result"
-        ):
-            raise ValueError("Invalid public ResultEnvelope")
-        print(json.dumps(envelope, ensure_ascii=True))
-        if result.returncode:
-            return result.returncode if result.returncode in {2, 3} else 2
-        if envelope.get("status") != "ok":
-            return 3
-        check_status = envelope.get("data", {}).get("check_status")
-        if check_status == "failed":
-            return 2
-        if (
-            check_status != "passed"
-            or envelope.get("phase") != "passed"
-            or envelope.get("data", {}).get("mode") != "merge"
-        ):
-            return 3
-        return 0
-    except (OSError, ValueError, KeyError, subprocess.SubprocessError) as exc:
-        return incomplete(str(exc), invalid=True)
+        if not all((args.trusted_root, args.candidate_root, args.rules_digest, args.commit, args.output)):
+            raise ValueError('Protected job must provide trusted-root, candidate-root, rules-digest, commit and fresh output')
+        trusted = absolute(args.trusted_root)
+        candidate = absolute(args.candidate_root)
+        output = Path(args.output)
+        if not output.is_absolute() or output.exists():
+            raise ValueError('A fresh absolute job report path is required')
+        if output.resolve().is_relative_to(candidate) or output.resolve().is_relative_to(trusted):
+            raise ValueError('CI report must be outside input trees')
+        modules, rules = trusted_contracts(trusted, args.rules_digest)
+        request = strict_json(absolute(args.input).read_bytes()) if args.input else {}
+        inputs = request.get('inputs', {})
+        view = modules['checks'].prepare_view(candidate, mode='ci', identity={'commit': args.commit, 'candidate_root': str(candidate), 'trusted_root': str(trusted)})
+        before = {ref: hashlib.sha256(raw).hexdigest() for ref, raw in view['files'].items()}
+        report = modules['checks'].run(view, rules, inputs=inputs, scope='full')
+        modules['checks'].validate_report(report, expected_rules=args.rules_digest, required_scope='full')
+        after_view = modules['checks'].prepare_view(candidate, mode='ci')
+        if before != {ref: hashlib.sha256(raw).hexdigest() for ref, raw in after_view['files'].items()}:
+            raise ValueError('Candidate inputs changed during fixed checking')
+        output.parent.mkdir(parents=True, exist_ok=True)
+        with output.open('xb') as stream:
+            stream.write(canonical(report))
+        print(canonical(report).decode('utf-8'))
+        return modules['checks'].exit_code(report)
+    except Exception as exc:
+        print(json.dumps({'report_version': '1.0', 'status': 'incomplete', 'phase': 'incomplete', 'exit_code': 2, 'complete': False, 'checks': [], 'findings': [{'code': 'CI_INPUT_UNAVAILABLE', 'severity': 'error', 'reason': str(exc)}]}, ensure_ascii=True))
+        return 2
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     raise SystemExit(main())

@@ -1,20 +1,21 @@
-# AIoTBot 当前设计与 SDD 入口
+# AIoTBot 设计与开发文档入口
 
-本目录是 `aiotbot-knowledge-wifi-mp/docs-llm-wiki/`，平铺保留 `AGENTS.md`、`README.md`、`AIoTBot知识库架构设计.md`、`知识库详细设计.md`、`task.md`、`使用说明.md`，以及既有 `sdd/`。先按任务选择入口，避免全量加载文档。
+本目录平铺保留架构设计、详细设计、使用说明、任务与入口文档，以及 `sdd/`。先按任务选择入口，避免全量加载。
 
 | 任务 | 阅读入口 |
 |---|---|
-| 当前范围与状态 | [README.md](README.md) |
-| 总体架构、目录职责和三条链路 | [AIoTBot知识库架构设计.md](AIoTBot知识库架构设计.md) |
-| 逐文件开发要求、阶段接口与验收 | [知识库详细设计.md](知识库详细设计.md) |
-| 当前模块任务与推进顺序 | [task.md](task.md)，当前T201–T211票据、依赖与完成条件 |
-| 初始化、使用教学与排错 | [使用说明.md](使用说明.md)，区分可运行合成 Demo 与待宿主适配的真实确认流程 |
-| 后续开发 | [knowledge-v2入口](sdd/knowledge-v2/README.md)，依次看需求、设计、ticket和实际记录；v1仅历史参考 |
+| 目录职责、系统分层和三条链路 | [AIoTBot知识库架构设计.md](AIoTBot知识库架构设计.md) |
+| 流程节点、判断逻辑及节点内文件分工 | [知识库详细设计.md](知识库详细设计.md)，先概要、后详细 |
+| 文档导航与部署约定 | [README.md](README.md) |
+| 日常操作、开发者接入与排错 | [使用说明.md](使用说明.md) |
+| 需求、实现任务与实际验证记录 | [task.md](task.md)、[SDD](sdd/knowledge-v3/README.md) |
 
-所有现行名称与路径以《AIoTBot知识库架构设计》§5.3 目录树为准，用户后续明确决定优先。本次只建设根下的 `aiotbot-knowledge-wifi-mp/`，无中间目录或其他领域目录；`main/` 为空。18个节点Skill（见详设v4清单），连同hs-knowledge-ingest、hs-knowledge-lint两个Workflow 在本仓能力目录实现。能力在FactumCore根目录开发，发行/安装状态按实际记录，不推断已有可用包，FactumCore只建立批准的节点包和两个Workflow。架构和链路图沿用原结构；明显设计冲突先讨论。Schema/Contract 的领域机器规则归[治理目录](../governance/)，此处不另造执行契约。
+现行名称和目录以架构设计 §5.3 为准，用户后续明确决定优先。唯一领域根为 `aiotbot-knowledge-wifi-mp/`，其下 `skills/common/knowledge/` 存节点能力，`workflows/common/knowledge/` 承载 ingest 端到端编排设计。Git 在 FactumCore 根执行，不建立嵌套 `.git` 或隐藏能力目录。
 
-本轮已批准按knowledge-v2进行SDD与开发，新票初始pending，实际验证后更新。knowledge-v1原字节保留，旧名称、路径和verified保持当时身份，不沿用作新实现证明。旧实现归档见[历史布局记录](sdd/knowledge-v1/records/workspace-layout-20261020.md)，当前不可按历史 CLI 手册运行。纯文档真人确认免代码 lint、代码双只读门禁、五类 raw 范围与未知业务上下文遵循仓根及领域 AGENTS；普通文档整理不读取受限 gold。
+架构设计解释分层与协作；详细设计分概要和节点设计两层，以流程图、分支条件和文件职责表达。设计正文不记开发轮次、票据状态、Agent 工作进度或历史测试成绩；这些进入 SDD 工件。系统设计不构成正式领域事实，Schema/Contract 机器规则归 `../governance/`，此处不另建执行契约。
 
-旧研究、实验、历史方案和旧 Agent 约定已移到 Git 仓外。归档身份见 [本次整理记录](sdd/knowledge-v1/records/docs-layout-20261020.md)；当前目录不再建立 research/experiments/agents/superpowers/workflows 或设计文档子目录。新增系统设计优先补现有两份主文档；实现规格和实际记录放入相应 SDD 工件。
+统一约定：一条 ingest 完整串起 P1 扫描／续办、P2 材料、P3 阅读计划、P4 写稿及必要确认／代码语义核验、P5 调用 lint Skill、P6 登记处理记录、P7 本地入库并上库，不再分前后两段。详设 §3.1 展开 lint 的 L1—L5 只读检查；它可被 ingest、手动或定期调用，只检查和报告。等待真人或材料时按原操作与视图续办。提交后 C1 固定 CI 直接复用确定性函数，通过后合入，不调用 Agent。索引构建不另拆维护、激活或发布交接主线；现有模板与实际调用边界仍按使用说明和源码核实。
 
-当前基线与任务在knowledge-v2，旧knowledge-v1的来源摘要、路径和记录不作批量替换；新旧关系显式记录，不把规划或路径整理当功能验收。
+实现修改前读取对应 SDD 需求、设计、任务和测试计划，依据实际验证更新记录。保留历史工件原字节，不批量替换旧记录路径或状态。普通文档整理不读受限 gold。纯文档真实确认、本地代码只读核验与固定 CI、五类原件及未知业务上下文遵循上级 AGENTS。
+
+不新增 research、experiments、agents、superpowers 或设计文档子目录。系统设计优先维护现有两份主文档；操作写使用说明，任务、测试、发布与历史记录写相应 SDD 工件。

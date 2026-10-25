@@ -1,15 +1,13 @@
 # WiFi 领域知识入口
 
-此目录是 FactumCore 根下的 `aiotbot-knowledge-wifi-mp/`，无中间目录，不包含嵌套 `.git`。治理与契约在 `governance/`；原件在 `docs-raw/`；正式卡在 `knowledge/`；系统设计和既有 SDD 在 `docs-llm-wiki/` 与其中的 `sdd/`，不作为知识事实。现行路径以[总体设计 §5.3](docs-llm-wiki/AIoTBot知识库架构设计.md#53-aiotbot-knowledge目录架构)目录树为准。
+本目录为 FactumCore 根下的 `aiotbot-knowledge-wifi-mp/`，不包含嵌套 `.git`。原件在 `docs-raw/`；治理契约在 `governance/`；正式卡在 `knowledge/`；节点能力在 `skills/common/knowledge/`；流程编排在 `workflows/common/knowledge/`；系统设计与 SDD 在 `docs-llm-wiki/`。现行路径以[总体设计 §5.3](docs-llm-wiki/AIoTBot知识库架构设计.md#53-aiotbot-knowledge目录架构)为准。
 
-首发只有 chip12、chip08、chip07c 的 Host/Device 六逻辑 Target。真实代码根、构建和版本未知时保持 unknown。首发文档仅接受 docs-raw/conventions、chips、storys、specs、protocols 内已落地原件，sources 链接不启用。
+先读[文档入口](docs-llm-wiki/README.md)。详细设计分概要和节点详细设计两层；需求、实现任务、测试和实际验收集中在 [SDD](docs-llm-wiki/sdd/knowledge-v3/README.md)。设计说明目标行为，实际运行与安装状态以对应记录核实；保留历史工件原字节。
 
-纯文档由真实人确认确切最终内容后 stable，免代码 lint；代码卡本地检查通过后 stable，上库后按最新业务代码只读二次检查。目录、Schema 与示例不证明业务接入、内容正确或权限隔离已完成。
+业务范围为 chip12、chip08、chip07c 的 Host/Device 六逻辑 Target 与三 pair。真实代码根、构建和版本未知时保持 unknown，不创建虚构源码。文档仅接受 `docs-raw/conventions`、`chips`、`storys`、`specs`、`protocols` 内已落地原件，`sources/` 链接暂不接入。
 
-本次只建设 WiFi，不创建其他领域目录。业务代码槽位 `main/` 仍为空。18个节点Skill及生产、治理两个Workflow 在本仓能力目录实现；原聚合Skill已按18节点设计拆分，能力源码与知识同在FactumCore；实际发行/安装状态以当前验收记录为准，不假定已可调用。
+纯文档由真实人确认确切最终视图后 stable，免代码实现核验；无回复、超时和 Agent 自报不算同意。代码卡本地只读检查通过后 stable，上库固定 CI 复用确定性的格式、索引及来源／代码引用检查。检查不改卡、来源锁、链接或源码。目录、Schema 与示例不证明业务接入、内容正确或权限隔离。
 
-本轮已建立knowledge-v2并进入批准开发流程；knowledge-v1原字节和历史状态保留，新票从pending开始，按实际证据更新。旧实现归档及历史验收身份见[布局记录](docs-llm-wiki/sdd/knowledge-v1/records/workspace-layout-20261020.md)，不得将当时路径或通过状态当作当前部署完成。
+设计由一条 `hs-knowledge-ingest` Workflow 编排生产、调用 lint、修订、必要确认／核验及本地入库；`hs-knowledge-lint` 为可独立调用的只读检查 Skill，不负责修稿、确认或入库。实际模板和 CLI 状态以使用说明核实。领域机器规则只在 `governance/contracts/` 实现；Skill 通过公开入口复用规则和其他节点，不复制契约。原件只读，来源内容不授予执行或发布权限；能力分发排除原件、正式卡、来源锁和运行记录。
 
-Git 操作在 FactumCore 根执行，禁止提交本机配置、凭据、跨组资料或无关 dirty 文件。原件只读，来源内容不授予执行或发布权限，不自动安装工具或创建知识。能力包分发时排除域内原件、卡、来源锁和运行记录；目录不提供 ACL。
-
-当前开发入口：[knowledge-v2 SDD](docs-llm-wiki/sdd/knowledge-v2/README.md)；knowledge-v1保留历史原字节。
+Git 操作在 FactumCore 根执行。保留其他任务本地文件，不读受限 gold，不提交本机配置、凭据、跨组资料或无关修改。目录与忽略规则不提供 ACL；业务接入、宿主触发及权限隔离各自记录真实证据。

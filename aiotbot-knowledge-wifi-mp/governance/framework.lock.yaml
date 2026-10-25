@@ -7,16 +7,16 @@ files:
     sha256: ccc90c8e3b38e19264e3c6843099880b6f293779fc7222051ea5a47c3316c8db
   contracts/knowledge.py:
     path: governance/contracts/knowledge.py
-    sha256: b8c6f54cc34db19361c14e6e7a28f00164121ed07a4355c7a988fd8cb4725a77
+    sha256: 833f55179ea674f87d39928cb5dab145c362a78ad0d81299b0a4da290718512e
   contracts/records.py:
     path: governance/contracts/records.py
-    sha256: 3896f79880396e640016911f5fa9746b9d570d790d8e0818188ec7a3c5fefea8
+    sha256: 7c352e10e2ff2a47e551a2b513e58e4cb9a98b70f0e063a5f31184fa963c6fb7
   contracts/source_resources.py:
     path: governance/contracts/source_resources.py
-    sha256: 29b478ce2f269171a10dd341eb75890d66c534dfd2b361eab573c9d3826e6e1f
+    sha256: e89eb242d2b6994f4223017024bae4787c15b7d6716aff089232cb097bd6ea0e
   contracts/validation.py:
     path: governance/contracts/validation.py
-    sha256: ea27b1cd15ba9e3748119595733125ac1c405696081be5f866b228f82ec3168b
+    sha256: b4c62846869963b5925ece30dd806989d44765d538ec65e2a2cf251aaa90d547
   schemas/frontmatter.schema.json:
     path: governance/schemas/frontmatter.schema.json
     sha256: 796f5032fb764b95cc24c76b468120646a23d090506b00eac0e77101c17b08f8
@@ -25,10 +25,10 @@ files:
     sha256: ec9eae684e484dd79cfe0f546a336d95d68ba5da7345f88e93733483d0d638be
   schemas/records.schema.json:
     path: governance/schemas/records.schema.json
-    sha256: 7fc4155bc669a19eeb0830eba044a01bc1ceaeb6b4787971da5267e7206803fb
+    sha256: fa2394da1977e0e33a7bb1806a5e72836267e3c547035bf830f3fc162cc4d33a
   schemas/registries.yaml:
     path: governance/schemas/registries.yaml
-    sha256: c9825adb48789efa89b2ed2745f65cf06f8ca867f4155c588dd7f725a8c0d75b
+    sha256: fbeec766e654c3f8ee96f8eb07bdd03619974f8cad258251f3e91816b03f7ed5
   schemas/sources.schema.json:
     path: governance/schemas/sources.schema.json
     sha256: 4eb46e8b8b6592308ce229f5f91553e0e1d50c3f90d0affef75bb5da3432134e
@@ -74,3 +74,19 @@ files:
   specs/sources.md:
     path: governance/specs/sources.md
     sha256: 332960e7c606e1a4c0b86d6d49773ffc0e35f976c4434448bc11ed13900d9588
+  contracts/checks.py:
+    path: governance/contracts/checks.py
+    sha256: 3606a9f723fe8594f16b1f36dee5231e7ef4b387680dbae86be52024103df0e7
+  contracts/indexing.py:
+    path: governance/contracts/indexing.py
+    sha256: 7d12d1dc4254fd5b66030796553f7fafa4ef5c461e988fb64b4954b9b83c8af5
+  templates/ingest-record.yaml:
+    path: governance/templates/ingest-record.yaml
+    sha256: 8afd7df6d6f45766b5b64ce025b98d6245e90a549d826e10a058449cea3346db
+  specs/ci-runner.md:
+    path: governance/specs/ci-runner.md
+    sha256: 4f5b705b3cfa5ab3d42296d1ca36c6ce74166d71aba1a5f3cb0ced47fe768e04
+capabilities:
+  checks: '1.0'
+  indexing: '1.0'
+  ingest_records: '1.0'

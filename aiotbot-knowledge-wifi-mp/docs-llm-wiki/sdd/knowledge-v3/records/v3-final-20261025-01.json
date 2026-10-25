@@ -1,0 +1,207 @@
+{
+  "schema_version": "2.0",
+  "verification_tier": "isolated_synthetic_mechanisms",
+  "groups": [
+    {
+      "group": "hs-knowledge-apply",
+      "exit_code": 0,
+      "seconds": 36.0,
+      "tests": 21,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-candidate-inspect",
+      "exit_code": 0,
+      "seconds": 39.297,
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-candidate-revise",
+      "exit_code": 0,
+      "seconds": 22.047,
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-change-plan",
+      "exit_code": 0,
+      "seconds": 224.844,
+      "tests": 27,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-confirmation-prepare",
+      "exit_code": 0,
+      "seconds": 0.422,
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-confirmation-record",
+      "exit_code": 0,
+      "seconds": 0.516,
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-governance-handoff",
+      "exit_code": 0,
+      "seconds": 15.375,
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-index-build",
+      "exit_code": 1,
+      "seconds": 91.797,
+      "tests": 12,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-lint",
+      "exit_code": 0,
+      "seconds": 0.531,
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-local-check",
+      "exit_code": 0,
+      "seconds": 43.188,
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-maintain",
+      "exit_code": 0,
+      "seconds": 19.718,
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-merge-check",
+      "exit_code": 0,
+      "seconds": 0.36,
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-publish-handoff",
+      "exit_code": 0,
+      "seconds": 0.375,
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-query",
+      "exit_code": 0,
+      "seconds": 69.515,
+      "tests": 15,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-query-regression",
+      "exit_code": 0,
+      "seconds": 1.828,
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-recover",
+      "exit_code": 0,
+      "seconds": 0.36,
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-source-capture",
+      "exit_code": 0,
+      "seconds": 44.75,
+      "tests": 36,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-source-scan",
+      "exit_code": 1,
+      "seconds": 46.203,
+      "tests": 13,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-view-materialize",
+      "exit_code": 0,
+      "seconds": 24.969,
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-workspace-explore",
+      "exit_code": 0,
+      "seconds": 12.047,
+      "tests": 22,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1
+    },
+    {
+      "group": "domain-and-integration",
+      "exit_code": 1,
+      "seconds": 92.469,
+      "tests": 68,
+      "failures": 3,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "passed": false,
+  "totals": {
+    "tests": 262,
+    "failures": 5,
+    "errors": 0,
+    "skipped": 1
+  },
+  "limitations": [
+    "No real human or implicit host acceptance",
+    "No real six Target or CI/publication/ACL acceptance",
+    "No restricted gold accessed"
+  ]
+}

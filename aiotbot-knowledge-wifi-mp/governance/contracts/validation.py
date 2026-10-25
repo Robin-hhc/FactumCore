@@ -188,6 +188,9 @@ def load_rules(knowledge_root, expected_digest):
         or lock.get("contract_family") != "aiot-wifi"
     ):
         raise ContractError("UNSUPPORTED_CONTRACT_VERSION", "Expected aiot-wifi 2.0")
+    capabilities = lock.get("capabilities", {})
+    if any(capabilities.get(name) != "1.0" for name in ("checks", "indexing", "ingest_records")):
+        raise ContractError("RULE_CAPABILITY_UNAVAILABLE", "Compatible checks, indexing and ingest-record capabilities are required")
     entries = lock.get("files", {})
     if not isinstance(entries, dict):
         raise ContractError("INVALID_RULE_LOCK", "files must be an object")
@@ -209,6 +212,8 @@ def load_rules(knowledge_root, expected_digest):
             "knowledge.py",
             "source_resources.py",
             "records.py",
+            "indexing.py",
+            "checks.py",
         )
     }
     if not code.issubset(seen):
@@ -236,13 +241,25 @@ def load_rules(knowledge_root, expected_digest):
         _walk_refs(schema)
         Draft202012Validator.check_schema(schema)
         schemas[kind] = schema
+    profiles = load_yaml(safe_path(root, "governance/schemas/profiles.yaml"))
+    registries = load_yaml(safe_path(root, "governance/schemas/registries.yaml"))
+    # Schema stores the executable shape; reject drift from its controlled
+    # declarations instead of silently accepting either of two enum truths.
+    for field in ("lifecycle", "review_mode"):
+        if schemas["card"]["properties"][field]["enum"] != registries[field]:
+            raise ContractError("RULE_DECLARATION_MISMATCH", field)
+    for field in ("evidence_kind", "usage"):
+        if schemas["card"]["$defs"]["claim"]["properties"][field]["enum"] != registries[field]:
+            raise ContractError("RULE_DECLARATION_MISMATCH", field)
+    if set(schemas["card"]["properties"]["profile"]["enum"]) != set(profiles["profiles"]):
+        raise ContractError("RULE_DECLARATION_MISMATCH", "profile")
     return {
         "knowledge_root": root,
         "lock": lock,
         "rules_digest": expected_digest,
         "schemas": schemas,
-        "profiles": load_yaml(safe_path(root, "governance/schemas/profiles.yaml")),
-        "registries": load_yaml(safe_path(root, "governance/schemas/registries.yaml")),
+        "profiles": profiles,
+        "registries": registries,
     }
 
 
@@ -304,3 +321,74 @@ def validate_shape(kind, payload, rules):
             ):
                 raise ContractError("PAIR_TARGET_MISMATCH", pair["pairing_id"])
     return payload
+
+
+def markdown_structure(data):
+    """Parse the governed Markdown subset while preserving original line numbers.
+
+    Code examples never create headings or links. Heading fragments use a fixed
+    Unicode, lower-case slug and occurrence suffix, shared by every checker.
+    """
+    import html
+    import unicodedata
+
+    text = data.decode("utf-8-sig") if isinstance(data, bytes) else str(data)
+    result, fence, frontmatter = [], None, False
+    for number, line in enumerate(text.splitlines(keepends=True), 1):
+        if number == 1 and line.strip() == "---":
+            frontmatter = True
+            result.append(" " * len(line.rstrip("\r\n")) + line[len(line.rstrip("\r\n")):])
+            continue
+        if frontmatter:
+            if line.strip() == "---":
+                frontmatter = False
+            result.append(" " * len(line.rstrip("\r\n")) + line[len(line.rstrip("\r\n")):])
+            continue
+        match = re.match(r"^ {0,3}(`{3,}|~{3,})", line)
+        hidden = fence is not None or match is not None
+        if match:
+            token = match.group(1)
+            if fence is None:
+                fence = (token[0], len(token))
+            elif token[0] == fence[0] and len(token) >= fence[1]:
+                fence = None
+        if hidden:
+            line = " " * len(line.rstrip("\r\n")) + line[len(line.rstrip("\r\n")):]
+        else:
+            line = re.sub(r"(`+)(?!`)(.*?)\1(?!`)", lambda m: " " * len(m.group()), line)
+        result.append(line)
+    visible = "".join(result)
+    anchors, counts, duplicate_anchors, links, conflicts = set(), {}, [], [], []
+    definitions = {}
+    for line in visible.splitlines():
+        match = re.match(r"^ {0,3}\[([^]]+)\]:\s*<?([^\s>]+)>?", line)
+        if match:
+            definitions[match.group(1).casefold()] = match.group(2)
+    for number, line in enumerate(visible.splitlines(), 1):
+        if re.match(r"^(?:<{7}|={7}|>{7})(?:\s|$)", line):
+            conflicts.append(number)
+        for explicit in re.finditer(r"<a\s+(?:id|name)=[\"']([^\"']+)[\"'][^>]*>", line):
+            anchor = html.unescape(explicit.group(1))
+            if anchor in anchors:
+                duplicate_anchors.append({"anchor": anchor, "line": number})
+            anchors.add(anchor)
+        heading = re.match(r"^ {0,3}#{1,6}\s+(.+?)\s*#*\s*$", line)
+        if heading:
+            label = html.unescape(re.sub(r"<[^>]+>", "", heading.group(1))).lower()
+            label = re.sub(r"\[([^]]+)\]\([^)]*\)", r"\1", label)
+            slug = "".join(ch for ch in label if ch.isspace() or ch in "_-" or unicodedata.category(ch)[0] in "LN")
+            slug = re.sub(r"\s", "-", slug)
+            occurrence = counts.get(slug, 0)
+            counts[slug] = occurrence + 1
+            anchor = slug if occurrence == 0 else f"{slug}-{occurrence}"
+            if anchor in anchors:
+                duplicate_anchors.append({"anchor": anchor, "line": number})
+            anchors.add(anchor)
+        if re.match(r"^ {0,3}\[[^]]+\]:", line):
+            continue
+        for match in re.finditer(r"!?\[[^]\n]*\]\(\s*(?:<([^>]+)>|([^\s)]+))(?:\s+[^)]*)?\)", line):
+            links.append({"target": html.unescape(match.group(1) or match.group(2)), "line": number})
+        for match in re.finditer(r"!?\[([^]\n]+)\]\[([^]\n]*)\]", line):
+            key = (match.group(2) or match.group(1)).casefold()
+            links.append({"target": definitions.get(key), "label": key, "line": number})
+    return {"visible": visible, "anchors": anchors, "duplicate_anchors": duplicate_anchors, "links": links, "conflicts": conflicts}

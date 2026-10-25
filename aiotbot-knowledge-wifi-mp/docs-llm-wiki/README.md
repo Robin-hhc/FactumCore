@@ -1,29 +1,32 @@
-# AIoTBot 设计与开发
+# AIoTBot 设计与使用入口
 
-当前文档采用设计、模块任务与入口文件平铺加 `sdd/` 的布局，不再保留设计文档子目录。总体设计与用户明确修正是当前依据；详细设计细化文件、接口、三条链路和验收要求。
+```mermaid
+flowchart LR
+    A["架构设计<br/>为什么这样分层、目录如何协作"] --> B["概要设计<br/>用户命令 → 三条链路 → 节点判断"]
+    B --> C["详细设计<br/>按节点解释文件与逻辑"]
+    C --> D["使用说明 / SDD<br/>操作方法 / 实现与验证记录"]
+```
 
-| 文件 / 目录 | 职责 |
+| 文件 / 目录 | 阅读目的 |
 |---|---|
-| [AGENTS.md](AGENTS.md) | Agent 阅读入口、维护边界与修改落点 |
-| [AIoTBot知识库架构设计.md](AIoTBot知识库架构设计.md) | 当前总体设计，重点是 §5.3 目录架构及第 11 章知识库架构与链路 |
-| [知识库详细设计.md](知识库详细设计.md) | 目录展开、逐文件开发要求、阶段接口、三链路及验收 |
-| [task.md](task.md) | 当前节点化票据、依赖、完成条件与推进顺序 |
-| [使用说明.md](使用说明.md) | 环境准备、初始化安装、合成 Demo、真实 raw 生产与治理、索引查询、更新恢复及排错 |
-| [sdd/knowledge-v2/](sdd/knowledge-v2/README.md) | 当前节点化需求、设计、T201–T211任务与验收 |
-| [sdd/knowledge-v1/](sdd/knowledge-v1/README.md) | 原字节保留的历史需求、任务和验收身份，不继承成绩 |
+| [AIoTBot知识库架构设计.md](AIoTBot知识库架构设计.md) | 目录架构、分层职责与生产、治理、消费三条链路 |
+| [知识库详细设计.md](知识库详细设计.md) | 第 1 节说明前置发现和命令；第 2.1 节画完整 ingest P1—P7，第 3.1 节展开 lint 检查，第 3.2 节说明固定 CI，第 4 节说明查询；第 5 节起按节点解释文件设计 |
+| [使用说明.md](使用说明.md) | 日常生产治理、查询与维护；另列开发者 CLI 环境准备、能力接入及排错 |
+| [AGENTS.md](AGENTS.md) | Agent 阅读入口和文档修改边界 |
+| [task.md](task.md) 与 [sdd/](sdd/knowledge-v3/README.md) | 实现任务、需求、测试计划、发布与实际验收记录 |
 
-FactumCore 承载业务代码与 WiFi 知识，目录以主设计 §5.3 目录树为准：`main/` 保持空目录；唯一领域根为 `aiotbot-knowledge-wifi-mp/`，直接位于仓根，无中间目录或其他领域目录。本目录为 `aiotbot-knowledge-wifi-mp/docs-llm-wiki/`，承载系统设计与既有 SDD，不存放正式业务知识卡。
+业务代码工作区和配置位于 FactumCore 根；WiFi 知识、节点 Skill 与 Workflow 位于 `aiotbot-knowledge-wifi-mp/`。能力目录分别为 `skills/common/knowledge/` 和 `workflows/common/knowledge/`，不包含嵌套 `.git`。本目录只存系统说明与开发工件，正式领域知识只进入 `../knowledge/`。
 
-业务部署与视图配置见[详细设计第7章](知识库详细设计.md#7-部署方式与manifest视图配置)：首选repo根内与CI同级、随代码共同拉取；受限部门可仓外手动拉取，以本地`config.env`的`project_root`定位代码。项目manifest适配由项目方负责，具体方案留白；此说明不新增task或WiFi Demo范围。
+部署首选在业务 repo 工作区根目录随代码共同拉取；受限环境可仓外手动拉取，以本地 `config.env` 的 `project_root` 指定业务代码根。项目 manifest 视图由各项目适配，见[部署与视图配置](知识库详细设计.md#7-部署方式与manifest视图配置)。
 
-18个节点Skill（完整清单见详设v4），与hs-knowledge-ingest、hs-knowledge-lint两个Workflow 在本仓能力目录实现，保留其 `skills/common/knowledge/` 与 `workflows/common/knowledge/` 归属。原四聚合Skill已拆为18节点包；能力在FactumCore根目录开发/发布，实际包版本与安装状态以当前验收记录为准。
+设计文档描述职责、流程与边界，能力安装、实际宿主、六 Target、CI 合入和权限验证以 SDD 记录为准。历史工件保留其原始版本身份，不据此推断当前部署状态。
 
-当前按详设v4与knowledge-v2实施节点化SDD开发；18个Skill和两个Workflow逐票交付，不把规划文件当运行成功。能力在本仓根skills/和workflows/开发，与main同级；发行和安装身份按实际记录，个人路径不写入公开配置。knowledge-v1只保留历史，不重置其任务状态。
+详设中的 `knowledge ...` 是统一入口的接口建议，须由宿主适配注册。实际安装、Workflow 和节点 CLI 的调用方式以[使用说明](使用说明.md)为准，不能直接把建议命令当作已有终端程序。
 
-当前详设为v4.1，T201–T210开发已完成。见[实际验收](sdd/knowledge-v2/records/development-acceptance-20261021.json)、[源码身份](sdd/knowledge-v2/records/implementation-manifest.json)和[发布](sdd/knowledge-v2/records/publication-20261021.md)；T211真实外部环境仍pending。
+`knowledge ingest` 默认扫描五类允许 raw 并选择新增、变化及待处理来源；`--source` 仅为限制本次范围的可选参数，首次导入和日常增量使用相同入口。
 
-首版覆盖 chip12/chip08/chip07c 的 Host/Device 六逻辑 Target。文档只处理五类 raw 目录内已落地原件，真人确认后 stable；代码相关卡本地通过后 stable，上库按最新业务代码只读二次检查。业务路径、构建和版本未登记时保留 unknown。
+日常入口 `ingest` 用一条工作流完成扫描、写稿及必要确认／代码核验、调用 lint、登记处理记录和本地入库，`query` 消费正式知识。`hs-knowledge-lint` 设计为可复用的只读检查 Skill，既供 ingest 调用，也可手动或定期检查；发现问题由 ingest 返回对应节点修订，暂停后按原操作续办。
 
-T01/T02 及 raw 捕获 → 候选 → 真人确认 → stable 事务曾完成合成机制验证，相关实现、工具和依赖已归档仓外。当前节点是否可运行按knowledge-v2记录核实；历史230项合成测试不代表当前部署可用。[历史布局记录](sdd/knowledge-v1/records/workspace-layout-20261020.md)、`traceability.json.current_deployment`、[任务入口](sdd/knowledge-v1/tasks.md)和[验收记录](sdd/knowledge-v1/records/README.md)保留原版本身份，其中的旧路径不作为当前落点。[raw 手工操作说明](sdd/knowledge-v1/document-chain-usage.md)仅供历史接口参考。
+本地入库后提交变更，由固定 CI 脚本复用格式、导航、引用和索引构建检查，通过后合入；见[上库流程](知识库详细设计.md#32-上库固定-ci-检查后合入)。
 
-旧研究、实验及历史方案已移至仓外归档，用户删除的六份旧稿不恢复；归档与迁移证据见 [整理记录](sdd/knowledge-v1/records/docs-layout-20261020.md)。SDD 保留当前需求、设计、任务、测试与历史验收身份，文档清理不改写已有成绩。
+`hs-workspace-explore` 是业务命令之前的保底发现能力：Agent 未加载项目约定，或独立 Workflow 节点尚不知道仓内知识库、代码图谱和入口时才补齐信息；已有上下文直接复用，不属于生产 P1 或各命令必调节点。

@@ -1,0 +1,272 @@
+{
+  "change": "capability_root_layout",
+  "base_commit": "2e5f8f73e86ec394097e0fe1d0c1e742cff404b7",
+  "reviewed_candidate_tree": "85a29634c090075604631d7ab9b51c2ef376cf08",
+  "layout": {
+    "skills": "skills/common/knowledge/",
+    "workflows": "workflows/common/knowledge/",
+    "knowledge": "aiotbot-knowledge-wifi-mp/",
+    "project_root_files": "removed; existing root AGENTS/config reused"
+  },
+  "capabilities": {
+    "files": 282,
+    "unchanged_bytes": 258,
+    "path_test_and_reference_updates": 24,
+    "staged_bytes_match_worktree": true,
+    "workflow_and_business_node_scripts_unchanged": true
+  },
+  "preservation": {
+    "governance_historical_and_original_files_unchanged": 266,
+    "current_raw_entry_path_updated": "aiotbot-knowledge-wifi-mp/docs-raw/AGENTS.md",
+    "business_files_unchanged_including_placeholder": 593,
+    "config_semantics_unchanged": true,
+    "ingest_section_2_1_unchanged": true,
+    "rules_digest": "0ab804a3cf63e4e2edcd153e58400490b08be2e52556ba4edfba6da9fd707cba"
+  },
+  "installation": {
+    "skills": 20,
+    "workflows": 1,
+    "source_installed_catalog_digests_match": true
+  },
+  "openflow": {
+    "revision": "1901a463efca222542a4634d7ce50c7b244b2bab",
+    "workflow_ids": [
+      "hs-knowledge-ingest"
+    ],
+    "skill_count": 20,
+    "contract_count": 24,
+    "role_ids": [
+      "coder",
+      "reviewer"
+    ],
+    "role_scope": "synthetic declared roles only; real host roles not verified"
+  },
+  "full_regression": {
+    "schema_version": "2.0",
+    "verification_tier": "isolated_synthetic_mechanisms",
+    "groups": [
+      {
+        "group": "hs-knowledge-apply",
+        "exit_code": 0,
+        "seconds": 54.844,
+        "tests": 29,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "group": "hs-knowledge-candidate-inspect",
+        "exit_code": 0,
+        "seconds": 119.094,
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "group": "hs-knowledge-candidate-revise",
+        "exit_code": 0,
+        "seconds": 21.907,
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "group": "hs-knowledge-change-plan",
+        "exit_code": 0,
+        "seconds": 355.281,
+        "tests": 31,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "group": "hs-knowledge-confirmation-prepare",
+        "exit_code": 0,
+        "seconds": 0.485,
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "group": "hs-knowledge-confirmation-record",
+        "exit_code": 0,
+        "seconds": 0.609,
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "group": "hs-knowledge-governance-handoff",
+        "exit_code": 0,
+        "seconds": 15.391,
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "group": "hs-knowledge-index-build",
+        "exit_code": 0,
+        "seconds": 165.812,
+        "tests": 26,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "group": "hs-knowledge-lint",
+        "exit_code": 0,
+        "seconds": 0.578,
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "group": "hs-knowledge-local-check",
+        "exit_code": 0,
+        "seconds": 114.344,
+        "tests": 31,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "group": "hs-knowledge-maintain",
+        "exit_code": 0,
+        "seconds": 19.688,
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "group": "hs-knowledge-merge-check",
+        "exit_code": 0,
+        "seconds": 0.359,
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "group": "hs-knowledge-publish-handoff",
+        "exit_code": 0,
+        "seconds": 0.407,
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "group": "hs-knowledge-query",
+        "exit_code": 0,
+        "seconds": 68.828,
+        "tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "group": "hs-knowledge-query-regression",
+        "exit_code": 0,
+        "seconds": 2.093,
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "group": "hs-knowledge-recover",
+        "exit_code": 0,
+        "seconds": 0.453,
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "group": "hs-knowledge-source-capture",
+        "exit_code": 0,
+        "seconds": 63.375,
+        "tests": 50,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "group": "hs-knowledge-source-scan",
+        "exit_code": 0,
+        "seconds": 111.437,
+        "tests": 34,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "group": "hs-knowledge-view-materialize",
+        "exit_code": 0,
+        "seconds": 24.907,
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "group": "hs-workspace-explore",
+        "exit_code": 0,
+        "seconds": 12.422,
+        "tests": 22,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 1
+      },
+      {
+        "group": "domain-and-integration",
+        "exit_code": 0,
+        "seconds": 268.531,
+        "tests": 96,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "passed": true,
+    "totals": {
+      "tests": 380,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1
+    },
+    "limitations": [
+      "No real human or implicit host acceptance",
+      "No real six Target or CI/publication/ACL acceptance",
+      "No restricted gold accessed"
+    ]
+  },
+  "skips": [
+    {
+      "name": "test_linked_package_file_rejected",
+      "reason": "symlink creation unavailable for this user"
+    }
+  ],
+  "documentation": {
+    "documents": 117,
+    "links_checked_before_final_evidence_link": 102,
+    "mermaid_parsed": 33,
+    "broken_links": []
+  },
+  "review": {
+    "standards": "passed",
+    "spec": "passed"
+  },
+  "limitations": [
+    "Path relocation and existing mechanism regression, not new knowledge semantics or real company deployment.",
+    "Pending query body/batch/lean-output design remains unimplemented.",
+    "Historical paths retain their original source revision."
+  ]
+}

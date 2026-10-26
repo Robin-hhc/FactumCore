@@ -56,7 +56,7 @@ class Pipeline:
         )
         self.rules = sha((self.root / "governance/framework.lock.yaml").read_bytes())
         self.root.joinpath(".isolated-knowledge-fixture").write_text("AIOTBOT_SYNTHETIC_FIXTURE_V2", encoding="utf-8")
-        self.skills = REPO / "aiotbot-knowledge-wifi-mp/skills/common/knowledge"
+        self.skills = REPO / "skills/common/knowledge"
         self.key = Ed25519PrivateKey.generate()
         self.catalog = {
             "schema_version": "2.0",

@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[3]
 DOMAIN = ROOT / "aiotbot-knowledge-wifi-mp"
 fixture_spec = importlib.util.spec_from_file_location(
     "source_admission_fixture",
-    DOMAIN / "skills/common/knowledge/hs-knowledge-local-check/tests/test_public_code_gate.py",
+    DOMAIN.parent / "skills/common/knowledge/hs-knowledge-local-check/tests/test_public_code_gate.py",
 )
 fixture = importlib.util.module_from_spec(fixture_spec)
 fixture_spec.loader.exec_module(fixture)
@@ -90,7 +90,7 @@ def test_source_identity_is_rechecked_without_build_artifacts(tmp_path, monkeypa
         )
         assert source_resources.validate_current_code_identity(*arguments) == identity
         for name in ("hs-knowledge-index-build", "hs-knowledge-query", "hs-knowledge-query-regression", "hs-knowledge-source-capture"):
-            package = DOMAIN / "skills/common/knowledge" / name
+            package = DOMAIN.parent / "skills/common/knowledge" / name
             environment.catalog["skills"][name] = {
                 "root": str(package), "entry": "scripts/cli.py", "python": sys.executable,
                 "package_digest": fixture.package_digest(package),
@@ -157,7 +157,7 @@ def test_unsigned_v3_review_remains_valid_for_query_and_maintenance(tmp_path, mo
         report = json.loads((environment.root / environment.report_ref).read_bytes())
         assert "signature_b64" not in report
         assert "semantic_reviewers" not in json.loads(environment.catalog_path.read_bytes())
-        package = DOMAIN / "skills/common/knowledge/hs-knowledge-maintain"
+        package = DOMAIN.parent / "skills/common/knowledge/hs-knowledge-maintain"
         environment.catalog["skills"][package.name] = {
             "root": str(package), "entry": "scripts/cli.py", "python": sys.executable,
             "package_digest": fixture.package_digest(package),

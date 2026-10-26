@@ -73,7 +73,7 @@ def test_formal_checks_collect_format_and_link_findings_without_catalog(rules):
 def test_lint_public_cli_needs_no_catalog_and_preserves_formal_tree(rules, tmp_path):
     import json
     import subprocess
-    cli = DOMAIN / "skills/common/knowledge/hs-knowledge-lint/scripts/cli.py"
+    cli = DOMAIN.parent / "skills/common/knowledge/hs-knowledge-lint/scripts/cli.py"
     output = tmp_path / "logs/report.json"
     before = {str(path): path.read_bytes() for path in (rules["knowledge_root"] / "governance").rglob("*") if path.is_file()}
     result = subprocess.run([sys.executable, str(cli), "--knowledge-root", str(rules["knowledge_root"]), "--rules-digest", rules["rules_digest"], "--output", str(output)], capture_output=True, text=True)
@@ -389,7 +389,7 @@ def test_lint_json_recovers_exact_old_record_card_after_current_card_update(rule
     request = tmp_path / "logs/request.json"
     request.write_bytes(json_bytes({"mode": "formal", "inputs": inputs}))
     output = tmp_path / "logs/result.json"
-    result = subprocess.run([sys.executable, str(DOMAIN / "skills/common/knowledge/hs-knowledge-lint/scripts/cli.py"), "--knowledge-root", str(tmp_path), "--rules-digest", rules["rules_digest"], "--input", str(request), "--output", str(output)], capture_output=True, text=True)
+    result = subprocess.run([sys.executable, str(DOMAIN.parent / "skills/common/knowledge/hs-knowledge-lint/scripts/cli.py"), "--knowledge-root", str(tmp_path), "--rules-digest", rules["rules_digest"], "--input", str(request), "--output", str(output)], capture_output=True, text=True)
     assert result.returncode == expected, result.stdout + result.stderr
     if not provide_history:
         report = json.loads(output.read_bytes())
@@ -419,5 +419,5 @@ def test_lint_recovers_the_record_version_from_real_git_without_archive_input(ru
     request = domain / "logs/git-request.json"
     request.write_bytes(json_bytes({"mode": "formal", "inputs": {"source_objects": {"raw:one": str(domain / "docs-raw/specs/a.md")}}}))
     output = domain / "logs/git-result.json"
-    result = subprocess.run([sys.executable, str(DOMAIN / "skills/common/knowledge/hs-knowledge-lint/scripts/cli.py"), "--knowledge-root", str(domain), "--rules-digest", rules["rules_digest"], "--input", str(request), "--output", str(output)], capture_output=True, text=True)
+    result = subprocess.run([sys.executable, str(DOMAIN.parent / "skills/common/knowledge/hs-knowledge-lint/scripts/cli.py"), "--knowledge-root", str(domain), "--rules-digest", rules["rules_digest"], "--input", str(request), "--output", str(output)], capture_output=True, text=True)
     assert result.returncode == 0, result.stdout + result.stderr

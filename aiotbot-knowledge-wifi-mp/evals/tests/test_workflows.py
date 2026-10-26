@@ -14,7 +14,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[3]
 VALIDATOR = ROOT / "aiotbot-knowledge-wifi-mp/evals/validate_design.py"
 INSTALLER = (
-    ROOT / "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-workspace-explore/scripts/install_catalog.py"
+    ROOT / "skills/common/knowledge/hs-workspace-explore/scripts/install_catalog.py"
 )
 
 
@@ -28,7 +28,7 @@ def validator_module():
 def fixture_packages(root):
     module = validator_module()
     for skill in module.SKILLS:
-        package = root / "aiotbot-knowledge-wifi-mp/skills/common/knowledge" / skill
+        package = root / "skills/common/knowledge" / skill
         mapping = module.ARTIFACT_SCOPE[skill]
         files = {
             "SKILL.md": f"---\nname: {skill}\ndescription: isolated synthetic contract fixture\n---\n# fixture\n",
@@ -61,20 +61,20 @@ def fixture_packages(root):
             path = package / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(data, encoding="utf-8")
-    shutil.copytree(ROOT / "aiotbot-knowledge-wifi-mp/workflows", root / "aiotbot-knowledge-wifi-mp/workflows")
+    shutil.copytree(ROOT / "workflows", root / "workflows")
     return root
 
 
 def test_ingest_is_one_complete_workflow_without_project_binding_or_lint_template():
     ingest = yaml.safe_load(
         (
-            ROOT / "aiotbot-knowledge-wifi-mp/workflows/common/knowledge/hs-knowledge-ingest/workflow.yaml"
+            ROOT / "workflows/common/knowledge/hs-knowledge-ingest/workflow.yaml"
         ).read_bytes()
     )
     nodes = {n["id"]: n for n in ingest["nodes"]}
     assert ingest["entry_node"] == "scan_sources"
     assert "bind_project" not in nodes and "governance_handoff" not in nodes
-    assert not (ROOT / "aiotbot-knowledge-wifi-mp/workflows/common/knowledge/hs-knowledge-lint/workflow.yaml").exists()
+    assert not (ROOT / "workflows/common/knowledge/hs-knowledge-lint/workflow.yaml").exists()
     gate = nodes["final_view_user_gate"]
     assert (gate["type"], gate["owner"]) == ("gate", "user")
     assert gate["on_pass"] == "record_confirmation"
@@ -99,7 +99,7 @@ def test_ingest_finishes_locally_without_repository_submission():
     workflow = yaml.safe_load(
         (
             ROOT
-            / "aiotbot-knowledge-wifi-mp/workflows/common/knowledge/hs-knowledge-ingest/workflow.yaml"
+            / "workflows/common/knowledge/hs-knowledge-ingest/workflow.yaml"
         ).read_bytes()
     )
     nodes = {node["id"]: node for node in workflow["nodes"]}
@@ -125,12 +125,12 @@ def test_ingest_finishes_locally_without_repository_submission():
     # The independent tool remains available after the local Workflow completes.
     assert (
         ROOT
-        / "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-publish-handoff/scripts/cli.py"
+        / "skills/common/knowledge/hs-knowledge-publish-handoff/scripts/cli.py"
     ).is_file()
 
 
 def test_public_mixed_candidate_routes_to_explicit_human_confirmation(tmp_path):
-    fixture_path = ROOT / "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-source-scan/tests/conftest.py"
+    fixture_path = ROOT / "skills/common/knowledge/hs-knowledge-source-scan/tests/conftest.py"
     spec = importlib.util.spec_from_file_location("workflow_mixed_public_fixture", fixture_path)
     fixture = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(fixture)
@@ -145,7 +145,7 @@ def test_public_mixed_candidate_routes_to_explicit_human_confirmation(tmp_path):
     view = harness.run("view-materialize", {"operation_id": "mixed-route", "plan_ref": plan["data"]["plan_ref"]})
     inspected = harness.run("candidate-inspect", {"operation_id": "mixed-route", "view_ref": view["data"]["view_ref"]})
     assert inspected["phase"] == "mixed_ready"
-    workflow = yaml.safe_load((ROOT / "aiotbot-knowledge-wifi-mp/workflows/common/knowledge/hs-knowledge-ingest/workflow.yaml").read_bytes())
+    workflow = yaml.safe_load((ROOT / "workflows/common/knowledge/hs-knowledge-ingest/workflow.yaml").read_bytes())
     node = next(item for item in workflow["nodes"] if item["id"] == "inspect_candidate")
     assert {edge["id"]: edge["target"] for edge in node["exits"]}.get(inspected["phase"]) == "prepare_confirmation"
 
@@ -156,13 +156,13 @@ def test_design_validation_checks_package_contracts_and_owners(tmp_path):
     assert module.validate(source) == []
     contract_path = (
         source
-        / "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-source-capture/artifacts/result.yaml"
+        / "skills/common/knowledge/hs-knowledge-source-capture/artifacts/result.yaml"
     )
     contract = yaml.safe_load(contract_path.read_bytes())
     contract["default_location"]["path"] = "node-result.md"
     contract_path.write_text(yaml.safe_dump(contract), encoding="utf-8")
     assert module.validate(source) == []  # a standard default path is legal
-    workflow = source / "aiotbot-knowledge-wifi-mp/workflows/common/knowledge/hs-knowledge-ingest/workflow.yaml"
+    workflow = source / "workflows/common/knowledge/hs-knowledge-ingest/workflow.yaml"
     document = yaml.safe_load(workflow.read_bytes())
     next(n for n in document["nodes"] if n["id"] == "final_view_user_gate")["owner"] = (
         "coder"
@@ -174,7 +174,7 @@ def test_design_validation_checks_package_contracts_and_owners(tmp_path):
 def test_missing_reference_or_wrong_artifact_exit_is_rejected(tmp_path):
     module = validator_module()
     source = fixture_packages(tmp_path / "fixture")
-    package = source / "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-apply/artifacts"
+    package = source / "skills/common/knowledge/hs-knowledge-apply/artifacts"
     (package / "review-guide.md").unlink()
     assert any("review_guide" in error for error in module.validate(source))
     (package / "review-guide.md").write_text("# Review\n", encoding="utf-8")
@@ -187,7 +187,7 @@ def test_missing_reference_or_wrong_artifact_exit_is_rejected(tmp_path):
 def test_cross_template_edge_and_apply_after_index_failure_rejected(tmp_path):
     module = validator_module()
     source = fixture_packages(tmp_path / "fixture")
-    path = source / "aiotbot-knowledge-wifi-mp/workflows/common/knowledge/hs-knowledge-ingest/workflow.yaml"
+    path = source / "workflows/common/knowledge/hs-knowledge-ingest/workflow.yaml"
     doc = yaml.safe_load(path.read_bytes())
     node = next(n for n in doc["nodes"] if n["id"] == "query_regression")
     next(e for e in node["exits"] if e["id"] == "blocked")["target"] = "apply_view"

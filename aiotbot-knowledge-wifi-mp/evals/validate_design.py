@@ -216,7 +216,7 @@ def validate(root):
     errors = []
     artifacts = set()
     for skill in SKILLS:
-        package = root / "aiotbot-knowledge-wifi-mp/skills/common/knowledge" / skill
+        package = root / "skills/common/knowledge" / skill
         try:
             text = (package / "SKILL.md").read_text(encoding="utf-8")
             frontmatter = re.match(r"\A---\r?\n(.*?)\r?\n---(?:\r?\n|$)", text, re.S)
@@ -282,7 +282,7 @@ def validate(root):
     # Native OpenFlow contracts are scoped per node. A multi-node contract's
     # required exits must exist on every node, not just in their union.
     for skill, contracts in EXTRA_ARTIFACT_SCOPE.items():
-        package = root / "aiotbot-knowledge-wifi-mp/skills/common/knowledge" / skill
+        package = root / "skills/common/knowledge" / skill
         for name, (expected_nodes, expected_exits) in contracts.items():
             try:
                 contract = load(package / "artifacts" / name)
@@ -306,7 +306,7 @@ def validate(root):
                 errors.append(f"{skill}/{name}: {exc}")
     for identity, expected in EDGES.items():
         try:
-            package = root / "aiotbot-knowledge-wifi-mp/workflows/common/knowledge" / identity
+            package = root / "workflows/common/knowledge" / identity
             doc = load(package / "workflow.yaml")
             if (
                 doc.get("version"),

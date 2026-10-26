@@ -1,12 +1,16 @@
-# FactumCore code/knowledge workspace; capabilities live under aiotbot-knowledge-wifi-mp/skills/ and workflows/.
+# FactumCore：项目根 skills/、workflows/ 存能力；aiotbot-knowledge-wifi-mp/ 存原件、知识与治理。
+# 此处是实际工作区配置，内部业务路径未知时保留 null；迁入真实项目后按实际补齐。
 schema_version: '2.0'
 workspace_id: aiotbot-wifi-v1
+# 相对本 config 所在项目根，目录名与当前配套能力一致。
 knowledge_roots:
   wifi: aiotbot-knowledge-wifi-mp
 repos:
 - repo_id: wifi-code
   kind: git
+  # 填实际业务 Git 仓根；若 config 就在真实业务仓根可用 .，当前未知保持 null。
   root: null
+  # 代码入库核验前填真实内部仓 remote.origin.url。
   expected_identity: null
 architecture:
 - binding_id: wifi-main
@@ -16,6 +20,7 @@ architecture:
   override_nested: false
 wiki_entities: {}
 symbol_aliases: {}
+# 六 Target／三 pair 是逻辑标识，实际源码、模块、宏、构建与兼容关系未知时保持空值。
 targets:
 - target_id: chip12-host
   chip: chip12
@@ -78,6 +83,7 @@ pairs:
   host_target: chip07c-host
   device_target: chip07c-device
   compatibility_policy: unknown
+# 日常默认使用本机知识；shared 仍按实际内部共享接纳规则使用。
 query:
   default_channel: local
   allowed_channels:

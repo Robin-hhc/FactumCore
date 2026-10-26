@@ -2,7 +2,7 @@
 
 先读 [AGENTS.md](AGENTS.md) 与[设计入口](docs-llm-wiki/README.md)。架构设计说明职责和链路，概要设计说明流程判断，详细设计说明节点内的文件分工。实现需求、任务、测试与验证记录集中在 [SDD](docs-llm-wiki/sdd/knowledge-v2/README.md)；修改实现时按适用任务验证，历史工件保留原字节。
 
-WiFi 原件、知识和能力均位于 `aiotbot-knowledge-wifi-mp/`。节点 Skill 维护在 `skills/common/knowledge/`，设计以 `workflows/common/knowledge/hs-knowledge-ingest/` 串起生产和本地入库，lint 为只读检查能力；实际模板调用见使用说明。不建立中间领域目录、隐藏能力目录或嵌套 `.git`。所有 Git 操作在 FactumCore 根执行。
+WiFi 原件、知识和治理位于 `aiotbot-knowledge-wifi-mp/`。节点 Skill 维护在项目根的 `skills/common/knowledge/`，由同级 `workflows/common/knowledge/hs-knowledge-ingest/` 串起生产和本地入库，lint 为只读检查能力；实际模板调用见使用说明。不建立中间领域目录、隐藏能力目录或嵌套 `.git`。所有 Git 操作在 FactumCore 根执行。
 
 原始文档放 `docs-raw/{conventions,chips,storys,specs,protocols}/`，保留原件及必要附件；`sources/` 的 URL 更新暂不接入。知识卡经候选和确切最终视图治理后进入 `knowledge/`。纯文档由真实人确认后 stable，免代码实现核验；无回复、超时和 Agent 自报不算同意。代码卡本地只读检查通过后 stable，上库固定 CI 校验格式、索引及来源／代码引用一致性；检查不修卡、锁、链接或源码。
 

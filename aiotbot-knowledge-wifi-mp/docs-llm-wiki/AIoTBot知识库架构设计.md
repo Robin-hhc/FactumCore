@@ -11,11 +11,12 @@ aiotbot-knowledge知识库仓目录结构如下所示。
 - AGENTS.md：本工作区的消费路由契约
 - config.yml：四张映射表，把代码仓、架构元素、领域知识实体、符号别名集中登记为一份配置事实
 - main/：真实代码工作区
-- aiotbot-knowledge-wifi-mp/：WiFi 领域根，集中维护原件、知识、治理及节点能力
+- skills/common/knowledge/：项目根的节点能力
+- workflows/common/knowledge/：项目根的 ingest 工作流
+- aiotbot-knowledge-wifi-mp/：WiFi 领域根，集中维护原件、知识与治理
   - knowledge/：知识卡，唯一检索对象，处理后知识的仓库
   - docs-raw/：源文档，原始证据层（LLM 只读）
   - governance/：治理文件夹，存放契约，模板，规范等
-  - skills/common/knowledge/ · workflows/common/knowledge/：节点能力与生产、治理编排
   - .build/ · logs/ · evals/ · artifacts/ · docs-llm-wiki/：配套支撑层
 
 ```text
@@ -23,31 +24,32 @@ FactumCore/
 ├── AGENTS.md                      # 项目入口与消费路由
 ├── config.yml                     # 代码、架构、领域实体及符号映射
 ├── main/                          # 业务代码工作区；真实布局由 config.yml 登记
+├── skills/common/knowledge/   # 节点级能力
+│   ├── hs-workspace-explore/             # E0：缺上下文时前置发现
+│   ├── hs-knowledge-source-scan/         # 增量扫描、材料与处理记录
+│   ├── hs-knowledge-source-capture/      # 保存本次原文副本与定位
+│   ├── hs-knowledge-change-plan/         # 六决策计划
+│   ├── hs-knowledge-view-materialize/    # 物化最终视图
+│   ├── hs-knowledge-governance-handoff/  # 登记稿件与检查上下文
+│   ├── hs-knowledge-lint/                # 只读确定性检查 Skill
+│   ├── hs-knowledge-candidate-inspect/   # 检查候选身份
+│   ├── hs-knowledge-confirmation-prepare/ # 准备真人展示
+│   ├── hs-knowledge-confirmation-record/ # 记录真实动作
+│   ├── hs-knowledge-local-check/         # 代码本地核验
+│   ├── hs-knowledge-candidate-revise/    # 修订或缩窄
+│   ├── hs-knowledge-apply/               # 精确事务落位
+│   ├── hs-knowledge-recover/             # 恢复事务
+│   ├── hs-knowledge-index-build/         # 构建、验证与激活索引
+│   ├── hs-knowledge-query-regression/    # 回归候选代
+│   ├── hs-knowledge-publish-handoff/     # 外部发布材料辅助
+│   ├── hs-knowledge-merge-check/         # 固定代码视图复核辅助
+│   ├── hs-knowledge-maintain/            # 变更影响与阻断复核
+│   └── hs-knowledge-query/               # 消费知识
+├── workflows/common/knowledge/
+│   └── hs-knowledge-ingest/   # P1—P7：原件到 stable 的完整流程
 └── aiotbot-knowledge-wifi-mp/       # WiFi 领域根，无嵌套 .git
     ├── AGENTS.md / README.md / CONTRIBUTING.md
     ├── check.py / check.sh         # 固定 CI 入口，复用共用检查函数
-    ├── skills/common/knowledge/   # 节点级能力
-    │   ├── hs-workspace-explore/             # E0：缺上下文时前置发现
-    │   ├── hs-knowledge-source-capture/      # 保存本次原文副本与定位
-    │   ├── hs-knowledge-change-plan/         # 六决策计划
-    │   ├── hs-knowledge-view-materialize/    # 物化最终视图
-    │   ├── hs-knowledge-governance-handoff/  # 登记稿件与检查上下文
-    │   ├── hs-knowledge-lint/                # 只读确定性检查 Skill
-    │   ├── hs-knowledge-candidate-inspect/   # 检查候选身份
-    │   ├── hs-knowledge-confirmation-prepare/ # 准备真人展示
-    │   ├── hs-knowledge-confirmation-record/ # 记录真实动作
-    │   ├── hs-knowledge-local-check/         # 代码本地核验
-    │   ├── hs-knowledge-candidate-revise/    # 修订或缩窄
-    │   ├── hs-knowledge-apply/               # 精确事务落位
-    │   ├── hs-knowledge-recover/             # 恢复事务
-    │   ├── hs-knowledge-index-build/         # 构建、验证与激活索引
-    │   ├── hs-knowledge-query-regression/    # 回归候选代
-    │   ├── hs-knowledge-publish-handoff/     # 外部发布材料辅助
-    │   ├── hs-knowledge-merge-check/         # 固定代码视图复核辅助
-    │   ├── hs-knowledge-maintain/            # 变更影响与阻断复核
-    │   └── hs-knowledge-query/               # 消费知识
-    ├── workflows/common/knowledge/
-    │   └── hs-knowledge-ingest/   # P1—P7：原件到 stable 的完整流程
     ├── docs-raw/                 # 原始证据，Agent 只读
     │   ├── conventions/          # 编码规范
     │   ├── chips/                # 芯片材料
@@ -81,7 +83,7 @@ FactumCore/
 
 节点 Skill 和 Workflow 随 WiFi 知识库维护：
 
-`skills/common/knowledge/` 和 `workflows/common/knowledge/` 均位于 `aiotbot-knowledge-wifi-mp/` 下，由 FactumCore 统一管理，不包含嵌套 `.git`。一条 `hs-knowledge-ingest` Workflow 完成 P1—P7；`hs-knowledge-lint` 位于 Skill 目录，只执行只读检查。真实人工批准保留 user Gate，由准备和记录 Skill 连接可信动作。
+`skills/common/knowledge/` 和 `workflows/common/knowledge/` 位于 FactumCore 根，与 `AGENTS.md`、`config.yml` 同级管理，不包含嵌套 `.git`。一条 `hs-knowledge-ingest` Workflow 完成 P1—P7；`hs-knowledge-lint` 位于 Skill 目录，只执行只读检查。真实人工批准保留 user Gate，由准备和记录 Skill 连接可信动作。
 
 
 
@@ -227,7 +229,7 @@ device 侧 + host 侧真实代码。`.codegraph/` 是代码图谱索引，**本�
 
 参与链路：生产取证、本地代码语义核验、CI 固定身份比对及消费的代码交叉印证。
 
-#### `aiotbot-knowledge-wifi-mp/skills/common/knowledge/` —— 项目入口与节点级能力
+#### `skills/common/knowledge/` —— 项目入口与节点级能力
 
 知识库的"操作说明书"，不装任何领域事实：
 
@@ -255,7 +257,7 @@ device 侧 + host 侧真实代码。`.codegraph/` 是代码图谱索引，**本�
 
 参与流程：ingest 编排 P1—P7，内部调用 lint Skill；query 使用知识、来源和索引能力。上表是能力清单，不表示上库必须逐个执行；固定 CI 复用 lint 的确定性检查函数。hs-workspace-explore 是命令前按需调用的 E0。
 
-#### `aiotbot-knowledge-wifi-mp/workflows/common/knowledge/` —— 增量更新与治理工作流
+#### `workflows/common/knowledge/` —— 增量更新与治理工作流
 
 知识库的"操作说明书"，不装任何领域事实：
 
@@ -267,7 +269,7 @@ ingest 不另分独立的生产和治理流程；它在 P5 调用 `skills/common
 
 #### aiotbot-knowledge-wifi-mp/ —— WiFi 领域知识库
 
-WiFi 原件、知识、治理及节点 Skill/Workflow 集中放在 `aiotbot-knowledge-wifi-mp/`，业务代码工作区通过外层 `config.yml` 关联。业务部署按第5.3节及详细设计第7章选择 repo 根内或仓外方式。目录和忽略规则不构成 ACL，资料与能力分发按实际授权处理。
+WiFi 原件、知识与治理集中放在 `aiotbot-knowledge-wifi-mp/`，节点 Skill/Workflow 位于项目根的 `skills/`、`workflows/`，业务代码工作区通过同级 `config.yml` 关联。业务部署按第5.3节及详细设计第7章选择 repo 根内或仓外方式。目录和忽略规则不构成 ACL，资料与能力分发按实际授权处理。
 
 参与流程：ingest 负责原件到本地知识，lint 检查固定资产，query 消费合格结论。
 

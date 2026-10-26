@@ -10,7 +10,7 @@
 | 日常操作、开发者接入与排错 | [使用说明.md](使用说明.md) |
 | 需求、实现任务与实际验证记录 | [task.md](task.md)、[SDD](sdd/knowledge-v3/README.md) |
 
-现行名称和目录以架构设计 §5.3 为准，用户后续明确决定优先。唯一领域根为 `aiotbot-knowledge-wifi-mp/`，其下 `skills/common/knowledge/` 存节点能力，`workflows/common/knowledge/` 承载 ingest 端到端编排设计。Git 在 FactumCore 根执行，不建立嵌套 `.git` 或隐藏能力目录。
+现行名称和目录以架构设计 §5.3 为准，用户后续明确决定优先。唯一领域根为 `aiotbot-knowledge-wifi-mp/`；项目根的 `skills/common/knowledge/` 存节点能力，`workflows/common/knowledge/` 承载 ingest 端到端编排。两者与根 AGENTS/config 同级管理。Git 在 FactumCore 根执行，不建立嵌套 `.git` 或隐藏能力目录。
 
 架构设计解释分层与协作；详细设计分概要和节点设计两层，以流程图、分支条件和文件职责表达。设计正文不记开发轮次、票据状态、Agent 工作进度或历史测试成绩；这些进入 SDD 工件。系统设计不构成正式领域事实，Schema/Contract 机器规则归 `../governance/`，此处不另建执行契约。
 

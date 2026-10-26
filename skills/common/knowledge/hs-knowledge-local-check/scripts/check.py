@@ -90,6 +90,16 @@ def read_configuration(ctx, context):
         raise Incomplete("code context does not fix current workspace configuration")
     config = ctx.domain.load_yaml(raw)
     ctx.domain.validate_shape("workspace", config, ctx.rules)
+    config = ctx.domain.normalize_workspace(config, path.parent)
+    if config.get("mapping_kind") == "modules":
+        registration = ctx.catalog.get("workspaces", {}).get(config["workspace_id"], {})
+        if (
+            not registration.get("config")
+            or pathlib.Path(registration["config"]).resolve() != path.resolve()
+            or registration.get("rules_digest") != ctx.rules_digest
+        ):
+            raise Incomplete("module mapping requires the installed workspace registration")
+        return config, config["code_policy"], raw
     declared = config.get("code_policy")
     trusted = ctx.catalog.get("code_policy")
     if not declared or not trusted or declared != trusted:
@@ -97,6 +107,88 @@ def read_configuration(ctx, context):
             "protected code authorization and domain declaration are missing or differ"
         )
     return config, trusted, raw
+
+
+def mapped_code_identity(ctx, context, config, mode, source_only=False, require_build=True):
+    """Check exact files in a relative module workspace without Git/mm.
+
+    Module labels locate code. Actual macros, builds and execution still come
+    from the fixed review context, never from labels or a synthesized Target.
+    """
+    repos, target = context.get("repos"), context.get("target")
+    check_build = require_build or context.get("build_evidence") is not None
+    require_target = not source_only or check_build
+    if not isinstance(repos, dict) or not repos:
+        raise Incomplete("fixed repositories are required")
+    declared = None
+    if target is not None:
+        if not isinstance(target, dict):
+            raise Incomplete("Target must be an actual context")
+        matches = [item for item in config["targets"] if item["target_id"] == target.get("target_id")]
+        if len(matches) != 1:
+            raise Incomplete("Target is outside the configured modules")
+        declared = matches[0]
+        if any(target.get(field) != declared[field] for field in ("target_id", "chip", "side")):
+            raise Incomplete("Target differs from the module mapping")
+    if require_target and (
+        declared is None or not isinstance(target.get("features"), list)
+        or not isinstance(target.get("protocol_versions"), list)
+    ):
+        raise Incomplete("actual Target feature/protocol context is incomplete")
+    build = context.get("build_evidence")
+    build_files = {}
+    if check_build:
+        if (
+            not isinstance(build, dict) or not isinstance(target, dict)
+            or not known(target.get("build_profile"))
+            or not known(target.get("revision"))
+            or build.get("profile") != target["build_profile"]
+            or build.get("source_revision") != target["revision"]
+            or not re.fullmatch(r"[0-9a-f]{64}", str(build.get("macro_digest", "")))
+            or not build.get("artifacts")
+        ):
+            raise Incomplete("actual build/macro evidence is missing")
+        for artifact in build["artifacts"]:
+            raw = ctx.path(artifact.get("path"), ("logs/evidence",)).read_bytes()
+            if digest(raw) != artifact.get("sha256"):
+                raise Incomplete("build evidence bytes changed")
+            build_files[artifact["path"]] = artifact["sha256"]
+    result = {"repos": {}, "target": target, "build_files": build_files,
+              "macro_digest": build["macro_digest"] if build is not None else None}
+    if source_only or build is None:
+        result["basis"] = "source"
+    registered = {item["repo_id"]: item for item in config["repos"]}
+    for repo_id, item in repos.items():
+        mapping = registered.get(repo_id)
+        if not mapping or not mapping.get("root"):
+            raise Incomplete("repository is outside the module mapping")
+        root = (ctx.root.parent / mapping["root"]).resolve()
+        if root != pathlib.Path(item.get("root", "")).resolve():
+            raise Incomplete("fixed repository path differs from the module mapping")
+        if any(item.get(field) != mapping[field] for field in ("kind", "evidence_basis", "workspace_path")):
+            raise Incomplete("fixed filesystem context does not preserve the module mapping identity")
+        files = item.get("files")
+        if not isinstance(files, dict) or not files:
+            raise Incomplete("code file byte manifest missing")
+        if mapping["kind"] != "export" or mapping.get("evidence_basis") != "filesystem":
+            raise Incomplete("module evidence requires its configured filesystem scope")
+        if known(item.get("head")) or known(item.get("identity")) or item.get("dirty") not in (None, "unknown"):
+            raise Incomplete("filesystem evidence cannot claim Git identity, revision or clean state")
+        actual_files = {}
+        for relative, expected in files.items():
+            if not ctx.domain.workspace_file_allowed(config, repo_id, relative, target.get("target_id") if target else None):
+                raise Incomplete("code file is outside the configured module/Target range")
+            raw = safe_path(root, relative).read_bytes()
+            if digest(raw) != expected:
+                raise Incomplete("code bytes differ from the fixed context")
+            actual_files[relative] = expected
+        result["repos"][repo_id] = {
+            "root": str(root), "workspace_path": mapping["workspace_path"],
+            "kind": "export", "evidence_basis": "filesystem",
+            "identity": None, "head": None,
+            "files": actual_files, "checked_files_dirty": None,
+        }
+    return result
 
 
 def source_analysis_claim(claim):
@@ -120,6 +212,8 @@ def artifact_requirements(claim):
 
 
 def code_identity(ctx, context, config, policy, mode, source_only=False, require_build=True):
+    if config.get("mapping_kind") == "modules":
+        return mapped_code_identity(ctx, context, config, mode, source_only, require_build)
     repos = context.get("repos")
     target = context.get("target")
     check_build = require_build or context.get("build_evidence") is not None
@@ -420,10 +514,12 @@ def frozen_identity(ctx, context, mode, source_only=False, require_build=True):
             raise Incomplete("historical build evidence bytes changed")
         result["build_files"][item["path"]] = item["sha256"]
     for repo_id, item in repos.items():
+        filesystem = item.get("kind") == "export" and item.get("evidence_basis") == "filesystem"
         if (
             not isinstance(item.get("files"), dict)
             or not item["files"]
-            or not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", str(item.get("head", "")))
+            or (filesystem and (item.get("head") is not None or known(item.get("identity")) or item.get("dirty") not in (None, "unknown")))
+            or (not filesystem and not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", str(item.get("head", ""))))
         ):
             raise Incomplete("historical repository manifest is incomplete")
         for relative, expected in item["files"].items():
@@ -438,6 +534,11 @@ def frozen_identity(ctx, context, mode, source_only=False, require_build=True):
             if mode == "local"
             else False,
         }
+        if filesystem:
+            result["repos"][repo_id].update(
+                kind="export", evidence_basis="filesystem", identity=None,
+                workspace_path=item.get("workspace_path"), checked_files_dirty=None,
+            )
     return result
 
 
@@ -617,7 +718,7 @@ def evaluate(
                                 repo["root"],
                                 ["cat-file", "blob", repo["head"] + ":" + relative],
                             )
-                            if mode == "merge"
+                            if mode == "merge" and repo.get("evidence_basis") != "filesystem"
                             else source_path.read_bytes()
                         )
                     location = checked.get("locator")

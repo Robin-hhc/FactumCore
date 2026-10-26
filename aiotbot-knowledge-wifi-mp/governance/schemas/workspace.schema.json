@@ -1,111 +1,189 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "AIoT WiFi Workspace v2",
-  "type": "object",
-  "properties": {
-    "schema_version": {
-      "const": "2.0"
-    },
-    "workspace_id": {
-      "type": "string",
-      "minLength": 1
-    },
-    "knowledge_roots": {
+  "title": "AIoT WiFi module mapping and legacy workspace v2",
+  "oneOf": [
+    {
       "type": "object",
       "properties": {
-        "wifi": {
+        "schema_version": {
+          "const": "2.0"
+        },
+        "workspace_id": {
           "type": "string",
           "minLength": 1
-        }
-      },
-      "required": [
-        "wifi"
-      ],
-      "additionalProperties": false
-    },
-    "repos": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/repo"
-      }
-    },
-    "architecture": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/binding"
-      }
-    },
-    "wiki_entities": {
-      "type": "object"
-    },
-    "symbol_aliases": {
-      "type": "object"
-    },
-    "targets": {
-      "type": "array",
-      "minItems": 6,
-      "maxItems": 6,
-      "items": {
-        "$ref": "#/$defs/target"
-      }
-    },
-    "pairs": {
-      "type": "array",
-      "minItems": 3,
-      "maxItems": 3,
-      "items": {
-        "$ref": "#/$defs/pair"
-      }
-    },
-    "query": {
-      "type": "object",
-      "properties": {
-        "default_channel": {
-          "enum": [
-            "local",
-            "shared"
-          ]
         },
-        "allowed_channels": {
+        "knowledge_roots": {
+          "type": "object",
+          "properties": {
+            "wifi": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "wifi"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {
+            "default_channel": {
+              "enum": [
+                "local",
+                "shared"
+              ]
+            },
+            "allowed_channels": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "local",
+                  "shared"
+                ]
+              }
+            }
+          },
+          "required": [
+            "default_channel",
+            "allowed_channels"
+          ],
+          "additionalProperties": false
+        },
+        "toolchain": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "code_root": {
+          "type": "string",
+          "minLength": 1
+        },
+        "modules": {
           "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
           "items": {
-            "enum": [
-              "local",
-              "shared"
-            ]
+            "$ref": "#/$defs/module"
           }
         }
       },
       "required": [
-        "default_channel",
-        "allowed_channels"
+        "schema_version",
+        "workspace_id",
+        "knowledge_roots",
+        "code_root",
+        "modules"
       ],
       "additionalProperties": false
     },
-    "toolchain": {
+    {
       "type": "object",
-      "additionalProperties": true
-    },
-    "code_policy": {
-      "type": "object",
-      "additionalProperties": true
+      "properties": {
+        "schema_version": {
+          "const": "2.0"
+        },
+        "workspace_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "knowledge_roots": {
+          "type": "object",
+          "properties": {
+            "wifi": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "wifi"
+          ],
+          "additionalProperties": false
+        },
+        "repos": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/repo"
+          }
+        },
+        "architecture": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/binding"
+          }
+        },
+        "wiki_entities": {
+          "type": "object"
+        },
+        "symbol_aliases": {
+          "type": "object"
+        },
+        "targets": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "$ref": "#/$defs/target"
+          }
+        },
+        "pairs": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "$ref": "#/$defs/pair"
+          }
+        },
+        "query": {
+          "type": "object",
+          "properties": {
+            "default_channel": {
+              "enum": [
+                "local",
+                "shared"
+              ]
+            },
+            "allowed_channels": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "local",
+                  "shared"
+                ]
+              }
+            }
+          },
+          "required": [
+            "default_channel",
+            "allowed_channels"
+          ],
+          "additionalProperties": false
+        },
+        "toolchain": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "code_policy": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "schema_version",
+        "workspace_id",
+        "knowledge_roots",
+        "repos",
+        "architecture",
+        "wiki_entities",
+        "symbol_aliases",
+        "targets",
+        "pairs",
+        "query"
+      ],
+      "additionalProperties": false
     }
-  },
-  "required": [
-    "schema_version",
-    "workspace_id",
-    "knowledge_roots",
-    "repos",
-    "architecture",
-    "wiki_entities",
-    "symbol_aliases",
-    "targets",
-    "pairs",
-    "query"
   ],
-  "additionalProperties": false,
   "$defs": {
     "repo": {
       "type": "object",
@@ -270,6 +348,48 @@
         "host_target",
         "device_target",
         "compatibility_policy"
+      ],
+      "additionalProperties": false
+    },
+    "module": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "chips": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "sides": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "host",
+              "device"
+            ]
+          }
+        },
+        "features": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
       ],
       "additionalProperties": false
     }

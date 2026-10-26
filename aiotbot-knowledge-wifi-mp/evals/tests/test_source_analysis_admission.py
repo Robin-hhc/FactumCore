@@ -50,7 +50,8 @@ def test_source_identity_is_rechecked_without_build_artifacts(tmp_path, monkeypa
             environment.source_analysis_view(usage=usage, with_target=with_target)
         context = json.loads((environment.root / environment.context_ref).read_bytes())
         context["rules_digest"] = environment.rules_digest
-        environment.save(environment.context_ref, fixture.seal(context))
+        context = fixture.seal(context)
+        environment.save(environment.context_ref, context)
         environment.view["rules_digest"] = environment.rules_digest
         environment.view = fixture.seal(environment.view)
         environment.save(environment.view_ref, environment.view)

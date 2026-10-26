@@ -31,3 +31,5 @@ flowchart LR
 后续目录调整按用户确认的[配套能力迁至项目根](capability-root-layout.md)执行：根 AGENTS/config 与 skills/workflows 同级，知识根继续保存原件、知识和治理。历史快照、记录及旧路径保持原字节；查询正文与来源复用优化仍待确认。
 
 Windows／Linux 已有 Python 3.11 时的依赖准备入口、版本选择与安装验证见[运行依赖安装](runtime-installation.md)。它复用已有 catalog 安装器，内部 Agent 仍由部署方手动接入。
+
+用户随后确认的[多仓工作区与模块映射](workspace-mapping.md)将人工配置收敛为 `code_root` 与模块相对路径、芯片、端、特性和用途；运行时只读取文件并固定内容指纹，不探测或执行 Git／mm／manifest。该设计补充原始规格，历史配置、快照及记录保持原字节。

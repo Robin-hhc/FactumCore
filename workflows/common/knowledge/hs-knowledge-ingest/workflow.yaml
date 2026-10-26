@@ -62,8 +62,12 @@ nodes:
     old cards, diffs, reasons and gaps. For affected code Claims capture actual current code/Target/config through
     the public source-capture code action, using a separate child operation_id for each code source (never the batch
     ID, and no forwarded workflow object). Pass explicit code_bundle_refs [{bundle_ref,bundle_digest}] to prepare
-    under the batch operation. It rechecks current authorized identity and preserves current code bytes beside adopted
-    old sources; never substitute historical code for current material. New concepts found later return here; no
+    under the batch operation. In a code_root/modules workspace the fixed scripts use the configured relative file
+    scope without probing or invoking Git, mm or manifest. The Agent may read actual company status output by the
+    existing project convention, retain its original text/provenance, and supply an optional typed version label.
+    Do not turn a ChangeID into a commit or infer missing status fields. Bind the original config and actual file
+    hashes, retain unknown version when no material supplies it, and preserve current code bytes beside adopted old sources. Never substitute
+    historical code for current material. New concepts found later return here; no
     hit never proves a new card is needed.
   exits:
   - id: prepared
@@ -375,7 +379,10 @@ nodes:
     and claims. Bind authors to the actual plan and keep the reviewer distinct from every author. No reviewer
     public-key registry or cryptographic signature is required. The fixed script checks record completeness,
     author separation and exact bindings; it does not authenticate Agent identities or decide knowledge semantics.
-    Static semantic-support requires exact source identity and the independent review record, not compiled artifacts.
+    Static semantic-support requires exact source-file hashes and the independent review record, not compiled artifacts.
+    A code_root/modules workspace uses ordinary mapped files without Git identity, HEAD, URL or duplicate code_policy
+    registration. Unknown version does not block current static source verification; module labels do not prove
+    enabled macros, build success or protocol compatibility.
     A current Claim still needs its real mapped Target/config; without a Target only explicitly historical/guidance
     Claims with unknown applicability and no concrete contexts may pass. build-support/runtime-support require
     their actual evidence; never infer compiled or runtime behavior from source alone. Preserve exact code context

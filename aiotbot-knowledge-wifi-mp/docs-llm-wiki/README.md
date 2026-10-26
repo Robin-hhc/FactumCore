@@ -15,9 +15,11 @@ flowchart LR
 | [AGENTS.md](AGENTS.md) | Agent 阅读入口和文档修改边界 |
 | [task.md](task.md) 与 [sdd/](sdd/knowledge-v3/README.md) | 实现任务、需求、测试计划、发布与实际验收记录 |
 
-业务代码工作区、`AGENTS.md`、`config.yml`、`skills/` 与 `workflows/` 位于 FactumCore 根；WiFi 原件、知识和治理位于 `aiotbot-knowledge-wifi-mp/`。能力目录分别为项目根的 `skills/common/knowledge/` 和 `workflows/common/knowledge/`，不包含嵌套 `.git`。本目录只存系统说明与开发工件，正式领域知识只进入 `../knowledge/`。
+业务代码工作区、`AGENTS.md`、`config.yml`、`skills/` 与 `workflows/` 位于 FactumCore 根；WiFi 原件、知识和治理位于 `aiotbot-knowledge-wifi-mp/`。能力目录分别为项目根的 `skills/common/knowledge/` 和 `workflows/common/knowledge/`，不包含嵌套 `.git`。业务代码可由内部 Git／mm 和 manifest 管理多个仓。本目录只存系统说明与开发工件，正式领域知识只进入 `../knowledge/`。
 
-部署首选在业务 repo 工作区根目录随代码共同拉取；受限环境可仓外手动拉取，以本地 `config.env` 的 `project_root` 指定业务代码根。项目 manifest 视图由各项目适配，见[部署与视图配置](知识库详细设计.md#7-部署方式与manifest视图配置)。
+部署首选在业务 repo 工作区根目录随代码共同拉取；受限环境可仓外手动拉取，以本地 `config.env` 的 `project_root` 指定业务代码根。项目视图沿用公司既有管理，知识库只按模块相对路径读取已落地文件，见[部署与视图配置](知识库详细设计.md#7-部署方式与manifest视图配置)。
+
+`config.yml` 维护代码根和模块相对路径，以及芯片、Host／Device、特性和用途；共享模块可关联多芯片、多端。无需逐项填写六 Target、三 pair 或重复代码根授权，固定脚本按路径读取实际文件并固定内容指纹，不探测或执行 Git／mm／manifest。配置填法见[使用说明](使用说明.md#配置项目代码架构)，实现与验证边界见[多仓工作区映射](sdd/knowledge-v3/workspace-mapping.md)。
 
 设计文档描述职责、流程与边界，能力安装、实际宿主、六 Target、CI 合入和权限验证以 SDD 记录为准。历史工件保留其原始版本身份，不据此推断当前部署状态。
 

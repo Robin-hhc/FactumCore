@@ -1,6 +1,7 @@
 """Finite path discovery and actual entry loading; no whole-disk scan or implicit trust."""
 
 from __future__ import annotations
+import os
 from pathlib import Path
 import subprocess
 from support import (
@@ -40,6 +41,9 @@ def resolve(request, registry=None):
             for entry in read_json(registry).get("workspaces", []):
                 path = Path(entry["config_path"]).resolve(strict=True)
                 config = load_yaml(path.read_bytes())
+                if "code_root" in config and under(target, path.parent):
+                    candidates.append((path, entry))
+                    continue
                 for repo in config.get("repos", []):
                     if repo.get("root"):
                         root = Path(repo["root"])
@@ -122,9 +126,20 @@ def execute(request, args, package):
         }, "resolved"
     modules, rules = domain(root, pinned)
     modules["validation"].validate_shape("workspace", config, rules)
+    config = modules["validation"].normalize_workspace(config, workspace)
+    mapped = config.get("mapping_kind") == "modules"
+    if mapped:
+        matches = []
+        for repo in config["repos"]:
+            repo_root = Path(repo["root"])
+            if not repo_root.is_absolute():
+                repo_root = workspace / repo_root
+            repo_root = repo_root.resolve(strict=True)
+            if under(target, repo_root) or under(repo_root, target):
+                matches.append((len(repo_root.parts), repo, repo_root))
     entries = [workspace / "AGENTS.md", root / "AGENTS.md"]
     if matches:
-        repo_root = matches[0][2]
+        repo_root = workspace if mapped else matches[0][2]
         current = target if target.is_dir() else target.parent
         local = []
         while under(current, repo_root):
@@ -153,35 +168,48 @@ def execute(request, args, package):
         observed[path] = data
     repos = {}
     gaps = []
+    gaps.extend(config.get("layout_gaps", []))
     if not matches:
         gaps.append("real_business_repo_unknown")
-    else:
-        repo = matches[0][1]
-        code_root = matches[0][2]
+    for _, repo, code_root in matches:
+        environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+        environment.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull,
+                           GIT_TERMINAL_PROMPT="0", GIT_OPTIONAL_LOCKS="0", GIT_NO_LAZY_FETCH="1")
         git = [
             "git",
             "-c",
             "core.fsmonitor=false",
             "-c",
-            "core.hooksPath=NUL",
+            "core.hooksPath=" + os.devnull,
+            "-c", "protocol.allow=never",
+            "-c", "protocol.file.allow=never",
             "-c",
             "safe.directory=" + code_root.as_posix(),
             "-C",
             str(code_root),
         ]
-        result = subprocess.run(
-            git + ["rev-parse", "HEAD"], capture_output=True, check=False, timeout=30
-        )
+        head, identity = None, None
+        if repo["kind"] == "git":
+            result = subprocess.run(git + ["rev-parse", "--verify", "HEAD^{commit}"],
+                                    capture_output=True, check=False, timeout=30, env=environment)
+            head = result.stdout.decode().strip() if result.returncode == 0 else None
+            origin = subprocess.run(git + ["config", "--local", "--get", "remote.origin.url"],
+                                    capture_output=True, check=False, timeout=30, env=environment)
+            identity = origin.stdout.decode().strip() if origin.returncode == 0 else None
         repos[repo["repo_id"]] = {
             "repo_id": repo["repo_id"],
             "root": str(code_root),
-            "commit": result.stdout.decode().strip()
-            if result.returncode == 0
-            else None,
+            "kind": repo["kind"],
+            **({"evidence_basis": "filesystem"} if mapped else {}),
+            "workspace_path": repo.get("workspace_path"),
+            "commit": head,
+            "head": head,
+            "identity": identity,
             "dirty": "unknown",
             "build_profile": None,
             "files": {},
         }
+    if repos:
         gaps.append("build_and_dirty_context_not_yet_fixed")
     if (
         any(path.read_bytes() != data for path, data in observed.items())
@@ -224,6 +252,8 @@ def execute(request, args, package):
             "context_kind": "discovery",
             "targets": config["targets"],
             "pairs": config["pairs"],
+            **({"mapping_kind": "modules", "modules": config["modules"],
+                "architecture": config["architecture"], "code_root": config["code_root"]} if mapped else {}),
             "gaps": gaps,
         }
     )

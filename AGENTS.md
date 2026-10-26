@@ -1,12 +1,12 @@
 # FactumCore：AIoTBot 开发入口
 
-本仓按[总体设计 §5.3](aiotbot-knowledge-wifi-mp/docs-llm-wiki/AIoTBot知识库架构设计.md#53-aiotbot-knowledge目录架构)组织，Git 操作统一在 FactumCore 根执行。FactumCore 承载业务代码工作区、WiFi 知识及配套能力；`AGENTS.md`、`config.yml`、`skills/`、`workflows/` 位于项目根，原件、知识与治理位于 `aiotbot-knowledge-wifi-mp/`，不建立嵌套 `.git`。
+本仓按[总体设计 §5.3](aiotbot-knowledge-wifi-mp/docs-llm-wiki/AIoTBot知识库架构设计.md#53-aiotbot-knowledge目录架构)组织，Git 操作统一在 FactumCore 根执行。FactumCore 承载业务代码工作区、WiFi 知识及配套能力；`AGENTS.md`、`config.yml`、`skills/`、`workflows/` 位于项目根，原件、知识与治理位于 `aiotbot-knowledge-wifi-mp/`。知识根和能力目录不建立嵌套 `.git`；业务代码保留内部 Git／mm 与 manifest 已有的多仓布局。
 
 | 位置 | 职责 |
 |---|---|
-| `config.yml` | 代码、架构、领域实体、符号及六 Target/三 pair 的唯一映射；未提供的真实路径、构建、版本保持 unknown |
+| `config.yml` | 项目架构映射：代码根、模块相对路径、芯片、Host／Device、特性及用途；工具按路径核对文件与内容指纹 |
 | `install.ps1` / `install.sh` | 使用现有 Python 3.11／3.12 准备仓外独立运行依赖与能力包；内部 Agent 接入见使用说明 |
-| `main/` | 业务代码工作区；未接入真实代码时不创建虚构源码树 |
+| `main/` | 默认业务代码工作区，可含多个实际 Git 仓；未接入真实代码时不创建虚构源码树 |
 | `aiotbot-knowledge-wifi-mp/` | 唯一领域根；原件、契约、知识及本地运行支撑按其 AGENTS 分层 |
 | `skills/common/knowledge/` | 节点 Skill 及其脚本、参考、产物模板与测试 |
 | `workflows/common/knowledge/` | `hs-knowledge-ingest` 串起生产与本地入库；只编排节点能力，日常调用见使用说明 |
@@ -25,7 +25,7 @@
 | 独立检查 | `hs-knowledge-lint`；只检查并报告，修订交回 ingest |
 | 查看进度 | `hs-knowledge-source-scan` 的 `status`；读取实际停点、待确认及材料缺口 |
 
-已有上下文直接调用；缺少知识库或代码入口信息时，才在业务命令前使用 `hs-workspace-explore`。真实项目保留自身代码目录，按 `config.yml` 定位，不要求另建 `main/`；未知仓库身份、Target、宏与构建仍保持 unknown。
+已有上下文直接调用；缺少知识库或代码入口信息时，才在业务命令前使用 `hs-workspace-explore`。`code_root` 相对项目根，模块 `path` 相对代码根；可覆盖多仓或共享模块，不要求手填六 Target／三 pair 或重复代码根授权。固定脚本按拉取好的文件工作，不探测 Git 元数据，不执行 Git、mm 或 manifest 命令；Agent 可按公司约定只读实际状态输出并保留原文与出处，公司视图与版本管理继续由既有系统负责。源码依据以确切文件和内容指纹留存，版本只采用已提供材料，未知就保持 unknown，不阻断当前文件的静态核验；模块标签不证明实际宏、构建或产品适用。
 
 原件只读，稿件保留在知识库 `.build/`，正式卡、导航、来源登记和处理记录由 ingest 统一落位。卡片未写全细节时继续回源，回答区分背景、历史依据、当前代码事实和推断。内容批本地入库、索引及目标查询通过后 ingest 结束；Git 提交、固定 CI 和合入由人后续处理。
 

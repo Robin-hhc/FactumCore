@@ -292,7 +292,24 @@ class PublicCodeGateTests(unittest.TestCase):
             "fixture",
         )
         self.head = self.git("rev-parse", "HEAD").decode().strip()
-        config = yaml.safe_load(domain.parents[1].joinpath("config.yml").read_bytes())
+        base = yaml.safe_load(domain.parents[1].joinpath("config.yml").read_bytes())
+        # These tests intentionally retain the legacy contract. The production
+        # entry no longer asks users to maintain six Target declarations.
+        config = {
+            "schema_version": "2.0", "workspace_id": base["workspace_id"],
+            "knowledge_roots": base["knowledge_roots"],
+            "repos": [], "architecture": [{"binding_id": "wifi-main", "repo_id": "wifi-code",
+                "module_root": ".", "knowledge_domain": "wifi", "override_nested": False}],
+            "wiki_entities": {}, "symbol_aliases": {},
+            "targets": [{"target_id": chip + "-" + side, "chip": chip, "side": side,
+                "source_bindings": [], "module_roots": [], "build_profile": None,
+                "required_features": [], "protocol_versions": []}
+                for chip in ("chip12", "chip08", "chip07c") for side in ("host", "device")],
+            "pairs": [{"pairing_id": chip + "-host-device", "host_target": chip + "-host",
+                "device_target": chip + "-device", "compatibility_policy": "unknown"}
+                for chip in ("chip12", "chip08", "chip07c")],
+            "query": {"default_channel": "local", "allowed_channels": ["local", "shared"]},
+        }
         config["repos"] = [
             {
                 "repo_id": "wifi-code",

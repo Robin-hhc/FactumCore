@@ -77,7 +77,7 @@ def authorized_repo(context, repo_id, receipt=None):
     if not context.args.catalog:
         raise NodeError(
             "CODE_AUTHORIZATION_REQUIRED",
-            "Installed code policy is required",
+            "Installed workspace catalog is required",
             blocked=True,
         )
     catalog = read_json(context.args.catalog)
@@ -92,6 +92,14 @@ def authorized_repo(context, repo_id, receipt=None):
     config_bytes = config_path.read_bytes()
     config = load_yaml(config_bytes)
     context.modules["validation"].validate_shape("workspace", config, context.rules)
+    config = context.modules["validation"].normalize_workspace(config, context.root.parent)
+    mapped = config.get("mapping_kind") == "modules"
+    if mapped:
+        registration = catalog.get("workspaces", {}).get(config["workspace_id"])
+        if (not registration or Path(registration.get("config", "")).resolve() != config_path.resolve()
+                or registration.get("rules_digest") != context.rules["rules_digest"]):
+            raise NodeError("CODE_AUTHORIZATION_REQUIRED", "Catalog must register this exact workspace config", blocked=True)
+        policy = config["code_policy"]
     if safe(
         context.root.parent, config["knowledge_roots"]["wifi"]
     ).resolve() != context.root or any(
@@ -204,6 +212,9 @@ def read_code(root, relative):
 
 def metadata(root, registered, relative, receipt=None):
     kind = registered["kind"]
+    if registered.get("evidence_basis") == "filesystem":
+        return {"kind": "export", "revision": None, "checked_file_dirty": None,
+                "evidence_basis": "filesystem"}, None
     if kind == "export":
         current = root
         for part in [None, *PurePosixPath(relative).parent.parts]:
@@ -268,9 +279,11 @@ def metadata(root, registered, relative, receipt=None):
 
 def current_code_hash(context, resource):
     try:
-        root, registered, _, _, config_digest = authorized_repo(
+        root, registered, config, _, config_digest = authorized_repo(
             context, resource["repo_id"]
         )
+        if not context.modules["validation"].workspace_file_allowed(config, resource["repo_id"], resource["path"]):
+            return None
         before = metadata(root, registered, resource["path"])
         raw, _ = read_code(root, resource["path"])
         after = metadata(root, registered, resource["path"])
@@ -311,14 +324,7 @@ def capture_code(context):
         context, repo_id, receipt
     )
     safe(root, relative)
-    if not any(
-        binding["repo_id"] == repo_id
-        and (
-            binding["module_root"] == "."
-            or relative.startswith(binding["module_root"].rstrip("/") + "/")
-        )
-        for binding in config["architecture"]
-    ):
+    if not context.modules["validation"].workspace_file_allowed(config, repo_id, relative):
         raise NodeError(
             "CODE_MODULE_UNKNOWN",
             "Selected code is outside registered architecture modules",
@@ -329,13 +335,16 @@ def capture_code(context):
     code_identity = {
         **before,
         "repo_id": repo_id,
+        **({"workspace_path": registered["workspace_path"]} if registered.get("workspace_path") else {}),
         "dirty_scope": "selected_file",
         "checked_file_dirty": (raw != committed) if before["revision"] else None,
     }
     limitations = [
         "not_semantically_verified: actual code bytes are frozen; Target/build/macros require separate positive gate evidence"
     ]
-    if before["kind"] == "export":
+    if before.get("evidence_basis") == "filesystem":
+        limitations.append("Version is unknown unless explicitly provided; current source checks use exact file bytes")
+    elif before["kind"] == "export":
         limitations.append(
             "No Git revision exists for this export; version remains explicitly unknown"
         )

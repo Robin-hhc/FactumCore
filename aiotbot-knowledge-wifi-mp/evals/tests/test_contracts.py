@@ -229,12 +229,28 @@ def test_record_kind_requires_its_actual_payload(rules, kind):
 
 
 def test_six_targets_and_three_pairs_have_consistent_identities(rules):
-    config = v.load_yaml(DOMAIN.parent / "config.yml")
+    def legacy_configuration():
+        normalized = v.normalize_workspace(v.load_yaml(DOMAIN.parent / "config.yml"), DOMAIN.parent)
+        # This test deliberately exercises the old public registration format.
+        # The shipped module mapping is validated in test_workspace_mapping.py.
+        fields = ("schema_version", "workspace_id", "knowledge_roots", "repos", "architecture",
+                  "wiki_entities", "symbol_aliases", "targets", "pairs", "query")
+        return {field: normalized[field] for field in fields}
+
+    config = legacy_configuration()
     v.validate_shape("workspace", config, rules)
     config["targets"] = [config["targets"][0]] * 6
     with pytest.raises(v.ContractError, match="TARGET_ID_SET_INVALID"):
         v.validate_shape("workspace", config, rules)
-    config = v.load_yaml(DOMAIN.parent / "config.yml")
+    config = legacy_configuration()
+    config["targets"][0]["chip"] = "chip08"
+    with pytest.raises(v.ContractError, match="TARGET_IDENTITY_MISMATCH"):
+        v.validate_shape("workspace", config, rules)
+    config = legacy_configuration()
+    config["pairs"] = [config["pairs"][0]] * 3
+    with pytest.raises(v.ContractError, match="PAIR_ID_SET_INVALID"):
+        v.validate_shape("workspace", config, rules)
+    config = legacy_configuration()
     config["pairs"][0]["device_target"] = "chip08-device"
     with pytest.raises(v.ContractError, match="PAIR_TARGET_MISMATCH"):
         v.validate_shape("workspace", config, rules)

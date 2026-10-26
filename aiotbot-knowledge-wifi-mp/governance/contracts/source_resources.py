@@ -116,6 +116,8 @@ def _recover_git(knowledge_root, recovery):
     mapped = config.get("knowledge_roots", {}).get("wifi")
     if not isinstance(mapped, str) or (workspace / mapped).resolve() != root:
         raise ContractError("RECOVERY_CONFIG_MISMATCH", "Configured domain does not match this knowledge root")
+    if "code_root" in config or "modules" in config:
+        raise ContractError("RECOVERY_CONFIG_MISMATCH", "Filesystem workspaces recover retained evidence objects without Git")
     if any(key in recovery for key in ("repo_root", "repository_root", "workspace_root")):
         raise ContractError("UNTRUSTED_RECOVERY_ROOT", "Repository roots come only from config")
     commit = recovery.get("commit", recovery.get("revision"))
@@ -176,6 +178,9 @@ def git_recovery_for_current(knowledge_root, source_path, expected_bytes):
 
     root = Path(knowledge_root).resolve()
     if not (root.parent / "config.yml").is_file():
+        return None
+    configuration = load_yaml(root.parent / "config.yml")
+    if isinstance(configuration, dict) and "code_root" in configuration:
         return None
     try:
         commit = _git_read(root.parent, "rev-parse", "--verify", "HEAD").decode().strip()
@@ -261,7 +266,7 @@ def validate_code_references(card, lock, checkout, rules):
     from pathlib import Path
     import re
     import subprocess
-    from .validation import validate_shape
+    from .validation import normalize_workspace, validate_shape, workspace_file_allowed
     if not isinstance(checkout, dict) or not checkout.get("configuration") or not checkout.get("repos"):
         raise ContractError("CODE_INPUT_UNAVAILABLE", "Fixed checkout and exact configuration are required")
     configuration = Path(checkout["configuration"])
@@ -272,13 +277,15 @@ def validate_code_references(card, lock, checkout, rules):
         raise ContractError("CODE_CONFIGURATION_MISMATCH", "Fixed configuration fingerprint differs")
     config = load_yaml(data)
     validate_shape("workspace", config, rules)
+    config = normalize_workspace(config, configuration.parent)
     registered = {item["repo_id"]: item for item in config["repos"]}
     targets = {item["target_id"]: item for item in config["targets"]}
     for context in card["metadata"]["scope"]["contexts"]:
         target_id = context.get("target_id")
         if target_id:
             target = targets.get(target_id)
-            if not target or any(context.get(key) and context[key] != target.get(key) for key in ("chip", "side", "build_profile", "pairing_id")):
+            fields = ("chip", "side") if config.get("mapping_kind") == "modules" else ("chip", "side", "build_profile", "pairing_id")
+            if not target or any(context.get(key) and context[key] != target.get(key) for key in fields):
                 raise ContractError("CODE_TARGET_MISMATCH", "Target/build reference differs from configuration")
     resources = {item["source_id"]: item for item in lock["resources"]}
     refs = [ref for ref in card["metadata"]["sources"] if resources.get(ref["source_id"], {}).get("kind") == "code"]
@@ -300,6 +307,20 @@ def validate_code_references(card, lock, checkout, rules):
             declared = configuration.parent / declared
         if not root.is_absolute() or root.resolve() != declared.resolve():
             raise ContractError("CODE_REPOSITORY_MISMATCH", "Checkout differs from the sole configured repository mapping")
+        if config.get("mapping_kind") == "modules":
+            target_ids = [context.get("target_id") for context in card["metadata"]["scope"]["contexts"]] or [None]
+            if not any(workspace_file_allowed(config, repo_id, relative, target_id) for target_id in target_ids):
+                raise ContractError("CODE_PATH_MISMATCH", "Code reference is outside the configured module/Target range", relative)
+            raw = safe_path(root, relative).read_bytes()
+            snapshot = validate_source_ref(ref, lock)
+            if sha256_bytes(raw) != snapshot["sha256"] or len(raw) != snapshot["bytes"]:
+                raise ContractError("CODE_FINGERPRINT_MISMATCH", "Current fixed code differs; return to local ingest")
+            if job_repo.get("files") and job_repo["files"].get(relative) != sha256_bytes(raw):
+                raise ContractError("CODE_FINGERPRINT_MISMATCH", "Job file fingerprint differs from actual source")
+            validate_reference(ref, lock, lambda snapshot: raw)
+            verified.append({"repo_id": repo_id, "path": relative, "commit": None,
+                             "sha256": snapshot["sha256"], "evidence_basis": "filesystem"})
+            continue
         safe_path(root, relative)
         commit = job_repo.get("commit")
         if not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", commit or ""):
@@ -346,6 +367,55 @@ def _fixed_code_git(root, arguments):
     return result.stdout
 
 
+def _validate_mapped_current_identity(identity, configuration, config, rules, read):
+    """Recheck automatic repository facts using the same relative module map."""
+    from pathlib import Path
+    from .validation import workspace_file_allowed
+
+    domain = Path(rules["knowledge_root"])
+    if configuration.resolve() != (domain.parent / "config.yml").resolve():
+        raise ContractError("CODE_CONFIGURATION_CHANGED", "Module configuration is outside the registered knowledge workspace")
+    source_basis = identity.get("basis") == "source"
+    target, build_files = identity.get("target"), identity["build_files"]
+    declared = None
+    if target is not None:
+        matches = [item for item in config["targets"] if item["target_id"] == target.get("target_id")]
+        if len(matches) != 1:
+            raise ContractError("CODE_TARGET_CHANGED", "Accepted Target is outside the configured modules")
+        declared = matches[0]
+        if any(target.get(field) != declared[field] for field in ("target_id", "chip", "side")):
+            raise ContractError("CODE_TARGET_CHANGED", "Accepted Target differs from configured module labels")
+    if not source_basis and (
+        declared is None or not isinstance(target.get("features"), list)
+        or not isinstance(target.get("protocol_versions"), list)
+    ):
+        raise ContractError("CODE_TARGET_UNAVAILABLE", "Actual Target context is incomplete")
+    for relative, expected in build_files.items():
+        if sha256_bytes(read(safe_path(domain, relative, ["logs/evidence"]))) != expected:
+            raise ContractError("CODE_BUILD_CHANGED", "Accepted build artifact bytes changed", relative)
+    registered = {item["repo_id"]: item for item in config["repos"]}
+    for repo_id, item in identity["repos"].items():
+        mapping = registered.get(repo_id)
+        if not mapping or item.get("kind") != mapping["kind"] or item.get("workspace_path") != mapping["workspace_path"]:
+            raise ContractError("CODE_REPOSITORY_CHANGED", "Accepted repository differs from the relative module mapping")
+        root = (configuration.parent / mapping["root"]).resolve()
+        kind = mapping["kind"]
+        files = item.get("files")
+        if not isinstance(files, dict) or not files:
+            raise ContractError("CODE_IDENTITY_UNAVAILABLE", "Accepted relevant file manifest is missing")
+        if kind != "export" or mapping.get("evidence_basis") != "filesystem" or item.get("evidence_basis") != "filesystem":
+            raise ContractError("CODE_IDENTITY_UNAVAILABLE", "Module evidence requires its exact filesystem scope")
+        if item.get("head") is not None or item.get("checked_files_dirty") is not None or item.get("identity") is not None:
+            raise ContractError("CODE_IDENTITY_UNAVAILABLE", "Filesystem evidence cannot establish Git or clean-state facts")
+        for relative, expected in files.items():
+            if not workspace_file_allowed(config, repo_id, relative, target.get("target_id") if target else None):
+                raise ContractError("CODE_TARGET_CHANGED", "Accepted file is outside the configured module/Target range", relative)
+            current = read(safe_path(root, relative))
+            if sha256_bytes(current) != expected:
+                raise ContractError("CODE_BYTES_CHANGED", "Current relevant code bytes differ", relative)
+    return identity
+
+
 def validate_current_code_identity(identity, config_path, config_digest, rules, policy):
     """Recheck an accepted code identity against current protected inputs.
 
@@ -356,7 +426,7 @@ def validate_current_code_identity(identity, config_path, config_digest, rules, 
     import os
     from pathlib import Path
     import re
-    from .validation import validate_shape
+    from .validation import normalize_workspace, validate_shape
 
     def known(value):
         return value is not None and value not in ("", "unknown", "unavailable")
@@ -391,6 +461,9 @@ def validate_current_code_identity(identity, config_path, config_digest, rules, 
         raise ContractError("CODE_CONFIGURATION_CHANGED", "Current configuration differs from accepted context")
     config = load_yaml(raw)
     validate_shape("workspace", config, rules)
+    config = normalize_workspace(config, configuration.parent)
+    if config.get("mapping_kind") == "modules":
+        return _validate_mapped_current_identity(identity, configuration, config, rules, read)
     if not isinstance(policy, dict) or not policy or config.get("code_policy") != policy:
         raise ContractError("CODE_POLICY_UNAVAILABLE", "Protected code policy must equal the configuration declaration")
     declared = None

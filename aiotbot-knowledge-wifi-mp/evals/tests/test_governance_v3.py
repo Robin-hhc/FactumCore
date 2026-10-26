@@ -198,7 +198,10 @@ def test_current_code_check_projects_claim_sources_and_keeps_current_version_str
     git("add", "source.c")
     git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "current")
     commit = git("rev-parse", "HEAD")
-    config = yaml.safe_load((DOMAIN.parent / "config.yml").read_bytes())
+    normalized = v.normalize_workspace(yaml.safe_load((DOMAIN.parent / "config.yml").read_bytes()), DOMAIN.parent)
+    legacy_fields = ("schema_version", "workspace_id", "knowledge_roots", "repos", "architecture",
+                     "wiki_entities", "symbol_aliases", "targets", "pairs", "query")
+    config = {field: normalized[field] for field in legacy_fields}
     config["repos"] = [{"repo_id": "fixture", "kind": "git", "root": str(code), "expected_identity": "fixture-origin"}]
     configuration = tmp_path / "config.yml"
     configuration.write_bytes(yaml.safe_dump(config).encode())

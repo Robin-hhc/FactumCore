@@ -1,5 +1,10 @@
 # Shared publication receipt
 
+This optional shared-channel contract follows human publication of the knowledge
+repository. Its Git checks concern published knowledge assets, not discovery or
+management of business code repositories. Local ingest/query with `code_root` /
+`modules` uses file/hash evidence and does not require these publishing inputs.
+
 New shared builds use a trusted signed publication payload containing
 `rules_digest`, exact `knowledge_commit`, `card_digests` and
 `acceptance_records: {"logs/ingest/<batch>.yaml": "<sha256>"}`. The adapter's

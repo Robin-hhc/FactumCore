@@ -29,6 +29,8 @@ flowchart TB
 
 新环境包含 `venv/`、合并生成的 `requirements.runtime.lock.txt`、`capabilities/` 和成功后才写入的 `installation.json`。venv 使用 `--copies`，满足现有 catalog 对解释器不为链接的检查。默认以源目录身份、时间和随机后缀生成新目录；显式指定已有目录立即拒绝。失败保留本次目录用于排错，不生成成功清单，不覆盖旧环境。
 
+项目采用[多仓模块映射](workspace-mapping.md)时，安装器登记工作区和规则位置；执行时按 `code_root`／`modules` 读取实际代码文件并固定内容指纹。人工配置只维护相对路径和模块归属，不要求额外安装或执行仓管理工具，也不要求两份绝对代码根授权。
+
 Python 3.11 没有 `Path.is_junction()`；相关目录检查统一使用兼容的 reparse 属性判断，避免静默跳过 Windows 目录联接。来源抽取依赖版本变化会改变 extractor 身份和快照标识，按新版本重新捕获，不重写历史快照。
 
 ## 版本选择与验证
@@ -59,7 +61,7 @@ CFFI 2.1 修复过删除指针／buffer 切片时的崩溃；本项目仅由 cry
 
 ## 实际验证
 
-2026-10-26 按最终源码验证，摘要见[安装与回归记录](records/runtime-installation-20261026.json)。
+以下记录安装脚本首次上库版本 `43ad226` 的验证事实，摘要见[安装与回归记录](records/runtime-installation-20261026.json)。后续多仓配置适配的验证单独记入[工作区映射](workspace-mapping.md)，不将本节旧成绩视为新接口已通过。
 
 | 验证范围 | 结果 |
 |---|---|

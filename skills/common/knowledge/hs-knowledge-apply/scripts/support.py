@@ -9,7 +9,6 @@ import importlib.util
 import importlib.abc
 import importlib.metadata
 import json
-import math
 import os
 import pathlib
 import platform
@@ -17,7 +16,6 @@ import re
 import stat
 import sys
 import tempfile
-import time
 
 
 class Invalid(ValueError):
@@ -373,70 +371,6 @@ def checked_view(ctx, request):
         if not (view.get("review_mode") == "record_only" and view.get("batch_kind") == "record_only" and view.get("ingest_record_ref")):
             raise Invalid("empty final view")
     return view
-
-
-def authenticated_event(ctx, display, event, allow_elapsed=False):
-    adapter_id = event.get("adapter_id")
-    trust = ctx.catalog.get("review_trust", {}).get("adapters", {}).get(adapter_id)
-    if not trust:
-        raise Blocked("awaiting authenticated human adapter")
-    if trust.get("synthetic"):
-        fixture = trust.get("fixture_root")
-        marker = ctx.root / ".isolated-knowledge-fixture"
-        if (
-            not fixture
-            or pathlib.Path(fixture).resolve() != ctx.root
-            or not marker.is_file()
-            or marker.read_text(encoding="utf-8").strip()
-            != "AIOTBOT_SYNTHETIC_FIXTURE_V2"
-        ):
-            raise Blocked("synthetic adapter requires explicitly isolated fixture root")
-    payload = event.get("payload")
-    if (
-        not isinstance(payload, dict)
-        or event.get("record_kind") != "host_event"
-        or event.get("schema_version") != "2.0"
-    ):
-        raise Invalid("invalid authenticated host event")
-    try:
-        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-
-        key = Ed25519PublicKey.from_public_bytes(
-            base64.b64decode(trust["public_key_b64"], validate=True)
-        )
-        key.verify(
-            base64.b64decode(event["signature_b64"], validate=True), canonical(payload)
-        )
-    except Exception as exc:
-        raise Invalid("host event signature invalid") from exc
-    expected = {
-        "display_digest": display["digest"],
-        "view_digest": display["view_digest"],
-        "challenge": display["challenge"],
-    }
-    if any(payload.get(key) != value for key, value in expected.items()):
-        raise Invalid("host event exact-view binding mismatch")
-    if (
-        payload.get("actor_type") != "human"
-        or not isinstance(payload.get("actor_id"), str)
-        or not payload["actor_id"].strip()
-    ):
-        raise Blocked("event does not attest a real human actor")
-    if payload.get("decision") not in ("approve", "reject"):
-        raise Blocked("human decision absent")
-    now = time.time()
-    issued = payload.get("issued_at")
-    if (
-        not isinstance(issued, (int, float))
-        or isinstance(issued, bool)
-        or not math.isfinite(issued)
-        or issued < display["created_at"] - 1
-        or issued > now + 60
-        or issued > display["expires_at"]
-        or (not allow_elapsed and now > display["expires_at"])
-    ):
-        raise Blocked("human event expired or predates display")
-    return "synthetic_host" if trust.get("synthetic") else "authenticated_host"
 
 
 def load_context(args, package_root):

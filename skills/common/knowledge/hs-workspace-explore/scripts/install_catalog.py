@@ -27,8 +27,6 @@ SKILLS = ("hs-workspace-explore",) + tuple(
         "view-materialize",
         "governance-handoff",
         "candidate-inspect",
-        "confirmation-prepare",
-        "confirmation-record",
         "local-check",
         "candidate-revise",
         "apply",
@@ -412,7 +410,7 @@ def install(source_root, destination, python_path, workspace_config=None):
                 "schema_version": "2.0",
                 "files": manifest,
                 "limitations": [
-                    "Installation is not host registration or authenticated user approval.",
+                    "Installation is not host registration or Workflow runtime acceptance.",
                     "OS access control and full OpenFlow runtime acceptance are external checks.",
                 ],
             },

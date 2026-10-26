@@ -1,4 +1,4 @@
-"""Revision creates a new capture, plan and exact view; old approvals are never reused."""
+"""Revision creates a new capture, plan and exact view for independent review."""
 
 from support import NodeError
 
@@ -16,7 +16,7 @@ def execute(context):
     ):
         raise NodeError(
             "REVISION_REASON_REQUIRED",
-            "Explicit return/partial-acceptance reason required",
+            "Explicit user correction or reviewer return reason required",
         )
     v3 = request.get("v3_required") or previous.get("v3_required")
     if v3:
@@ -56,7 +56,7 @@ def execute(context):
             "revision_reason": request["revision_reason"],
             "view_ref": materialized["data"]["view_ref"],
             "view_digest": materialized["data"]["view_digest"],
-            "confirmation_required": True,
+            "content_review_required": True,
         },
         "operation_status",
     )
@@ -64,7 +64,7 @@ def execute(context):
     return {
         **materialized["data"],
         "revision_ref": ref,
-        "confirmation_required": True,
+        "content_review_required": True,
     }, "ready"
 
 

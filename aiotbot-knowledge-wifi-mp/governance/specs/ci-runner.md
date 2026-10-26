@@ -9,9 +9,9 @@ FACTUM_PYTHON=<job-selected absolute Python>
 <trusted K>/check.sh --trusted-root <trusted K> --candidate-root <candidate K> --rules-digest <job-pinned SHA> --commit <candidate commit> --input <job-input.json> --output <new external report.json>
 ```
 
-全部路径须为绝对路径；报告在两个输入树外。job-input 的 `inputs.source_objects` 显式映射 snapshot ID 到确切原版路径；结构化源定位还需固定提取器的确切字节结果。代码卡另外需要真实固定 `code_checkout` 和映射；未知不当成已接入。候选目录中的程序、私人 `.build`、确认事件、安装 catalog 和活动索引不参与检查。
+全部路径须为绝对路径；报告在两个输入树外。job-input 的 `inputs.source_objects` 显式映射 snapshot ID 到确切原版路径；结构化源定位还需固定提取器的确切字节结果。代码卡另外需要真实固定 `code_checkout` 和映射；未知不当成已接入。候选目录中的程序、私人 `.build`、执行记录、安装 catalog 和活动索引不参与检查。
 
-固定脚本只生成临时索引及报告，退出 0/1/2；不执行 Agent、真人确认、修改或入库。作业负责固定 candidate checkout 与声明的 commit 一致，并记录确切原文、业务 checkout 和映射的版本。此仓当前未部署远端 CI 受保护配置；本契约与 fixture 证明接口行为，不代表保护规则已启用。规则变更作为被测对象走独立回归，不能批准同批知识。
+固定脚本只生成临时索引及报告，退出 0/1/2；不执行 Agent、修改或入库。作业负责固定 candidate checkout 与声明的 commit 一致，并记录确切原文、业务 checkout 和映射的版本。此仓当前未部署远端 CI 受保护配置；本契约与 fixture 证明接口行为，不代表保护规则已启用。规则变更作为被测对象走独立回归，不能批准同批知识。
 
 旧处理记录按实际采用的正文版本核对，不用更新后的当前卡替换旧卡。检查先使用完整候选视图；需要旧版时，固定脚本只读候选仓同一知识根的 Git 正文对象。历史不完整、对象不可得或搜索范围未完整执行时返回未完成。也可由作业明确提供确切的 Markdown 对象。以下输入准备示例以项目根 `repo/` 为当前目录，将仓外相对布局解析为接口所需的实际绝对路径：
 

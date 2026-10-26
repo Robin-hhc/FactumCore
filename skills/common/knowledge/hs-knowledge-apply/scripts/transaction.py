@@ -12,7 +12,6 @@ from support import (
     Invalid,
     WriterLock,
     atomic_bytes,
-    authenticated_event,
     canonical,
     checked_view,
     digest,
@@ -138,44 +137,25 @@ def validate_proof(
         or proof.get("view_digest") != view["digest"]
     ):
         raise Invalid("proof is not bound to this exact final view")
-    if proof.get("record_kind") == "confirmation_review":
-        if view.get("review_mode") == "record_only":
-            from transaction_v3 import record_input
-            if view.get("writes") or view.get("deletes") or proof.get("batch_kind") != "record_only":
-                raise Invalid("record-only proof cannot authorize content writes")
-            record, _ = record_input(ctx, {"operation_id": view["operation_id"], "ingest_record_ref": proof.get("ingest_record_ref")}, view)
-            if proof.get("ingest_record_digest") != record["digest"]:
-                raise Invalid("record-only proof binds another processing record")
-            return proof
-        refs = proof.get("proof_refs", {})
-        if view.get("review_mode") != "mixed" or set(refs) != {"manual_document", "code_gate"}:
-            raise Invalid("mixed views require both applicable proof kinds")
-        for mode, ref in refs.items():
-            validate_proof(ctx, {**request, "proof_ref": ref}, {**view, "review_mode": mode}, purpose, allow_merge, card_path)
+    if view.get("review_mode") == "record_only":
+        from transaction_v3 import record_input
+        if (proof.get("record_kind") != "admission_record" or view.get("writes")
+                or view.get("deletes") or proof.get("batch_kind") != "record_only"):
+            raise Invalid("record-only proof cannot authorize content writes")
+        record, _ = record_input(ctx, {"operation_id": view["operation_id"],
+                                      "ingest_record_ref": proof.get("ingest_record_ref")}, view)
+        if proof.get("ingest_record_digest") != record["digest"]:
+            raise Invalid("record-only proof binds another processing record")
         return proof
     if view.get("review_mode") == "manual_document":
-        if (
-            proof.get("record_kind") != "manual_review"
-            or proof.get("status") != "approved"
-        ):
-            raise Blocked("document view requires explicit real-human approval")
-        ctx.path(
-            proof.get("display_ref"), (f".build/operations/{view['operation_id']}",)
-        )
-        display = ctx.read(proof.get("display_ref"))
-        if (
-            display.get("digest") != proof.get("display_digest")
-            or display.get("view_digest") != view["digest"]
-            or display.get("writes") != view.get("writes")
-            or display.get("deletes") != view.get("deletes")
-        ):
-            raise Invalid("manual proof display binding mismatch")
-        authenticated_event(
-            ctx, display, proof.get("host_event", {}), allow_elapsed=True
-        )
-        if proof["host_event"]["payload"]["decision"] != "approve":
-            raise Blocked("human rejected this view")
-    elif view.get("review_mode") == "code_gate":
+        from transaction_v3 import validate_content_review
+        validate_content_review(ctx, view, proof)
+    elif view.get("review_mode") in {"code_gate", "mixed"}:
+        if view["review_mode"] == "mixed":
+            from transaction_v3 import validate_content_review
+            if not request.get("content_review_ref"):
+                raise Blocked("mixed views require independent content review of the complete view")
+            validate_content_review(ctx, view, ctx.read(request["content_review_ref"]))
         if (
             proof.get("record_kind")
             not in (("local_check", "merge_check") if allow_merge else ("local_check",))
@@ -234,7 +214,7 @@ def validate_final_cards(ctx, view):
             (view["review_mode"] != "mixed" and card["metadata"]["review_mode"] != view["review_mode"])
             or card["metadata"]["lifecycle"] not in ("stable", "deprecated")
         ):
-            raise Invalid("final card review mode/lifecycle mismatches approved view")
+            raise Invalid("final card review mode/lifecycle mismatches reviewed view")
     for card in cards.values():
         knowledge.validate_card(card, cards, rules)
     knowledge.validate_relations(cards)
@@ -262,16 +242,12 @@ def baseline(view):
 
 def fixture_fault_allowed(ctx):
     marker = ctx.root / ".isolated-knowledge-fixture"
-    adapters = ctx.catalog.get("review_trust", {}).get("adapters", {}).values()
+    fixture_root = ctx.catalog.get("test_fixture_root")
     return (
         marker.is_file()
         and marker.read_text(encoding="utf-8").strip() == "AIOTBOT_SYNTHETIC_FIXTURE_V2"
-        and any(
-            spec.get("synthetic")
-            and spec.get("fixture_root")
-            and pathlib.Path(spec["fixture_root"]).resolve() == ctx.root
-            for spec in adapters
-        )
+        and isinstance(fixture_root, str)
+        and pathlib.Path(fixture_root).resolve() == ctx.root
     )
 
 
@@ -305,9 +281,19 @@ def validate_journal(ctx, journal, op, purpose="current", card_path=None):
         "operation_id": op,
         "view_ref": journal.get("view_ref"),
         "proof_ref": journal.get("proof_ref"),
+        "content_review_ref": journal.get("content_review_ref"),
     }
     view = checked_view(ctx, request)
     proof = validate_proof(ctx, request, view, purpose=purpose, card_path=card_path)
+    needs_review = view.get("review_mode") in {"manual_document", "mixed"} or view.get("v3_required") or view.get("semantic_plan_ref")
+    if needs_review and not journal.get("content_review_ref"):
+        raise Blocked("transaction journal is missing its complete-view content review")
+    if journal.get("content_review_ref"):
+        from transaction_v3 import validate_content_review
+        review = ctx.read(journal["content_review_ref"])
+        validate_content_review(ctx, view, review)
+        if review["digest"] != journal.get("content_review_digest"):
+            raise Invalid("journal independent content review changed")
     if view["digest"] != journal.get("view_digest") or proof["digest"] != journal.get(
         "proof_digest"
     ):
@@ -316,7 +302,8 @@ def validate_journal(ctx, journal, op, purpose="current", card_path=None):
     rows = view["writes"] + view.get("deletes", [])
     if journal.get("ingest_record_ref"):
         from transaction_v3 import record_input
-        original, entry = record_input(ctx, {"operation_id": op, "ingest_record_ref": journal["ingest_record_ref"]}, view, proof)
+        original, entry = record_input(ctx, {"operation_id": op, "ingest_record_ref": journal["ingest_record_ref"],
+                                             "content_review_ref": journal.get("content_review_ref")}, view, proof)
         if original["digest"] != journal.get("ingest_record_digest"):
             raise Invalid("journal processing-record input changed")
         rows = rows + [entry]
@@ -426,15 +413,12 @@ def execute(ctx, request, action="run"):
     if action == "run" and not request.get("view_ref") and request.get("ingest_record_ref"):
         from transaction_v3 import record_only_view
         request = record_only_view(ctx, request)
-    if action == "run" and request.get("proof_set"):
+    if action == "run" and "proof_set" in request:
+        raise Invalid("proof_set is obsolete; use the code proof_ref and full-view content_review_ref")
+    if action == "run" and not request.get("proof_ref") and request.get("content_review_ref"):
         view = checked_view(ctx, request)
-        if view.get("review_mode") != "mixed" or set(request["proof_set"]) != {"manual_document", "code_gate"}:
-            raise Invalid("proof_set is only for a mixed exact view")
-        proof = ctx.record("confirmation_review", op, status="passed", view_digest=view["digest"],
-                           proof_refs=request["proof_set"], verification_tier="combined_applicable_proofs")
-        proof_ref = f".build/operations/{op}/proof-set-{proof['digest']}.json"
-        ctx.save(proof_ref, proof)
-        request = {**request, "proof_ref": proof_ref}
+        if view.get("review_mode") == "manual_document":
+            request = {**request, "proof_ref": request["content_review_ref"]}
     if action == "verify-result":
         purpose = request.get("purpose", "current")
         if purpose not in ("current", "historical"):
@@ -474,6 +458,7 @@ def execute(ctx, request, action="run"):
                     "operation_id": op,
                     "view_ref": journal["view_ref"],
                     "proof_ref": current_proof_ref,
+                    "content_review_ref": journal.get("content_review_ref"),
                 },
                 view,
                 purpose="current",
@@ -681,6 +666,7 @@ def execute(ctx, request, action="run"):
                 "operation_id": op,
                 "view_ref": journal["view_ref"],
                 "proof_ref": journal["proof_ref"],
+                "content_review_ref": journal.get("content_review_ref"),
             }
             view = checked_view(ctx, request)
             proof = validate_proof(ctx, request, view)
@@ -694,16 +680,25 @@ def execute(ctx, request, action="run"):
         if journal:
             raise Blocked("interrupted operation requires explicit resume or rollback")
         view = checked_view(ctx, request)
+        if view.get("review_mode") == "manual_document" and not request.get("content_review_ref"):
+            request = {**request, "content_review_ref": request.get("proof_ref")}
         proof = validate_proof(ctx, request, view)
+        content_review = None
+        if request.get("content_review_ref"):
+            from transaction_v3 import validate_content_review
+            content_review = ctx.read(request["content_review_ref"])
+            validate_content_review(ctx, view, content_review)
         if view.get("baseline_digest", baseline(view)) != baseline(view):
             raise Invalid("complete write-set baseline digest mismatch")
         validate_final_cards(ctx, view)
         rows = view["writes"] + view.get("deletes", [])
         ingest_record = None
-        if request.get("v3_required") or view.get("v3_required") or request.get("ingest_record_ref"):
-            from transaction_v3 import check_admission, record_input
-            if view.get("review_mode") != "record_only":
-                check_admission(ctx, request, view)
+        if view.get("review_mode") != "record_only":
+            from transaction_v3 import check_admission
+            check_admission(ctx, request, view)
+        if (request.get("v3_required") or view.get("v3_required") or request.get("ingest_record_ref")
+                or view.get("semantic_plan_ref") or view.get("semantic_plan_digest")):
+            from transaction_v3 import record_input
             ingest_record, entry = record_input(ctx, request, view, proof)
             rows = rows + [entry]
         for row in rows:
@@ -755,9 +750,10 @@ def execute(ctx, request, action="run"):
             proof_digest=proof["digest"],
             verification_tier=proof.get("verification_tier", "code_gate"),
             entries=entries,
+            **({"content_review_ref": request["content_review_ref"],
+                "content_review_digest": content_review["digest"]} if content_review else {}),
             **({"ingest_record_ref": request["ingest_record_ref"], "ingest_record_digest": ingest_record["digest"],
-                "batch_kind": ingest_record["batch_kind"], "lint_report_ref": request.get("lint_report_ref"),
-                "content_review_ref": request.get("content_review_ref")} if ingest_record else {}),
+                "batch_kind": ingest_record["batch_kind"], "lint_report_ref": request.get("lint_report_ref")} if ingest_record else {}),
         )
         save_journal(ctx, journal)
         return mutate(ctx, journal, fault)

@@ -1,0 +1,194 @@
+{
+  "schema_version": "2.0",
+  "verification_tier": "isolated_synthetic_mechanisms",
+  "groups": [
+    {
+      "group": "hs-knowledge-apply",
+      "exit_code": 0,
+      "seconds": 33.031,
+      "tests": 39,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-candidate-inspect",
+      "exit_code": 0,
+      "seconds": 106.14,
+      "tests": 13,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-candidate-revise",
+      "exit_code": 0,
+      "seconds": 19.297,
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-change-plan",
+      "exit_code": 0,
+      "seconds": 300.234,
+      "tests": 31,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-governance-handoff",
+      "exit_code": 0,
+      "seconds": 13.469,
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-index-build",
+      "exit_code": 0,
+      "seconds": 130.515,
+      "tests": 29,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-lint",
+      "exit_code": 0,
+      "seconds": 0.422,
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-local-check",
+      "exit_code": 0,
+      "seconds": 104.391,
+      "tests": 51,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-maintain",
+      "exit_code": 0,
+      "seconds": 14.735,
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-merge-check",
+      "exit_code": 0,
+      "seconds": 0.344,
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-publish-handoff",
+      "exit_code": 0,
+      "seconds": 0.296,
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-query",
+      "exit_code": 0,
+      "seconds": 53.672,
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-query-regression",
+      "exit_code": 0,
+      "seconds": 1.578,
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-recover",
+      "exit_code": 0,
+      "seconds": 0.344,
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-source-capture",
+      "exit_code": 0,
+      "seconds": 68.672,
+      "tests": 59,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-source-scan",
+      "exit_code": 0,
+      "seconds": 97.594,
+      "tests": 70,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-knowledge-view-materialize",
+      "exit_code": 0,
+      "seconds": 21.203,
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "group": "hs-workspace-explore",
+      "exit_code": 0,
+      "seconds": 8.984,
+      "tests": 41,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1
+    },
+    {
+      "group": "domain-and-integration",
+      "exit_code": 0,
+      "tests": 136,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "evidence": ".scratch/nhdomain-final.xml"
+    }
+  ],
+  "passed": true,
+  "totals": {
+    "tests": 510,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 1
+  },
+  "source_runs": {
+    "packages": ".scratch/nhfull3/summary.json",
+    "domain": ".scratch/nhdomain-final.xml"
+  },
+  "assembly_note": "All 18 package groups passed in nhfull3. The domain group was rerun after isolating two new test imports; runtime source remained unchanged.",
+  "limitations": [
+    "No implicit host triggering or review-context isolation acceptance",
+    "No real six Target or CI/publication/ACL acceptance",
+    "No restricted gold accessed"
+  ]
+}

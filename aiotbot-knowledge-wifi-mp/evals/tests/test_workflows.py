@@ -75,23 +75,18 @@ def test_ingest_is_one_complete_workflow_without_project_binding_or_lint_templat
     assert ingest["entry_node"] == "scan_sources"
     assert "bind_project" not in nodes and "governance_handoff" not in nodes
     assert not (ROOT / "workflows/common/knowledge/hs-knowledge-lint/workflow.yaml").exists()
-    gate = nodes["final_view_user_gate"]
-    assert (gate["type"], gate["owner"]) == ("gate", "user")
-    assert gate["on_pass"] == "record_confirmation"
-    assert gate["on_fail"] == "revise_candidate"
-    assert "skill" not in gate
+    assert not any(node["type"] == "gate" for node in nodes.values())
+    assert not {"prepare_confirmation", "final_view_user_gate", "record_confirmation"} & nodes.keys()
+    assert nodes["review_content"]["owner"] == "reviewer"
     assert "verify_merge" not in nodes and "maintain_knowledge" not in nodes
     assert nodes["lint_view"]["skill"] == "hs-knowledge-lint"
     assert nodes["record_ingest"]["skill"] == "hs-knowledge-source-scan"
     assert {e["id"]: e["target"] for e in nodes["record_ingest"]["exits"]}["recorded"] == "apply_view"
-    manual_nodes = (
-        "prepare_confirmation",
-        "final_view_user_gate",
-        "record_confirmation",
-    )
-    assert not any(
-        nodes[name].get("skill") == "hs-knowledge-local-check" for name in manual_nodes
-    )
+    routes = {edge["id"]: edge["target"] for edge in nodes["inspect_candidate"]["exits"]}
+    assert routes["manual_ready"] == "lint_view"
+    assert routes["mixed_ready"] == routes["code_ready"] == "local_check"
+    assert "content_review_ref" in nodes["apply_view"]["prompt"]
+    assert "proof_set" not in nodes["apply_view"]["prompt"]
 
 
 def test_ingest_finishes_locally_without_repository_submission():
@@ -129,7 +124,7 @@ def test_ingest_finishes_locally_without_repository_submission():
     ).is_file()
 
 
-def test_public_mixed_candidate_routes_to_explicit_human_confirmation(tmp_path):
+def test_public_mixed_candidate_routes_to_code_check_without_human_confirmation(tmp_path):
     fixture_path = ROOT / "skills/common/knowledge/hs-knowledge-source-scan/tests/conftest.py"
     spec = importlib.util.spec_from_file_location("workflow_mixed_public_fixture", fixture_path)
     fixture = importlib.util.module_from_spec(spec)
@@ -147,7 +142,7 @@ def test_public_mixed_candidate_routes_to_explicit_human_confirmation(tmp_path):
     assert inspected["phase"] == "mixed_ready"
     workflow = yaml.safe_load((ROOT / "workflows/common/knowledge/hs-knowledge-ingest/workflow.yaml").read_bytes())
     node = next(item for item in workflow["nodes"] if item["id"] == "inspect_candidate")
-    assert {edge["id"]: edge["target"] for edge in node["exits"]}.get(inspected["phase"]) == "prepare_confirmation"
+    assert {edge["id"]: edge["target"] for edge in node["exits"]}.get(inspected["phase"]) == "local_check"
 
 
 def test_design_validation_checks_package_contracts_and_owners(tmp_path):
@@ -164,11 +159,9 @@ def test_design_validation_checks_package_contracts_and_owners(tmp_path):
     assert module.validate(source) == []  # a standard default path is legal
     workflow = source / "workflows/common/knowledge/hs-knowledge-ingest/workflow.yaml"
     document = yaml.safe_load(workflow.read_bytes())
-    next(n for n in document["nodes"] if n["id"] == "final_view_user_gate")["owner"] = (
-        "coder"
-    )
+    next(n for n in document["nodes"] if n["id"] == "review_content")["owner"] = "coder"
     workflow.write_text(yaml.safe_dump(document), encoding="utf-8")
-    assert any("user gate" in error.lower() for error in module.validate(source))
+    assert any("review_content: wrong Skill/owner/type" in error for error in module.validate(source))
 
 
 def test_missing_reference_or_wrong_artifact_exit_is_rejected(tmp_path):
@@ -220,7 +213,7 @@ def test_real_pinned_openflow_loader(tmp_path):
     assert installed.returncode == 0, installed.stderr
     result = validator_module().validate_openflow(Path(upstream), destination)
     assert result["workflow_ids"] == ["hs-knowledge-ingest"]
-    assert result["skill_count"] == 20
-    assert result["contract_count"] == 24
+    assert result["skill_count"] == 18
+    assert result["contract_count"] == 22
 
 

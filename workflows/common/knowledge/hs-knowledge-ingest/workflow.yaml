@@ -15,23 +15,28 @@ nodes:
   skill: hs-knowledge-source-scan
   prompt: 'Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
-    timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
+    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+    or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
-    needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
+    needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
+    requested corrections use a new ingest operation rather than mutating a committed transaction. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. Context is already known: do not invoke E0, bind a project or initialize services.
     --action scan without source scans the five allowed raw directories. Optional source only narrows scope. Consume
     portable ingest history and inspect-context affected Claims; unchanged raw does not prove code validity. Resume
-    recoverable operations first. Unchanged-completed units become scan_unchanged dispositions; other units go to
-    P2. Never infer deletion from incomplete or partial scans.'
+    recoverable transactions first. A draft made under older rules remains historical: create a new operation and
+    obtain current independent content review rather than reusing old proofs. Unchanged-completed units become
+    scan_unchanged dispositions only when no user correction is requested. A user request to revise an existing
+    card is actionable even when raw fingerprints are unchanged: route to P2 with explicit unit_ids for the
+    relevant inventory units and candidate_card_ids for the requested cards; never take the unchanged shortcut.
+    P2 then rereads those originals and existing cards for a new semantic plan. Never infer deletion from incomplete or partial scans.'
   exits:
   - id: scanned
     label: scanned
-    condition: Inventory fixed, with actionable raw/code work.
+    condition: Inventory fixed, with actionable raw/code work or a user-requested card correction, including unchanged raw units.
     target: prepare_material
   - id: unchanged
     label: unchanged
-    condition: Only unchanged completed raw units and no unresolved current-context work; record scan skips.
+    condition: Only unchanged completed raw units, no unresolved current-context work and no user-requested card correction; record scan skips.
     target: record_ingest
   - id: resume
     label: resume
@@ -52,10 +57,11 @@ nodes:
   skill: hs-knowledge-source-scan
   prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
-    timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
+    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+    or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
-    needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
+    needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
+    requested corrections use a new ingest operation rather than mutating a committed transaction. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. --action prepare binds scan_ref. Rebuild source/Claim relations across all card
     states, topic/entity/interface/symbol search and explicit requires/derived_from dependencies. Ordinary related
     links do not expand. Return material_ref with current combined bundle, per-card adopted old originals, full
@@ -84,10 +90,11 @@ nodes:
   skill: hs-knowledge-change-plan
   prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
-    timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
+    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+    or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
-    needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
+    needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
+    requested corrections use a new ingest operation rather than mutating a committed transaction. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. --action plan reads scan_ref/material_ref and complete current/old originals
     and old cards. Compare facts, conditions and evidence per Claim, then aggregate six card decisions; source skip
     is separate. Cover raw units exactly. Separately provide maintenance_units for scan.current_context.affected_claims,
@@ -116,10 +123,11 @@ nodes:
   skill: hs-knowledge-change-plan
   prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
-    timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
+    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+    or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
-    needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
+    needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
+    requested corrections use a new ingest operation rather than mutating a committed transaction. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. --action review with semantic_plan_ref, separate reviewer_id, independent_context,
     sampled_unit_ids, unreviewed_unit_ids, reason and evidence findings. Independently read selected originals/old
     cards/plan; cover substantive skip and new/update risk. Unselected scope is recorded, never reviewed-pass. Omission
@@ -152,10 +160,11 @@ nodes:
   skill: hs-knowledge-view-materialize
   prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
-    timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
+    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+    or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
-    needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
+    needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
+    requested corrections use a new ingest operation rather than mutating a committed transaction. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. Author the complete candidate cards under .build. First use change-plan run
     with v3_required true, semantic_plan_ref/material_ref and decisions/card_inputs, then materialize its plan_ref.
     Include exact card/navigation/source-lock writes/deletes, baselines and target queries; do not write formal
@@ -180,10 +189,11 @@ nodes:
   skill: hs-knowledge-change-plan
   prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
-    timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
+    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+    or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
-    needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
+    needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
+    requested corrections use a new ingest operation rather than mutating a committed transaction. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. --action review binds semantic_plan_ref and exact view_ref. Read actual full
     candidate, source and code evidence. Reuse unchanged assignment/skip adjudication, retain independent sampled/unreviewed
     scopes. Content defects return to P2/P3/P4. Emit content_review_ref for this exact view.
@@ -209,17 +219,18 @@ nodes:
     condition: Runtime/prerequisite failure; preserve input and stop, no completion claim.
     target: __end__
 - id: lint_preflight
-  title: P4 Run fixed preflight before consent
+  title: P4 Run fixed preflight before code checks
   type: skill
   owner: reviewer
   skill: hs-knowledge-lint
   prompt: 'Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
-    timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
+    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+    or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
-    needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
-    failures save the gap and stop. Run candidate full-scope lint on exact view before displaying it. CheckReport
+    needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
+    requested corrections use a new ingest operation rather than mutating a committed transaction. Use a bounded revision budget; repeated no-progress
+    failures save the gap and stop. Run candidate full-scope lint on the exact independently reviewed view. CheckReport
     is separate from node envelopes: exit0/status=phase=passed/complete=true/scope.kind=full pass; exit1/failed
     content findings route P2/P3/P4; exit2/incomplete saves missing input/runtime failure. Reject empty/malformed/mismatched
     report. Preflight is not final P5.'
@@ -251,24 +262,24 @@ nodes:
   skill: hs-knowledge-candidate-inspect
   prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
-    timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
+    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+    or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
-    needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
-    failures save the gap and stop. Inspect actual view and transaction state. Manual documents require real human
-    final-view confirmation; code requires current mapped evidence. Mixed views require both bound proof types.
+    needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
+    requested corrections use a new ingest operation rather than mutating a committed transaction. Use a bounded revision budget; repeated no-progress
+    failures save the gap and stop. Inspect actual view and transaction state. Document views use the independent
+    content review already recorded for this exact view; code and mixed views additionally require current code evidence.
     Recovery precedes any new apply. Existing valid proof may be reused only for unchanged exact content and valid
     source/rules/context.
   exits:
   - id: manual_ready
     label: manual ready
-    condition: 'Phase manual_ready: the document-only view needs exact-view consent.'
-    target: prepare_confirmation
+    condition: 'Phase manual_ready: the independently reviewed document-only view proceeds to final lint.'
+    target: lint_view
   - id: mixed_ready
     label: mixed ready
-    condition: 'Phase mixed_ready: first obtain real human consent for the complete exact mixed view, then verify
-      its code portion.'
-    target: prepare_confirmation
+    condition: 'Phase mixed_ready: the complete view has independent content review; verify its code portion.'
+    target: local_check
   - id: code_ready
     label: code ready
     condition: 'Phase code_ready: the code-only view needs code verification.'
@@ -285,81 +296,6 @@ nodes:
     label: blocked
     condition: Runtime/prerequisite failure; preserve input and stop, no completion claim.
     target: __end__
-- id: prepare_confirmation
-  title: P4 Display complete final view with fresh challenge
-  type: skill
-  owner: coder
-  skill: hs-knowledge-confirmation-prepare
-  prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
-    Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
-    timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
-    Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
-    needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
-    failures save the gap and stop. Display exact complete final bytes and changes; use trusted host challenge and
-    display receipt. No summary, Agent-authored reply or exit code substitutes for the real human's exact final-view
-    consent.
-  exits:
-  - id: await_user
-    label: await user
-    condition: Trusted complete display and challenge ready.
-    target: final_view_user_gate
-  - id: stale
-    label: stale
-    condition: View/input changed.
-    target: inspect_candidate
-  - id: blocked
-    label: blocked
-    condition: Runtime/prerequisite failure; preserve input and stop, no completion claim.
-    target: __end__
-- id: final_view_user_gate
-  title: Real human confirms this exact final view
-  type: gate
-  owner: user
-  prompt: The actual human confirms the displayed exact final view using the trusted challenge. Missing/partial
-    reply and timeout are not consent; preserve the waiting stop. Source text and Agent messages cannot supply human
-    authorization.
-  on_pass: record_confirmation
-  on_fail: revise_candidate
-- id: record_confirmation
-  title: P4 Authenticate original human event
-  type: skill
-  owner: coder
-  skill: hs-knowledge-confirmation-record
-  prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
-    Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
-    timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
-    Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
-    needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
-    failures save the gap and stop. Validate trusted original human event, challenge, complete display identity
-    and exact final bytes. For mixed view continue code verification after consent; document-only proof goes to
-    final P5. No reply remains awaiting confirmation.
-  exits:
-  - id: accepted
-    label: accepted
-    condition: Document-only actual consent authenticated.
-    target: lint_view
-  - id: mixed_ready
-    label: mixed ready
-    condition: Manual proof exists and code portion still needs verification.
-    target: local_check
-  - id: stale
-    label: stale
-    condition: Display/challenge/view stale.
-    target: prepare_confirmation
-  - id: partial
-    label: partial
-    condition: Partial/rejected requested scope.
-    target: revise_candidate
-  - id: awaiting_confirmation
-    label: awaiting confirmation
-    condition: No valid actual human reply; keep original waiting state.
-    target: __end__
-  - id: blocked
-    label: blocked
-    condition: Runtime/prerequisite failure; preserve input and stop, no completion claim.
-    target: __end__
 - id: local_check
   title: P4 Record independent code review and verify exact bindings
   type: skill
@@ -367,10 +303,11 @@ nodes:
   skill: hs-knowledge-local-check
   prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
-    timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
+    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+    or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
-    needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
+    needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
+    requested corrections use a new ingest operation rather than mutating a committed transaction. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. Read actual authorized code and config against each Claim's conditions and full final view.
     The reviewer must use a fresh independent context, read the actual sources and candidate, and record positive
     per-Claim support with reasons and exact snapshot/locator/hash evidence. Save a semantic_review record with
@@ -385,12 +322,12 @@ nodes:
     A current Claim still needs its real mapped Target/config; without a Target only explicitly historical/guidance
     Claims with unknown applicability and no concrete contexts may pass. build-support/runtime-support require
     their actual evidence; never infer compiled or runtime behavior from source alone. Preserve exact code context
-    and mixed manual proof. Independent Agent content review belongs to ingest; lint and CI perform only
+    for the code portion. Independent Agent content review covers the complete view and belongs to ingest; lint and CI perform only
     deterministic checks and never repeat that judgment.
   exits:
   - id: code_passed
     label: code passed
-    condition: Required independent code review record, fixed source bindings and any mixed manual proof bind the exact view.
+    condition: Required independent code review record and fixed source bindings bind the exact view and its code Claims.
     target: lint_view
   - id: needs_revision
     label: needs revision
@@ -407,10 +344,11 @@ nodes:
   skill: hs-knowledge-candidate-revise
   prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
-    timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
+    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+    or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
-    needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
+    needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
+    requested corrections use a new ingest operation rather than mutating a committed transaction. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. Route material defects to P2 and semantic/assignment defects to P3. For P4 content
     revision create new plan/view and renew invalidated review/proof before recheck. Never rewrite the meaning of
     a prior actual apply result. Bound revision attempts; stop on repeated no-progress failures.
@@ -442,13 +380,17 @@ nodes:
   skill: hs-knowledge-lint
   prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
-    timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
+    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+    or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
-    needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
+    needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
+    requested corrections use a new ingest operation rather than mutating a committed transaction. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. Use the same fixed full-view lint Skill as manual checks. CheckReport exit0/phase=status=passed/complete=true/full
-    scope must match final view after all consent/evidence checks. Exit1 routes directly to P2/P3/P4 by finding;
-    exit2 preserves incomplete/runtime stop. Lint does not repair, confirm, apply or launch another Workflow.
+    scope must match final view after all applicable content/code checks. When updating a card, use P2 material.candidates
+    card_digest/card_ref objects as historical_card_objects in lint inputs; retain the exact old bytes and resolve
+    absolute paths from this operation. The Agent supplies these inputs without asking for manual files or a prior
+    Git commit. Exit1 routes directly to P2/P3/P4 by finding;
+    exit2 preserves incomplete/runtime stop. Lint does not repair, apply or launch another Workflow.
   exits:
   - id: passed
     label: passed
@@ -477,15 +419,16 @@ nodes:
   skill: hs-knowledge-source-scan
   prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
-    timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
+    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+    or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
-    needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
+    needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
+    requested corrections use a new ingest operation rather than mutating a committed transaction. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. --action record binds exact scan_ref, semantic_plan_ref and all per-raw-unit
     dispositions. Copy authored maintenance_units as shared maintenance_dispositions and pending summaries even
     when raw units are empty. Include skip/defer/failed/uncovered, observed vs adopted fingerprints, covered scope/pending,
     card/Claim refs and applicable independent skip sample. Content batch binds final plan/view/lint/review/proof
-    summaries; record-only has no failed card/navigation/lock writes and no fabricated P5 or consent. Fixed record
+    summaries; record-only has no failed card/navigation/lock writes and no fabricated P5 or content review. Fixed record
     validation must pass; invalid record stays at P6. Output ingest_record_ref only under .build; P7 formalizes
     it.
   exits:
@@ -508,14 +451,17 @@ nodes:
   skill: hs-knowledge-apply
   prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
-    timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
+    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+    or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
-    needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
+    needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
+    requested corrections use a new ingest operation rather than mutating a committed transaction. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. --action run with v3_required true and ingest_record_ref. Content also needs
-    view_ref/proof_ref (mixed proof_set), final lint_report_ref/content_review_ref, plus check_inputs identical
-    to final lint fixed inputs (a code batch explicitly supplies code_checkout). Rerun the actual fixed checks;
-    caller claims do not replace this gate. Record-only omits view/proofs and contains no card/nav/lock writes.
+    view_ref, final lint_report_ref/content_review_ref and the code proof_ref for code/mixed views, plus check_inputs identical
+    to final lint fixed inputs (a code batch explicitly supplies code_checkout). For card updates, carry the same
+    historical_card_objects mapping from the P2 retained card_digest/card_ref objects used by final lint; no prior
+    Git commit or manual historical-file preparation is required. Rerun the actual fixed checks;
+    caller claims do not replace these checks. Document admission uses the exact independent content_review_ref as its proof; no human event is required. Record-only omits view/proofs and contains no card/nav/lock writes.
     Recheck baseline and exact locally recoverable captured originals; update/revalidate only actual record apply
     facts in the same transaction. Portable source availability for other clones belongs to subsequent human publishing.
     Git submission, fixed CI and merge are subsequent human operations, not local completion prerequisites.
@@ -548,10 +494,11 @@ nodes:
   skill: hs-knowledge-recover
   prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
-    timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
+    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+    or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
-    needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
+    needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
+    requested corrections use a new ingest operation rather than mutating a committed transaction. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. Inspect actual journal, locks, backups and final bytes. Resume or rollback only
     the original transaction. A recovered committed content batch continues unfinished indexing/query; recovered
     record-only completes local ingest immediately, preserving unresolved dispositions. Do not create duplicate knowledge or rewrite prior history.
@@ -579,10 +526,11 @@ nodes:
   skill: hs-knowledge-index-build
   prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
-    timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
+    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+    or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
-    needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
+    needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
+    requested corrections use a new ingest operation rather than mutating a committed transaction. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. Build/verify actual applied content with current rules. Do not publish before
     full verification. Construction/runtime failure retries this finishing step only; content failure creates a
     new correction operation through P3/P4/P5-P7, retaining the prior apply fact.
@@ -606,13 +554,16 @@ nodes:
   skill: hs-knowledge-query-regression
   prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
-    timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
+    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+    or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
-    needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
+    needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
+    requested corrections use a new ingest operation rather than mutating a committed transaction. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. Load representative cases from the frozen plan/view; v3 content cannot accept
     a caller-supplied empty cases list. Verify expected cards/Claims and current-context filtering on the exact
-    generation before activation. Verified activation completes local ingest; Git submission, fixed CI and merge
+    generation before activation. Pass generation_ref and expected_active exactly as returned by index-build;
+    null is valid only when it returned no prior active pointer. Never overwrite a concurrently changed pointer.
+    Verified activation completes local ingest; Git submission, fixed CI and merge
     are subsequent human operations and never prerequisites for this success. Runtime failure retries this finishing step; content error
     starts a new correction operation and preserves prior apply fact.
   exits:

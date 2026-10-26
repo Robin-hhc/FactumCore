@@ -25,9 +25,9 @@ def test_hard_exit_after_card_replace_preserves_journal_and_recovers_exact_view(
     target_ref = "knowledge/rules/crash-rule.md"
     bundle_ref, bundle = p.capture(operation, b"# Fixture\nCrash recovery is a synthetic rule.\n")
     view_ref = p.view(operation, bundle_ref, "crash-rule", p.card("crash-rule", bundle))
-    proof_ref, display = p.approve(operation, view_ref)
+    proof_ref, review = p.review(operation, view_ref)
     view = p.record(view_ref)
-    assert display["view_digest"] == view["digest"]
+    assert review["view_digest"] == view["digest"]
     expected = {row["path"]: base64.b64decode(row["bytes_b64"], validate=True) for row in view["writes"]}
     source_lock_before = (p.root / "governance/sources.lock.yaml").read_bytes()
     framework_lock_before = (p.root / "governance/framework.lock.yaml").read_bytes()

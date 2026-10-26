@@ -8,4 +8,4 @@
 
 证据保存在 `logs/evidence/<bundle_id>/` 的 manifest.json、objects/<digest>.bin 和 extractions/<id>/{text.txt,locators.json}。bundle_id 固定内容身份；manifest_digest 固定包含采集时间的确切清单。相同输入幂等复用首次完整证据。每个文本 locator 记录原字节与提取字符/行区间，原始 BOM/换行不因提取而改写。清理 .build 不得删唯一恢复证据。
 
-捕获不修改 `governance/sources.lock.yaml`、knowledge 或导航；它不证明来源语义正确。来源锁由明确 ChangeSet 经文档人工确认后事务落位。
+捕获不修改 `governance/sources.lock.yaml`、knowledge 或导航；它不证明来源语义正确。来源锁由明确 ChangeSet 经独立内容复核和固定检查后事务落位。

@@ -1,4 +1,4 @@
-"""Real node CLIs with an isolated raw/human fixture and real local Git objects."""
+"""Real node CLIs with an isolated raw/Agent-review fixture and real local Git objects."""
 
 import base64
 import importlib.util
@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import yaml
 
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 
@@ -37,7 +38,7 @@ def test_interrupted_other_operation_blocks_build_and_activate(tmp_path):
     view = p.view(
         "other-operation", bundle_ref, "another-rule", p.card("another-rule", bundle)
     )
-    proof, _ = p.approve("other-operation", view)
+    proof, _ = p.review("other-operation", view)
     p.call(
         "knowledge-apply",
         {
@@ -65,6 +66,8 @@ def test_interrupted_other_operation_blocks_build_and_activate(tmp_path):
 
 
 def test_shared_receipt_binds_actual_git_blobs_and_is_rechecked_by_query(tmp_path):
+    # This isolated test key signs publication receipts only.
+    publication_key = Ed25519PrivateKey.generate()
     p = applied_pipeline(tmp_path)
     workspace = p.root.parent
 
@@ -105,7 +108,7 @@ def test_shared_receipt_binds_actual_git_blobs_and_is_rechecked_by_query(tmp_pat
             "synthetic": True,
             "fixture_root": str(p.root),
             "public_key_b64": base64.b64encode(
-                p.key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+                publication_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
             ).decode(),
         }
     }
@@ -121,7 +124,7 @@ def test_shared_receipt_binds_actual_git_blobs_and_is_rechecked_by_query(tmp_pat
         "adapter_id": "fixture-publication",
         "payload": payload,
         "signature_b64": base64.b64encode(
-            p.key.sign(FIXTURE.canonical(payload))
+            publication_key.sign(FIXTURE.canonical(payload))
         ).decode(),
     }
     ref = p.write("logs/publication/fixture.json", FIXTURE.canonical(receipt))

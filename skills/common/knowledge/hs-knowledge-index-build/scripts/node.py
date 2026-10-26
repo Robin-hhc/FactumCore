@@ -154,7 +154,7 @@ def qualify(ctx, card, results, current_code_proof_ref=None):
             continue
     raise NodeError(
         "CARD_PROOF_MISSING",
-        "Stable content has no matching authenticated proof",
+        "Stable content has no matching verified admission record",
         path,
         blocked=True,
     )
@@ -442,7 +442,7 @@ def repository_acceptance(ctx, receipt, cards):
             raise NodeError("ACCEPTANCE_RECORD_REQUIRED", "Card has no exact accepted summary", card["path"])
         ref, record_sha, acceptance, row = sorted(matches, key=lambda item: item[0])[-1]
         mode = card["metadata"]["review_mode"]
-        expected_result = "retired" if card["metadata"].get("lifecycle") == "deprecated" else ("supported" if mode == "code_gate" else "approved")
+        expected_result = "retired" if card["metadata"].get("lifecycle") == "deprecated" else "supported"
         claim_ids = sorted(claim["id"] for claim in card["claims"])
         if (row.get("card_id") != card["metadata"]["id"] or row.get("review_mode") != mode
                 or sorted(row.get("claim_ids", [])) != claim_ids or row.get("review_result") != expected_result):

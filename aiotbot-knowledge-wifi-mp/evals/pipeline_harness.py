@@ -1,20 +1,16 @@
 """Isolated mechanism fixture using only installed-package public CLI boundaries.
 
-Keys are generated per fixture and never represent a real human/host approval.
+Independent review declarations are synthetic fixture data, not production semantic acceptance.
 """
 
-import base64
 import hashlib
 import json
 from pathlib import Path
 import shutil
 import subprocess
 import sys
-import time
 
 import yaml
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 
 REPO = Path(__file__).resolve().parents[2]
@@ -57,21 +53,8 @@ class Pipeline:
         self.rules = sha((self.root / "governance/framework.lock.yaml").read_bytes())
         self.root.joinpath(".isolated-knowledge-fixture").write_text("AIOTBOT_SYNTHETIC_FIXTURE_V2", encoding="utf-8")
         self.skills = REPO / "skills/common/knowledge"
-        self.key = Ed25519PrivateKey.generate()
         self.catalog = {
-            "schema_version": "2.0",
-            "skills": {},
-            "review_trust": {
-                "adapters": {
-                    "fixture": {
-                        "synthetic": True,
-                        "fixture_root": str(self.root),
-                        "public_key_b64": base64.b64encode(
-                            self.key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
-                        ).decode(),
-                    }
-                }
-            },
+            "schema_version": "2.0", "skills": {}, "test_fixture_root": str(self.root),
         }
         for package in self.skills.glob("hs-*"):
             if (package / "scripts/cli.py").is_file():
@@ -170,35 +153,23 @@ class Pipeline:
         )
         return materialized["data"]["view_ref"]
 
-    def approve(self, op, view_ref):
-        prepared = self.call("knowledge-confirmation-prepare", {"operation_id": op, "view_ref": view_ref})
-        display_ref = prepared["data"]["display_ref"]
-        display = self.record(display_ref)
-        self.call("knowledge-confirmation-record", {"operation_id": op, "display_ref": display_ref}, expected=3)
-        payload = {
-            "actor_type": "human",
-            "actor_id": "fixture-human",
-            "decision": "approve",
-            "display_digest": display["digest"],
-            "view_digest": display["view_digest"],
-            "challenge": display["challenge"],
-            "issued_at": time.time(),
+    def review(self, op, view_ref):
+        view = self.record(view_ref)
+        review = {
+            "schema_version": "2.0", "record_kind": "content_review", "operation_id": op,
+            "rules_digest": self.rules, "tool_identity": view["tool_identity"],
+            "status": "passed", "view_digest": view["digest"],
+            "plan_ref": view["plan_ref"], "plan_digest": view["plan_digest"],
+            "author_id": "fixture-author", "reviewer_id": "fixture-independent-reader",
+            "independent_context": "fresh-fixture-context", "findings": [],
+            "verification_tier": "declared_independent_content_review",
         }
-        event = {
-            "schema_version": "2.0",
-            "record_kind": "host_event",
-            "adapter_id": "fixture",
-            "payload": payload,
-            "signature_b64": base64.b64encode(self.key.sign(canonical(payload))).decode(),
-        }
-        event_ref = self.write(f".build/operations/{op}/host-event.json", canonical(event))
-        reviewed = self.call(
-            "knowledge-confirmation-record",
-            {"operation_id": op, "display_ref": display_ref, "host_event_ref": event_ref},
-        )
-        return reviewed["data"]["manual_review_ref"], display
+        review["digest"] = sha(canonical(review))
+        ref = self.write(f".build/operations/{op}/content-review.json", canonical(review))
+        return ref, review
 
     def apply(self, op, view_ref):
-        proof, display = self.approve(op, view_ref)
-        applied = self.call("knowledge-apply", {"operation_id": op, "view_ref": view_ref, "proof_ref": proof})
-        return applied["data"]["apply_result_ref"], display
+        proof, review = self.review(op, view_ref)
+        applied = self.call("knowledge-apply", {"operation_id": op, "view_ref": view_ref,
+                                               "content_review_ref": proof})
+        return applied["data"]["apply_result_ref"], review

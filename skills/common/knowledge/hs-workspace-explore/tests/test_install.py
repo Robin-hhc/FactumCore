@@ -20,8 +20,6 @@ IDS = ["hs-workspace-explore"] + [
         "view-materialize",
         "governance-handoff",
         "candidate-inspect",
-        "confirmation-prepare",
-        "confirmation-record",
         "local-check",
         "candidate-revise",
         "apply",
@@ -48,6 +46,34 @@ def test_catalog_declares_logical_commands_and_only_one_ingest_workflow(tmp_path
     assert catalog["commands"]["lint"]["target"] == "hs-knowledge-lint"
     assert "hs-knowledge-source-scan" in catalog["skills"]
     assert [p.name for p in (destination / "config/workflow-templates").iterdir()] == ["hs-knowledge-ingest"]
+
+
+def test_current_catalog_omits_human_confirmation_capabilities():
+    installer = runpy.run_path(str(SCRIPT))
+    assert len(installer["SKILLS"]) == 18
+    assert "hs-knowledge-confirmation-prepare" not in installer["SKILLS"]
+    assert "hs-knowledge-confirmation-record" not in installer["SKILLS"]
+
+
+def test_current_workflow_reviews_then_lints_without_human_gate():
+    repository = SCRIPT.resolve().parents[5]
+    package = repository / "workflows/common/knowledge/hs-knowledge-ingest"
+    workflow = yaml.safe_load((package / "workflow.yaml").read_bytes())
+    layout = yaml.safe_load((package / "layouts.yaml").read_bytes())
+    nodes = {node["id"]: node for node in workflow["nodes"]}
+    assert not any(node["type"] == "gate" for node in nodes.values())
+    assert not {"prepare_confirmation", "final_view_user_gate", "record_confirmation"} & nodes.keys()
+    assert set(layout["canvas"]["nodes"]) == set(nodes)
+    routes = {row["id"]: row["target"] for row in nodes["inspect_candidate"]["exits"]}
+    assert routes["manual_ready"] == "lint_view"
+    assert routes["mixed_ready"] == routes["code_ready"] == "local_check"
+    assert nodes["review_content"]["owner"] == "reviewer"
+    assert nodes["review_content"]["skill"] == "hs-knowledge-change-plan"
+    assert "content_review_ref" in nodes["apply_view"]["prompt"]
+    assert "proof_set" not in nodes["apply_view"]["prompt"]
+    for node in nodes.values():
+        for route in node.get("exits", []):
+            assert route["target"] == "__end__" or route["target"] in nodes
 
 
 def test_installer_validates_additional_native_artifact_contracts(tmp_path):

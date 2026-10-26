@@ -1,10 +1,9 @@
-"""Transaction mechanism tests with authenticated synthetic fixture consent."""
+"""Transactions use independent content review without human confirmation."""
 
 import base64
 import pathlib
 import sys
 import tempfile
-import time
 import unittest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "scripts"))
@@ -12,30 +11,13 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "scripts"))
 
 class ApplyTests(unittest.TestCase):
     def fixture(self, root):
-        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-        from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
-        from support import Context, canonical, digest
+        from support import Context, digest
 
         ctx = Context.synthetic(root, "hs-knowledge-apply")
+        ctx.catalog = {"test_fixture_root": str(root.resolve())}
         root.joinpath(".isolated-knowledge-fixture").write_text(
             "AIOTBOT_SYNTHETIC_FIXTURE_V2", encoding="utf-8"
         )
-        key = Ed25519PrivateKey.generate()
-        ctx.catalog = {
-            "review_trust": {
-                "adapters": {
-                    "fixture": {
-                        "synthetic": True,
-                        "fixture_root": str(root),
-                        "public_key_b64": base64.b64encode(
-                            key.public_key().public_bytes(
-                                Encoding.Raw, PublicFormat.Raw
-                            )
-                        ).decode(),
-                    }
-                }
-            }
-        }
         (root / "knowledge").mkdir()
         (root / "knowledge/update.md").write_bytes(b"old")
         (root / "knowledge/delete.md").write_bytes(b"delete")
@@ -67,49 +49,17 @@ class ApplyTests(unittest.TestCase):
             source_refs=[],
         )
         ctx.save(".build/operations/op/view.json", view)
-        display = ctx.record(
-            "confirmation_display",
-            "op",
-            view_ref=".build/operations/op/view.json",
-            view_digest=view["digest"],
-            writes=writes,
-            deletes=view["deletes"],
-            challenge="challenge",
-            created_at=time.time() - 1,
-            expires_at=time.time() + 100,
-        )
-        ctx.save(".build/operations/op/display.json", display)
-        payload = {
-            "actor_type": "human",
-            "actor_id": "fixture-human",
-            "decision": "approve",
-            "display_digest": display["digest"],
-            "view_digest": view["digest"],
-            "challenge": display["challenge"],
-            "issued_at": time.time(),
-        }
-        event = {
-            "schema_version": "2.0",
-            "record_kind": "host_event",
-            "adapter_id": "fixture",
-            "payload": payload,
-            "signature_b64": base64.b64encode(key.sign(canonical(payload))).decode(),
-        }
         proof = ctx.record(
-            "manual_review",
-            "op",
-            status="approved",
-            view_digest=view["digest"],
-            display_ref=".build/operations/op/display.json",
-            display_digest=display["digest"],
-            host_event=event,
-            verification_tier="synthetic_host",
+            "content_review", "op", status="passed", view_digest=view["digest"],
+            author_id="fixture-author", reviewer_id="fixture-reviewer",
+            independent_context=True, findings=[], verification_tier="independent_agent_review",
         )
-        ctx.save("logs/operations/op/manual-review.json", proof)
+        ctx.save(".build/operations/op/content-review.json", proof)
         request = {
             "operation_id": "op",
             "view_ref": ".build/operations/op/view.json",
-            "proof_ref": "logs/operations/op/manual-review.json",
+            "proof_ref": ".build/operations/op/content-review.json",
+            "content_review_ref": ".build/operations/op/content-review.json",
         }
         return ctx, request
 
@@ -181,18 +131,120 @@ class ApplyTests(unittest.TestCase):
                     execute(ctx, {"operation_id": "op"}, action)
             self.assertEqual(ctx.path("knowledge/create.md").read_bytes(), b"external")
 
-    def test_resealed_fake_consent_is_not_approval(self):
+    def test_document_admission_needs_no_human_adapter_or_event(self):
         from transaction import execute
-        from support import Invalid, canonical, seal
+        with tempfile.TemporaryDirectory() as tmp:
+            ctx, request = self.fixture(pathlib.Path(tmp))
+            request.pop("proof_ref")
+            result = execute(ctx, request)
+            self.assertEqual(result["transaction_status"], "committed")
+            self.assertNotIn("review_trust", ctx.catalog)
+            self.assertFalse(ctx.path("logs/host-events").exists())
 
+    def test_document_self_review_cannot_authorize_writes(self):
+        from transaction import execute
+        from support import Blocked, canonical, seal
         with tempfile.TemporaryDirectory() as tmp:
             ctx, request = self.fixture(pathlib.Path(tmp))
             proof = ctx.read(request["proof_ref"])
-            proof["host_event"]["payload"]["actor_id"] = "forged"
+            proof["reviewer_id"] = proof["author_id"]
+            ctx.path(request["proof_ref"]).write_bytes(canonical(seal(proof)))
+            with self.assertRaises(Blocked):
+                execute(ctx, request)
+            self.assertFalse(ctx.path("knowledge/create.md").exists())
+
+    def test_legacy_human_approval_cannot_replace_independent_review(self):
+        from transaction import execute
+        from support import Blocked, canonical, seal
+        with tempfile.TemporaryDirectory() as tmp:
+            ctx, request = self.fixture(pathlib.Path(tmp))
+            proof = ctx.read(request["proof_ref"])
+            proof.update(record_kind="manual_review", status="approved")
+            ctx.path(request["proof_ref"]).write_bytes(canonical(seal(proof)))
+            with self.assertRaises(Blocked):
+                execute(ctx, request)
+            self.assertFalse(ctx.path("knowledge/create.md").exists())
+
+    def test_changed_document_view_invalidates_review(self):
+        from transaction import execute
+        from support import Invalid, canonical, seal
+        with tempfile.TemporaryDirectory() as tmp:
+            ctx, request = self.fixture(pathlib.Path(tmp))
+            proof = ctx.read(request["proof_ref"])
+            proof["view_digest"] = "f" * 64
             ctx.path(request["proof_ref"]).write_bytes(canonical(seal(proof)))
             with self.assertRaises(Invalid):
-                execute(ctx, request, "run")
+                execute(ctx, request)
             self.assertFalse(ctx.path("knowledge/create.md").exists())
+
+    def test_removed_proof_set_is_rejected_even_when_empty(self):
+        from transaction import execute
+        from support import Invalid
+        with tempfile.TemporaryDirectory() as tmp:
+            ctx, request = self.fixture(pathlib.Path(tmp))
+            with self.assertRaises(Invalid):
+                execute(ctx, {**request, "proof_set": {}})
+            self.assertFalse(ctx.path("knowledge/create.md").exists())
+
+    def test_authored_plan_binding_cannot_be_disabled_by_omitting_v3_flag(self):
+        from transaction_v3 import validate_content_review
+        from support import Blocked, seal
+        with tempfile.TemporaryDirectory() as tmp:
+            ctx, request = self.fixture(pathlib.Path(tmp))
+            view = ctx.read(request["view_ref"])
+            plan = ctx.record("semantic_plan", "op", author_id="fixture-author", scan_digest="a" * 64,
+                              card_actions=[{"author_id": "second-author"}])
+            ctx.save(".build/operations/op/semantic-plan.json", plan)
+            view = seal({**view, "semantic_plan_ref": ".build/operations/op/semantic-plan.json",
+                         "semantic_plan_digest": plan["digest"]})
+            review = ctx.record("content_review", "op", status="passed", view_digest=view["digest"],
+                                author_id="fixture-author", reviewer_id="second-author",
+                                independent_context="separate", findings=[], plan_digest=plan["digest"],
+                                semantic_plan_ref=view["semantic_plan_ref"], scan_digest=plan["scan_digest"])
+            with self.assertRaises(Blocked):
+                validate_content_review(ctx, view, review)
+
+    def mixed_fixture(self, root):
+        from support import canonical, seal
+        ctx, request = self.fixture(root)
+        view = seal({**ctx.read(request["view_ref"]), "review_mode": "mixed"})
+        ctx.path(request["view_ref"]).write_bytes(canonical(view))
+        review = seal({**ctx.read(request["content_review_ref"]), "view_digest": view["digest"]})
+        ctx.path(request["content_review_ref"]).write_bytes(canonical(review))
+        proof = ctx.record("local_check", "op", status="passed", mode="local", view_digest=view["digest"],
+                           claims=[{"status": "supported", "evidence": ["fixture-code"]}])
+        ctx.save("logs/operations/op/code-proof.json", proof)
+        return ctx, {**request, "proof_ref": "logs/operations/op/code-proof.json"}
+
+    def test_mixed_code_proof_cannot_replace_full_view_content_review_without_v3(self):
+        from transaction import execute
+        from support import Blocked
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as tmp:
+            ctx, request = self.mixed_fixture(pathlib.Path(tmp))
+            request.pop("content_review_ref")
+            with patch("transaction.invoke_checker", return_value={}), self.assertRaises(Blocked):
+                execute(ctx, request)
+            self.assertFalse(ctx.path("knowledge/create.md").exists())
+
+    def test_mixed_review_digest_is_persisted_and_rechecked_during_recovery(self):
+        from transaction import execute
+        from support import Blocked, Invalid, canonical, seal
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as tmp:
+            ctx, request = self.mixed_fixture(pathlib.Path(tmp))
+            with patch("transaction.invoke_checker", return_value={}):
+                with self.assertRaises(Blocked):
+                    execute(ctx, {**request, "fault_after": 1})
+                journal = ctx.read("logs/operations/op/journal.json")
+                self.assertEqual(journal["content_review_ref"], request["content_review_ref"])
+                review = ctx.read(request["content_review_ref"])
+                self.assertEqual(journal["content_review_digest"], review["digest"])
+                review["reason"] = "changed after interruption"
+                ctx.path(request["content_review_ref"]).write_bytes(canonical(seal(review)))
+                with self.assertRaises(Invalid):
+                    execute(ctx, {"operation_id": "op"}, "resume")
+                self.assertEqual(ctx.path("knowledge/update.md").read_bytes(), b"old")
 
     def test_resealed_journal_cannot_authorize_raw_writes(self):
         from transaction import execute

@@ -1,4 +1,4 @@
-"""The shared record contract separates Agent review from human consent."""
+"""The shared record contract accepts Agent review and removes human events."""
 
 import copy
 import hashlib
@@ -53,12 +53,14 @@ def test_unsigned_agent_review_is_valid_in_the_canonical_contract(rules):
     validation.validate_shape("semantic_review", record, rules)
 
 
-def test_unsigned_human_event_is_still_rejected_by_the_canonical_contract(rules):
-    record = {"schema_version": "2.0", "record_kind": "host_event", "payload": {"actor_type": "human"}}
-    with pytest.raises(validation.ContractError, match="signature_b64"):
-        validation.validate_shape("host_event", record, rules)
-    # Shape acceptance does not verify a signature or authenticate a human.
-    validation.validate_shape("host_event", {**record, "signature_b64": "shape-only-fixture"}, rules)
+@pytest.mark.parametrize("kind", ["host_event", "confirmation_display", "manual_review"])
+@pytest.mark.parametrize("signed", [False, True])
+def test_removed_human_record_kinds_are_not_admission_contracts(rules, kind, signed):
+    record = {"schema_version": "2.0", "record_kind": kind, "payload": {"actor_type": "human"}}
+    if signed:
+        record["signature_b64"] = "obsolete-fixture"
+    with pytest.raises(validation.ContractError):
+        validation.validate_shape(kind, record, rules)
 
 
 @pytest.mark.parametrize("defect", ["author", "reason", "evidence"])

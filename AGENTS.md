@@ -18,7 +18,7 @@
 
 先阅读 WiFi [AGENTS.md](aiotbot-knowledge-wifi-mp/AGENTS.md) 与[文档入口](aiotbot-knowledge-wifi-mp/docs-llm-wiki/README.md)。架构设计说明目录和三条链路；详细设计先讲流程与判断，再按节点解释文件分工。实现任务、测试计划与实际验收放在 [SDD](aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v3/README.md)，修改实现前按相应需求、设计和任务核实。保留历史工件原字节，不把历史路径或成绩当作当前部署证明。
 
-只接受 `docs-raw/{conventions,chips,storys,specs,protocols}/` 内已落地原件；`sources/` 链接、网页及仓外映射暂不接入。纯文档由真实人确认确切最终视图后 stable，免代码实现核验；无回复、超时或 Agent 自报不是同意。代码卡本地通过后 stable，上库固定 CI 检查格式、索引及来源／代码引用的一致性，不修卡、锁、链接或源码。
+只接受 `docs-raw/{conventions,chips,storys,specs,protocols}/` 内已落地原件；`sources/` 链接、网页及仓外映射暂不接入。纯文档经独立 Agent 内容复核和完整固定检查后 stable，免代码实现核验。用户可在执行中退回或入库后要求修订。代码卡本地通过后 stable，上库固定 CI 检查格式、索引及来源／代码引用的一致性，不修卡、锁、链接或源码。
 
 日常任务按需使用以下能力：
 
@@ -27,7 +27,7 @@
 | 入库、增量更新、续办 | `hs-knowledge-ingest`；默认扫描五类原件，完成本地生产、检查、记录、入库和索引／目标查询 |
 | 查询背景与定位 | `hs-knowledge-query`；卡片提供背景、条件与索引，具体代码问题继续读取所问版本的实际源码，追查调用、宏条件和早退 |
 | 独立检查 | `hs-knowledge-lint`；只检查并报告，修订交回 ingest |
-| 查看进度 | `hs-knowledge-source-scan` 的 `status`；读取实际停点、待确认及材料缺口 |
+| 查看进度 | `hs-knowledge-source-scan` 的 `status`；读取实际停点、待修订及材料缺口 |
 
 已有上下文直接调用；缺少知识库或代码入口信息时，才在业务命令前使用 `hs-workspace-explore`。`code_root` 相对项目根，模块 `path` 相对代码根；可覆盖多目录或共享模块，不要求手填六 Target／三 pair 或重复代码根授权。源码依据以确切文件和内容指纹留存，可选版本材料须保留出处，未知就保持 unknown，不阻断当前文件的静态核验；模块标签不证明实际宏、构建或产品适用。
 

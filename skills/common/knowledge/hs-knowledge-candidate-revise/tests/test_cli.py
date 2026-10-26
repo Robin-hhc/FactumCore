@@ -49,7 +49,7 @@ def test_revision_rejects_reusing_old_operation(harness):
     assert result["diagnostics"][0]["code"] == "NEW_OPERATION_REQUIRED"
 
 
-def test_revision_produces_new_view_and_requires_fresh_confirmation(harness):
+def test_revision_produces_new_view_and_requires_fresh_content_review(harness):
     ref, bundle = harness.view()
     candidate = harness.write(
         ".build/candidates/revised.md", harness.card("revised", bundle)
@@ -71,7 +71,7 @@ def test_revision_produces_new_view_and_requires_fresh_confirmation(harness):
         },
     )
     assert (
-        result["phase"] == "ready" and result["data"]["confirmation_required"] is True
+        result["phase"] == "ready" and result["data"]["content_review_required"] is True
     )
     assert harness.record(result["data"]["view_ref"])["operation_id"] == "revision"
     assert result["data"]["view_ref"] != ref

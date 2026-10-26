@@ -6,7 +6,6 @@ import json
 import subprocess
 import shutil
 import sys
-import time
 
 import pytest
 import yaml
@@ -32,10 +31,7 @@ def pin_fixture(harness):
 
 
 @pytest.mark.parametrize("unrelated_nav_changes", [False, True, "historical_fallback", "local_only", "uncommitted_raw"])
-def test_current_ingest_plan_review_confirm_lint_record_apply_query_submit(harness, unrelated_nav_changes):
-    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-    from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
-
+def test_current_ingest_review_lint_record_apply_query_without_human_confirmation(harness, unrelated_nav_changes):
     def git(*args):
         return subprocess.run(["git", "-C", str(harness.base), *args], capture_output=True, check=True).stdout.decode().strip()
 
@@ -92,21 +88,7 @@ def test_current_ingest_plan_review_confirm_lint_record_apply_query_submit(harne
     review = harness.run("change-plan", {"operation_id": "op", "semantic_plan_ref": semantic, "view_ref": view_ref,
         "reviewer_id": "independent", "independent_context": "second-context", "sampled_unit_ids": [unit["unit_id"]],
         "unreviewed_unit_ids": [], "reason": "New rule needs full risk sample", "findings": []}, "review")["data"]["content_review_ref"]
-    key = Ed25519PrivateKey.generate()
-    catalog = json.loads(harness.catalog.read_bytes())
-    catalog["review_trust"] = {"adapters": {"fixture": {"synthetic": True, "fixture_root": str(harness.root),
-        "public_key_b64": base64.b64encode(key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)).decode()}}}
-    harness.catalog.write_bytes(canonical(catalog))
-    harness.write(".isolated-knowledge-fixture", b"AIOTBOT_SYNTHETIC_FIXTURE_V2")
-    prepared = harness.run("confirmation-prepare", {"operation_id": "op", "view_ref": view_ref})
-    display_ref = prepared["data"]["display_ref"]
-    display = harness.record(display_ref)
-    payload = {"actor_type": "human", "actor_id": "fixture-human", "decision": "approve", "display_digest": display["digest"],
-               "view_digest": display["view_digest"], "challenge": display["challenge"], "issued_at": time.time()}
-    event = {"schema_version": "2.0", "record_kind": "host_event", "adapter_id": "fixture", "payload": payload,
-             "signature_b64": base64.b64encode(key.sign(canonical(payload))).decode()}
-    event_ref = harness.write(".build/operations/op/event.json", canonical(event))
-    proof = harness.run("confirmation-record", {"operation_id": "op", "display_ref": display_ref, "host_event_ref": event_ref})["data"]["manual_review_ref"]
+    assert "review_trust" not in json.loads(harness.catalog.read_bytes())
     lint_ref = ".build/operations/op/final-lint.json"
     lint_input = harness.write(".build/operations/op/lint-input.json", canonical({"view_ref": view_ref}))
     lint = subprocess.run([sys.executable, str(harness.packages / "hs-knowledge-lint/scripts/cli.py"),
@@ -117,7 +99,7 @@ def test_current_ingest_plan_review_confirm_lint_record_apply_query_submit(harne
         "dispositions": [{"unit_id": unit["unit_id"], "action": "create", "reason": "New exact design rule",
                           "observed_fingerprint": unit["observed_fingerprint"], "adopted_fingerprint": unit["observed_fingerprint"],
                           "progress": "completed", "card_refs": ["new"], "claim_refs": ["new#new-claim"]}]}, "record")["data"]["ingest_record_ref"]
-    apply_request = {"operation_id": "op", "v3_required": True, "view_ref": view_ref, "proof_ref": proof,
+    apply_request = {"operation_id": "op", "v3_required": True, "view_ref": view_ref,
                      "ingest_record_ref": record_ref, "lint_report_ref": lint_ref, "content_review_ref": review}
     if unrelated_nav_changes == "uncommitted_raw":
         original_path = harness.root / bundle["snapshots"][0]["recovery"]["path"]
@@ -159,11 +141,12 @@ def test_current_ingest_plan_review_confirm_lint_record_apply_query_submit(harne
             forged["digest"] = hashlib.sha256(canonical(forged)).hexdigest()
             ref = harness.write(".build/operations/op/forged-review-" + defect + ".json", canonical(forged))
             blocked = harness.run("apply", {**apply_request, "content_review_ref": ref}, expected=3)
-            assert "conflict" in blocked["diagnostics"][0]["message"] or "findings" in blocked["diagnostics"][0]["message"]
+            assert blocked["status"] == "blocked"
             assert not (harness.root / "knowledge/rules/new.md").exists()
     applied = harness.run("apply", apply_request)["data"]["apply_result_ref"]
     saved = harness.record("logs/ingest/op.yaml")
     assert saved["acceptance"]["cards"][0]["card_id"] == "new"
+    assert saved["acceptance"]["cards"][0]["review_result"] == "supported"
     generation = harness.run("index-build", {"operation_id": "op"}, "build")["data"]["generation_ref"]
     queries = harness.run("query-regression", {"operation_id": "op", "v3_required": True,
         "apply_result_ref": applied, "generation_ref": generation})["data"]["report_ref"]

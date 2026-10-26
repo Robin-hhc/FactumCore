@@ -1,4 +1,4 @@
-"""Real public CLIs + copied 2.0 domain, synthetic host and navigation only.
+"""Real public CLIs + copied 2.0 domain and independent synthetic review.
 
 Set AIOTBOT_TEST_GOVERNANCE when running outside the monorepo. No private
 cross-Skill imports, real source documents, gold or installed host are used.
@@ -15,7 +15,6 @@ import subprocess
 import struct
 import sys
 import tempfile
-import time
 import unittest
 
 SKILLS = pathlib.Path(__file__).resolve().parents[2]
@@ -108,20 +107,20 @@ class PublicGovernanceTests(unittest.TestCase):
         self.assertFalse((self.root / "logs/ingest/legacy.yaml").exists())
 
     def test_old_terminal_journal_does_not_approve_a_forged_new_content_proof(self):
-        request = self.prepare_and_approve("new-forged-proof")
+        request = self.prepare_reviewed("new-forged-proof")
         old = self.save_foreign_journal()
         frozen = old.read_bytes()
         proof_path = self.root / request["proof_ref"]
         proof = json.loads(proof_path.read_bytes())
-        proof["host_event"]["payload"]["actor_id"] = "forged-actor"
+        proof["reviewer_id"] = proof["author_id"]
         proof_path.write_bytes(canonical(seal(proof)))
-        result = self.invoke("hs-knowledge-apply", request, expected=2)
-        self.assertIn("signature", result["diagnostics"][0]["message"])
+        result = self.invoke("hs-knowledge-apply", request, expected=3)
+        self.assertIn("independent content review", result["diagnostics"][0]["message"])
         self.assertEqual(old.read_bytes(), frozen)
         self.assertEqual((self.root / "knowledge/index.md").read_bytes(), b"old navigation")
 
     def test_old_terminal_journal_does_not_accept_an_old_rules_current_proof(self):
-        request = self.prepare_and_approve("new-old-proof")
+        request = self.prepare_reviewed("new-old-proof")
         old = self.save_foreign_journal()
         frozen = old.read_bytes()
         proof_path = self.root / request["proof_ref"]
@@ -134,7 +133,7 @@ class PublicGovernanceTests(unittest.TestCase):
         self.assertEqual((self.root / "knowledge/index.md").read_bytes(), b"old navigation")
 
     def test_old_terminal_journal_does_not_accept_an_invalid_new_view(self):
-        request = self.prepare_and_approve("new-invalid-view")
+        request = self.prepare_reviewed("new-invalid-view")
         old = self.save_foreign_journal()
         frozen = old.read_bytes()
         view_path = self.root / request["view_ref"]
@@ -155,7 +154,7 @@ class PublicGovernanceTests(unittest.TestCase):
             item["sha256"] = digest((self.root / item["path"]).read_bytes())
         path.write_text(yaml.safe_dump(lock, sort_keys=False), encoding="utf-8")
         self.rules_digest = digest(path.read_bytes())
-        request = self.prepare_and_approve("gate")
+        request = self.prepare_reviewed("gate")
         applied = self.invoke("hs-knowledge-apply", request)
         result = self.invoke("hs-knowledge-publish-handoff", {"operation_id": "gate", "v3_required": True,
                              "apply_result_ref": applied["data"]["apply_result_ref"]}, expected=3)
@@ -243,31 +242,11 @@ class PublicGovernanceTests(unittest.TestCase):
         self.root.joinpath("knowledge").mkdir()
         self.root.joinpath("knowledge/index.md").write_bytes(b"old navigation")
         self.counter = 0
-        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-        from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
-
-        self.key = Ed25519PrivateKey.generate()
         self.catalog = {
-            "schema_version": "2.0",
-            "skills": {},
-            "review_trust": {
-                "adapters": {
-                    "fixture": {
-                        "synthetic": True,
-                        "fixture_root": str(self.root),
-                        "public_key_b64": base64.b64encode(
-                            self.key.public_key().public_bytes(
-                                Encoding.Raw, PublicFormat.Raw
-                            )
-                        ).decode(),
-                    }
-                }
-            },
+            "schema_version": "2.0", "skills": {}, "test_fixture_root": str(self.root.resolve()),
         }
         for name in (
             "hs-knowledge-source-capture",
-            "hs-knowledge-confirmation-prepare",
-            "hs-knowledge-confirmation-record",
             "hs-knowledge-apply",
             "hs-knowledge-recover",
             "hs-knowledge-publish-handoff",
@@ -321,7 +300,7 @@ class PublicGovernanceTests(unittest.TestCase):
         )
         return result
 
-    def prepare_and_approve(self, op, include_card=False, workflow=None):
+    def prepare_reviewed(self, op, include_card=False, workflow=None):
         old = self.root.joinpath("knowledge/index.md").read_bytes()
         row = {
             "path": "knowledge/index.md",
@@ -415,83 +394,94 @@ class PublicGovernanceTests(unittest.TestCase):
                 ),
             }
         )
+        if include_card:
+            navigation = b"[Synthetic flow](fixture-flow.md)\n"
+            writes.append({"path": "knowledge/flows/index.md", "expected_old_digest": None,
+                           "final_digest": digest(navigation), "bytes_b64": base64.b64encode(navigation).decode()})
+        plan_ref = f".build/operations/{op}/synthetic-plan.json"
+        plan = seal({"schema_version": "2.0", "record_kind": "change_plan", "operation_id": op,
+                     "rules_digest": self.rules_digest, "tool_identity": view["tool_identity"],
+                     "bundle_ref": view.get("bundle_ref", f".build/operations/{op}/synthetic-bundle.json"),
+                     "bundle_digest": bundle["digest"] if include_card else "0" * 64,
+                     "candidate_ids": [], "decisions": [], "author_id": "fixture-author",
+                     "writes": writes, "deletes": [], "baseline": {row["path"]: row["expected_old_digest"] for row in writes},
+                     "review_mode": "manual_document"})
+        (self.root / plan_ref).parent.mkdir(parents=True, exist_ok=True)
+        (self.root / plan_ref).write_bytes(canonical(plan))
+        view = seal({**view, "writes": writes, "plan_ref": plan_ref, "plan_digest": plan["digest"],
+                     "source_set_digest": digest(view["source_refs"]),
+                     "baseline_digest": digest({"files": plan["baseline"]})})
         ref = f".build/operations/{op}/view.json"
         path = self.root / ref
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(canonical(view))
-        prepared = self.invoke(
-            "hs-knowledge-confirmation-prepare",
-            {
-                "operation_id": op,
-                "view_ref": ref,
-                **({"workflow": workflow} if workflow else {}),
-            },
-        )
-        self.assertEqual(prepared["phase"], "awaiting_human")
-        display_ref = prepared["data"]["display_ref"]
-        self.invoke(
-            "hs-knowledge-confirmation-record",
-            {"operation_id": op, "display_ref": display_ref},
-            expected=3,
-        )
-        display = json.loads((self.root / display_ref).read_text(encoding="utf-8"))
-        payload = {
-            "actor_type": "human",
-            "actor_id": "synthetic-human",
-            "decision": "approve",
-            "display_digest": display["digest"],
-            "view_digest": display["view_digest"],
-            "challenge": display["challenge"],
-            "issued_at": time.time(),
-        }
-        event = {
-            "schema_version": "2.0",
-            "record_kind": "host_event",
-            "adapter_id": "fixture",
-            "payload": payload,
-            "signature_b64": base64.b64encode(
-                self.key.sign(canonical(payload))
-            ).decode(),
-        }
-        event_ref = f".build/operations/{op}/host-event.json"
-        (self.root / event_ref).write_bytes(canonical(event))
-        reviewed = self.invoke(
-            "hs-knowledge-confirmation-record",
-            {
-                "operation_id": op,
-                "display_ref": display_ref,
-                "host_event_ref": event_ref,
-            },
-        )
-        return {
-            "operation_id": op,
-            "view_ref": ref,
-            "proof_ref": reviewed["data"]["manual_review_ref"],
-        }
+        review = seal({"schema_version": "2.0", "record_kind": "content_review", "operation_id": op,
+                       "rules_digest": self.rules_digest, "tool_identity": view["tool_identity"],
+                       "status": "passed", "view_digest": view["digest"],
+                       "plan_ref": plan_ref, "plan_digest": plan["digest"],
+                       "author_id": "fixture-author", "reviewer_id": "fixture-reviewer",
+                       "independent_context": "separate-fixture-context", "findings": [],
+                       "verification_tier": "declared_independent_content_review"})
+        review_ref = f".build/operations/{op}/content-review.json"
+        (self.root / review_ref).write_bytes(canonical(review))
+        return {"operation_id": op, "view_ref": ref, "proof_ref": review_ref,
+                "content_review_ref": review_ref}
 
-    def test_workflow_artifact_binds_actual_display_json_without_approving_it(self):
-        workflow = {
-            "run_id": "fixture-run",
-            "node_id": "prepare_confirmation",
-            "attempt_id": "first",
-        }
-        self.prepare_and_approve("workflow", workflow=workflow)
-        manifest_path = (
-            self.root
-            / "logs/workflows/fixture-run/nodes/prepare_confirmation/first/result.json"
-        )
+    def test_non_v3_document_review_requires_the_exact_existing_change_plan(self):
+        request = self.prepare_reviewed("missing-plan-binding")
+        path = self.root / request["content_review_ref"]
+        review = json.loads(path.read_bytes())
+        review.pop("plan_ref")
+        path.write_bytes(canonical(seal(review)))
+        result = self.invoke("hs-knowledge-apply", request, expected=3)
+        self.assertIn("exact change plan", result["diagnostics"][0]["message"])
+        self.assertEqual((self.root / "knowledge/index.md").read_bytes(), b"old navigation")
+
+    def test_non_v3_document_runs_full_checks_before_admission(self):
+        request = self.prepare_reviewed("invalid-full-view")
+        view_path = self.root / request["view_ref"]
+        view = json.loads(view_path.read_bytes())
+        raw = b"[Broken navigation](absent.md)\n"
+        view["writes"][0].update(bytes_b64=base64.b64encode(raw).decode(), final_digest=digest(raw))
+        plan_path = self.root / view["plan_ref"]
+        plan = json.loads(plan_path.read_bytes())
+        plan["writes"] = view["writes"]
+        plan = seal(plan)
+        plan_path.write_bytes(canonical(plan))
+        view["plan_digest"] = plan["digest"]
+        view = seal(view)
+        view_path.write_bytes(canonical(view))
+        review_path = self.root / request["content_review_ref"]
+        review = json.loads(review_path.read_bytes())
+        review.update(view_digest=view["digest"], plan_digest=plan["digest"])
+        review_path.write_bytes(canonical(seal(review)))
+        result = self.invoke("hs-knowledge-apply", request, expected=3)
+        self.assertIn("full-view checks", result["diagnostics"][0]["message"])
+        self.assertEqual((self.root / "knowledge/index.md").read_bytes(), b"old navigation")
+        self.assertFalse((self.root / "logs/operations/invalid-full-view/journal.json").exists())
+
+    def test_non_v3_document_requires_exact_source_recovery_before_first_write(self):
+        request = self.prepare_reviewed("unrecoverable", include_card=True)
+        (self.root / self.fixture_original_ref).write_bytes(b"altered original")
+        self.invoke("hs-knowledge-apply", request, expected=3)
+        self.assertEqual((self.root / "knowledge/index.md").read_bytes(), b"old navigation")
+        self.assertFalse((self.root / "knowledge/flows/fixture-flow.md").exists())
+
+    def test_workflow_artifact_binds_actual_apply_result_without_human_gate(self):
+        workflow = {"run_id": "fixture-run", "node_id": "apply_view", "attempt_id": "first"}
+        request = self.prepare_reviewed("workflow")
+        applied = self.invoke("hs-knowledge-apply", {**request, "workflow": workflow})
+        manifest_path = self.root / "logs/workflows/fixture-run/nodes/apply_view/first/result.json"
         self.assertTrue(manifest_path.is_file())
         record = json.loads(manifest_path.read_text(encoding="utf-8"))
-        self.assertEqual(record["phase"], "awaiting_human")
-        display_ref = record["result"]["display_ref"]
-        self.assertEqual(
-            record["artifact_digests"][display_ref],
-            digest((self.root / display_ref).read_bytes()),
-        )
+        self.assertEqual(record["phase"], "committed")
+        result_ref = applied["data"]["apply_result_ref"]
+        self.assertEqual(record["artifact_digests"][result_ref], digest((self.root / result_ref).read_bytes()))
         self.assertTrue(manifest_path.with_suffix(".md").is_file())
+        self.assertNotIn("review_trust", self.catalog)
 
-    def test_public_prepare_record_apply_verify_publish(self):
-        request = self.prepare_and_approve("public")
+    def test_public_review_apply_verify_publish(self):
+        request = self.prepare_reviewed("public")
         applied = self.invoke("hs-knowledge-apply", request)
         self.assertEqual(
             self.root.joinpath("knowledge/index.md").read_bytes(), b"new navigation"
@@ -512,10 +502,10 @@ class PublicGovernanceTests(unittest.TestCase):
         )
         self.assertFalse(record["git_merge_verified"])
         self.assertFalse(record["remote_push_verified"])
-        self.assertEqual(record["verification_tier"], "synthetic_host")
+        self.assertEqual(record["verification_tier"], "declared_independent_content_review")
 
     def test_public_recover_delegates_to_single_apply_engine(self):
-        request = self.prepare_and_approve("recover")
+        request = self.prepare_reviewed("recover")
         self.invoke("hs-knowledge-apply", {**request, "fault_after": 1}, expected=3)
         inspected = self.invoke(
             "hs-knowledge-recover",
@@ -545,7 +535,7 @@ class PublicGovernanceTests(unittest.TestCase):
         self.assertEqual(resumed["data"]["transaction_status"], "committed")
 
     def test_invalid_workflow_is_rejected_before_apply_mutates_files(self):
-        request = self.prepare_and_approve("invalid-workflow")
+        request = self.prepare_reviewed("invalid-workflow")
         for workflow in ({"attempt_id": "partial"}, {}, None, []):
             self.invoke(
                 "hs-knowledge-apply",
@@ -560,7 +550,7 @@ class PublicGovernanceTests(unittest.TestCase):
         )
 
     def test_card_eligibility_ignores_unrelated_navigation_and_source_append(self):
-        request = self.prepare_and_approve("card", include_card=True)
+        request = self.prepare_reviewed("card", include_card=True)
         applied = self.invoke("hs-knowledge-apply", request)
         path = "knowledge/flows/fixture-flow.md"
         card_digest = digest((self.root / path).read_bytes())
@@ -597,15 +587,16 @@ class PublicGovernanceTests(unittest.TestCase):
             + struct.pack("<III", 0, int(metadata.st_mtime), metadata.st_size)
             + marshal.dumps(code)
         )
-        self.prepare_and_approve("hostile-cache")
+        request = self.prepare_reviewed("hostile-cache")
+        self.invoke("hs-knowledge-apply", request)
 
     def test_own_support_and_business_pyc_are_never_executed(self):
-        name = "hs-knowledge-confirmation-prepare"
+        name = "hs-knowledge-apply"
         copied = self.root / "isolated-installed" / name
         shutil.copytree(
             SKILLS / name, copied, ignore=shutil.ignore_patterns("__pycache__")
         )
-        for module in ("support", "prepare"):
+        for module in ("support", "transaction"):
             source = copied / "scripts" / (module + ".py")
             cached = pathlib.Path(importlib.util.cache_from_source(str(source)))
             cached.parent.mkdir(parents=True, exist_ok=True)
@@ -623,7 +614,8 @@ class PublicGovernanceTests(unittest.TestCase):
         self.catalog["skills"][name]["root"] = str(copied)
         self.catalog["skills"][name]["package_digest"] = package_digest(copied)
         self.catalog_path.write_bytes(canonical(self.catalog))
-        self.prepare_and_approve("hostile-package-cache")
+        request = self.prepare_reviewed("hostile-package-cache")
+        self.invoke("hs-knowledge-apply", request)
 
 
 if __name__ == "__main__":

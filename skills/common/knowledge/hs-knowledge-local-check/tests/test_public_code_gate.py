@@ -177,7 +177,7 @@ class PublicCodeGateTests(unittest.TestCase):
         self.assertEqual(regression["phase"], "checked")
         self.assertTrue(regression["data"]["passed"])
 
-    def test_mixed_view_requires_authenticated_human_and_code_proofs(self):
+    def test_mixed_view_requires_code_proof_without_human_confirmation(self):
         # Only this copied fixture is repinned during concurrent rule development.
         lock_path = self.root / "governance/framework.lock.yaml"
         framework = yaml.safe_load(lock_path.read_bytes())
@@ -198,48 +198,52 @@ class PublicCodeGateTests(unittest.TestCase):
         meta["claims"][0].update(evidence_kind="design", usage="guidance", context_ids=[], source_refs=["doc"], verification_requirements=[])
         document = ("---\n" + yaml.safe_dump(meta, sort_keys=False) + "---" + body.replace("The fixture function returns one.", "Synthetic document requirement.")).encode()
         raw = b"Synthetic document requirement.\n"
-        for ref in ("docs-raw/specs/document.md", "logs/evidence/document.bin"):
+        object_ref = "logs/evidence/objects/" + digest(raw) + ".bin"
+        for ref in ("docs-raw/specs/document.md", object_ref):
             path = self.root / ref
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(raw)
         registry = json.loads(base64.b64decode(self.view["writes"][1]["bytes_b64"]))
         registry["resources"].append({"source_id": "fixture-document", "kind": "raw", "path": "docs-raw/specs/document.md"})
         registry["snapshots"].append({"source_id": "fixture-document", "snapshot_id": "document-v1", "sha256": digest(raw),
-                                     "bytes": len(raw), "recovery": {"path": "logs/evidence/document.bin"}})
+                                     "bytes": len(raw), "recovery": {"method": "evidence_object", "path": object_ref}})
         registry_bytes = canonical(registry)
         (self.root / "governance/sources.lock.yaml").write_bytes(registry_bytes)
         self.view["writes"][1].update(expected_old_digest=digest(registry_bytes), final_digest=digest(registry_bytes),
                                       bytes_b64=base64.b64encode(registry_bytes).decode())
         self.view["writes"].append({"path": "knowledge/flows/fixture-document.md", "expected_old_digest": None,
                                      "final_digest": digest(document), "bytes_b64": base64.b64encode(document).decode()})
+        index = next(row for row in self.view["writes"] if row["path"] == "knowledge/flows/index.md")
+        navigation = base64.b64decode(index["bytes_b64"]) + b"[Fixture document](fixture-document.md)\n"
+        index.update(final_digest=digest(navigation), bytes_b64=base64.b64encode(navigation).decode())
+        snapshots = sorted(registry["snapshots"], key=lambda item: item["snapshot_id"])
+        self.view.update(source_refs=snapshots, source_set_digest=digest(snapshots))
         self.view.update(rules_digest=self.rules_digest, review_mode="mixed",
                          review_requirements={"manual_document": ["knowledge/flows/fixture-document.md"], "code_gate": ["knowledge/flows/fixture-code-flow.md"]},
                          baseline_digest=digest({"files": {r["path"]: r["expected_old_digest"] for r in self.view["writes"]}}))
+        plan = self.record("change_plan", bundle_ref=".build/operations/op/fixture-bundle.json",
+                           bundle_digest="0" * 64, candidate_ids=["document", "code"], decisions=[],
+                           writes=self.view["writes"], deletes=[], baseline={}, review_mode="mixed")
+        self.save(self.view["plan_ref"], plan)
+        self.view["plan_digest"] = plan["digest"]
         self.view = seal(self.view)
         self.save(self.view_ref, self.view)
         self.sign_report("local")
-        for name in ("hs-knowledge-source-capture", "hs-knowledge-confirmation-prepare", "hs-knowledge-confirmation-record"):
-            package = SKILLS / name
-            self.catalog["skills"][name] = {"root": str(package), "entry": "scripts/cli.py", "python": sys.executable,
-                                               "package_digest": package_digest(package)}
-        self.catalog["review_trust"] = {"adapters": {"fixture": self.catalog["semantic_reviewers"]["fixture"]}}
         self.catalog_path.write_bytes(canonical(self.catalog))
         checked = self.invoke()
         self.assertEqual(checked["data"]["check_status"], "passed")
         code_proof = checked["data"]["local_check_ref"]
+        self.invoke("hs-knowledge-apply", request={"operation_id": "op", "view_ref": self.view_ref}, expected=2)
         self.invoke("hs-knowledge-apply", request={"operation_id": "op", "view_ref": self.view_ref,
-                    "proof_set": {"code_gate": code_proof}}, expected=2)
-        prepared = self.invoke("hs-knowledge-confirmation-prepare", request={"operation_id": "op", "view_ref": self.view_ref})
-        display_ref = prepared["data"]["display_ref"]
-        display = json.loads((self.root / display_ref).read_bytes())
-        payload = {"actor_type": "human", "actor_id": "fixture-human", "decision": "approve", "issued_at": time.time(),
-                   "view_digest": self.view["digest"], "display_digest": display["digest"], "challenge": display["challenge"]}
-        self.save(".build/operations/op/human-event.json", {"schema_version": "2.0", "record_kind": "host_event",
-                    "adapter_id": "fixture", "payload": payload, "signature_b64": base64.b64encode(self.key.sign(canonical(payload))).decode()})
-        approved = self.invoke("hs-knowledge-confirmation-record", request={"operation_id": "op", "display_ref": display_ref,
-                                "host_event_ref": ".build/operations/op/human-event.json"})
+                    "proof_ref": code_proof}, expected=3)
+        self.assertFalse((self.root / "knowledge/flows/fixture-document.md").exists())
+        review_ref = ".build/operations/op/content-review.json"
+        self.save(review_ref, self.record("content_review", status="passed", view_digest=self.view["digest"],
+                  plan_ref=self.view["plan_ref"], plan_digest=plan["digest"], author_id="fixture",
+                  reviewer_id="independent-document-reader", independent_context="fresh-mixed-review",
+                  findings=[], verification_tier="declared_independent_content_review"))
         applied = self.invoke("hs-knowledge-apply", request={"operation_id": "op", "view_ref": self.view_ref,
-                              "proof_set": {"manual_document": approved["data"]["manual_review_ref"], "code_gate": code_proof}})
+                              "proof_ref": code_proof, "content_review_ref": review_ref})
         self.assertEqual(applied["phase"], "committed")
 
     def setUp(self):
@@ -378,6 +382,7 @@ class PublicCodeGateTests(unittest.TestCase):
         }
         for rel, data in (
             ("logs/evidence/code.bin", self.source),
+            ("logs/evidence/objects/" + digest(self.source) + ".bin", self.source),
             ("logs/evidence/build.bin", b"synthetic fixture build only\n"),
         ):
             path = self.root / rel
@@ -406,7 +411,8 @@ class PublicCodeGateTests(unittest.TestCase):
                     "snapshot_id": "fixture-code-snapshot",
                     "sha256": digest(self.source),
                     "bytes": len(self.source),
-                    "recovery": {"path": "logs/evidence/code.bin"},
+                    "recovery": {"method": "evidence_object",
+                                 "path": "logs/evidence/objects/" + digest(self.source) + ".bin"},
                 }
             ],
         }
@@ -513,13 +519,17 @@ class PublicCodeGateTests(unittest.TestCase):
                 "bytes_b64": base64.b64encode(source_raw).decode(),
             },
         ]
+        navigation = b"[Fixture code](fixture-code-flow.md)\n"
+        writes.append({"path": "knowledge/flows/index.md", "expected_old_digest": None,
+                       "final_digest": digest(navigation), "bytes_b64": base64.b64encode(navigation).decode()})
         self.view = self.record(
             "final_view",
             review_mode="code_gate",
             context_ref=self.context_ref,
             writes=writes,
             deletes=[],
-            source_refs=[],
+            source_refs=source_lock["snapshots"],
+            source_set_digest=digest(source_lock["snapshots"]),
             plan_ref=".build/operations/op/fixture-plan.json",
             plan_digest="0" * 64,
             baseline_digest=digest(
@@ -618,6 +628,11 @@ class PublicCodeGateTests(unittest.TestCase):
             "context_ref": self.context_ref,
             "semantic_report_ref": self.report_ref,
         }
+        if skill == "hs-knowledge-apply" and action == "run":
+            config = self.workspace / "config.yml"
+            request.setdefault("check_inputs", {"code_checkout": {"configuration": str(config),
+                "config_digest": digest(config.read_bytes()),
+                "repos": {"wifi-code": {"root": str(self.code), "commit": self.head}}}})
         inp, out = (
             f".build/operations/op/request-{self.counter}.json",
             f".build/operations/op/response-{self.counter}.json",
@@ -896,9 +911,7 @@ class PublicCodeGateTests(unittest.TestCase):
         self.assertEqual(self.invoke()["data"]["check_status"], "incomplete")
 
     def test_interrupted_apply_can_roll_back_after_code_revision_changes(self):
-        self.catalog["review_trust"] = {
-            "adapters": {"fixture": {"synthetic": True, "fixture_root": str(self.root)}}
-        }
+        self.catalog["test_fixture_root"] = str(self.root)
         self.catalog_path.write_bytes(canonical(self.catalog))
         checked = self.invoke()
         before_lock = (self.root / "governance/sources.lock.yaml").read_bytes()

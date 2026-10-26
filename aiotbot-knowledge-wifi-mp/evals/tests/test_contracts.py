@@ -134,10 +134,10 @@ def test_duplicate_logical_source_rejected(rules):
         source_resources.read_source_lock(rules["knowledge_root"])
 
 
-def test_record_digest_not_human_authorization():
-    record = records.seal({"schema_version": "2.0", "record_kind": "manual_review", "approved": True})
+def test_record_digest_detects_changed_review_status():
+    record = records.seal({"schema_version": "2.0", "record_kind": "content_review", "status": "passed"})
     assert records.verify(record) == record
-    record["approved"] = False
+    record["status"] = "blocked"
     with pytest.raises(v.ContractError):
         records.verify(record)
 
@@ -222,7 +222,7 @@ def test_guidance_only_implementation_text_never_becomes_current_implementation(
     assert not knowledge.match_scope(claim, {}, "implementation")
 
 
-@pytest.mark.parametrize("kind", ["manual_review", "final_view", "local_check", "apply_result", "index_manifest"])
+@pytest.mark.parametrize("kind", ["content_review", "final_view", "local_check", "apply_result", "index_manifest"])
 def test_record_kind_requires_its_actual_payload(rules, kind):
     with pytest.raises(v.ContractError, match="SCHEMA_INVALID"):
         v.validate_shape(kind, {"schema_version": "2.0", "record_kind": kind}, rules)

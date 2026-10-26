@@ -1,6 +1,6 @@
 """Validate the approved node packages and the complete ingest Workflow.
 
-Local structural checks do not prove host triggering, human authentication,
+Local structural checks do not prove host triggering,
 knowledge semantics or CI permissions. --openflow-source additionally executes
 the actual pinned upstream loader against an explicit isolated installation.
 """
@@ -24,8 +24,6 @@ SKILLS = ('hs-workspace-explore',
  'hs-knowledge-view-materialize',
  'hs-knowledge-governance-handoff',
  'hs-knowledge-candidate-inspect',
- 'hs-knowledge-confirmation-prepare',
- 'hs-knowledge-confirmation-record',
  'hs-knowledge-local-check',
  'hs-knowledge-candidate-revise',
  'hs-knowledge-apply',
@@ -44,12 +42,7 @@ ARTIFACT_SCOPE = {'hs-workspace-explore': ([], []),
  'hs-knowledge-view-materialize': (['materialize_view'], ['ready']),
  'hs-knowledge-governance-handoff': ([], []),
  'hs-knowledge-candidate-inspect': (['inspect_candidate'],
-                                    ['manual_ready',
-                                     'mixed_ready',
-                                     'code_ready',
-                                     'recovery_required']),
- 'hs-knowledge-confirmation-prepare': (['prepare_confirmation'], ['await_user']),
- 'hs-knowledge-confirmation-record': (['record_confirmation'], ['accepted', 'mixed_ready']),
+                                    ['manual_ready', 'mixed_ready', 'code_ready', 'recovery_required']),
  'hs-knowledge-local-check': (['local_check'], ['code_passed', 'needs_revision']),
  'hs-knowledge-candidate-revise': (['revise_candidate'], ['ready', 'deferred']),
  'hs-knowledge-apply': (['apply_view'], ['applied', 'record_only']),
@@ -70,7 +63,6 @@ EXTRA_ARTIFACT_SCOPE = {'hs-knowledge-source-scan': {'prepare-result.yaml': (['p
 OWNERS = {'review_plan': 'reviewer',
  'review_content': 'reviewer',
  'lint_preflight': 'reviewer',
- 'final_view_user_gate': 'user',
  'local_check': 'reviewer',
  'lint_view': 'reviewer',
  'query_regression': 'reviewer'}
@@ -82,8 +74,6 @@ NODE_SKILLS = {'scan_sources': 'hs-knowledge-source-scan',
  'review_content': 'hs-knowledge-change-plan',
  'lint_preflight': 'hs-knowledge-lint',
  'inspect_candidate': 'hs-knowledge-candidate-inspect',
- 'prepare_confirmation': 'hs-knowledge-confirmation-prepare',
- 'record_confirmation': 'hs-knowledge-confirmation-record',
  'local_check': 'hs-knowledge-local-check',
  'revise_candidate': 'hs-knowledge-candidate-revise',
  'lint_view': 'hs-knowledge-lint',
@@ -119,23 +109,12 @@ EDGES = {'hs-knowledge-ingest': {'scan_sources': {'scanned': 'prepare_material',
                                             'needs_plan': 'plan_change',
                                             'needs_revision': 'revise_candidate',
                                             'blocked': '__end__'},
-                         'inspect_candidate': {'manual_ready': 'prepare_confirmation',
-                                               'mixed_ready': 'prepare_confirmation',
+                         'inspect_candidate': {'manual_ready': 'lint_view',
+                                               'mixed_ready': 'local_check',
                                                'code_ready': 'local_check',
                                                'recovery_required': 'recover_transaction',
                                                'needs_revision': 'revise_candidate',
                                                'blocked': '__end__'},
-                         'prepare_confirmation': {'await_user': 'final_view_user_gate',
-                                                  'stale': 'inspect_candidate',
-                                                  'blocked': '__end__'},
-                         'final_view_user_gate': {'on_pass': 'record_confirmation',
-                                                  'on_fail': 'revise_candidate'},
-                         'record_confirmation': {'accepted': 'lint_view',
-                                                 'mixed_ready': 'local_check',
-                                                 'stale': 'prepare_confirmation',
-                                                 'partial': 'revise_candidate',
-                                                 'awaiting_confirmation': '__end__',
-                                                 'blocked': '__end__'},
                          'local_check': {'code_passed': 'lint_view',
                                          'needs_revision': 'revise_candidate',
                                          'blocked': '__end__'},
@@ -325,27 +304,15 @@ def validate(root):
                 if node_id not in expected:
                     continue
                 owner = OWNERS.get(node_id, "coder")
-                if node_id == "final_view_user_gate":
-                    if (
-                        node.get("type") != "gate"
-                        or node.get("owner") != "user"
-                        or "skill" in node
-                    ):
-                        errors.append(f"{identity}: real user gate required")
-                    transitions = {
-                        "on_pass": node.get("on_pass"),
-                        "on_fail": node.get("on_fail"),
-                    }
-                else:
-                    if (
-                        node.get("type") != "skill"
-                        or node.get("owner") != owner
-                        or node.get("skill") != NODE_SKILLS[node_id]
-                    ):
-                        errors.append(f"{identity}.{node_id}: wrong Skill/owner/type")
-                    transitions = {e["id"]: e["target"] for e in node.get("exits", [])}
-                    if len(transitions) != len(node.get("exits", [])):
-                        errors.append(f"{identity}.{node_id}: duplicate exits")
+                if (
+                    node.get("type") != "skill"
+                    or node.get("owner") != owner
+                    or node.get("skill") != NODE_SKILLS[node_id]
+                ):
+                    errors.append(f"{identity}.{node_id}: wrong Skill/owner/type")
+                transitions = {e["id"]: e["target"] for e in node.get("exits", [])}
+                if len(transitions) != len(node.get("exits", [])):
+                    errors.append(f"{identity}.{node_id}: duplicate exits")
                 if transitions != expected[node_id]:
                     errors.append(f"{identity}.{node_id}: unsafe or missing transition")
                 if not node.get("prompt"):
@@ -404,13 +371,13 @@ const contracts=require(path.join(root,'src/config/skill-artifact-loader')).load
 const loader=require(path.join(root,'src/config/workflow-template-loader'));
 const layoutLoader=require(path.join(root,'src/config/workflow-template-layout-loader'));
 const workflows=loader.loadWorkflowTemplates(installed);
-if(workflows.length!==1||registry.skillIds.length!==20||contracts.length!==24) throw Error('Incomplete packages');
+if(workflows.length!==1||registry.skillIds.length!==18||contracts.length!==22) throw Error('Incomplete packages');
 for(const workflow of workflows){
  const layout=layoutLoader.loadWorkflowTemplateLayoutFromPackageDir(path.dirname(workflow.filePath),workflow.id);
  if(layout.template_id!==workflow.id) throw Error('Wrong layout identity');
  const ids=workflow.nodes.map(n=>n.id).sort();
  if(JSON.stringify(Object.keys(layout.canvas.nodes).sort())!==JSON.stringify(ids)) throw Error('Wrong layout nodes');
- if(workflow.nodes.some(n=>!['coder','reviewer','user'].includes(n.owner))) throw Error('Unavailable declared role');
+ if(workflow.nodes.some(n=>!['coder','reviewer'].includes(n.owner))) throw Error('Unavailable declared role');
 }
 console.log(JSON.stringify({workflow_ids:workflows.map(w=>w.id).sort(),skill_count:registry.skillIds.length,
 contract_count:contracts.length,role_ids:['coder','reviewer'],role_scope:'synthetic declared roles only; real host roles not verified'}));
@@ -446,7 +413,7 @@ def main():
     report = {
         "status": "invalid" if errors else "static_valid",
         "errors": errors,
-        "limitations": ["Not real host/human/CI/permission or semantic acceptance."],
+        "limitations": ["Not real host/CI/permission or semantic acceptance."],
     }
     if args.openflow_source:
         if not args.installed_root:

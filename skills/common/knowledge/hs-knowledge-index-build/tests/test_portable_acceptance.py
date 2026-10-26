@@ -7,6 +7,7 @@ from pathlib import Path
 import shutil
 import subprocess
 
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 ROOT = Path(__file__).resolve().parents[5]
@@ -15,7 +16,9 @@ fixture = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fixture)
 
 
-def test_accepted_repository_works_without_another_machines_human_files(tmp_path):
+def test_accepted_repository_works_without_machine_private_review_files(tmp_path):
+    # This isolated test key signs publication receipts only.
+    publication_key = Ed25519PrivateKey.generate()
     pipeline = fixture.Pipeline(tmp_path)
     bundle_ref, bundle = pipeline.capture("create", b"# Fixture\nPublished capture rule.\n")
     view_ref = pipeline.view("create", bundle_ref, "portable-rule", pipeline.card("portable-rule", bundle))
@@ -38,7 +41,7 @@ def test_accepted_repository_works_without_another_machines_human_files(tmp_path
         "progress": {"apply": {"status": "applied", "operation_id": "create", "view_digest": view["digest"]}},
         "acceptance": {"content_view_digest": view["digest"], "rules_digest": pipeline.rules,
                        "cards": [{"path": path, "card_id": "portable-rule", "sha256": card_sha, "review_mode": "manual_document",
-                                  "claim_ids": ["c1"], "review_result": "approved"}],
+                                  "claim_ids": ["c1"], "review_result": "supported"}],
                        "proof_digests": [pipeline.record("logs/operations/create/apply-result.json")["proof_digest"]]},
     }
     record["digest"] = fixture.sha(fixture.canonical(record))
@@ -54,12 +57,12 @@ def test_accepted_repository_works_without_another_machines_human_files(tmp_path
     git("add", "aiotbot-knowledge-wifi-mp/knowledge", "aiotbot-knowledge-wifi-mp/governance", "aiotbot-knowledge-wifi-mp/logs/ingest", "aiotbot-knowledge-wifi-mp/logs/evidence")
     git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "commit", "-qm", "accepted synthetic repository")
     pipeline.catalog["publication_trust"] = {"fixture-publication": {"synthetic": True, "fixture_root": str(pipeline.root),
-        "public_key_b64": base64.b64encode(pipeline.key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)).decode()}}
+        "public_key_b64": base64.b64encode(publication_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)).decode()}}
     pipeline.catalog_path.write_bytes(fixture.canonical(pipeline.catalog))
     payload = {"rules_digest": pipeline.rules, "knowledge_commit": git("rev-parse", "HEAD"), "card_digests": {path: card_sha},
                "acceptance_records": {record_ref: fixture.sha((pipeline.root / record_ref).read_bytes())}}
     publication = {"adapter_id": "fixture-publication", "payload": payload,
-                   "signature_b64": base64.b64encode(pipeline.key.sign(fixture.canonical(payload))).decode()}
+                   "signature_b64": base64.b64encode(publication_key.sign(fixture.canonical(payload))).decode()}
     receipt_ref = pipeline.write("logs/publication/accepted.json", fixture.canonical(publication))
     # Only machine-private execution state is removed from this isolated fixture.
     for relative in (".build", "logs/operations"):

@@ -1,4 +1,4 @@
-"""Record integrity; a public digest seal never authenticates human consent."""
+"""Record integrity and exact-view Agent review summaries."""
 
 from .validation import ContractError, digest_payload, validate_shape
 
@@ -178,7 +178,7 @@ validate_scan = validate_scan_manifest
 
 
 def validate_ingest_record(record, scan=None, view=None, rules=None, *, version_resolver=None, require_final=False):
-    """Validate per-unit dispositions; this never authenticates human consent."""
+    """Validate per-unit dispositions and their exact reviewed content bindings."""
     verify(record)
     if record.get("record_kind") != "ingest_record":
         raise ContractError("RECORD_KIND_MISMATCH", "Expected ingest_record")
@@ -357,7 +357,7 @@ def validate_ingest_record(record, scan=None, view=None, rules=None, *, version_
             if any(key not in summary for key in required_summary) or summary["card_id"] in seen or not re.fullmatch(digest_pattern, summary["sha256"]):
                 raise ContractError("INVALID_ACCEPTANCE", "Acceptance card summary is incomplete or duplicate")
             seen.add(summary["card_id"])
-            expected = "approved" if summary["review_mode"] == "manual_document" else "supported" if summary["review_mode"] == "code_gate" else None
+            expected = "supported" if summary["review_mode"] in {"manual_document", "code_gate"} else None
             if summary["review_result"] not in {expected, "retired"} or expected is None or not summary["claim_ids"] or len(set(summary["claim_ids"])) != len(summary["claim_ids"]):
                 raise ContractError("INVALID_ACCEPTANCE", "Acceptance Claim identities or review result differ")
             card = cards.get(summary["card_id"])

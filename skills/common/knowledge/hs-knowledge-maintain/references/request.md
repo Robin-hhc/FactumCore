@@ -1,6 +1,6 @@
 # Requests
 
-`register-source-change`: operation_id, bundle_ref. Changes are derived from the actual current source lock and fixed bundle, not accepted from caller assertions. `status`: operation_id. `advance`: operation_id, apply_result_ref, generation_ref. Raw originals are read-only; unresolved human, code, activation or source evidence keeps blocks intact.
+`register-source-change`: operation_id, bundle_ref. Changes are derived from the actual current source lock and fixed bundle, not accepted from caller assertions. `status`: operation_id. `advance`: operation_id, apply_result_ref, generation_ref. Raw originals are read-only; unresolved content-review, code, activation or source evidence keeps blocks intact.
 
 `register-code-change`: operation_id, bundle_ref. This explicit action derives old registered snapshots and affected Claims, verifies the new code snapshot against the currently authorized repo/path through the public source resolver, and durably records `code_changed` blocks. Capture alone does not register a semantic change. A source ID cannot migrate to another repo/path. Repeated identical transitions are idempotent.
 

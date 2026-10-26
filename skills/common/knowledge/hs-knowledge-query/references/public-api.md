@@ -26,7 +26,7 @@ retains the original generation even after a new generation activates.
 
 Receipt hashes and active-pointer observations provide integrity and lineage
 under the existing local artifact trust model. They are not origin signatures,
-ACLs, human consent or local/merge proof. They cannot replace any application
+ACLs or independent content/code review. They cannot replace any application
 provenance, code proof, publication verification, source or dependency check.
 Current reads recheck live blockers/revocation and current exact-content proof;
 historical reads use authenticated historical application content. If no
@@ -40,7 +40,7 @@ Shared repository acceptance can instead bind an exact accepted Git commit,
 card hashes and `logs/ingest` acceptance summaries through a trusted signed
 publication receipt. The consumer verifies actual Git blobs, current record
 bytes, rules, source references and Claim scope; another machine's private
-human event or `.build` directory is not required. A digest alone or an
+operation log or `.build` directory is not required. A digest alone or an
 uncommitted local record grants no shared authority. Code/current use also
 requires the accepted configuration fingerprint and actual referenced code
 bytes to match; unknown or changed context restricts those Claims.

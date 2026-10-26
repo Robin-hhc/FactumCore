@@ -112,7 +112,9 @@ def content_review(ctx, request):
             and text(request.get("independent_context")), "INDEPENDENT_REVIEW_REQUIRED", "Review needs a different author and fresh context identity")
     scan = ctx.record(plan["scan_ref"], "source_inventory")
     applicable = {u["unit_id"] for u in plan["units"] + plan.get("maintenance_units", []) if u["outcome"] in {"skip", "content"}}
-    scan_skip = {u["unit_id"] for u in scan["units"] if u.get("change") == "unchanged"
+    planned_skips = {u["unit_id"] for u in plan["units"] if u["outcome"] == "skip"}
+    scan_skip = {u["unit_id"] for u in scan["units"] if u["unit_id"] in planned_skips
+                 and u.get("change") == "unchanged"
                  and u.get("progress") in {"completed", "skipped", "withdrawn"}}
     applicable -= scan_skip
     sampled, unreviewed = request.get("sampled_unit_ids", []), request.get("unreviewed_unit_ids", [])

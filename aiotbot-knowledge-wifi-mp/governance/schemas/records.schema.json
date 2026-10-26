@@ -18,8 +18,6 @@
         "final_view",
         "handoff",
         "candidate_inspection",
-        "display",
-        "manual_review",
         "local_check",
         "merge_check",
         "apply_result",
@@ -30,13 +28,9 @@
         "maintenance_event",
         "maintenance_state",
         "publish_handoff",
-        "host_event",
         "recovery_result",
         "source_resolution",
         "workflow_manifest",
-        "display_receipt",
-        "confirmation_display",
-        "confirmation_review",
         "generation",
         "event",
         "operation_status",
@@ -47,7 +41,8 @@
         "semantic_plan",
         "content_review",
         "check_report",
-        "source_materials"
+        "source_materials",
+        "admission_record"
       ]
     },
     "digest": {
@@ -100,7 +95,6 @@
             "not": {
               "enum": [
                 "result",
-                "host_event",
                 "semantic_review"
               ]
             }
@@ -289,113 +283,6 @@
         ],
         "properties": {
           "view_digest": {
-            "type": "string",
-            "pattern": "^[0-9a-f]{64}$"
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "record_kind": {
-            "const": "confirmation_display"
-          }
-        }
-      },
-      "then": {
-        "required": [
-          "view_ref",
-          "view_digest",
-          "challenge",
-          "display_text",
-          "created_at",
-          "expires_at",
-          "writes",
-          "deletes"
-        ],
-        "properties": {
-          "writes": {
-            "type": "array"
-          },
-          "deletes": {
-            "type": "array"
-          },
-          "view_digest": {
-            "type": "string",
-            "pattern": "^[0-9a-f]{64}$"
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "record_kind": {
-            "const": "display"
-          }
-        }
-      },
-      "then": {
-        "required": [
-          "view_ref",
-          "view_digest",
-          "challenge"
-        ],
-        "properties": {
-          "view_digest": {
-            "type": "string",
-            "pattern": "^[0-9a-f]{64}$"
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "record_kind": {
-            "const": "display_receipt"
-          }
-        }
-      },
-      "then": {
-        "required": [
-          "view_ref",
-          "view_digest",
-          "challenge"
-        ],
-        "properties": {
-          "view_digest": {
-            "type": "string",
-            "pattern": "^[0-9a-f]{64}$"
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "record_kind": {
-            "const": "manual_review"
-          }
-        }
-      },
-      "then": {
-        "required": [
-          "view_ref",
-          "view_digest",
-          "display_ref",
-          "display_digest",
-          "host_event",
-          "status",
-          "verification_tier"
-        ],
-        "properties": {
-          "view_digest": {
-            "type": "string",
-            "pattern": "^[0-9a-f]{64}$"
-          },
-          "display_digest": {
             "type": "string",
             "pattern": "^[0-9a-f]{64}$"
           }
@@ -797,30 +684,6 @@
       }
     },
     {
-      "if": {
-        "properties": {
-          "record_kind": {
-            "const": "host_event"
-          }
-        }
-      },
-      "then": {
-        "required": [
-          "payload",
-          "signature_b64"
-        ],
-        "properties": {
-          "payload": {
-            "type": "object"
-          },
-          "signature_b64": {
-            "type": "string",
-            "minLength": 1
-          }
-        }
-      }
-    },
-    {
       "if": {"properties": {"record_kind": {"const": "semantic_review"}}},
       "then": {
         "required": ["reviewer_id", "payload"],
@@ -1027,9 +890,50 @@
             "enum": [
               "passed",
               "failed",
-              "incomplete",
-              "awaiting_human"
+              "incomplete"
             ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {
+            "const": "admission_record"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "status",
+          "batch_kind",
+          "view_digest",
+          "ingest_record_ref",
+          "ingest_record_digest",
+          "verification_tier"
+        ],
+        "properties": {
+          "status": {
+            "const": "passed"
+          },
+          "batch_kind": {
+            "const": "record_only"
+          },
+          "view_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "ingest_record_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "ingest_record_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "verification_tier": {
+            "const": "record_only_fixed_validation"
           }
         }
       }

@@ -25,15 +25,6 @@ canvas:
     inspect_candidate:
       x: 680
       y: 240
-    prepare_confirmation:
-      x: 1020
-      y: 240
-    final_view_user_gate:
-      x: 1360
-      y: 240
-    record_confirmation:
-      x: 0
-      y: 480
     local_check:
       x: 340
       y: 480

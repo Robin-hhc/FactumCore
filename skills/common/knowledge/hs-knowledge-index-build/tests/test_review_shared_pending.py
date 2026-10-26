@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import yaml
 import pytest
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 ROOT = Path(__file__).resolve().parents[5]
@@ -17,6 +18,8 @@ spec.loader.exec_module(fixture)
 
 @pytest.mark.parametrize("include_raw_refs", [False, True])
 def test_committed_record_only_pending_blocks_current_without_private_events(tmp_path, include_raw_refs):
+    # This isolated test key signs publication receipts only.
+    publication_key = Ed25519PrivateKey.generate()
     p = fixture.Pipeline(tmp_path)
     # Explicitly pin the isolated contract copy while other groups finish work.
     lock_path = p.root / "governance/framework.lock.yaml"
@@ -55,16 +58,16 @@ def test_committed_record_only_pending_blocks_current_without_private_events(tmp
     inventory["digest"] = fixture.sha(fixture.canonical(inventory))
     accepted = {"schema_version": "2.0", "record_kind": "ingest_record", "operation_id": "create", "status": "applied", "batch_kind": "content", "rules_digest": p.rules, "tool_identity": view["tool_identity"],
         "scan_ref": ".build/operations/create/inventory.json", "scan_digest": inventory["digest"], "inventory": inventory, "content_view_digest": view["digest"],
-        "dispositions": [{"unit_id": "u1", "action": "create", "reason": "Exact approved source", "observed_fingerprint": fixture.sha(original), "adopted_fingerprint": fixture.sha(original), "progress": "completed", "card_refs": ["pending-rule"], "claim_refs": [{"card_id": "pending-rule", "claim_id": "c1"}]}],
+        "dispositions": [{"unit_id": "u1", "action": "create", "reason": "Exact reviewed source", "observed_fingerprint": fixture.sha(original), "adopted_fingerprint": fixture.sha(original), "progress": "completed", "card_refs": ["pending-rule"], "claim_refs": [{"card_id": "pending-rule", "claim_id": "c1"}]}],
         "progress": {"apply": {"status": "applied", "operation_id": "create", "view_digest": view["digest"]}},
-        "acceptance": {"content_view_digest": view["digest"], "rules_digest": p.rules, "proof_digests": [p.record(applied_ref)["proof_digest"]], "cards": [{"path": path, "card_id": "pending-rule", "sha256": card_sha, "review_mode": "manual_document", "claim_ids": ["c1"], "review_result": "approved"}]}}
+        "acceptance": {"content_view_digest": view["digest"], "rules_digest": p.rules, "proof_digests": [p.record(applied_ref)["proof_digest"]], "cards": [{"path": path, "card_id": "pending-rule", "sha256": card_sha, "review_mode": "manual_document", "claim_ids": ["c1"], "review_result": "supported"}]}}
     accepted["digest"] = fixture.sha(fixture.canonical(accepted))
     accepted_ref = p.write("logs/ingest/accepted.yaml", fixture.canonical(accepted))
-    p.catalog["publication_trust"] = {"fixture": {"synthetic": True, "fixture_root": str(p.root), "public_key_b64": base64.b64encode(p.key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)).decode()}}
+    p.catalog["publication_trust"] = {"fixture": {"synthetic": True, "fixture_root": str(p.root), "public_key_b64": base64.b64encode(publication_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)).decode()}}
     p.catalog_path.write_bytes(fixture.canonical(p.catalog))
     def publish(label):
         payload = {"knowledge_commit": git("rev-parse", "HEAD"), "rules_digest": p.rules, "card_digests": {path: card_sha}, "acceptance_records": {accepted_ref: fixture.sha((p.root / accepted_ref).read_bytes())}}
-        receipt_ref = p.write("logs/publication/" + label + ".json", fixture.canonical({"adapter_id": "fixture", "payload": payload, "signature_b64": base64.b64encode(p.key.sign(fixture.canonical(payload))).decode()}))
+        receipt_ref = p.write("logs/publication/" + label + ".json", fixture.canonical({"adapter_id": "fixture", "payload": payload, "signature_b64": base64.b64encode(publication_key.sign(fixture.canonical(payload))).decode()}))
         built = p.call("knowledge-index-build", {"operation_id": "build-" + label, "channel": "shared", "publication_receipt_ref": receipt_ref})["data"]
         p.call("knowledge-index-build", {"operation_id": "activate-" + label, "generation_ref": built["generation_ref"], "expected_active": built["expected_active"]}, "activate")
     git("add", p.root.name + "/knowledge", p.root.name + "/governance", p.root.name + "/logs/ingest")

@@ -52,7 +52,7 @@ def record_input(ctx, request, view=None, proof=None):
     }}
     final["status"] = "recorded" if record["batch_kind"] == "record_only" else "applied"
     if record["batch_kind"] == "content" and proof is not None:
-        final["acceptance"] = acceptance(ctx, view, proof)
+        final["acceptance"] = acceptance(ctx, view, proof, request.get("content_review_ref"))
     final = seal(final)
     records.validate_ingest_record(final, view=view, rules=ctx.rules)
     raw = canonical(final) + b"\n"
@@ -63,7 +63,7 @@ def record_input(ctx, request, view=None, proof=None):
                     "final_digest": digest(raw), "bytes_b64": base64.b64encode(raw).decode()}
 
 
-def acceptance(ctx, view, proof):
+def acceptance(ctx, view, proof, content_review_ref=None):
     knowledge = contracts(ctx, "knowledge")
     cards = []
     for row in view["writes"]:
@@ -74,10 +74,13 @@ def acceptance(ctx, view, proof):
         cards.append({"path": path, "card_id": card["metadata"]["id"], "sha256": row["final_digest"],
                       "review_mode": card["metadata"]["review_mode"], "claim_ids": [c["id"] for c in card["claims"]],
                       "review_result": "retired" if card["metadata"]["lifecycle"] == "deprecated" else
-                      "approved" if card["metadata"]["review_mode"] == "manual_document" else "supported"})
+                      "supported"})
     proofs = [proof]
-    if proof.get("proof_refs"):
-        proofs = [ctx.read(ref) for ref in proof["proof_refs"].values()]
+    if content_review_ref:
+        review = ctx.read(content_review_ref)
+        validate_content_review(ctx, view, review)
+        if review["digest"] != proof["digest"]:
+            proofs.insert(0, review)
     result = {"content_view_digest": view["digest"], "rules_digest": ctx.rules_digest,
               "cards": cards, "proof_digests": [p["digest"] for p in proofs],
               "verification_tiers": [p.get("verification_tier") for p in proofs]}
@@ -92,31 +95,74 @@ def acceptance(ctx, view, proof):
     return result
 
 
+def validate_content_review(ctx, view, review):
+    """Validate independent review of the exact authored view, without human consent."""
+    author, reviewer = review.get("author_id"), review.get("reviewer_id")
+    if (review.get("record_kind") != "content_review" or review.get("status") != "passed"
+            or review.get("operation_id") != view["operation_id"]
+            or review.get("view_digest") != view["digest"]
+            or not isinstance(author, str) or not author.strip()
+            or not isinstance(reviewer, str) or not reviewer.strip()
+            or reviewer == author or not review.get("independent_context")
+            or review.get("findings") != []):
+        raise Blocked("independent content review must pass for this exact view with different authors and reviewers")
+    if view.get("v3_required") or view.get("semantic_plan_ref") or view.get("semantic_plan_digest"):
+        if not view.get("semantic_plan_ref") or not view.get("semantic_plan_digest"):
+            raise Blocked("independent content review requires the exact authored plan")
+        plan = ctx.read(view["semantic_plan_ref"])
+        authors = {plan["author_id"], *(row["author_id"] for row in plan["card_actions"])}
+        if (plan.get("record_kind") != "semantic_plan"
+                or plan.get("operation_id") != view["operation_id"]
+                or plan.get("digest") != view["semantic_plan_digest"]
+                or review.get("plan_digest") != plan["digest"]
+                or review.get("semantic_plan_ref") != view["semantic_plan_ref"]
+                or author != plan["author_id"] or reviewer in authors
+                or review.get("scan_digest") != plan.get("scan_digest")):
+            raise Blocked("independent content review has a stale plan, author conflict or changed scan")
+    elif ctx.domain is not None:
+        plan_ref = view.get("plan_ref")
+        if not plan_ref or review.get("plan_ref") != plan_ref or review.get("plan_digest") != view.get("plan_digest"):
+            raise Blocked("independent content review must bind the exact change plan")
+        plan = ctx.read(plan_ref)
+        if (plan.get("record_kind") != "change_plan" or plan.get("operation_id") != view["operation_id"]
+                or plan.get("digest") != view.get("plan_digest")):
+            raise Blocked("independent content review has a changed or foreign change plan")
+        declared = {plan.get("author_id")}
+        declared.update(row.get("author_id") for row in plan.get("decisions", []) if isinstance(row, dict))
+        if reviewer in declared or (plan.get("author_id") and author != plan["author_id"]):
+            raise Blocked("independent content review has a change-plan author conflict")
+    return review
+
+
 def check_admission(ctx, request, view):
-    if not view.get("v3_required") and not request.get("v3_required"):
+    versioned = any((view.get("v3_required"), request.get("v3_required"), request.get("ingest_record_ref"),
+                     view.get("semantic_plan_ref"), view.get("semantic_plan_digest")))
+    # Legacy code-only admission already verifies the fixed local-check proof.
+    # Keep its checked-snapshot semantics; only documents/mixed batches gain
+    # the document replacement checks, while versioned code keeps its full gate.
+    if view.get("review_mode") == "code_gate" and not versioned:
+        return
+    if ctx.domain is None:
+        if versioned:
+            raise Blocked("versioned domain contracts are required for admission")
         return
     checks = contracts(ctx, "checks")
-    path = ctx.path(request.get("lint_report_ref"), (f".build/operations/{view['operation_id']}",))
-    report = strict_json(path.read_text(encoding="utf-8"))
-    checks.validate_report(report, expected_rules=ctx.rules_digest, required_scope="full")
-    if report.get("status") != "passed" or report.get("object", {}).get("view_digest") != view["digest"]:
-        raise Blocked("a complete passing lint report for the exact view is required")
+    if versioned:
+        path = ctx.path(request.get("lint_report_ref"), (f".build/operations/{view['operation_id']}",))
+        report = strict_json(path.read_text(encoding="utf-8"))
+        checks.validate_report(report, expected_rules=ctx.rules_digest, required_scope="full")
+        if report.get("status") != "passed" or report.get("object", {}).get("view_digest") != view["digest"]:
+            raise Blocked("a complete passing lint report for the exact view is required")
     actual = checks.run(checks.prepare_view(ctx.root, view, mode="candidate", identity={"view_digest": view["digest"], "operation_id": view["operation_id"]}),
                         ctx.rules, request.get("check_inputs"), scope="full")
     checks.validate_report(actual, expected_rules=ctx.rules_digest, required_scope="full")
     if actual["exit_code"] != 0:
         raise Blocked("actual fixed full-view checks must pass immediately before admission")
-    review = ctx.read(request.get("content_review_ref"))
-    if (review.get("record_kind") != "content_review" or review.get("status") != "passed"
-            or review.get("view_digest") != view["digest"]
-            or review.get("plan_digest") != view.get("semantic_plan_digest")):
-        raise Blocked("independent content review must bind this exact view and authored plan")
-    plan = ctx.read(view["semantic_plan_ref"])
-    authors = {plan["author_id"], *(row["author_id"] for row in plan["card_actions"])}
-    if (plan.get("digest") != view.get("semantic_plan_digest") or review.get("reviewer_id") in authors
-            or not review.get("independent_context") or review.get("findings") != []
-            or review.get("scan_digest") != plan.get("scan_digest")):
-        raise Blocked("content review has an author conflict or unresolved findings")
+    if versioned or view.get("review_mode") in {"manual_document", "mixed"} or request.get("content_review_ref"):
+        if not request.get("content_review_ref"):
+            raise Blocked("the complete view requires independent content review")
+        review = ctx.read(request["content_review_ref"])
+        validate_content_review(ctx, view, review)
     for snapshot in view.get("source_refs", []):
         recovery = snapshot.get("recovery", {})
         if recovery.get("kind") != "git" and recovery.get("method") != "git":
@@ -142,7 +188,7 @@ def record_only_view(ctx, request):
                       batch_kind="record_only", ingest_record_ref=request["ingest_record_ref"])
     view_ref = f".build/operations/{op}/record-only-view.json"
     ctx.save(view_ref, view)
-    proof = ctx.record("confirmation_review", op, status="passed", view_digest=view["digest"],
+    proof = ctx.record("admission_record", op, status="passed", view_digest=view["digest"],
                        batch_kind="record_only", ingest_record_ref=request["ingest_record_ref"],
                        ingest_record_digest=record["digest"], verification_tier="record_only_fixed_validation")
     proof_ref = f".build/operations/{op}/record-only-proof.json"

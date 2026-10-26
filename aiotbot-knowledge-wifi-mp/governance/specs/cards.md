@@ -1,6 +1,6 @@
 # Card Markdown：技术解析与作者要求
 
-正式知识卡使用 UTF-8 Markdown。本文说明 Card/Claim 的技术身份和作者填写要求；Schema、摘要、章节和锚点通过不代表结论正确，也不是纯文档的自动语义门禁。纯文档仍由真实人确认最终内容，代码卡走对应代码检查路径。
+正式知识卡使用 UTF-8 Markdown。本文说明 Card/Claim 的技术身份和作者填写要求；Schema、摘要、章节和锚点通过不代表结论正确，也不是纯文档的自动语义门禁。纯文档与代码卡均由独立 Agent 复核最终内容，代码卡另走对应代码检查路径。
 
 ## 输入与七个 Profile
 
@@ -38,7 +38,7 @@ Claim.text_ref 只使用下列两种形式：
 
 Claim.context_ids 和关系的 context_ids 只能引用本卡 scope.contexts 中已存在的 context_id；解析后为每个 Claim 编译完整 scope。条件组内 AND、组间 OR；unknown 不等于 universal。不要凭原件文件夹、共享代码或资料标题补造芯片、侧别、宏、构建或 Host/Device pair 的适用性。
 
-更新时作者明确判断是延续同一断言还是形成新断言；新结论不能只沿用旧 ID 隐藏替换。程序不猜语义相似度，不将相似字符串当作同一结论。修改后的正文、来源或范围必须重新走对应确认/检查。
+更新时作者明确判断是延续同一断言还是形成新断言；新结论不能只沿用旧 ID 隐藏替换。程序不猜语义相似度，不将相似字符串当作同一结论。修改后的正文、来源或范围必须重新走独立复核和对应检查。
 
 ## 来源引用语法
 
@@ -52,6 +52,6 @@ Claim.context_ids 和关系的 context_ids 只能引用本卡 scope.contexts 中
 
 模板默认 draft/manual_document、未知范围，作者应按证据补齐内容。生产只写 candidates、ChangeSet、final-view 和 review-package；final-view 含拟落位 stable 的确切字节，正式卡、导航和来源锁在 apply 前不变。
 
-人工确认绑定最终卡、来源集合、范围、相关基线和全部拟写文件；真实贡献者本人可确认。部分接受要先生成缩窄的新 final-view，再重新展示并确认。无回复、Agent 署名或名字参数不构成确认。manual_document 不要求 LocalCheckRecord/MergeGateRecord，解析/摘要/CAS 只用于防写错对象。
+`manual_document` 保留为文档类的协议取值，不再表示真人确认。独立内容复核绑定最终卡、来源集合、范围、计划和全部拟写文件，并检查作者回避、独立上下文及未解决问题。文档类不要求 LocalCheckRecord/MergeGateRecord；代码卡仍须额外核对源码、配置条件与逐 Claim 依据。用户可在入库前要求退回或缩小范围，修订后生成新操作并重新复核；入库后再修订时也走新操作，不覆盖旧事务。
 
 本地 stable、已合入/未合入、当前有效性是不同状态。落位不等于已建立索引、已共享发布、最新代码已核验或已部署访问控制。未完成能力以 SDD 及实际验收记录为准。

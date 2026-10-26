@@ -30,10 +30,10 @@ def execute(context):
             "baseline_digest": view["baseline_digest"],
             "target_workflow": "hs-knowledge-ingest",
             "target_phase": "P4",
-            "next_action": "content_review_then_confirmation_then_P5_lint",
+            "next_action": "content_review_then_applicable_code_check_then_P5_lint",
             "workflow": context.request.get("workflow"),
             "limitations": [
-                "P4 continuation only; confirmation, final lint, application and submission remain explicit"
+                "P4 continuation only; independent review, final lint and local application remain required"
             ],
         },
         "handoff",

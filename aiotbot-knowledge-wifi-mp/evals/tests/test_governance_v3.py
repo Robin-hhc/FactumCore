@@ -258,10 +258,18 @@ def maintenance_record(name, claim="c1", outcome="defer", parent=None, sample=No
     if content:
         value["content_view_digest"] = "d" * 64
         value["progress"]["apply"]["view_digest"] = "d" * 64
-        value["acceptance"] = {"content_view_digest": "d" * 64, "rules_digest": "a" * 64, "proof_digests": ["b" * 64], "cards": [{"path": "knowledge/rules/card.md", "card_id": "card", "sha256": "c" * 64, "review_mode": "manual_document", "review_result": "approved", "claim_ids": [claim]}]}
+        value["acceptance"] = {"content_view_digest": "d" * 64, "rules_digest": "a" * 64, "proof_digests": ["b" * 64], "cards": [{"path": "knowledge/rules/card.md", "card_id": "card", "sha256": "c" * 64, "review_mode": "manual_document", "review_result": "supported", "claim_ids": [claim]}]}
     if sample:
         value["skip_sample"] = sample
     return records.seal(value)
+
+
+def test_document_admission_summary_uses_agent_support_instead_of_human_approval():
+    reviewed = maintenance_record("reviewed", outcome="content")
+    records.validate_ingest_record(reviewed)
+    reviewed["acceptance"]["cards"][0]["review_result"] = "approved"
+    with pytest.raises(v.ContractError, match="INVALID_ACCEPTANCE"):
+        records.validate_ingest_record(records.seal(reviewed))
 
 
 def test_only_final_same_claim_descendant_review_clears_shared_pending():
@@ -380,7 +388,7 @@ def test_lint_json_recovers_exact_old_record_card_after_current_card_update(rule
     record = records.seal({"schema_version": "2.0", "record_kind": "ingest_record", "operation_id": "op", "record_id": "historical", "rules_digest": rules["rules_digest"], "tool_identity": tool,
         "batch_kind": "content", "status": "applied", "content_view_digest": "d" * 64, "progress": {"apply": {"status": "applied", "operation_id": "op", "view_digest": "d" * 64}}, "scan_ref": ".build/old/scan.json", "scan_digest": inventory["digest"], "inventory": inventory,
         "dispositions": [{"unit_id": "u1", "action": "update", "reason": "Original adopted version", "observed_fingerprint": source_sha, "adopted_fingerprint": source_sha, "progress": "completed", "card_refs": [{"card_id": "card-a", "sha256": old_sha}], "claim_refs": [{"card_id": "card-a", "claim_id": "missing" if provide_history == "phantom_claim" else "c1"}]}],
-        "acceptance": {"content_view_digest": "d" * 64, "rules_digest": rules["rules_digest"], "proof_digests": ["b" * 64], "cards": [{"path": card_path, "card_id": "card-a", "sha256": old_sha, "review_mode": "manual_document", "review_result": "approved", "claim_ids": ["c1"]}]}})
+        "acceptance": {"content_view_digest": "d" * 64, "rules_digest": rules["rules_digest"], "proof_digests": ["b" * 64], "cards": [{"path": card_path, "card_id": "card-a", "sha256": old_sha, "review_mode": "manual_document", "review_result": "supported", "claim_ids": ["c1"]}]}})
     formal = tmp_path / "logs/ingest/history.yaml"
     formal.parent.mkdir(parents=True)
     formal.write_bytes(json_bytes(record))

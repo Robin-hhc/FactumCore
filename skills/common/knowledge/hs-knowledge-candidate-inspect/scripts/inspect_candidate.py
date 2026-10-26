@@ -163,7 +163,7 @@ def execute(context):
         report = checks.run(checks.prepare_view(context.root, view, mode="candidate", identity={"view_digest": view["digest"]}),
                             context.rules, request.get("check_inputs"), scope="full")
         if report["exit_code"] != 0:
-            raise NodeError("PREFLIGHT_FAILED", "Fixed preflight must pass before confirmation", blocked=True)
+            raise NodeError("PREFLIGHT_FAILED", "Fixed preflight must pass before final lint and admission", blocked=True)
     return {
         "view_ref": request["view_ref"],
         "view_digest": view["digest"],

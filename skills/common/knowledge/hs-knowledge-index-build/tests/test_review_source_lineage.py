@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import sys
 import yaml
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 ROOT = Path(__file__).resolve().parents[5]
@@ -16,6 +17,8 @@ spec.loader.exec_module(fixture)
 
 
 def test_published_reference_rejects_retargeted_local_snapshot(tmp_path):
+    # This isolated test key signs publication receipts only.
+    publication_key = Ed25519PrivateKey.generate()
     p = fixture.Pipeline(tmp_path)
     bundle_ref, bundle = p.capture("create", b"# Fixture\nOriginal capture statement.\n")
     view_ref = p.view("create", bundle_ref, "lineage-rule", p.card("lineage-rule", bundle))
@@ -30,7 +33,7 @@ def test_published_reference_rejects_retargeted_local_snapshot(tmp_path):
               "scan_ref": scan_ref, "scan_digest": scan["digest"], "inventory": scan, "content_view_digest": view["digest"],
               "dispositions": [{"unit_id": unit["unit_id"], "action": "update", "reason": "exact accepted source", "observed_fingerprint": unit["observed_fingerprint"], "adopted_fingerprint": unit["observed_fingerprint"], "progress": "completed", "card_refs": ["lineage-rule"], "claim_refs": []}],
               "progress": {"apply": {"status": "applied", "operation_id": "summary-scan", "view_digest": view["digest"]}},
-              "acceptance": {"content_view_digest": view["digest"], "rules_digest": p.rules, "proof_digests": ["a" * 64], "cards": [{"path": card_path, "card_id": "lineage-rule", "sha256": card_sha, "review_mode": "manual_document", "claim_ids": ["c1"], "review_result": "approved"}]}}
+              "acceptance": {"content_view_digest": view["digest"], "rules_digest": p.rules, "proof_digests": ["a" * 64], "cards": [{"path": card_path, "card_id": "lineage-rule", "sha256": card_sha, "review_mode": "manual_document", "claim_ids": ["c1"], "review_result": "supported"}]}}
     record["digest"] = fixture.sha(fixture.canonical(record))
     record_ref = p.write("logs/ingest/accepted.yaml", fixture.canonical(record))
     def git(*args):
@@ -39,10 +42,10 @@ def test_published_reference_rejects_retargeted_local_snapshot(tmp_path):
     git("config", "core.autocrlf", "false")
     git("add", "aiotbot-knowledge-wifi-mp/knowledge", "aiotbot-knowledge-wifi-mp/governance", "aiotbot-knowledge-wifi-mp/logs/ingest", "aiotbot-knowledge-wifi-mp/logs/evidence")
     git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "accepted fixture")
-    p.catalog["publication_trust"] = {"fixture": {"synthetic": True, "fixture_root": str(p.root), "public_key_b64": base64.b64encode(p.key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)).decode()}}
+    p.catalog["publication_trust"] = {"fixture": {"synthetic": True, "fixture_root": str(p.root), "public_key_b64": base64.b64encode(publication_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)).decode()}}
     p.catalog_path.write_bytes(fixture.canonical(p.catalog))
     payload = {"knowledge_commit": git("rev-parse", "HEAD"), "rules_digest": p.rules, "card_digests": {card_path: card_sha}, "acceptance_records": {record_ref: fixture.sha((p.root / record_ref).read_bytes())}}
-    receipt_ref = p.write("logs/publication/accepted.json", fixture.canonical({"adapter_id": "fixture", "payload": payload, "signature_b64": base64.b64encode(p.key.sign(fixture.canonical(payload))).decode()}))
+    receipt_ref = p.write("logs/publication/accepted.json", fixture.canonical({"adapter_id": "fixture", "payload": payload, "signature_b64": base64.b64encode(publication_key.sign(fixture.canonical(payload))).decode()}))
     built = p.call("knowledge-index-build", {"operation_id": "build", "channel": "shared", "publication_receipt_ref": receipt_ref})["data"]
     p.call("knowledge-index-build", {"operation_id": "activate", "generation_ref": built["generation_ref"], "expected_active": None}, "activate")
     replacement = b"# Fixture\nAn unrelated replacement statement.\n"

@@ -9,41 +9,38 @@ FIXTURE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(FIXTURE)
 
 
-def test_confirmation_displays_fixed_attachments_and_bundle_limitations(tmp_path):
+def test_document_admission_requires_independent_review_without_human_events(tmp_path):
     p = FIXTURE.Pipeline(tmp_path)
-    source = p.write(
-        "docs-raw/specs/source.md", b"# Source\n![diagram](diagram.png)\n[deferred](https://example.invalid/source)\n"
-    )
-    p.write("docs-raw/specs/diagram.png", b"opaque synthetic image bytes")
-    captured = p.call(
-        "knowledge-source-capture",
-        {
-            "operation_id": "attachments",
-            "source_id": "with-attachments",
-            "source_path": source,
-            "attachments": ["docs-raw/specs/diagram.png"],
-        },
-    )["data"]
-    bundle = p.record(captured["bundle_ref"])
-    view = p.view("attachments", captured["bundle_ref"], "attachment-rule", p.card("attachment-rule", bundle))
-    prepared = p.call("knowledge-confirmation-prepare", {"operation_id": "attachments", "view_ref": view})["data"]
-    display = p.record(prepared["display_ref"])
-    assert display["source_bundle_display"]["bundle_digest"] == bundle["digest"]
-    assert bundle["snapshots"][1]["sha256"] in display["display_text"]
-    assert bundle["snapshots"][1]["recovery"]["path"] in display["display_text"]
-    assert all(gap in display["display_text"] for gap in bundle["limitations"])
+    bundle_ref, bundle = p.capture("review-required", b"# Source\nIndependent review is required.\n")
+    view_ref = p.view("review-required", bundle_ref, "review-rule", p.card("review-rule", bundle))
+    assert "review_trust" not in p.catalog
+    p.call("knowledge-apply", {"operation_id": "review-required", "view_ref": view_ref}, expected=2)
+    assert not (p.root / "knowledge/rules/review-rule.md").exists()
+    proof_ref, review = p.review("review-required", view_ref)
+    for field, value in (("reviewer_id", review["author_id"]), ("view_digest", "0" * 64)):
+        bad = {**review, field: value}
+        bad.pop("digest")
+        bad["digest"] = FIXTURE.sha(FIXTURE.canonical(bad))
+        bad_ref = p.write(f".build/operations/review-required/bad-{field}.json", FIXTURE.canonical(bad))
+        p.call("knowledge-apply", {"operation_id": "review-required", "view_ref": view_ref,
+                                   "content_review_ref": bad_ref}, expected=3 if field == "reviewer_id" else 2)
+        assert not (p.root / "knowledge/rules/review-rule.md").exists()
+    p.call("knowledge-apply", {"operation_id": "review-required", "view_ref": view_ref,
+                               "content_review_ref": proof_ref})
+    assert (p.root / "knowledge/rules/review-rule.md").exists()
+    assert not list(p.root.rglob("host-event.json"))
 
 
-def test_raw_to_confirmed_stable_generation_and_live_source_change(tmp_path):
+def test_raw_to_reviewed_stable_generation_and_post_ingest_correction(tmp_path):
     p = FIXTURE.Pipeline(tmp_path)
     bundle_ref, bundle = p.capture("create-card", b"# Original\nCapture marker is a fixture rule.\n")
     view_ref = p.view("create-card", bundle_ref, "capture-rule", p.card("capture-rule", bundle))
     handoff = p.call("knowledge-governance-handoff", {"operation_id": "create-card", "view_ref": view_ref})
     assert handoff["phase"] == "handed_off"
     assert not (p.root / "knowledge/rules/capture-rule.md").exists()
-    applied_ref, display = p.apply("create-card", view_ref)
-    assert "Capture marker is a fixture rule" in display["display_text"]
-    assert display["source_displays"][0]["source_ref"]["snapshot_id"] == bundle["snapshots"][0]["snapshot_id"]
+    applied_ref, review = p.apply("create-card", view_ref)
+    assert review["view_digest"] == p.record(view_ref)["digest"]
+    assert "review_trust" not in p.catalog
     card_path = p.root / "knowledge/rules/capture-rule.md"
     original_card = card_path.read_bytes()
     built = p.call("knowledge-index-build", {"operation_id": "build-first"})["data"]
@@ -71,7 +68,7 @@ def test_raw_to_confirmed_stable_generation_and_live_source_change(tmp_path):
     first_generation = found["generation_ref"]
     old_pointer = (p.root / "artifacts/indexes/local/active.json").read_bytes()
     new_bundle_ref, new_bundle = p.capture(
-        "update-source", b"# Original\nChanged marker requires another human review.\n"
+        "update-source", b"# Original\nChanged marker requires another independent content review.\n"
     )
     stale = p.call("knowledge-query", {**search, "operation_id": "consume-stale"}, "search")["data"]
     assert stale["matches"] == []

@@ -1,6 +1,6 @@
 # WiFi 领域知识入口
 
-本目录为项目根 `repo/` 下的 `aiotbot-knowledge-wifi-mp/`，不包含嵌套 `.git`。原件在 `docs-raw/`；治理契约在 `governance/`；正式卡在 `knowledge/`；节点能力在项目根 `../skills/common/knowledge/`；流程编排在项目根 `../workflows/common/knowledge/`；系统设计与 SDD 在 `docs-llm-wiki/`。现行路径以[总体设计 §5.3](docs-llm-wiki/AIoTBot知识库架构设计.md#53-aiotbot-knowledge目录架构)为准。
+本目录为项目根 `repo/` 下的 `aiotbot-knowledge-wifi-mp/`，不包含嵌套 `.git`。原件在 `docs-raw/`；治理契约在 `governance/`；正式卡在 `knowledge/`；独立部署工具在 `tools/deploy/`；系统设计与本地 SDD 在 `docs-llm-wiki/`。开发分发源码在项目根 `../skills/common/knowledge/` 和 `../workflows/common/knowledge/`，实际能力安装到 Agent 自己的目录，由 catalog/registry 按最终位置登记；运行不依赖项目根能力目录。现行路径以[总体设计 §5.3](docs-llm-wiki/AIoTBot知识库架构设计.md#53-aiotbot-knowledge目录架构)为准。
 
 先读[文档入口](docs-llm-wiki/README.md)。详细设计分概要和节点详细设计两层。项目自身的需求、实现任务、测试和验收记录保存在本地 `docs-llm-wiki/sdd/`，任务入口为本地 `docs-llm-wiki/task.md`，均由 Git 忽略，不随仓库分发。开发时按需读取本地已有工件；未提供时依据共享设计、源码与实际验证工作，不把缺少工件视为部署缺项。保留本地历史工件原字节。
 

@@ -1,6 +1,6 @@
 # AIoTBot 项目开发入口
 
-本仓按[总体设计 §5.3](aiotbot-knowledge-wifi-mp/docs-llm-wiki/AIoTBot知识库架构设计.md#53-aiotbot-knowledge目录架构)组织，Git 操作统一在项目根执行。项目根以 `repo/` 为示意名称，承载业务代码工作区、WiFi 知识及配套能力；`AGENTS.md`、`config.yml`、`skills/`、`workflows/` 位于项目根，原件、知识与治理位于 `aiotbot-knowledge-wifi-mp/`。知识根和能力目录不建立嵌套 `.git`；业务代码保留项目已有的多目录布局。
+本仓按[总体设计 §5.3](aiotbot-knowledge-wifi-mp/docs-llm-wiki/AIoTBot知识库架构设计.md#53-aiotbot-knowledge目录架构)组织，Git 操作统一在项目根执行。项目根以 `repo/` 为示意名称，放置业务代码工作区、`AGENTS.md`、`config.yml` 和知识库 `aiotbot-knowledge-wifi-mp/`。本开发仓的 `skills/`、`workflows/` 是能力分发源码；实际部署到 Agent 自己的目录，按最终位置登记，运行不要求项目根保留这两个目录。知识根和能力目录不建立嵌套 `.git`；业务代码保留项目已有的多目录布局。
 
 共享文档统一使用 `repo/` 表示项目根，不要求部署目录取此名称。目录、配置和命令示例使用相对路径并说明基准；接口要求绝对路径时，从实际部署位置解析取得，不写死机器盘符或用户目录。历史快照、验收记录和外部资源身份保留原样。
 
@@ -9,11 +9,11 @@
 | 位置 | 职责 |
 |---|---|
 | `config.yml` | 项目架构映射：代码根、模块相对路径、芯片、Host／Device、特性及用途；工具按路径核对文件与内容指纹 |
-| `install.ps1` / `install.sh` | 使用现有 Python 3.11／3.12 准备仓外独立运行依赖与能力包；内部 Agent 接入见使用说明 |
+| `aiotbot-knowledge-wifi-mp/tools/deploy/` | 独立环境准备、能力分发和已部署能力登记；`install.ps1` / `install.sh` 位于此处，不依赖 Skill 包内安装器 |
 | `main/` | 默认业务代码工作区，可含多个实际 Git 仓；未接入真实代码时不创建虚构源码树 |
 | `aiotbot-knowledge-wifi-mp/` | 唯一领域根；原件、契约、知识及本地运行支撑按其 AGENTS 分层 |
-| `skills/common/knowledge/` | 节点 Skill 及其脚本、参考、产物模板与测试 |
-| `workflows/common/knowledge/` | `hs-knowledge-ingest` 串起生产与本地入库；只编排节点能力，日常调用见使用说明 |
+| `skills/common/knowledge/` | 节点 Skill 的开发分发源码；运行时使用 Agent 最终目录及 catalog 中的路径 |
+| `workflows/common/knowledge/` | ingest Workflow 的开发分发源码；部署到 Agent 的工作流目录，按逻辑 Skill ID 编排节点 |
 | `aiotbot-knowledge-wifi-mp/docs-llm-wiki/` | 共享架构、概要与详细设计、使用说明；本项目 `sdd/` 与 `task.md` 仅本地维护，不在仓根另建文档目录 |
 
 先阅读 WiFi [AGENTS.md](aiotbot-knowledge-wifi-mp/AGENTS.md) 与[文档入口](aiotbot-knowledge-wifi-mp/docs-llm-wiki/README.md)。架构设计说明目录和三条链路；详细设计先讲流程与判断，再按节点解释文件分工。修改实现前按共享设计和适用测试核实；本地存在对应 SDD 需求、设计和任务时一并读取。本项目开发工件位于 `aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/` 和同级 `task.md`，由 Git 忽略，不随部署分发；缺少它们不影响安装、运行或共享文档阅读。保留本地历史工件原字节，不把历史路径或成绩当作当前部署证明。

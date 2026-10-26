@@ -1,6 +1,6 @@
 # 节点机制验收
 
-此目录保存当前设计对齐实现 的领域契约、Workflow 和跨包公开 CLI 联检。各 Skill 的单元测试位于仓根 `skills/common/knowledge/<Skill>/tests/` 中，分别启动 Python 进程，避免同名私有模块的测试导入互相污染。只使用隔离合成材料，不读取受限 gold。
+此目录保存当前设计对齐实现的领域契约、Workflow 和跨包公开 CLI 联检。开发仓的 Skill 单元测试在 `skills/common/knowledge/<Skill>/tests/`，独立部署工具测试在知识库 `tools/deploy/tests/`；分别启动 Python 进程，避免同名私有模块的测试导入互相污染。这些是开发测试入口，不要求部署项目保留根能力源码目录。只使用隔离合成材料，不读取受限 gold。
 
 使用 Python 3.11（也兼容 3.12）和显式锁定测试环境，在项目根 `repo/` 执行 `python aiotbot-knowledge-wifi-mp/evals/run_acceptance.py --output-dir .scratch/acceptance-new`；结果目录须全新，相对路径以项目根为基准。保留每组 JUnit、stdout/stderr 和汇总 JSON；退出码不能替代逐项报告。可选环境 `FACTUM_OPENFLOW_SOURCE` 指向验证器固定 SHA 的上游源码，`FACTUM_POSIX_SHELL` 指向实际 POSIX Shell；缺少时相关检查明确 skipped，不算通过。验收运行器不自动安装依赖或修改全局宿主配置。
 

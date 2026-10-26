@@ -14,7 +14,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[3]
 VALIDATOR = ROOT / "aiotbot-knowledge-wifi-mp/evals/validate_design.py"
 INSTALLER = (
-    ROOT / "skills/common/knowledge/hs-workspace-explore/scripts/install_catalog.py"
+    ROOT / "aiotbot-knowledge-wifi-mp/tools/deploy/install_catalog.py"
 )
 
 

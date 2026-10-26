@@ -108,19 +108,24 @@ def absolute(value, *, exists=True):
     return path.resolve(strict=exists)
 
 
-def package_files(package):
+def package_files(package, *, runtime_only=False):
     no_links(package)
     files = {}
     for path in sorted(package.rglob("*")):
         rel = path.relative_to(package)
-        if any(p in IGNORED for p in rel.parts) or path.suffix == ".pyc":
+        if "__pycache__" in rel.parts or runtime_only and "tests" in rel.parts:
+            continue
+        # Copies may omit development caches; an existing runtime directory must
+        # reject unsupported identity files rather than silently omit their hash.
+        if not runtime_only and (any(p in IGNORED for p in rel.parts) or path.suffix == ".pyc"):
             continue
         no_links(path)
         if not path.is_file():
             continue
         if rel.as_posix() == "SKILL.md" or (
             len(rel.parts) == 1
-            and re.fullmatch(r"requirements(?:-dev)?\.lock\.txt", path.name)
+            and (re.fullmatch(r"requirements(?:-dev)?\.lock\.txt", path.name)
+                 or runtime_only and path.name.startswith("requirements") and path.name.endswith(".txt"))
         ):
             files[rel.as_posix()] = public_bytes(path.read_bytes(), rel)
         elif rel.parts[0] in DIRECTORIES:
@@ -132,8 +137,9 @@ def package_files(package):
             ):
                 raise InstallError(f"UNPUBLISHABLE_PACKAGE_FILE: {rel}")
             files[rel.as_posix()] = public_bytes(path.read_bytes(), rel)
-    missing = set(REQUIRED) - files.keys()
-    if not any(ref.startswith("tests/test") and ref.endswith(".py") for ref in files):
+    required = set(REQUIRED) - ({"requirements-dev.lock.txt"} if runtime_only else set())
+    missing = required - files.keys()
+    if not runtime_only and not any(ref.startswith("tests/test") and ref.endswith(".py") for ref in files):
         missing.add("tests/test*.py")
     if missing:
         raise InstallError(f"INCOMPLETE_PACKAGE: {package.name}: {sorted(missing)}")
@@ -162,6 +168,7 @@ def package_digest(files):
 
 def dependencies(files):
     pins = {}
+    normalized = {}
     for line in files["requirements.lock.txt"].decode("utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
@@ -170,6 +177,10 @@ def dependencies(files):
         if not match:
             raise InstallError("INVALID_DEPENDENCY_LOCK: exact pins required")
         name, version = match.groups()
+        identity = re.sub(r"[-_.]+", "-", name).lower()
+        if identity in normalized and normalized[identity] != version:
+            raise InstallError(f"CONFLICTING_DEPENDENCY_LOCKS: {identity}")
+        normalized[identity] = version
         pins[name] = version
     return pins
 
@@ -336,32 +347,50 @@ def workspace_registration(config_path, python):
     }
 
 
-def install(source_root, destination, python_path, workspace_config=None):
-    source = absolute(source_root)
+def install(source_root, destination, python_path, workspace_config=None, *,
+            skills_root=None, workflows_root=None, register_existing=False):
+    """Copy a source distribution, or register the Agent's final directories in place."""
+    source = absolute(source_root) if source_root is not None else None
     destination = absolute(destination, exists=False)
     python = absolute(python_path)
     if not python.is_file():
         raise InstallError("INTERPRETER_NOT_FILE")
     if destination.exists():
         raise InstallError("DESTINATION_EXISTS: choose a new isolated destination")
-    if (
-        source == destination
-        or source in destination.parents
-        or destination in source.parents
-    ):
+    if bool(skills_root) != bool(workflows_root):
+        raise InstallError("CAPABILITY_ROOTS_REQUIRED: supply both skills-root and workflows-root")
+    if register_existing and not skills_root:
+        raise InstallError("CAPABILITY_ROOTS_REQUIRED: register the final Agent directories explicitly")
+    if not skills_root:
+        if source is None:
+            raise InstallError("SOURCE_ROOT_REQUIRED")
+        skills_root = source / "skills/common/knowledge"
+        workflows_root = source / "workflows/common/knowledge"
+    skills_root, workflows_root = absolute(skills_root), absolute(workflows_root)
+    for capability_root in (skills_root, workflows_root):
+        if not capability_root.is_dir():
+            raise InstallError("CAPABILITY_ROOT_NOT_DIRECTORY")
+    protected_roots = [skills_root, workflows_root]
+    if source is not None:
+        protected_roots.append(source)
+    if workspace_config:
+        protected_roots.append(absolute(workspace_config).parent)
+    if any(destination == path or path in destination.parents or destination in path.parents
+           for path in protected_roots):
         raise InstallError("DESTINATION_OVERLAPS_SOURCE")
     packages = {}
     pins = {}
     for identity in SKILLS:
-        files = package_files(source / "skills/common/knowledge" / identity)
+        files = package_files(skills_root / identity, runtime_only=register_existing)
         for name, version in dependencies(files).items():
+            name = re.sub(r"[-_.]+", "-", name).lower()
             if name in pins and pins[name] != version:
                 raise InstallError("CONFLICTING_DEPENDENCY_LOCKS")
             pins[name] = version
         packages[identity] = files
     templates = {}
     for identity in WORKFLOWS:
-        package = source / "workflows/common/knowledge" / identity
+        package = workflows_root / identity
         no_links(package)
         templates[identity] = {}
         for name in ("workflow.yaml", "layouts.yaml"):
@@ -378,15 +407,19 @@ def install(source_root, destination, python_path, workspace_config=None):
         os.chmod(staging, 0o700)
         skills = {}
         manifest = {}
+        external_manifest = {}
         for identity, files in packages.items():
             relative = Path("config/skills") / identity
             for ref, data in files.items():
-                path = staging / relative / ref
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_bytes(data)
-                manifest[(relative / ref).as_posix()] = sha(data)
+                if register_existing:
+                    external_manifest[str(skills_root / identity / ref)] = sha(data)
+                else:
+                    path = staging / relative / ref
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(data)
+                    manifest[(relative / ref).as_posix()] = sha(data)
             skills[identity] = {
-                "root": str(destination / relative),
+                "root": str(skills_root / identity if register_existing else destination / relative),
                 "entry": "scripts/cli.py",
                 "python": str(python),
                 "package_digest": package_digest(files),
@@ -394,21 +427,42 @@ def install(source_root, destination, python_path, workspace_config=None):
         for identity, files in templates.items():
             for ref, data in files.items():
                 relative = Path("config/workflow-templates") / identity / ref
-                path = staging / relative
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_bytes(data)
-                manifest[relative.as_posix()] = sha(data)
+                if register_existing:
+                    external_manifest[str(workflows_root / identity / ref)] = sha(data)
+                else:
+                    path = staging / relative
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(data)
+                    manifest[relative.as_posix()] = sha(data)
+        if register_existing:
+            for identity, files in packages.items():
+                if package_files(skills_root / identity, runtime_only=True) != files:
+                    raise InstallError("CAPABILITY_CHANGED_DURING_REGISTRATION")
+            for identity, files in templates.items():
+                for ref, data in files.items():
+                    path = workflows_root / identity / ref
+                    no_links(path)
+                    if path.read_bytes() != data:
+                        raise InstallError("CAPABILITY_CHANGED_DURING_REGISTRATION")
         outputs = {
             "catalog.json": {
                 "schema_version": "2.0",
                 "skills": skills,
                 "workspaces": workspaces,
                 "commands": COMMANDS,
+                "workflows": {
+                    identity: {"root": str(workflows_root / identity if register_existing
+                                            else destination / "config/workflow-templates" / identity),
+                               "files": {ref: sha(data) for ref, data in files.items()}}
+                    for identity, files in templates.items()
+                },
             },
             "workspace-registry.json": registry,
             "install-manifest.json": {
                 "schema_version": "2.0",
                 "files": manifest,
+                "external_files": external_manifest,
+                "mode": "registered_existing" if register_existing else "copied_distribution",
                 "limitations": [
                     "Installation is not host registration or Workflow runtime acceptance.",
                     "OS access control and full OpenFlow runtime acceptance are external checks.",
@@ -437,14 +491,21 @@ def install(source_root, destination, python_path, workspace_config=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source-root", required=True)
-    parser.add_argument("--destination", required=True)
-    parser.add_argument("--python", required=True)
-    parser.add_argument("--workspace-config")
+    def absolute_argument(value):
+        return str(Path(value).absolute())
+    parser.add_argument("--source-root", type=absolute_argument, help="development source distribution; not needed for existing Agent directories")
+    parser.add_argument("--register-existing", action="store_true", help="register final Agent directories without copying or modifying them")
+    parser.add_argument("--skills-root", type=absolute_argument)
+    parser.add_argument("--workflows-root", type=absolute_argument)
+    parser.add_argument("--destination", type=absolute_argument, required=True)
+    parser.add_argument("--python", type=absolute_argument, required=True)
+    parser.add_argument("--workspace-config", type=absolute_argument)
     args = parser.parse_args()
     try:
         catalog = install(
-            args.source_root, args.destination, args.python, args.workspace_config
+            args.source_root, args.destination, args.python, args.workspace_config,
+            skills_root=args.skills_root, workflows_root=args.workflows_root,
+            register_existing=args.register_existing,
         )
     except (InstallError, OSError, ValueError, subprocess.SubprocessError) as exc:
         print(str(exc), file=sys.stderr)

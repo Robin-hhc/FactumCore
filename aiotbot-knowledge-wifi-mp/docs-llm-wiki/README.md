@@ -16,7 +16,7 @@ flowchart LR
 
 项目自身的 `task.md` 与 `sdd/` 仅在本地保存开发任务、需求、测试计划和验收记录，已由 Git 忽略；共享仓库和能力包不包含这些工件，使用与部署无需准备它们。
 
-文档用 `repo/` 表示项目根目录的示意名称。业务代码工作区、`AGENTS.md`、`config.yml`、`skills/` 与 `workflows/` 位于该根目录；WiFi 原件、知识和治理位于 `aiotbot-knowledge-wifi-mp/`。能力目录分别为项目根的 `skills/common/knowledge/` 和 `workflows/common/knowledge/`，不包含嵌套 `.git`。业务代码可包含多个实际代码仓或模块目录。本目录只存系统说明与开发工件，正式领域知识只进入 `../knowledge/`。
+文档用 `repo/` 表示项目根目录的示意名称。业务代码工作区、`AGENTS.md`、`config.yml` 与知识库 `aiotbot-knowledge-wifi-mp/` 位于该根目录。开发仓的 `skills/common/knowledge/` 和 `workflows/common/knowledge/` 是分发源码；部署到 Agent 自己的最终目录后，由知识库 `tools/deploy/` 登记实际位置，运行不要求项目根保留能力目录。业务代码可包含多个实际代码仓或模块目录，不另建嵌套 `.git`。本目录只存系统说明与开发工件，正式领域知识只进入 `../knowledge/`。
 
 当前安装器和命令入口将知识库与代码放在同一业务工作区。独立存放知识库需要另行完成宿主部署适配，默认入口不读取 `config.env`。知识库按模块相对路径读取已落地文件，见[工作区路径与部署边界](知识库详细设计.md#7-工作区路径与部署边界)。
 

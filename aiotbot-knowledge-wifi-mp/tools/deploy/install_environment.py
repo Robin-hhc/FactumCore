@@ -1,4 +1,4 @@
-"""Prepare locked dependencies and a private catalog with existing Python.
+"""Prepare a knowledge-owned runtime, optionally registering final Agent packages.
 
 Uses the machine's pip configuration by default. --wheelhouse is strictly offline;
 --index-url explicitly selects the company's package index. No system packages,
@@ -23,15 +23,19 @@ import install_catalog as catalog
 
 
 def runtime_pins(source):
-    """Union the real package locks, rejecting aliases with conflicting pins."""
+    """Read the knowledge-owned lock; installed Skills may live anywhere."""
+    lock = Path(source) / "aiotbot-knowledge-wifi-mp/tools/deploy/requirements.runtime.lock.txt"
+    catalog.no_links(lock)
+    if not lock.is_file():
+        raise catalog.InstallError("RUNTIME_LOCK_MISSING")
     pins = {}
-    for identity in catalog.SKILLS:
-        files = catalog.package_files(source / "skills/common/knowledge" / identity)
-        for name, version in catalog.dependencies(files).items():
-            normalized = re.sub(r"[-_.]+", "-", name).lower()
-            if normalized in pins and pins[normalized] != version:
-                raise catalog.InstallError(f"CONFLICTING_DEPENDENCY_LOCKS: {normalized}")
-            pins[normalized] = version
+    for name, version in catalog.dependencies({"requirements.lock.txt": lock.read_bytes()}).items():
+        normalized = re.sub(r"[-_.]+", "-", name).lower()
+        if normalized in pins and pins[normalized] != version:
+            raise catalog.InstallError(f"CONFLICTING_DEPENDENCY_LOCKS: {normalized}")
+        pins[normalized] = version
+    if not pins:
+        raise catalog.InstallError("EMPTY_RUNTIME_LOCK")
     return dict(sorted(pins.items()))
 
 
@@ -66,7 +70,8 @@ def validate_pip_destination(python):
             raise catalog.InstallError(f"PIP_DESTINATION_OVERRIDE: remove {key} before private installation")
 
 
-def prepare(source, destination, *, wheelhouse=None, index_url=None):
+def prepare(source, destination, *, wheelhouse=None, index_url=None,
+            skills_root=None, workflows_root=None):
     if sys.version_info[:2] not in {(3, 11), (3, 12)}:
         raise catalog.InstallError("PYTHON_VERSION: use existing Python 3.11 (3.12 is also supported)")
     for name in ("PIP_TARGET", "PIP_PREFIX", "PIP_ROOT", "PIP_PYTHON"):
@@ -78,6 +83,14 @@ def prepare(source, destination, *, wheelhouse=None, index_url=None):
         raise catalog.InstallError("DESTINATION_EXISTS: select a new directory; existing installations are preserved")
     if source == destination or source in destination.parents or destination in source.parents:
         raise catalog.InstallError("DESTINATION_OVERLAPS_SOURCE: runtime must be outside the project")
+    if bool(skills_root) != bool(workflows_root):
+        raise catalog.InstallError("CAPABILITY_ROOTS_REQUIRED: supply both skills-root and workflows-root")
+    if skills_root:
+        skills_root = catalog.absolute(str(Path(skills_root).absolute()))
+        workflows_root = catalog.absolute(str(Path(workflows_root).absolute()))
+        if any(destination == path or path in destination.parents or destination in path.parents
+               for path in (skills_root, workflows_root)):
+            raise catalog.InstallError("DESTINATION_OVERLAPS_SOURCE")
     if wheelhouse and index_url:
         raise catalog.InstallError("Choose either --wheelhouse or --index-url")
     if wheelhouse:
@@ -113,20 +126,30 @@ def prepare(source, destination, *, wheelhouse=None, index_url=None):
     run(command, f"Installing {len(pins)} locked runtime packages...")
     run([str(python), "-m", "pip", "--disable-pip-version-check", "check"], "Checking dependency consistency...")
     catalog.validate_interpreter(python, pins)
-    installed = destination / "capabilities"
-    catalog_path = catalog.install(source, installed, python, config)
+    catalog_path = None
+    if skills_root:
+        installed = destination / "registration"
+        catalog_path = catalog.install(source, installed, python, config,
+                                       skills_root=skills_root, workflows_root=workflows_root,
+                                       register_existing=True)
+        registry_path = installed / "workspace-registry.json"
+    else:
+        _, registry = catalog.workspace_registration(config, python)
+        registry_path = destination / "workspace-registry.json"
+        registry_path.write_bytes(catalog.canonical(registry) + b"\n")
     report = {
-        "status": "installed",
+        "status": "installed" if catalog_path else "runtime_ready",
         "installation": str(destination / "installation.json"),
         "python": str(python),
         "python_version": sys.version.split()[0],
-        "catalog": str(catalog_path),
-        "workspace_registry": str(installed / "workspace-registry.json"),
-        "skills": str(installed / "config/skills"),
-        "workflows": str(installed / "config/workflow-templates"),
+        "catalog": str(catalog_path) if catalog_path else None,
+        "workspace_registry": str(registry_path),
+        "skills": str(skills_root) if skills_root else None,
+        "workflows": str(workflows_root) if workflows_root else None,
         "requirements": str(lock),
         "runtime_packages": pins,
-        "next_step": "Register these skills/workflows and this Python interpreter with your internal Agent.",
+        "next_step": ("Use this catalog and Python with the Agent's registered capability directories."
+                      if catalog_path else "Move capabilities into their final Agent directories, then run install_catalog.py --register-existing with this Python."),
     }
     (destination / "installation.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return report
@@ -134,8 +157,10 @@ def prepare(source, destination, *, wheelhouse=None, index_url=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source-root", default=str(Path(__file__).resolve().parents[5]))
+    parser.add_argument("--source-root", default=str(Path(__file__).resolve().parents[3]))
     parser.add_argument("--destination", help="new private directory outside the source project")
+    parser.add_argument("--skills-root", help="final Agent directory containing the hs-* Skill packages")
+    parser.add_argument("--workflows-root", help="final Agent directory containing hs-knowledge-ingest")
     sources = parser.add_mutually_exclusive_group()
     sources.add_argument("--wheelhouse", help="offline wheel directory for this OS, CPU and Python")
     sources.add_argument("--index-url", help="internal pip index; otherwise uses existing pip configuration")
@@ -143,7 +168,8 @@ def main():
     source = Path(args.source_root).absolute()
     destination = Path(args.destination).absolute() if args.destination else default_destination(source)
     try:
-        report = prepare(source, destination, wheelhouse=args.wheelhouse, index_url=args.index_url)
+        report = prepare(source, destination, wheelhouse=args.wheelhouse, index_url=args.index_url,
+                         skills_root=args.skills_root, workflows_root=args.workflows_root)
     except (catalog.InstallError, OSError, ValueError, subprocess.SubprocessError) as exc:
         # CalledProcessError includes the command, potentially containing a private
         # index URL. Print the stage failure only; pip supplies its own diagnostics.

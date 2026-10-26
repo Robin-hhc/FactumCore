@@ -1,13 +1,15 @@
 <#
 Prepare a private knowledge runtime using an existing Python 3.11/3.12.
-Example: .\install.ps1 -IndexUrl https://packages.example.internal/simple
+Run from the project root: .\aiotbot-knowledge-wifi-mp\tools\deploy\install.ps1
 #>
 [CmdletBinding()]
 param(
     [string]$Python,
     [string]$Destination,
     [string]$Wheelhouse,
-    [string]$IndexUrl
+    [string]$IndexUrl,
+    [string]$SkillsRoot,
+    [string]$WorkflowsRoot
 )
 
 $ErrorActionPreference = 'Stop'
@@ -24,10 +26,13 @@ if (-not $Python) {
         throw 'Python 3.11 was not found. Specify -Python with the existing interpreter path.'
     }
 }
-$helper = Join-Path $PSScriptRoot 'skills/common/knowledge/hs-workspace-explore/scripts/install_environment.py'
-$helperArgs = @('-X', 'utf8', $helper, '--source-root', $PSScriptRoot)
+$helper = Join-Path $PSScriptRoot 'install_environment.py'
+$projectRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../..'))
+$helperArgs = @('-X', 'utf8', $helper, '--source-root', $projectRoot)
 if ($Destination) { $helperArgs += @('--destination', $Destination) }
 if ($Wheelhouse) { $helperArgs += @('--wheelhouse', $Wheelhouse) }
 if ($IndexUrl) { $helperArgs += @('--index-url', $IndexUrl) }
+if ($SkillsRoot) { $helperArgs += @('--skills-root', $SkillsRoot) }
+if ($WorkflowsRoot) { $helperArgs += @('--workflows-root', $WorkflowsRoot) }
 & $Python @pythonArgs @helperArgs
 exit $LASTEXITCODE

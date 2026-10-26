@@ -11,7 +11,8 @@ import pytest
 import yaml
 
 
-SCRIPT = Path(__file__).parents[1] / "scripts/install_catalog.py"
+REPOSITORY = Path(__file__).resolve().parents[4]
+SCRIPT = Path(__file__).resolve().parents[1] / "install_catalog.py"
 IDS = ["hs-workspace-explore"] + [
     "hs-knowledge-" + name
     for name in (
@@ -56,8 +57,7 @@ def test_current_catalog_omits_human_confirmation_capabilities():
 
 
 def test_current_workflow_reviews_then_lints_without_human_gate():
-    repository = SCRIPT.resolve().parents[5]
-    package = repository / "workflows/common/knowledge/hs-knowledge-ingest"
+    package = REPOSITORY / "workflows/common/knowledge/hs-knowledge-ingest"
     workflow = yaml.safe_load((package / "workflow.yaml").read_bytes())
     layout = yaml.safe_load((package / "layouts.yaml").read_bytes())
     nodes = {node["id"]: node for node in workflow["nodes"]}

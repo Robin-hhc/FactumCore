@@ -63,6 +63,7 @@ def main():
     packages = sorted(path for path in (ROOT / "skills/common/knowledge").glob("hs-*/tests")
                       if (path.parent / "SKILL.md").is_file())
     groups = [(i, path.parent.name, path) for i, path in enumerate(packages)]
+    groups.append((len(groups), "deployment-tools", ROOT / "aiotbot-knowledge-wifi-mp/tools/deploy/tests"))
     groups.append((len(groups), "domain-and-integration", ROOT / "aiotbot-knowledge-wifi-mp/evals/tests"))
     env = dict(os.environ, AIOTBOT_TEST_TMP=str(output / "unittest-tmp"))
     with ThreadPoolExecutor(max_workers=args.jobs) as pool:

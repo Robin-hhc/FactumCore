@@ -4,19 +4,20 @@
 
 aiotbot-knowledge知识库仓目录结构如下所示。
 
-本节以 `repo/` 表示项目根目录，实际目录名称和存放位置不限。默认将 `aiotbot-knowledge-wifi-mp/` 放在项目根，与代码及配套能力共同管理。业务工作区可包含 Host、Device、特性和算法等多个代码模块；知识库按配置中的相对路径读取实际文件，以内容指纹核对引用。
+本节以 `repo/` 表示项目根目录，实际目录名称和存放位置不限。默认将 `aiotbot-knowledge-wifi-mp/` 放在项目根，与业务代码共同管理。开发仓保存 Skill／Workflow 分发源码；实际部署在 Agent 自己的能力目录，运行不依赖项目根保留源码副本。业务工作区可包含 Host、Device、特性和算法等多个代码模块；知识库按配置中的相对路径读取实际文件，以内容指纹核对引用。
 
 当前安装和命令入口按同一业务工作区部署，从 `config.yml` 所在目录解析模块路径。知识库独立存放属于需另行实现的部署适配方案；默认入口不读取 `config.env`。路径约定与部署边界见[详细设计第7章](知识库详细设计.md#7-工作区路径与部署边界)。
 
 - AGENTS.md：本工作区的消费路由契约
 - config.yml：项目架构映射，登记代码根、模块相对路径及芯片／端／特性／用途
 - main/：真实代码工作区
-- skills/common/knowledge/：项目根的节点能力
-- workflows/common/knowledge/：项目根的 ingest 工作流
+- skills/common/knowledge/：开发分发用的节点能力源码，部署位置由 Agent 决定
+- workflows/common/knowledge/：开发分发用的 ingest 工作流源码
 - aiotbot-knowledge-wifi-mp/：WiFi 领域根，集中维护原件、知识与治理
   - knowledge/：知识卡，唯一检索对象，处理后知识的仓库
   - docs-raw/：源文档，原始证据层（LLM 只读）
   - governance/：治理文件夹，存放契约，模板，规范等
+  - tools/deploy/：环境准备、能力分发及 Agent 最终目录登记，不属于 Skill
   - .build/ · logs/ · evals/ · artifacts/ · docs-llm-wiki/：配套支撑层
 
 ```text
@@ -24,7 +25,7 @@ repo/
 ├── AGENTS.md                      # 项目入口与消费路由
 ├── config.yml                     # 代码根、模块相对路径与归属
 ├── main/                          # 业务代码工作区，可包含多个模块
-├── skills/common/knowledge/   # 节点级能力
+├── skills/common/knowledge/   # 开发分发源码，部署时放入 Agent Skills
 │   ├── hs-workspace-explore/             # E0：缺上下文时前置发现
 │   ├── hs-knowledge-source-scan/         # 增量扫描、材料与处理记录
 │   ├── hs-knowledge-source-capture/      # 保存本次原文副本与定位
@@ -43,7 +44,7 @@ repo/
 │   ├── hs-knowledge-merge-check/         # 固定代码视图复核辅助
 │   ├── hs-knowledge-maintain/            # 变更影响与阻断复核
 │   └── hs-knowledge-query/               # 消费知识
-├── workflows/common/knowledge/
+├── workflows/common/knowledge/ # 开发分发源码，部署时放入 Agent Workflows
 │   └── hs-knowledge-ingest/   # P1—P7：原件到 stable 的完整流程
 └── aiotbot-knowledge-wifi-mp/       # WiFi 领域根，无嵌套 .git
     ├── AGENTS.md / README.md / CONTRIBUTING.md
@@ -74,6 +75,7 @@ repo/
     │   └── glossaries/           # 术语
     ├── .build/                   # 候选暂存，Git 忽略
     ├── logs/                     # 来源、复核、操作和恢复留痕
+    ├── tools/deploy/             # 独立安装工具、运行锁及能力目录登记
     ├── evals/                    # 检索案例和回归门禁
     ├── artifacts/                # 可重建索引和报告，Git 忽略
     └── docs-llm-wiki/             # 系统设计与使用说明；自身 SDD 仅本地维护
@@ -81,7 +83,7 @@ repo/
 
 节点 Skill 和 Workflow 随 WiFi 知识库维护：
 
-`skills/common/knowledge/` 和 `workflows/common/knowledge/` 位于项目根 `repo/`，与 `AGENTS.md`、`config.yml` 同级管理，不包含嵌套 `.git`。一条 `hs-knowledge-ingest` Workflow 完成 P1—P7；`hs-knowledge-lint` 位于 Skill 目录，只执行只读检查。文档和代码均先完成独立 Agent 内容复核，文档继续 lint，代码及混合稿另完成适用代码核验。
+上树展示开发分发源码。部署后，`S` 表示 Agent 实际的 Skill 父目录，`F` 表示其 Workflow 父目录；两者可以在项目外，按最终位置生成 catalog/registry。知识库 `tools/deploy/` 独立准备运行环境和登记能力，不要求项目根保留 `skills/`、`workflows/`，节点也不从 Skill 包内运行安装器。一条 `hs-knowledge-ingest` Workflow 完成 P1—P7；`hs-knowledge-lint` 位于已安装的 Skill 目录，只执行只读检查。文档和代码均先完成独立 Agent 内容复核，文档继续 lint，代码及混合稿另完成适用代码核验。
 
 
 
@@ -118,7 +120,7 @@ AIoT 业务横跨 WiFi、BGLE、定位、雷达、SLP、NFC、NPU、MCU 等十�
 | 人读与机读分离 | 谁来浏览、谁来召回？ | `index.md`（人读导航）↔ `artifacts/`（机器索引） |
 | 沉淀与暂存分离 | 什么入库、什么忽略？ | 上库目录 ↔ `.build/`（暂存，Git 忽略） |
 
-项目与知识库按层协作：下图的 `AGENTS.md`、`config.yml`、`skills/`、`workflows/` 相对项目根，`docs-raw/`、`knowledge/`、`governance/` 及运行支撑目录相对知识根 K。`main/` 是本仓代码工作区，真实业务目录按 `config.yml` 映射。总体架构如下：
+项目与知识库按层协作：下图的 `AGENTS.md`、`config.yml` 相对项目根，`docs-raw/`、`knowledge/`、`governance/`、`tools/` 及运行支撑目录相对知识根 K；`S`、`F` 是 Agent 实际能力目录。`main/` 是本仓代码工作区，真实业务目录按 `config.yml` 映射。总体架构如下：
 
 ```mermaid
 flowchart TB
@@ -154,8 +156,8 @@ flowchart TB
     subgraph S4["④ 治理与工具层"]
         direction LR
         D1["governance/<br />templates · schemas · contracts · specs · sources.lock.yaml"]
-        D2["skills/common/knowledge<br />source-capture · change-plan · lint · apply · query"]
-        D3["workflows/common/knowledge<br />hs-knowledge-ingest：完整 P1—P7"]
+        D2["Agent Skills · S<br />source-capture · change-plan · lint · apply · query"]
+        D3["Agent Workflows · F<br />hs-knowledge-ingest：完整 P1—P7"]
     end
 
     subgraph S5["⑤ 配套支撑层"]
@@ -185,7 +187,7 @@ flowchart TB
 | ① 入口路由层 | 已知上下文直接路由；缺失时先发现 | `AGENTS.md` · `config.yml` · 领域仓根四件套；`hs-workspace-explore` 作为可选前置 E0 |
 | ② 源事实层 | 证据底座：代码事实 + 原始材料，喂知识层 | `main/` · `docs-raw/` |
 | ③ 知识资产层 | 唯一检索对象：治理后的知识卡 | `knowledge/` |
-| ④ 治理与工具层 | 契约约束知识层，三流程执行体 | `governance/` · `skills/` · `workflows/` |
+| ④ 治理与工具层 | 契约约束、独立部署工具与节点执行体 | `governance/` · `tools/deploy/` · Agent 的 `S`／`F` |
 | ⑤ 配套支撑层 | 候选暂存 · 回归门禁 · 留痕 · 派生索引 | `.build/` · `evals/` · `logs/` · `artifacts/` · `docs-llm-wiki/` |
 
 递进一句话：证据层喂知识层，契约层束知识层，技能层跑知识层，配套层验知识层，入口层路由知识层。
@@ -229,7 +231,7 @@ Agent 会话入口。作用是"先路由，再消费"：代码静态事实读取
 
 #### `skills/common/knowledge/` —— 项目入口与节点级能力
 
-知识库的"操作说明书"，不装任何领域事实：
+该路径是开发分发源码；实际能力放在 Agent 的 `S` 目录，由 catalog 按逻辑 Skill ID 定位，不依赖项目根同名目录。Skill 是知识库的"操作说明书"，不装领域事实或安装工具：
 
 | 技能 | 职责 | 一句话 |
 |------|------|--------|
@@ -256,17 +258,17 @@ Agent 会话入口。作用是"先路由，再消费"：代码静态事实读取
 
 #### `workflows/common/knowledge/` —— 增量更新与治理工作流
 
-知识库的"操作说明书"，不装任何领域事实：
+该路径是开发分发源码；实际 Workflow 放在 Agent 的 `F` 目录，按 Skill ID 编排，不以项目根目录拼接运行脚本。不装领域事实：
 
 | 技能 | 职责 | 一句话 |
 |------|------|--------|
 | `hs-knowledge-ingest/` | P1 扫描或续办→P2 材料→P3 阅读计划→P4 稿件及适用复核→P5 lint→P6 处理记录→P7 入库、索引与目标查询 | 一次入口完成本地闭环 |
 
-ingest 不另分独立的生产和治理流程；它在 P5 调用 `skills/common/knowledge/hs-knowledge-lint/`，由返回的问题决定补材料、重判或修稿，再继续检查。lint 不建立 Workflow。
+ingest 不另分独立的生产和治理流程；它在 P5 调用已登记的 `hs-knowledge-lint`，由返回的问题决定补材料、重判或修稿，再继续检查。lint 不建立 Workflow。
 
 #### aiotbot-knowledge-wifi-mp/ —— WiFi 领域知识库
 
-WiFi 原件、知识与治理集中放在 `aiotbot-knowledge-wifi-mp/`，节点 Skill/Workflow 位于项目根的 `skills/`、`workflows/`，业务代码工作区通过同级 `config.yml` 关联。当前部署采用第 5.3 节的项目根内布局；仓外方案需另行实现详细设计第 7.3 节的宿主适配。目录和忽略规则不构成 ACL，资料与能力分发按实际授权处理。
+WiFi 原件、知识、治理与独立部署工具集中放在 `aiotbot-knowledge-wifi-mp/`，业务代码工作区通过项目根 `config.yml` 关联。节点 Skill／Workflow 放在 Agent 的最终目录，工具生成 catalog/registry 连接已安装能力与项目；部署不要求项目根保留分发源码。知识库与业务工作区分离的方案仍需另行实现详细设计第 7.3 节的宿主适配。目录和忽略规则不构成 ACL，资料与能力分发按实际授权处理。
 
 参与流程：ingest 负责原件到本地知识，lint 检查固定资产，query 消费合格结论。
 
@@ -428,7 +430,7 @@ P1 对照原件处理记录发现新增、修改、缺失与未完成事项，�
 
 ### 流程二：lint Skill —— 只读检查并汇总问题
 
-`skills/common/knowledge/hs-knowledge-lint/` 是 Skill 包，内部调用固定脚本。ingest 的 P5、独立 lint 命令及 C1 共用确定性规则；lint 只做确定性检查，不修稿、不做内容语义复核、不 apply。
+`hs-knowledge-lint` 是 Agent 已安装的 Skill 包，内部调用固定脚本。ingest 的 P5、独立 lint 命令及 C1 共用确定性规则；lint 只做确定性检查，不修稿、不做内容语义复核、不 apply。C1 直接使用知识库的 `check.py`／`check.sh` 与受锁领域规则，不依赖 Agent 的能力目录。
 
 ```mermaid
 flowchart LR
@@ -466,7 +468,7 @@ flowchart TB
     RAW --> ANSWER
 ```
 
-图中展示证据入口，主 Agent 根据问题综合材料；代码事实以所问版本的实际源码确认。下表沿用项目根／知识根 K 的路径基准。
+图中展示证据入口，主 Agent 根据问题综合材料；代码事实以所问版本的实际源码确认。下表沿用项目根／知识根 K 的路径基准；能力位置以 Agent 的实际目录 `S`、`F` 为准。
 
 #### 目录 × 链路参与矩阵
 
@@ -474,8 +476,8 @@ flowchart TB
 |---|---|---|---|
 | `AGENTS.md` / `config.yml` | 项目约定、代码根与模块归属 | 适用规则、实际代码上下文和条件缺口 | 路由与范围依据 |
 | 实际业务代码目录 | 代码取证与 P4 内容复核 | 固定引用与文件身份检查 | 源码交叉印证 |
-| `skills/` | P2—P7 的材料、计划、内容复核、lint、核验及入库能力 | lint Skill 与共用确定性规则 | 查询、精读、来源恢复 |
-| `workflows/` | 一条 ingest 编排 P1—P7 | — | — |
+| Agent Skills（`S`） | P2—P7 的材料、计划、内容复核、lint、核验及入库能力 | 独立 lint Skill；固定 CI 直接复用 K 内规则 | 查询、精读、来源恢复 |
+| Agent Workflows（`F`） | 一条 ingest 编排 P1—P7 | — | — |
 | `knowledge/` | 查重、关联卡和 P7 精确入库 | 正式卡格式与引用检查 | 唯一正文检索对象 |
 | `docs-raw/` | 只读原件 | 来源一致性复核 | 原件与证据溯源 |
 | `governance/` | 模板、来源和卡契约 | 共同规则、来源锁与记录约束 | 范围、来源、依赖及证明规则 |

@@ -1,4 +1,4 @@
-# Preserve verified hashes of domain rules, capability packages and SDD evidence.
+# Preserve verified hashes of domain rules and capability packages.
 # Line-ending normalization would invalidate the byte-pinned framework and snapshots.
 /aiotbot-knowledge-wifi-mp/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
 /config.yml -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
@@ -10,7 +10,6 @@
 /install.sh text eol=lf
 /install.ps1 text eol=crlf
 
-# Preserve approved design and SDD evidence bytes.
+# Preserve approved design bytes.
 /aiotbot-knowledge-wifi-mp/docs-llm-wiki/AIoTBot知识库架构设计.md -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
 /aiotbot-knowledge-wifi-mp/docs-llm-wiki/知识库详细设计.md -text
-/aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/** -text

@@ -1,4 +1,5 @@
 # 项目架构映射：人工维护相对路径和模块归属，工具读取实际文件并固定内容指纹。
+# 通常只需填写 code_root 和 modules，其余字段先保持现值。
 schema_version: '2.0'
 workspace_id: aiotbot-wifi-v1
 knowledge_roots:
@@ -8,6 +9,28 @@ code_root: main
 # 登记真实已拉取的模块。path 相对 code_root；chips、sides、features、description 按实际填写。
 # 多值表示共享或关联，不证明实际宏、构建或协议条件。未知目录不创建虚构映射。
 modules: []
+# 填写时用下面的 modules: 列表替换上面的 modules: []，不要保留两个同名字段。
+# 示例路径须换成真实已存在的目录，再去掉对应行开头的注释符号。
+# modules:
+#   - path: device/实际驱动仓目录
+#     chips: [chip12]
+#     sides: [device]
+#     description: Device 侧驱动
+#
+#   - path: host/实际公共仓目录
+#     chips: [chip12, chip08]
+#     sides: [host]
+#     description: 多芯片共用的 Host 侧代码
+#
+#   - path: 实际算法仓目录
+#     sides: [host, device]
+#     features: [实际特性名]
+#     description: Host 与 Device 关联的公共算法
+#
+# 例如源码在 repo/main/device/实际驱动仓目录/，path 只填 device/实际驱动仓目录。
+# 每个模块只有 path 必填；chips、sides、features、description 未知时可省略。
+# sides 使用小写 host / device；路径统一用 /，不填绝对路径或 ..。
+# 仅处理文档时可以保留 modules: []；它不会自动登记 main/ 下的全部代码。
 query:
   default_channel: local
   allowed_channels:

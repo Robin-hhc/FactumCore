@@ -1,3 +1,0 @@
-................                                                         [100%]
-- generated xml file: E:\FactumCore\aiotbot-knowledge-wifi-mp\artifacts\test-tmp\v3-final-20261025-03-localcheck-native\localcheck-native.xml -
-16 passed in 79.60s (0:01:19)

@@ -1,6 +1,0 @@
-{
-  "output": "E:\\FactumCore\\aiotbot-knowledge-wifi-mp\\artifacts\\test-tmp\\local-ingest-boundary-20261026-01",
-  "owned_process_count": 20,
-  "status": "interrupted",
-  "reason": "Supplied build context discrepancy found in independent targeted RED; production will be fixed before a new full run"
-}

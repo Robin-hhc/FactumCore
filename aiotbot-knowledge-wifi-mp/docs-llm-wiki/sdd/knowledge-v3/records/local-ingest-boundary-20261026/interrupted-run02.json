@@ -1,6 +1,0 @@
-{
-  "output": "E:\\FactumCore\\aiotbot-knowledge-wifi-mp\\artifacts\\test-tmp\\local-ingest-boundary-20261026-02",
-  "status": "interrupted",
-  "owned_process_count": 10,
-  "reason": "Chosen output root exceeded Windows fixture mkdir path limit; workspace installer group had 17 WinError206 failures before installation; rerun entire suite under shorter root"
-}

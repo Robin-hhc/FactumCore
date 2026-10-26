@@ -2,7 +2,7 @@
 
 本目录为项目根 `repo/` 下的 `aiotbot-knowledge-wifi-mp/`，不包含嵌套 `.git`。原件在 `docs-raw/`；治理契约在 `governance/`；正式卡在 `knowledge/`；节点能力在项目根 `../skills/common/knowledge/`；流程编排在项目根 `../workflows/common/knowledge/`；系统设计与 SDD 在 `docs-llm-wiki/`。现行路径以[总体设计 §5.3](docs-llm-wiki/AIoTBot知识库架构设计.md#53-aiotbot-knowledge目录架构)为准。
 
-先读[文档入口](docs-llm-wiki/README.md)。详细设计分概要和节点详细设计两层；需求、实现任务、测试和实际验收集中在 [SDD](docs-llm-wiki/sdd/knowledge-v3/README.md)。设计说明目标行为，实际运行与安装状态以对应记录核实；保留历史工件原字节。
+先读[文档入口](docs-llm-wiki/README.md)。详细设计分概要和节点详细设计两层。项目自身的需求、实现任务、测试和验收记录保存在本地 `docs-llm-wiki/sdd/`，任务入口为本地 `docs-llm-wiki/task.md`，均由 Git 忽略，不随仓库分发。开发时按需读取本地已有工件；未提供时依据共享设计、源码与实际验证工作，不把缺少工件视为部署缺项。保留本地历史工件原字节。
 
 业务范围沿用 chip12、chip08、chip07c 的 Host/Device 逻辑名称。项目根 `config.yml` 只维护 `code_root` 和模块相对路径、芯片／端／特性／用途，不要求逐项填写六 Target 或三 pair；共享模块可关联多个芯片和端。模块读取以实际文件、配置和内容指纹为依据；可选版本材料须保留来源，未知版本不阻断当前文件静态核验。未知构建和适用条件保持 unknown，不创建虚构源码，不从标签推断宏开启或产品兼容。文档仅接受 `docs-raw/conventions`、`chips`、`storys`、`specs`、`protocols` 内已落地原件，`sources/` 链接暂不接入。
 

@@ -21,9 +21,9 @@ flowchart LR
 | `logs/` | 操作、复核、来源快照及恢复记录 |
 | `evals/` | 检索案例、契约与流程回归 |
 | `artifacts/` | 可重建索引与报告，生成内容不上库 |
-| `docs-llm-wiki/` | 架构、概要与详细设计、使用说明及 SDD 工件 |
+| `docs-llm-wiki/` | 架构、概要与详细设计、使用说明；项目自身 SDD 工件仅在本地维护 |
 
-从[架构设计](docs-llm-wiki/AIoTBot知识库架构设计.md)了解目录与三条链路，从[概要与详细设计](docs-llm-wiki/知识库详细设计.md)了解节点判断和文件分工，操作见[使用说明](docs-llm-wiki/使用说明.md)。贡献规则见 [CONTRIBUTING.md](CONTRIBUTING.md)，实现任务与实际验证记录见 [SDD](docs-llm-wiki/sdd/knowledge-v3/README.md)。
+从[架构设计](docs-llm-wiki/AIoTBot知识库架构设计.md)了解目录与三条链路，从[概要与详细设计](docs-llm-wiki/知识库详细设计.md)了解节点判断和文件分工，操作见[使用说明](docs-llm-wiki/使用说明.md)。贡献规则见 [CONTRIBUTING.md](CONTRIBUTING.md)。项目自身的 `docs-llm-wiki/sdd/` 和 `docs-llm-wiki/task.md` 为 Git 忽略的本地开发工件，不是使用或部署知识库的必需文件。
 
 默认将知识库与代码放在同一业务工作区；独立放置时，以本机 `config.env` 的 `project_root` 解析代码引用。路径基准见[工作区路径与部署边界](docs-llm-wiki/知识库详细设计.md#7-工作区路径与部署边界)。
 

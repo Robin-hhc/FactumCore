@@ -76,7 +76,7 @@ repo/
     ├── logs/                     # 来源、复核、操作和恢复留痕
     ├── evals/                    # 检索案例和回归门禁
     ├── artifacts/                # 可重建索引和报告，Git 忽略
-    └── docs-llm-wiki/             # 系统设计、使用说明与 SDD
+    └── docs-llm-wiki/             # 系统设计与使用说明；自身 SDD 仅本地维护
 ```
 
 节点 Skill 和 Workflow 随 WiFi 知识库维护：

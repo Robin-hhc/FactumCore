@@ -14,9 +14,9 @@
 | `aiotbot-knowledge-wifi-mp/` | 唯一领域根；原件、契约、知识及本地运行支撑按其 AGENTS 分层 |
 | `skills/common/knowledge/` | 节点 Skill 及其脚本、参考、产物模板与测试 |
 | `workflows/common/knowledge/` | `hs-knowledge-ingest` 串起生产与本地入库；只编排节点能力，日常调用见使用说明 |
-| `aiotbot-knowledge-wifi-mp/docs-llm-wiki/` | 架构、概要与详细设计、使用说明及 `sdd/`；不在仓根另建文档目录 |
+| `aiotbot-knowledge-wifi-mp/docs-llm-wiki/` | 共享架构、概要与详细设计、使用说明；本项目 `sdd/` 与 `task.md` 仅本地维护，不在仓根另建文档目录 |
 
-先阅读 WiFi [AGENTS.md](aiotbot-knowledge-wifi-mp/AGENTS.md) 与[文档入口](aiotbot-knowledge-wifi-mp/docs-llm-wiki/README.md)。架构设计说明目录和三条链路；详细设计先讲流程与判断，再按节点解释文件分工。实现任务、测试计划与实际验收放在 [SDD](aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v3/README.md)，修改实现前按相应需求、设计和任务核实。保留历史工件原字节，不把历史路径或成绩当作当前部署证明。
+先阅读 WiFi [AGENTS.md](aiotbot-knowledge-wifi-mp/AGENTS.md) 与[文档入口](aiotbot-knowledge-wifi-mp/docs-llm-wiki/README.md)。架构设计说明目录和三条链路；详细设计先讲流程与判断，再按节点解释文件分工。修改实现前按共享设计和适用测试核实；本地存在对应 SDD 需求、设计和任务时一并读取。本项目开发工件位于 `aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/` 和同级 `task.md`，由 Git 忽略，不随部署分发；缺少它们不影响安装、运行或共享文档阅读。保留本地历史工件原字节，不把历史路径或成绩当作当前部署证明。
 
 只接受 `docs-raw/{conventions,chips,storys,specs,protocols}/` 内已落地原件；`sources/` 链接、网页及仓外映射暂不接入。纯文档经独立 Agent 内容复核和完整固定检查后 stable，免代码实现核验。用户可在执行中退回或入库后要求修订。代码卡本地通过后 stable，上库固定 CI 检查格式、索引及来源／代码引用的一致性，不修卡、锁、链接或源码。
 

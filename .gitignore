@@ -11,6 +11,10 @@ __pycache__/
 *.pyc
 config.local.yml
 
+# Project development artifacts stay local; shared design and usage remain versioned.
+/aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/
+/aiotbot-knowledge-wifi-mp/docs-llm-wiki/task.md
+
 # Business sources are registered separately; keep the slot only.
 /main/*
 !/main/.gitkeep

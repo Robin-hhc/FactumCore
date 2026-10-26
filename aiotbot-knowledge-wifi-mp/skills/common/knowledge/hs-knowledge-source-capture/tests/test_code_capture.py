@@ -189,6 +189,86 @@ def test_committed_code_is_portable_and_resolves_without_first_machine_cache(har
     assert incompatible["diagnostics"][0]["code"] == "SOURCE_EXTRACTION_UNAVAILABLE"
 
 
+@pytest.mark.parametrize("relative", ["sample.c", "src/sample.c"])
+def test_authorized_code_capture_and_git_replay_allow_a_different_owner(harness, monkeypatch, relative):
+    repo, context_ref = setup_code(harness, git=True)
+    if relative != "sample.c":
+        path = repo / relative
+        path.parent.mkdir()
+        path.write_bytes((repo / "sample.c").read_bytes())
+        subprocess.run(["git", "-c", "core.fsmonitor=false", "-C", str(repo), "add", relative], check=True, capture_output=True)
+        subprocess.run(["git", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + os.devnull, "-C", str(repo), "commit", "-m", "Isolated nested-code fixture"], check=True, capture_output=True)
+        context = harness.record(context_ref)
+        context["repos"]["code"]["head"] = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"]).decode().strip()
+        context.pop("digest")
+        context["digest"] = hashlib.sha256(canonical(context)).hexdigest()
+        harness.write(context_ref, canonical(context))
+    monkeypatch.setenv("GIT_TEST_ASSUME_DIFFERENT_OWNER", "1")
+    captured = harness.run("source-capture", {"operation_id": "other-owner", "kind": "code", "repo_id": "code",
+        "relative_path": relative, "source_id": "other-owner", "context_ref": context_ref})
+    snapshot = harness.record(captured["data"]["bundle_ref"])["snapshots"][0]
+    assert snapshot["recovery"]["method"] == "git"
+    assert snapshot["code_identity"]["checked_file_dirty"] is False
+    assert not (repo / "fsmonitor-executed.txt").exists()
+
+
+def test_explicit_gb18030_preserves_original_and_rebuilds_text_from_exact_git(harness):
+    repo, context_ref = setup_code(harness, git=True)
+    raw = b"// \xbd\xd3\xca\xd5\xbe\xdb\xba\xcf\xd6\xa1\nint receive(void) { return 1; }\n"
+    expected_text = "// 接收聚合帧\nint receive(void) { return 1; }\n"
+    (repo / "sample.c").write_bytes(raw)
+    subprocess.run(["git", "-c", "core.fsmonitor=false", "-C", str(repo), "add", "sample.c"], check=True, capture_output=True)
+    subprocess.run(["git", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + os.devnull, "-C", str(repo), "commit", "-m", "Isolated GB18030 fixture"], check=True, capture_output=True)
+    head = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"]).decode().strip()
+    context = harness.record(context_ref)
+    context["repos"]["code"]["head"] = head
+    context.pop("digest")
+    context["digest"] = hashlib.sha256(canonical(context)).hexdigest()
+    harness.write(context_ref, canonical(context))
+    captured = harness.run("source-capture", {"operation_id": "gb-source", "kind": "code", "repo_id": "code",
+        "relative_path": "sample.c", "source_id": "gb-source", "context_ref": context_ref, "text_encoding": "gb18030"})
+    snapshot = harness.record(captured["data"]["bundle_ref"])["snapshots"][0]
+    assert snapshot["extraction"]["extractor"] == "code-gb18030:1"
+    assert snapshot["sha256"] == hashlib.sha256(raw).hexdigest()
+    assert (harness.root / snapshot["local_recovery"]["path"]).read_bytes() == raw
+    for ref in (snapshot["local_recovery"]["path"], snapshot["extraction"]["text_ref"], snapshot["extraction"]["locator_ref"]):
+        (harness.root / ref).unlink()
+    response = harness.run("source-capture", {"operation_id": "gb-replay", "bundle_ref": captured["data"]["bundle_ref"],
+        "source_ref": {"evidence_ref": "e1", "source_id": "gb-source", "snapshot_id": snapshot["snapshot_id"],
+                       "locator": {"kind": "lines", "start": 1, "end": 2}}}, "resolve-source")
+    assert response["data"]["text"] == expected_text
+    assert response["data"]["current_source_matches"] is True
+    assert (repo / "sample.c").read_bytes() == raw
+
+
+@pytest.mark.parametrize("encoding", ["auto", "gbk", "utf-16", None, ["gb18030"]])
+def test_code_capture_rejects_unknown_or_ambiguous_explicit_encoding(harness, encoding):
+    _, context_ref = setup_code(harness)
+    result = harness.run("source-capture", {"operation_id": "bad-codec", "kind": "code", "repo_id": "code",
+        "relative_path": "sample.c", "source_id": "bad-codec", "context_ref": context_ref, "text_encoding": encoding}, expected=2)
+    assert result["diagnostics"][0]["code"] == "INVALID_CODE_ENCODING"
+    assert not (harness.root / "logs/evidence").exists()
+
+
+@pytest.mark.parametrize("encoding,raw", [("gb18030", b"\xff"), ("gb18030", b"//\0\n"), ("utf-8", b"\xff"), ("utf-8", b"//\0\n")])
+def test_explicit_code_encoding_rejects_invalid_bytes_and_nul(harness, encoding, raw):
+    repo, context_ref = setup_code(harness)
+    (repo / "sample.c").write_bytes(raw)
+    result = harness.run("source-capture", {"operation_id": "unreadable-codec", "kind": "code", "repo_id": "code",
+        "relative_path": "sample.c", "source_id": "unreadable-codec", "context_ref": context_ref, "text_encoding": encoding}, expected=2)
+    assert result["diagnostics"][0]["code"] == "UNREADABLE_CODE_TEXT"
+    assert not (harness.root / "logs/evidence").exists()
+
+
+def test_utf8_default_and_explicit_encoding_keep_original_snapshot_identity(harness):
+    _, context_ref = setup_code(harness)
+    request = {"operation_id": "default-utf8", "kind": "code", "repo_id": "code", "relative_path": "sample.c",
+               "source_id": "same-utf8-source", "context_ref": context_ref}
+    implicit = harness.run("source-capture", request)
+    explicit = harness.run("source-capture", {**request, "operation_id": "explicit-utf8", "text_encoding": "utf-8"})
+    assert harness.record(implicit["data"]["bundle_ref"])["snapshots"] == harness.record(explicit["data"]["bundle_ref"])["snapshots"]
+
+
 def test_payload_context_cannot_authorize_a_different_code_root(harness):
     _, context_ref = setup_code(harness)
     context = harness.record(context_ref)

@@ -58,9 +58,3 @@ canvas:
     query_regression:
       x: 1020
       y: 720
-    publish_handoff:
-      x: 1360
-      y: 720
-    submit_batch:
-      x: 0
-      y: 960

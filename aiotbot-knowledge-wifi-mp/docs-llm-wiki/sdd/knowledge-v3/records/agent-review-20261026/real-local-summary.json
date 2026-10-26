@@ -1,0 +1,33 @@
+{
+  "status": "completed_locally",
+  "scope": "one revised historical HMAC scan card in a separate trial knowledge root",
+  "cards": 1,
+  "claims": 4,
+  "code_files": 3,
+  "actual_agent_reviewer": "/root/real_scan_content_review",
+  "semantic_keys_configured": false,
+  "signature_report_supplied": false,
+  "synthetic_marker": false,
+  "local_check_phase": "passed",
+  "apply_phase": "committed",
+  "regression_passed": true,
+  "index_activated": true,
+  "query_phase": "queried",
+  "read_phase": "queried",
+  "processing_progress": "partial",
+  "request_original_adopted_as_fact": false,
+  "git_submitted": false,
+  "remote_ci_run": false,
+  "review_record_sha256": "d3f8038189998fd1ef85cde108d3c67349abea69d8dd4c50f54b6072d6b3c8e2",
+  "binding_review_sha256": "0fc2836f0ad77fe48b9d896359da470dc913fd2a30dd5f18107a09b5362896a5",
+  "resolved_original_findings": [
+    "conditional VAP state change",
+    "missing VAP timeout early return"
+  ],
+  "limitations": [
+    "One revised historical HMAC scan card in a separate trial knowledge root, not a whole-corpus extraction",
+    "Public nodes manually orchestrated by Agent; no claim of automatic host Workflow integration",
+    "Declared independent Agent review is actual work here, not cryptographic identity authentication",
+    "No business build, runtime execution, product Target applicability, publication or merge proof"
+  ]
+}

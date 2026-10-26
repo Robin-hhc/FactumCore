@@ -1,5 +1,7 @@
 # 固定 CI 作业契约
 
+ingest 在本地入库、索引验证和目标查询通过后结束。以下作业由人工提交变更后触发；检查复用 lint 的 `contracts.checks` 与 `contracts.indexing`，现有 `check.py`／`check.sh` 仅负责 CI 输入和调用，不增加独立检查算法或业务代码编译任务。通过后由人评审合入。
+
 `K/check.py` 与 `check.sh` 必须由受保护的作业从可信基线取得；作业固定程序、规则、依赖与接受／拒绝样例。候选提交只能提供卡、导航、来源锁与 `logs/ingest/` 记录。不要从候选 checkout 执行它自己的 check.py，亦不可由候选选择本次规则摘要。
 
 ```text

@@ -1,0 +1,82 @@
+"""The shared record contract separates Agent review from human consent."""
+
+import copy
+import hashlib
+import importlib.util
+from pathlib import Path
+import shutil
+import sys
+
+import pytest
+import yaml
+
+
+DOMAIN = Path(__file__).resolve().parents[2]
+spec = importlib.util.spec_from_file_location(
+    "agent_review_contract", DOMAIN / "governance/contracts/__init__.py",
+    submodule_search_locations=[str(DOMAIN / "governance/contracts")],
+)
+contract = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = contract
+spec.loader.exec_module(contract)
+from agent_review_contract import validation  # noqa: E402
+
+
+@pytest.fixture
+def rules(tmp_path):
+    shutil.copytree(DOMAIN / "governance", tmp_path / "governance")
+    lock_path = tmp_path / "governance/framework.lock.yaml"
+    lock = yaml.safe_load(lock_path.read_bytes())
+    for row in lock["files"].values():
+        row["sha256"] = hashlib.sha256((tmp_path / row["path"]).read_bytes()).hexdigest()
+    lock_path.write_text(yaml.safe_dump(lock, sort_keys=False), encoding="utf-8")
+    return validation.load_rules(tmp_path, hashlib.sha256(lock_path.read_bytes()).hexdigest())
+
+
+def independent_review():
+    return {
+        "schema_version": "2.0", "record_kind": "semantic_review", "reviewer_id": "independent-reader",
+        "payload": {
+            "author_id": "original-author", "independent_context": "fresh-reading-context", "findings": [],
+            "view_digest": "1" * 64, "context_digest": "2" * 64, "mode": "local", "issued_at": 1.0,
+            "claims": [{"card_id": "card-a", "claim_id": "c1", "status": "supported",
+                        "reason": "Read the exact definition and its caller.",
+                        "evidence": [{"source_id": "code-a", "snapshot_id": "snapshot-a",
+                                      "locator": {"kind": "lines", "start": 1, "end": 2}, "sha256": "3" * 64}]}],
+        },
+    }
+
+
+def test_unsigned_agent_review_is_valid_in_the_canonical_contract(rules):
+    record = independent_review()
+    assert "signature_b64" not in record
+    validation.validate_shape("semantic_review", record, rules)
+
+
+def test_unsigned_human_event_is_still_rejected_by_the_canonical_contract(rules):
+    record = {"schema_version": "2.0", "record_kind": "host_event", "payload": {"actor_type": "human"}}
+    with pytest.raises(validation.ContractError, match="signature_b64"):
+        validation.validate_shape("host_event", record, rules)
+    # Shape acceptance does not verify a signature or authenticate a human.
+    validation.validate_shape("host_event", {**record, "signature_b64": "shape-only-fixture"}, rules)
+
+
+@pytest.mark.parametrize("defect", ["author", "reason", "evidence"])
+def test_agent_review_metadata_and_positive_evidence_have_a_shared_shape(rules, defect):
+    record = copy.deepcopy(independent_review())
+    record["signature_b64"] = "legacy-field-does-not-substitute-for-review-data"
+    if defect == "author":
+        record["payload"]["author_id"] = {"unexpected": "object"}
+    elif defect == "reason":
+        record["payload"]["claims"][0]["reason"] = ""
+    else:
+        record["payload"]["claims"][0]["evidence"][0]["sha256"] = "not-a-source-hash"
+    with pytest.raises(validation.ContractError, match="SCHEMA_INVALID"):
+        validation.validate_shape("semantic_review", record, rules)
+
+
+def test_shared_shape_keeps_incomplete_claim_coverage_and_findings_for_node_diagnostics(rules):
+    record = independent_review()
+    record["payload"]["claims"] = []
+    record["payload"]["findings"] = [{"reason": "Missing source branch remains unresolved"}]
+    validation.validate_shape("semantic_review", record, rules)

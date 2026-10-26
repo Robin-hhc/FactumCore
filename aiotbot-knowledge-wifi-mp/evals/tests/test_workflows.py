@@ -94,6 +94,41 @@ def test_ingest_is_one_complete_workflow_without_project_binding_or_lint_templat
     )
 
 
+def test_ingest_finishes_locally_without_repository_submission():
+    """Content and record-only success stop before optional human publishing."""
+    workflow = yaml.safe_load(
+        (
+            ROOT
+            / "aiotbot-knowledge-wifi-mp/workflows/common/knowledge/hs-knowledge-ingest/workflow.yaml"
+        ).read_bytes()
+    )
+    nodes = {node["id"]: node for node in workflow["nodes"]}
+
+    def destination(node_id, exit_id):
+        return next(
+            edge["target"]
+            for edge in nodes[node_id]["exits"]
+            if edge["id"] == exit_id
+        )
+
+    assert destination("apply_view", "applied") == "rebuild_index"
+    assert destination("rebuild_index", "built") == "query_regression"
+    assert destination("query_regression", "checked") == "__end__"
+    assert destination("apply_view", "record_only") == "__end__"
+    assert destination("recover_transaction", "record_only") == "__end__"
+    assert "publish_handoff" not in nodes
+    assert "submit_batch" not in nodes
+    assert not any(
+        node.get("skill") == "hs-knowledge-publish-handoff"
+        for node in workflow["nodes"]
+    )
+    # The independent tool remains available after the local Workflow completes.
+    assert (
+        ROOT
+        / "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-publish-handoff/scripts/cli.py"
+    ).is_file()
+
+
 def test_public_mixed_candidate_routes_to_explicit_human_confirmation(tmp_path):
     fixture_path = ROOT / "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-source-scan/tests/conftest.py"
     spec = importlib.util.spec_from_file_location("workflow_mixed_public_fixture", fixture_path)

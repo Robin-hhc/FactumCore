@@ -1,0 +1,145 @@
+{
+  "status": "completed_bounded_real_source_trial",
+  "source_revision": "ef69ead1d69e9d56a4a925c3aec065f4e54961be",
+  "source_files_exported_and_rechecked": 592,
+  "main_export_bytes": 15028757,
+  "original_source_clean": true,
+  "frozen_design_unchanged": true,
+  "historical_files_unchanged": 123,
+  "mechanism_regression": {
+    "tests": 353,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 1,
+    "passed": true,
+    "groups": 21,
+    "distinct_passes": 352,
+    "ruff": "passed",
+    "diff_check": "passed"
+  },
+  "first_full_run_preserved": {
+    "tests": 323,
+    "failures": 1,
+    "errors": 0,
+    "skipped": 1
+  },
+  "real_content_trial": {
+    "cards_drafted": 6,
+    "claims": 20,
+    "selected_code_files": 13,
+    "official_rfc_files": 3,
+    "topic_cases": 14,
+    "hit_at_1": 12,
+    "hit_at_3": 14,
+    "independent_answer_audit": {
+      "total": 18,
+      "grades": {
+        "partial": 3,
+        "full": 13,
+        "insufficient": 2
+      },
+      "answerable_or_boundary_positive_questions": 14,
+      "positive_grades": {
+        "partial": 3,
+        "full": 9,
+        "insufficient": 2
+      },
+      "explicit_refusal_questions": 4,
+      "correct_explicit_refusals": 4,
+      "unsupported_concrete_facts": 0,
+      "severe_target_or_binary_errors": 0,
+      "distinct_used_claims": 19,
+      "distinct_original_citation_ranges_checked": 37,
+      "actual_source_files_read": 17,
+      "formal_cards_admitted": 0
+    },
+    "formal_cards_admitted": 0,
+    "formal_query_activated": false,
+    "retrieval_scope": "shared production index/scorer/hash-bound read over unadmitted drafts; not formal query"
+  },
+  "fixed_ci_trial": {
+    "source_objects": 17,
+    "candidate_commit": null,
+    "positive_exit": 0,
+    "bad_navigation_exit": 1,
+    "bad_locator_exit": 1
+  },
+  "rules_digest": "301e71f65ce031d586f3e85cab771221c878a39b8862773a55c7297b5d744699",
+  "implementation_files": 333,
+  "evidence": [
+    {
+      "path": "retrieval-metrics.json",
+      "sha256": "ef62203f750828c794893a789c3be5d64be260d59204deafcf87a0a311e3325a",
+      "local_input": ".scratch/wifi-real-trial-20261025/preview/first-pass/retrieval-metrics.json"
+    },
+    {
+      "path": "answer-audit.json",
+      "sha256": "b6dbf4a43109310249ee9ff00b29f7e58dac92ad98d5aeced4e89f473c9f6ad5",
+      "local_input": ".scratch/wifi-real-trial-20261025/review/answer-audit.json"
+    },
+    {
+      "path": "protocol-manifest.json",
+      "sha256": "cfcba4ac389fc40f44252797c11a2159839fa400ae4edc243c87e60ee5d0c76b",
+      "local_input": ".scratch/wifi-real-trial-20261025/protocols/manifest.json"
+    },
+    {
+      "path": "preservation.json",
+      "sha256": "5f5f3a1bbd23dd1f6b692c1854d7d71d17787d63adac2a35f61574523a3db7b7",
+      "local_input": ".scratch/wifi-real-trial-20261025/final-preservation.json"
+    },
+    {
+      "path": "runtime-repair.json",
+      "sha256": "d5217b340b2f013ab4cf8af48374e1a227a1c4b93d898aca30891c6d9244e7fb",
+      "local_input": ".scratch/wifi-real-trial-20261025/runtime-repair-verification.json"
+    },
+    {
+      "path": "scan-repair.json",
+      "sha256": "62420995770cc3591069d93e4835beb945e586ee1d657b36b7f88633be8a942a",
+      "local_input": ".scratch/wifi-real-trial-20261025/review/scan-fix.json"
+    },
+    {
+      "path": "recover-repair.json",
+      "sha256": "c2c68d253a9398cbf82460983dd3579c633ff9cab6c695dac12e6c2ef0ef153a",
+      "local_input": ".scratch/wifi-real-trial-20261025/review/recover-fix.json"
+    },
+    {
+      "path": "journal-repair.json",
+      "sha256": "1958ea2d9b38b43c7a11339b890796cfe0e4e4a5d9add5e1300d968b569743e7",
+      "local_input": ".scratch/wifi-real-trial-20261025/journal-compat/final-verification.json"
+    },
+    {
+      "path": "public-flow.json",
+      "sha256": "de8769373239a78ebd4e871da973b13a5ea0bf12a8d97aa5663162a554060c74",
+      "local_input": ".scratch/wifi-real-trial-20261025/public-plan-results.json"
+    },
+    {
+      "path": "public-guards.json",
+      "sha256": "18897206a43069de876bd610a79deb35788f6146a69fde7a92c07fdd038e4829",
+      "local_input": ".scratch/wifi-real-trial-20261025/final-public-guards.json"
+    },
+    {
+      "path": "incremental-before.json",
+      "sha256": "7e5f8b560c535b6f1328e3f370604bf04bca6f5d38e53015d9e02164e35120cc",
+      "local_input": ".scratch/wifi-real-trial-20261025/incremental-results.json"
+    },
+    {
+      "path": "incremental-after.json",
+      "sha256": "4cc5e1cd13a92bab3183ed796fb95586f8f1bcc273c620d236b66218931d2542",
+      "local_input": ".scratch/wifi-real-trial-20261025/incremental-repaired-results.json"
+    },
+    {
+      "path": "ci.json",
+      "sha256": "24df89d5c131ce5b2c9b136c58a000b6ac15be807626f0a72b86af5486b4024f",
+      "local_input": ".scratch/wifi-real-trial-20261025/ci-trial/summary.json"
+    }
+  ],
+  "remaining_limits": [
+    "Real human and semantic signing adapters not configured",
+    "Actual legacy Target/build/macro evidence unknown",
+    "No complete raw-original portable Git version before admission",
+    "No actual host Workflow execution or protected remote CI/merge",
+    "Source-only export recovery and historical static-code admission policy need explicit design",
+    "Deeper intermediate Windows paths still have observed mkdir limit"
+  ],
+  "git_commit_created": false
+}

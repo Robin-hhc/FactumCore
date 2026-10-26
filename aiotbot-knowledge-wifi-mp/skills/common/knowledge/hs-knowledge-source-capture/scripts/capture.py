@@ -206,16 +206,10 @@ def snapshot_text(context, snapshot, resource, data):
             if recovery.get("kind") != "git" and recovery.get("method") != "git":
                 raise
             if resource.get("kind") == "code":
-                if retained.get("extractor") != "code-utf8:1":
-                    raise NodeError("SOURCE_EXTRACTION_UNAVAILABLE", "Frozen code extractor is not supported by this pinned resolver", blocked=True)
                 try:
-                    text = data.decode("utf-8-sig")
-                    if "\0" in text:
-                        raise UnicodeError("NUL in code source")
-                except UnicodeError as exc:
-                    raise NodeError("SOURCE_EXTRACTION_UNAVAILABLE", "Frozen code UTF-8 extraction cannot be reproduced", blocked=True) from exc
-                locators = [{"kind": "lines", "start": i + 1, "end": i + 1, "text": line}
-                            for i, line in enumerate(text.splitlines())]
+                    text, locators = context.modules["source_resources"].extract_code_text(data, retained.get("extractor"))
+                except context.modules["validation"].ContractError as exc:
+                    raise NodeError("SOURCE_EXTRACTION_UNAVAILABLE", "Frozen code extraction cannot be reproduced by its fixed adapter", blocked=True) from exc
                 gaps = list(retained.get("limitations", []))
             else:
                 text, locators, _, gaps = extract(data, suffix, primary=False)

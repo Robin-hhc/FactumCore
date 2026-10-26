@@ -1,4 +1,4 @@
-"""Signed synthetic code protocol in an isolated Git fixture; no real Target QA."""
+"""Agent review records over isolated Git fixtures; no real Target QA."""
 
 import base64
 import json
@@ -11,6 +11,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 import yaml
 
@@ -144,6 +145,15 @@ class PublicCodeGateTests(unittest.TestCase):
         self.evidence = [{"card_id": "fixture-code-flow", "claim_id": "c1", "status": "supported", "evidence": [
             {"source_id": "fixture-code", "snapshot_id": snapshot["snapshot_id"], "locator": meta["sources"][0]["locator"], "sha256": digest(self.source)}]}]
         self.sign_report("local")
+        independent_report = json.loads((self.root / self.report_ref).read_bytes())
+        author_report = json.loads(json.dumps(independent_report))
+        author_report["reviewer_id"] = "fixture-author"
+        self.save(self.report_ref, author_report)
+        refused = self.invoke(request={"operation_id": "op", "view_ref": self.view_ref,
+            "semantic_report_ref": self.report_ref,
+            "workflow": {"run_id": "v3-author-check", "node_id": "local_check", "attempt_id": "same-author"}})
+        self.assertEqual(refused["data"]["check_status"], "incomplete")
+        self.save(self.report_ref, independent_report)
         checked = self.invoke()
         self.assertEqual(checked["data"]["check_status"], "passed")
         inputs = {"code_checkout": {"configuration": str(self.workspace / "config.yml"), "config_digest": context["config_digest"],
@@ -552,12 +562,22 @@ class PublicCodeGateTests(unittest.TestCase):
         path.write_bytes(canonical(value))
 
     def sign_report(self, mode):
+        """Compatibility helper name; Agent review records no longer need a key."""
         context = json.loads((self.root / self.context_ref).read_text(encoding="utf-8"))
+        author = "fixture"
+        if self.view.get("semantic_plan_ref"):
+            author = json.loads((self.root / self.view["semantic_plan_ref"]).read_bytes())["author_id"]
+        evidence = json.loads(json.dumps(self.evidence))
+        for row in evidence:
+            row.setdefault("reason", "Read the exact source and conditions supporting this Claim.")
         payload = {
+            "author_id": author,
+            "independent_context": "fixture-independent-code-reading-context",
+            "findings": [],
             "view_digest": self.view["digest"],
             "context_digest": context["digest"],
             "mode": mode,
-            "claims": self.evidence,
+            "claims": evidence,
             "issued_at": time.time(),
         }
         self.save(
@@ -565,11 +585,8 @@ class PublicCodeGateTests(unittest.TestCase):
             {
                 "schema_version": "2.0",
                 "record_kind": "semantic_review",
-                "reviewer_id": "fixture",
+                "reviewer_id": "fixture-independent-reviewer",
                 "payload": payload,
-                "signature_b64": base64.b64encode(
-                    self.key.sign(canonical(payload))
-                ).decode(),
             },
         )
 
@@ -627,6 +644,222 @@ class PublicCodeGateTests(unittest.TestCase):
         applied = self.invoke(skill="hs-knowledge-apply", request=request)
         self.assertEqual(applied["data"]["transaction_status"], "committed")
         self.assertEqual(self.code.joinpath("src/wifi.c").read_bytes(), before)
+
+    def test_independent_agent_review_needs_no_registered_key_or_signature(self):
+        self.catalog.pop("semantic_reviewers", None)
+        self.catalog_path.write_bytes(canonical(self.catalog))
+        report = json.loads((self.root / self.report_ref).read_bytes())
+        report.pop("signature_b64", None)
+        report["reviewer_id"] = "fixture-independent-reviewer"
+        report["payload"].update(author_id="fixture", independent_context="fresh-code-reading-context", findings=[])
+        report["payload"]["claims"][0]["reason"] = "Read the exact function body and verified its return value."
+        self.save(self.report_ref, report)
+        checked = self.invoke()
+        self.assertEqual(checked["data"]["check_status"], "passed")
+        proof = json.loads((self.root / checked["data"]["local_check_ref"]).read_bytes())
+        self.assertEqual(proof["verification_tier"], "agent_content_review")
+
+    def test_agent_review_rejects_missing_independence_and_unresolved_content(self):
+        self.catalog.pop("semantic_reviewers", None)
+        self.catalog_path.write_bytes(canonical(self.catalog))
+        baseline = json.loads((self.root / self.report_ref).read_bytes())
+        baseline.pop("signature_b64", None)
+        baseline["reviewer_id"] = "fixture-independent-reviewer"
+        baseline["payload"].update(author_id="fixture", independent_context="fresh-context", findings=[])
+        baseline["payload"]["claims"][0]["reason"] = "Read the actual return statement."
+        for defect, message in (("author", "author"), ("author_type", "author"), ("self_review", "author"),
+                                ("context", "independent"), ("findings", "findings"),
+                                ("reason", "reason")):
+            with self.subTest(defect=defect):
+                report = json.loads(json.dumps(baseline))
+                if defect == "author":
+                    report["payload"]["author_id"] = "unrelated-author"
+                elif defect == "author_type":
+                    report["payload"]["author_id"] = {"unexpected": "object"}
+                elif defect == "self_review":
+                    report["reviewer_id"] = "fixture"
+                elif defect == "context":
+                    report["payload"]["independent_context"] = ""
+                elif defect == "findings":
+                    report["payload"]["findings"] = [{"reason": "Unresolved source contradiction"}]
+                else:
+                    report["payload"]["claims"][0]["reason"] = ""
+                self.save(self.report_ref, report)
+                result = self.invoke(request={"operation_id": "op", "view_ref": self.view_ref,
+                    "semantic_report_ref": self.report_ref,
+                    "workflow": {"run_id": "review-guards", "node_id": "local_check", "attempt_id": defect}})
+                self.assertIn(result["data"]["check_status"], {"incomplete", "failed"})
+                record = json.loads((self.root / result["data"]["local_check_ref"]).read_bytes())
+                self.assertIn(message, " ".join(record["gaps"]))
+
+    def test_owner_of_another_card_in_the_mixed_view_is_not_an_independent_reviewer(self):
+        row = self.view["writes"][0]
+        _, front, body = base64.b64decode(row["bytes_b64"]).decode().split("---", 2)
+        metadata = yaml.safe_load(front)
+        metadata.update(id="fixture-document", owner="document-author", review_mode="manual_document")
+        raw = ("---\n" + yaml.safe_dump(metadata, sort_keys=False) + "---" + body).encode()
+        document_path = "knowledge/flows/fixture-document.md"
+        self.view["writes"].append({"path": document_path, "expected_old_digest": None,
+            "final_digest": digest(raw), "bytes_b64": base64.b64encode(raw).decode()})
+        self.view.update(review_mode="mixed", review_requirements={
+            "code_gate": [row["path"]], "manual_document": [document_path]},
+            baseline_digest=digest({"files": {item["path"]: item["expected_old_digest"] for item in self.view["writes"]}}))
+        self.view = seal(self.view)
+        self.save(self.view_ref, self.view)
+        self.sign_report("local")
+        report = json.loads((self.root / self.report_ref).read_bytes())
+        report["reviewer_id"] = "document-author"
+        self.save(self.report_ref, report)
+        checked = self.invoke()
+        self.assertEqual(checked["data"]["check_status"], "incomplete")
+
+    def test_legacy_report_missing_review_metadata_requires_a_new_review(self):
+        report = json.loads((self.root / self.report_ref).read_bytes())
+        report["payload"].pop("author_id")
+        report["signature_b64"] = "legacy-signature-is-not-an-author-declaration"
+        self.save(self.report_ref, report)
+        checked = self.invoke()
+        self.assertEqual(checked["data"]["check_status"], "incomplete")
+        record = json.loads((self.root / checked["data"]["local_check_ref"]).read_bytes())
+        self.assertIn("author_id", " ".join(record["gaps"]))
+
+    def source_analysis_view(self, usage="historical", with_target=False):
+        row = self.view["writes"][0]
+        _, front, body = base64.b64decode(row["bytes_b64"]).decode().split("---", 2)
+        metadata = yaml.safe_load(front)
+        metadata["scope"] = {"applicability": "unknown", "contexts": []}
+        metadata["claims"][0].update(usage=usage, context_ids=[])
+        raw = ("---\n" + yaml.safe_dump(metadata, sort_keys=False) + "---" + body).encode()
+        row.update(bytes_b64=base64.b64encode(raw).decode(), final_digest=digest(raw))
+        self.view = seal(self.view)
+        self.save(self.view_ref, self.view)
+        context = json.loads((self.root / self.context_ref).read_bytes())
+        if not with_target:
+            context["target"] = None
+        context.pop("build_evidence", None)
+        self.save(self.context_ref, seal(context))
+        self.sign_report("local")
+
+    def test_source_analysis_without_target_or_build_is_admitted_and_reverified(self):
+        self.source_analysis_view()
+        checked = self.invoke()
+        self.assertEqual(checked["data"]["check_status"], "passed")
+        proof_ref = checked["data"]["local_check_ref"]
+        proof = json.loads((self.root / proof_ref).read_bytes())
+        self.assertEqual(proof["code_identity"]["basis"], "source")
+        self.assertIsNone(proof["code_identity"]["target"])
+        request = {"operation_id": "op", "view_ref": self.view_ref, "proof_ref": proof_ref}
+        applied = self.invoke(skill="hs-knowledge-apply", request=request)
+        self.assertEqual(applied["data"]["transaction_status"], "committed")
+        verified = self.invoke(action="verify-proof", request={**request, "purpose": "historical"})
+        self.assertTrue(verified["data"]["proof_verified"])
+        self.code.joinpath("src/wifi.c").write_bytes(b"changed source\n")
+        self.invoke(action="verify-proof", request=request, expected=3)
+
+    def test_source_analysis_with_registered_target_does_not_require_build_artifacts(self):
+        self.source_analysis_view(usage="guidance", with_target=True)
+        self.assertEqual(self.invoke()["data"]["check_status"], "passed")
+
+    def test_current_static_source_claim_does_not_require_build_artifacts(self):
+        context = json.loads((self.root / self.context_ref).read_bytes())
+        context.pop("build_evidence")
+        self.save(self.context_ref, seal(context))
+        self.sign_report("local")
+        self.assertEqual(self.invoke()["data"]["check_status"], "passed")
+
+    def test_current_static_source_still_requires_target_conditions(self):
+        context = json.loads((self.root / self.context_ref).read_bytes())
+        context.pop("build_evidence")
+        context["target"].pop("features")
+        self.save(self.context_ref, seal(context))
+        self.sign_report("local")
+        checked = self.invoke()
+        self.assertEqual(checked["data"]["check_status"], "incomplete")
+
+    def test_current_static_source_still_requires_actual_target_code_mapping(self):
+        config_path = self.workspace / "config.yml"
+        config = yaml.safe_load(config_path.read_bytes())
+        config["targets"][0].update(module_roots=[], source_bindings=[])
+        config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+        context = json.loads((self.root / self.context_ref).read_bytes())
+        context.pop("build_evidence")
+        context["config_digest"] = digest(config_path.read_bytes())
+        self.save(self.context_ref, seal(context))
+        self.sign_report("local")
+        checked = self.invoke()
+        self.assertEqual(checked["data"]["check_status"], "incomplete")
+
+    def test_build_requirement_needs_signed_per_claim_artifact_support(self):
+        row = self.view["writes"][0]
+        _, front, body = base64.b64decode(row["bytes_b64"]).decode().split("---", 2)
+        metadata = yaml.safe_load(front)
+        metadata["claims"][0]["verification_requirements"] = ["semantic-support", "build-support"]
+        raw = ("---\n" + yaml.safe_dump(metadata, sort_keys=False) + "---" + body).encode()
+        row.update(bytes_b64=base64.b64encode(raw).decode(), final_digest=digest(raw))
+        self.view = seal(self.view)
+        self.save(self.view_ref, self.view)
+        self.sign_report("local")
+        self.assertEqual(self.invoke()["data"]["check_status"], "incomplete")
+
+    def test_signed_build_and_runtime_artifacts_are_checked_without_running_builds(self):
+        runtime_ref = "logs/evidence/runtime.log"
+        runtime = b"synthetic fixture runtime observation only\n"
+        (self.root / runtime_ref).write_bytes(runtime)
+        context = json.loads((self.root / self.context_ref).read_bytes())
+        context["build_evidence"]["artifacts"].append({"path": runtime_ref, "sha256": digest(runtime)})
+        self.save(self.context_ref, seal(context))
+        row = self.view["writes"][0]
+        _, front, body = base64.b64decode(row["bytes_b64"]).decode().split("---", 2)
+        metadata = yaml.safe_load(front)
+        metadata["claims"][0]["verification_requirements"] = ["build-support", "runtime-support"]
+        raw = ("---\n" + yaml.safe_dump(metadata, sort_keys=False) + "---" + body).encode()
+        row.update(bytes_b64=base64.b64encode(raw).decode(), final_digest=digest(raw))
+        self.view = seal(self.view)
+        self.save(self.view_ref, self.view)
+        self.evidence[0]["verification_evidence"] = [
+            {"requirement": "build-support", "path": "logs/evidence/build.bin",
+             "sha256": digest(b"synthetic fixture build only\n")},
+            {"requirement": "runtime-support", "path": runtime_ref, "sha256": digest(runtime)},
+        ]
+        self.sign_report("local")
+        self.assertEqual(self.invoke()["data"]["check_status"], "passed")
+        (self.root / "logs/evidence/build.bin").write_bytes(b"changed build evidence\n")
+        checked = self.invoke(request={"operation_id": "op", "view_ref": self.view_ref,
+            "semantic_report_ref": self.report_ref,
+            "workflow": {"run_id": "artifact-check", "node_id": "local_check", "attempt_id": "changed-artifact"}})
+        self.assertEqual(checked["data"]["check_status"], "incomplete")
+
+    def test_current_claim_cannot_use_source_analysis_admission(self):
+        self.source_analysis_view(usage="current")
+        self.assertEqual(self.invoke()["data"]["check_status"], "incomplete")
+
+    def test_source_analysis_does_not_ignore_supplied_broken_build_evidence(self):
+        self.source_analysis_view(with_target=True)
+        context = json.loads((self.root / self.context_ref).read_bytes())
+        context["build_evidence"] = {"artifacts": []}
+        self.save(self.context_ref, seal(context))
+        self.sign_report("local")
+        self.assertEqual(self.invoke()["data"]["check_status"], "incomplete")
+
+    def test_source_analysis_checks_conditions_of_a_supplied_build(self):
+        original = json.loads((self.root / self.context_ref).read_bytes())
+        self.source_analysis_view(with_target=True)
+        context = json.loads((self.root / self.context_ref).read_bytes())
+        context["build_evidence"] = original["build_evidence"]
+        context["target"]["features"] = []
+        self.save(self.context_ref, seal(context))
+        self.sign_report("local")
+        self.assertEqual(self.invoke()["data"]["check_status"], "incomplete")
+
+    def test_code_gate_rechecks_authorized_git_with_a_different_owner(self):
+        # Only ownership is simulated; Git objects, signatures and public calls
+        # retain the existing explicitly synthetic fixture tier.
+        with patch.dict(os.environ, {"GIT_TEST_ASSUME_DIFFERENT_OWNER": "1"}):
+            checked = self.invoke()
+            self.assertEqual(checked["data"]["check_status"], "passed")
+            verified = self.invoke(action="verify-proof", request={"operation_id": "op", "view_ref": self.view_ref,
+                "proof_ref": checked["data"]["local_check_ref"]})
+            self.assertTrue(verified["data"]["proof_verified"])
 
     def test_missing_signed_support_stays_incomplete(self):
         result = self.invoke(request={"operation_id": "op", "view_ref": self.view_ref})

@@ -2,7 +2,7 @@
 
 import base64
 
-from support import NodeError, digest, fixed_bytes, load_yaml, safe, sha
+from support import NodeError, digest, fixed_bytes, load_yaml, read_json, safe, sha
 
 
 def execute(context):
@@ -13,7 +13,22 @@ def execute(context):
     journals = safe(context.root, "logs/operations")
     if journals.exists():
         for path in journals.glob("*/journal.json"):
-            record = context.record(path.relative_to(context.root).as_posix())
+            reference = path.relative_to(context.root).as_posix()
+            try:
+                record = context.record(reference, "transaction_journal")
+            except NodeError as exc:
+                if exc.code != "STALE_RULES" or path.parent.name == context.operation:
+                    raise
+                # Historical terminal liveness is not current content approval.
+                record = read_json(safe(context.root, reference, ["logs/operations"]))
+                context.modules["records"].verify(record)
+                context.modules["validation"].validate_shape("transaction_journal", record, context.rules)
+                if record.get("operation_id") != path.parent.name:
+                    raise NodeError("JOURNAL_OPERATION_MISMATCH", "Transaction journal does not bind its directory", reference)
+                if record.get("status") not in {"committed", "rolled_back"}:
+                    raise NodeError("TRANSACTION_PENDING", "Old-rules transaction requires explicit recovery", reference, blocked=True)
+            if record.get("operation_id") != path.parent.name:
+                raise NodeError("JOURNAL_OPERATION_MISMATCH", "Transaction journal does not bind its directory", reference)
             if record.get("status") not in {"committed", "rolled_back"}:
                 return {
                     "view_ref": request["view_ref"],

@@ -1,0 +1,15 @@
+{
+  "changes": [
+    {
+      "asset": "contracts/source_resources.py",
+      "before": "a2c972e54b432ebd9157b33c3d56384232bb8602cb64b190393f6d03130338c7",
+      "after": "acaccf9899705a60e67c398e486162a2903a571652987f46546d85593feb84b8"
+    },
+    {
+      "asset": "specs/ci-runner.md",
+      "before": "4f5b705b3cfa5ab3d42296d1ca36c6ce74166d71aba1a5f3cb0ced47fe768e04",
+      "after": "de3ece8450ad767e5695b34598ed910533ea9e8aa3303979f9d0985f5446d352"
+    }
+  ],
+  "rules_digest": "c7a1f1440f629e19795e6db1d891305a59cf76053df33613de41f8c578718eb7"
+}

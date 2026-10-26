@@ -1,0 +1,230 @@
+[
+  {
+    "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/AGENTS.md",
+    "sha256": "ef8848f1b13359c91731997d10f0e045735c54bedd8d884c224acd619e6e6991"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/README.md",
+    "sha256": "7f6d7b889e4c19b5605638ee26c3d0ec2c5023ccdaeb21cd5cd655089e30c745"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v3/README.md",
+    "sha256": "cc286fc9fcd4c5a482344f5de1d6e09818bd695071e5aae65f828b9cee384d3c"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v3/agent-content-review.md",
+    "sha256": "8e6f7ccb34ce65603f5ea9691b446eb67719d3db9d01aebbb3de743d61e715c3"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/使用说明.md",
+    "sha256": "5d93378ad5d2d2e7b8ae5095bdbc40a7d8cd0b465c6cc12aedc88c9ea7322e04"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/知识库详细设计.md",
+    "sha256": "f0a245aadfce77e2a97c1cf3e0f006370a6057620230c58ac5ec65967c3b2134"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/evals/tests/test_agent_review_contract.py",
+    "sha256": "2a5a437ab7a039a62edd2a305806af7729d85d4ab0687f2666748c2fcf563974"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/evals/tests/test_process_recovery.py",
+    "sha256": "33c4e3076f9cccd2ac477f86828a3a7e02a3c607f108bc6ce8f153bd3f8fb867"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/evals/tests/test_real_source_compat.py",
+    "sha256": "85978b32e5c648d7f70edda1ba22a09683e49454a3512630e7cbffea197792cd"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/evals/tests/test_source_analysis_admission.py",
+    "sha256": "397762f7ded247daa49eed184f78236a0c8245ec00d3f9dcdc238c5bd63f2823"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/evals/tests/test_workflows.py",
+    "sha256": "2a73db301f72087b63cdf5c2ceaa5b5ed05e72aec277bdc4b1047d76d855bd8a"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/evals/validate_design.py",
+    "sha256": "9f59af52cf430cf85b979856a46d4a733fb7089c2a34afa570a1812934593906"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/governance/AGENTS.md",
+    "sha256": "75bb0f7f2ac9dfc62ae39ebf279b42e8bbd73d1240c13f2dc6d1a2aaad374954"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/governance/contracts/checks.py",
+    "sha256": "df168e4950dd4b5ac9690d6e95399fca457a532ad4b1505b314cd96d3d6dc34d"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/governance/contracts/source_resources.py",
+    "sha256": "acaccf9899705a60e67c398e486162a2903a571652987f46546d85593feb84b8"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/governance/framework.lock.yaml",
+    "sha256": "0ab804a3cf63e4e2edcd153e58400490b08be2e52556ba4edfba6da9fd707cba"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/governance/schemas/records.schema.json",
+    "sha256": "432648c5427281f0602f5e6ec967d476298bfdd214dfaf48a676fe2aa1302dd0"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/governance/specs/ci-runner.md",
+    "sha256": "de3ece8450ad767e5695b34598ed910533ea9e8aa3303979f9d0985f5446d352"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-apply/SKILL.md",
+    "sha256": "d27a26975c8464d54938325937b1a5b53bb523f34c6c7cc2110e2c1086ed77a2"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-apply/artifacts/review-guide.md",
+    "sha256": "1c9fd99b04b2565d3190ba5f7925ec2e0c57b526254b04c716d0ef1994f4de38"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-apply/scripts/transaction.py",
+    "sha256": "295ed26204bacfb649f595e5e1a8f84afe3f35326fc5196b05a7282b514dde3d"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-apply/scripts/transaction_v3.py",
+    "sha256": "507124925a45ee0f1eda6bd9970bbbea2544e8ccfdd9e1b60a3c09d6f5cc0326"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-apply/tests/test_apply.py",
+    "sha256": "5e58225b4c36e906596ea82e43bcb21c3a687284ea14b743718da9d9d09dd83e"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-apply/tests/test_public_governance.py",
+    "sha256": "b58c0b91a3fd662e1c5316b8c161f25736b7c4ed241c2d1ffe16b7b6db105fe7"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-candidate-inspect/scripts/inspect_candidate.py",
+    "sha256": "88d16ee9fcb390de59fe8f884ef5549a9793612f72399dc9dac425a07adf1991"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-candidate-inspect/tests/test_journal_liveness.py",
+    "sha256": "9acf37de4d1621327dfbef6a7779538372734e499ead3a97486bffba3f7418de"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-change-plan/tests/test_v3_flow.py",
+    "sha256": "6a4fb3645d4a640f7d5b61326bed8b98fe2920ab49d043a011619b856a28f211"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-index-build/scripts/node.py",
+    "sha256": "eb4ecef27ee9582d9b1464c6319a457812dfb640fe95b63c9f21de744c14ad16"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-index-build/tests/test_journal_liveness.py",
+    "sha256": "d30d518a04175d916ca25d5b67d517bc5b783a14fd1bf1c385c169817aaf9f17"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-local-check/SKILL.md",
+    "sha256": "99c9b7ef8765e655faed2a7b5fbf1c59cf5649c5accf55c9a7a47186a103722e"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-local-check/artifacts/review-guide.md",
+    "sha256": "d66d8d900f620ceab4106965ce55d9145c36601c1c9cb4f35b59f24bf7dc57a4"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-local-check/artifacts/writing-guide.md",
+    "sha256": "91280e0f18321431dcdd68b11ee6d4b0393cd614a4e26b4bdf5fc744d2e9b30c"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-local-check/references/review-guide.md",
+    "sha256": "a4a9d1afa5403905572ae9ea8a18f3677668515a9a80766fe157b9e819f17256"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-local-check/scripts/check.py",
+    "sha256": "684bd979347c90ca563fabc41da004909199d3292b6c6d8db56b9aae0f771801"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-local-check/tests/test_public_code_gate.py",
+    "sha256": "4a1fb2a43c2e2899625185d9361e6da8c7bfd7c62c7eee0e1fcb80a4341eeaaf"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-maintain/references/request.md",
+    "sha256": "94ad3dc5479b6646422a6fea47f9aadf1888c1be85547c3f2c3ee2ec28c3bb9d"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-maintain/scripts/maintain.py",
+    "sha256": "08484e9a7cbc9783035fb0b1b340d25d14fe9339a851703d47102d8157633170"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-merge-check/SKILL.md",
+    "sha256": "a37d81c636b1be5684283d7b77690244d1467bf82a3a67c08d43ab431d3d0963"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-merge-check/artifacts/review-guide.md",
+    "sha256": "f495a8fdb44176f5b14b2a3e0ea061f6fe2cf076afca8243980be31614f799af"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-merge-check/references/compatibility.md",
+    "sha256": "900516d8d9b95af083bfbc5f507c07c0f7e63f4f0fb27748668754d304abc619"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-publish-handoff/SKILL.md",
+    "sha256": "07ffe51a9701f4e33b68bf88e99feeb26ffa82f52456522228297823c101c63a"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-publish-handoff/artifacts/result.yaml",
+    "sha256": "2011616b326a6b1e78e1c742c2d37fcd816a587fd70c521b4a2b4cc3b3c8c0b3"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-publish-handoff/artifacts/review-guide.md",
+    "sha256": "2825ebbd306b7bfca2e7065694ca7c23705da38db26972a6c6f8ac20a5ec0c04"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-publish-handoff/artifacts/submission-result.yaml",
+    "sha256": "4e2e801f6654ca03b170a19b3a896d65a2fabe9f578c592d2fc90fe58d7ac6a4"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-publish-handoff/scripts/publish.py",
+    "sha256": "5996c5469aadc802aa79eebac2e7674f127e61de931fb07b1841d47b88bb1535"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-query/scripts/node.py",
+    "sha256": "13e01d1c20d080cf845ce16240b8ef08a7fc7e92dc622ffb0ed1f8bf8956f03b"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-recover/scripts/recover.py",
+    "sha256": "7c05e3145a0d97cbe852dd94502bb581208da4bdaf5df708029b746dc80eee57"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-recover/tests/test_recover.py",
+    "sha256": "74ba31ecd0ca62c63055d17033cdd393791286cc296a31eed54b1322e43891c6"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-source-capture/references/request.md",
+    "sha256": "ec96a532228fe7b710f9c39a0393b97ad4ad54c52ee4b00e6c0e280854135312"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-source-capture/scripts/capture.py",
+    "sha256": "a125313b0c3f7b6e0ae8677b7b5989bdcc4eef32a49446b11aa3b0413408f179"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-source-capture/scripts/code_capture.py",
+    "sha256": "4f9b9b81b67dff1bb9e3ddfc02e70ced2ce9a0e088897e702666ba734d622560"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-source-capture/tests/test_code_capture.py",
+    "sha256": "0329058e0c05e5f579461faa13a10a85e732377c3e0193e3ea16545e748322d9"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-source-scan/scripts/scan.py",
+    "sha256": "d1e37ca6e77d4b87e0fd7ead3d14274d8293330452c8e26148c616d32edb809b"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-source-scan/tests/test_cli.py",
+    "sha256": "a3a930b562cb699347a810ac256fc931361d9b4ba667492ca670617f2a86250e"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-workspace-explore/scripts/node.py",
+    "sha256": "07c9a8150790738ae9771c03f7a780927b6df013a9d1b3a93d793e096ef99b96"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/workflows/common/knowledge/hs-knowledge-ingest/layouts.yaml",
+    "sha256": "149a1d7c8824c87f55143910fedf1da4ca05ca8d084c1dd911bd8cd5be25911e"
+  },
+  {
+    "path": "aiotbot-knowledge-wifi-mp/workflows/common/knowledge/hs-knowledge-ingest/workflow.yaml",
+    "sha256": "52d08b6b251fb4af1a6f7e6b9389cb6f8c5696c2e67f35286c366c0a4729694d"
+  }
+]

@@ -17,7 +17,10 @@ from support import (
     checked_view,
     digest,
     package_digest,
+    native_path,
+    strict_json,
     sync_directory,
+    verify,
 )
 
 
@@ -31,6 +34,26 @@ def current_digest(ctx, path):
     if target.exists() and not target.is_file():
         raise Invalid("transaction target is not a file")
     return digest(target.read_bytes()) if target.is_file() else None
+
+
+def read_other_journal(ctx, relative, directory_operation):
+    """Read only another operation's supported journal for writer liveness.
+
+    A terminal old-rules journal is not a current-rule proof. It is never
+    resumed, re-signed, migrated or used to authorize the new operation.
+    Same-operation reads keep Context.read's exact rules identity requirement.
+    """
+    path = ctx.path(relative, ("logs/operations",))
+    other = verify(strict_json(pathlib.Path(native_path(path)).read_text(encoding="utf-8")))
+    if other.get("record_kind") != "transaction_journal":
+        raise Invalid("another operation has an unsupported transaction journal kind")
+    if ctx.operation(other) != directory_operation:
+        raise Invalid("another transaction journal operation does not match its directory")
+    if not re.fullmatch(r"[0-9a-f]{64}", str(other.get("rules_digest", ""))):
+        raise Invalid("another transaction journal has an invalid rules identity")
+    if ctx.domain:
+        ctx.domain.validate_shape("transaction_journal", other, ctx.rules)
+    return other
 
 
 def invoke_checker(ctx, request, purpose="current", allow_merge=False, card_path=None):
@@ -432,7 +455,7 @@ def execute(ctx, request, action="run"):
             or result.get("view_digest") != view["digest"]
             or result.get("proof_digest") != proof["digest"]
         ):
-            raise Invalid("apply result is not an authenticated committed transaction")
+            raise Invalid("apply result does not match the verified committed transaction")
         expected_writes = [row["path"] for row in journal["entries"] if row["new_digest"] is not None]
         expected_deletes = [row["path"] for row in view.get("deletes", [])]
         if (
@@ -528,11 +551,11 @@ def execute(ctx, request, action="run"):
             for row in (historical if purpose == "historical" else eligible)
         ):
             raise Blocked(
-                "requested card has no current authenticated exact-content eligibility"
+                "requested card has no current verified exact-content eligibility"
             )
         return {
             "result_verified": True,
-            "verification_scope": "authenticated_content_eligibility",
+            "verification_scope": "verified_content_eligibility",
             "purpose": purpose,
             "eligible_files": eligible,
             "historical_files": historical,
@@ -579,7 +602,7 @@ def execute(ctx, request, action="run"):
         ):
             if other_path.parent.name == op:
                 continue
-            other = ctx.read(other_path.relative_to(ctx.root).as_posix())
+            other = read_other_journal(ctx, other_path.relative_to(ctx.root).as_posix(), other_path.parent.name)
             if other.get("record_kind") != "transaction_journal" or other.get(
                 "status"
             ) not in ("committed", "rolled_back"):

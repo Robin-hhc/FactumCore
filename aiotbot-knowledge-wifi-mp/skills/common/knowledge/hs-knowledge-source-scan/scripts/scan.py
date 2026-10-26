@@ -90,8 +90,22 @@ def pending_units(context, records):
                 continue
             ref = ".build/operations/" + operation.name + "/source-inventory.json"
             if safe(context.root, ref).is_file():
-                scan = context.record(ref, "source_inventory")
-                pending.update(u["path"] for u in scan["units"])
+                try:
+                    scan = context.record(ref, "source_inventory")
+                except NodeError as exc:
+                    if exc.code != "STALE_RULES":
+                        raise
+                    # An old operation can suggest unfinished paths only. Its
+                    # rules and processing results never authorize this run.
+                    scan = load_yaml(fixed_bytes(context.root, ref, [".build/operations"]))
+                context.modules["records"].validate_scan_manifest(scan, context.rules)
+                if scan["operation_id"] != operation.name:
+                    raise NodeError("RECORD_BINDING_MISMATCH", "Pending inventory belongs to a different operation", ref)
+                for scope in scan["scope"]:
+                    safe(context.root, scope, RAW_DIRS)
+                for unit in scan["units"]:
+                    safe(context.root, unit["path"], RAW_DIRS)
+                    pending.add(unit["path"])
     return pending
 
 
@@ -166,10 +180,17 @@ def scan(context):
         finished = bool(prior) and all(progress_status(d) in FINISHED and record_applied(r) and r.get("rules_digest") == context.args.rules_digest for _, d, r in prior)
         ambiguous = len(prior_fingerprints) > 1 or len(prior_ids) > 1 or (bool(prior_ids) and source_id not in prior_ids)
         progress = "completed" if finished and not ambiguous else None
+        prior_progress = {progress_status(d) for _, d, _ in prior}
+        if not ambiguous and len(prior_progress) == 1:
+            status = next(iter(prior_progress))
+            if status not in FINISHED:
+                progress = status
         if path in errors:
             change = "read_failed"
         elif fingerprint is None:
             change = "missing" if complete and prior else "unfinished"
+        elif prior and old is not None and fingerprint != old and not ambiguous:
+            change = "changed"
         elif path in pending or ambiguous or (prior and fingerprint == old and (not finished or source_id in affected_sources)):
             change = "unfinished"
         elif not prior:

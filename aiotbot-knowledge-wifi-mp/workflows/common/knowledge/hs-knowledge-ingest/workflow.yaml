@@ -1,7 +1,7 @@
 version: 1
 id: hs-knowledge-ingest
 name: hs-knowledge-ingest
-description: 'One raw-to-knowledge Workflow: scan, read, author/review, lint, record and apply with checked submission.'
+description: 'One local raw-to-knowledge Workflow: scan, read, author/review, lint, record, apply and verify local queries; people submit, run CI and merge afterward.'
 kind: custom
 source: user_created
 entry:
@@ -17,7 +17,7 @@ nodes:
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
     timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
-    Already applied content is never applied again; retry only unfinished indexing/query/submission. A revised input
+    Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. Context is already known: do not invoke E0, bind a project or initialize services.
     --action scan without source scans the five allowed raw directories. Optional source only narrows scope. Consume
@@ -54,7 +54,7 @@ nodes:
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
     timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
-    Already applied content is never applied again; retry only unfinished indexing/query/submission. A revised input
+    Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. --action prepare binds scan_ref. Rebuild source/Claim relations across all card
     states, topic/entity/interface/symbol search and explicit requires/derived_from dependencies. Ordinary related
@@ -83,7 +83,7 @@ nodes:
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
     timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
-    Already applied content is never applied again; retry only unfinished indexing/query/submission. A revised input
+    Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. --action plan reads scan_ref/material_ref and complete current/old originals
     and old cards. Compare facts, conditions and evidence per Claim, then aggregate six card decisions; source skip
@@ -115,7 +115,7 @@ nodes:
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
     timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
-    Already applied content is never applied again; retry only unfinished indexing/query/submission. A revised input
+    Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. --action review with semantic_plan_ref, separate reviewer_id, independent_context,
     sampled_unit_ids, unreviewed_unit_ids, reason and evidence findings. Independently read selected originals/old
@@ -151,7 +151,7 @@ nodes:
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
     timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
-    Already applied content is never applied again; retry only unfinished indexing/query/submission. A revised input
+    Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. Author the complete candidate cards under .build. First use change-plan run
     with v3_required true, semantic_plan_ref/material_ref and decisions/card_inputs, then materialize its plan_ref.
@@ -179,7 +179,7 @@ nodes:
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
     timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
-    Already applied content is never applied again; retry only unfinished indexing/query/submission. A revised input
+    Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. --action review binds semantic_plan_ref and exact view_ref. Read actual full
     candidate, source and code evidence. Reuse unchanged assignment/skip adjudication, retain independent sampled/unreviewed
@@ -214,7 +214,7 @@ nodes:
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
     timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
-    Already applied content is never applied again; retry only unfinished indexing/query/submission. A revised input
+    Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. Run candidate full-scope lint on exact view before displaying it. CheckReport
     is separate from node envelopes: exit0/status=phase=passed/complete=true/scope.kind=full pass; exit1/failed
@@ -250,7 +250,7 @@ nodes:
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
     timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
-    Already applied content is never applied again; retry only unfinished indexing/query/submission. A revised input
+    Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. Inspect actual view and transaction state. Manual documents require real human
     final-view confirmation; code requires current mapped evidence. Mixed views require both bound proof types.
@@ -291,7 +291,7 @@ nodes:
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
     timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
-    Already applied content is never applied again; retry only unfinished indexing/query/submission. A revised input
+    Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. Display exact complete final bytes and changes; use trusted host challenge and
     display receipt. No summary, Agent-authored reply or exit code substitutes for the real human's exact final-view
@@ -327,7 +327,7 @@ nodes:
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
     timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
-    Already applied content is never applied again; retry only unfinished indexing/query/submission. A revised input
+    Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. Validate trusted original human event, challenge, complete display identity
     and exact final bytes. For mixed view continue code verification after consent; document-only proof goes to
@@ -358,7 +358,7 @@ nodes:
     condition: Runtime/prerequisite failure; preserve input and stop, no completion claim.
     target: __end__
 - id: local_check
-  title: P4 Verify current code Claim evidence
+  title: P4 Record independent code review and verify exact bindings
   type: skill
   owner: reviewer
   skill: hs-knowledge-local-check
@@ -366,15 +366,25 @@ nodes:
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
     timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
-    Already applied content is never applied again; retry only unfinished indexing/query/submission. A revised input
+    Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
-    failures save the gap and stop. Read actual mapped code and config against Claim conditions and full final view;
-    unknown Target/build/revision remains a gap. Preserve exact code context and mixed manual proof. This semantic
-    verification is outside deterministic lint and CI.
+    failures save the gap and stop. Read actual authorized code and config against each Claim's conditions and full final view.
+    The reviewer must use a fresh independent context, read the actual sources and candidate, and record positive
+    per-Claim support with reasons and exact snapshot/locator/hash evidence. Save a semantic_review record with
+    reviewer_id and payload author_id, independent_context, findings, view_digest, context_digest, mode, issued_at
+    and claims. Bind authors to the actual plan and keep the reviewer distinct from every author. No reviewer
+    public-key registry or cryptographic signature is required. The fixed script checks record completeness,
+    author separation and exact bindings; it does not authenticate Agent identities or decide knowledge semantics.
+    Static semantic-support requires exact source identity and the independent review record, not compiled artifacts.
+    A current Claim still needs its real mapped Target/config; without a Target only explicitly historical/guidance
+    Claims with unknown applicability and no concrete contexts may pass. build-support/runtime-support require
+    their actual evidence; never infer compiled or runtime behavior from source alone. Preserve exact code context
+    and mixed manual proof. Independent Agent content review belongs to ingest; lint and CI perform only
+    deterministic checks and never repeat that judgment.
   exits:
   - id: code_passed
     label: code passed
-    condition: Applicable code proof and any mixed manual proof bind exact view.
+    condition: Required independent code review record, fixed source bindings and any mixed manual proof bind the exact view.
     target: lint_view
   - id: needs_revision
     label: needs revision
@@ -393,7 +403,7 @@ nodes:
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
     timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
-    Already applied content is never applied again; retry only unfinished indexing/query/submission. A revised input
+    Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. Route material defects to P2 and semantic/assignment defects to P3. For P4 content
     revision create new plan/view and renew invalidated review/proof before recheck. Never rewrite the meaning of
@@ -428,7 +438,7 @@ nodes:
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
     timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
-    Already applied content is never applied again; retry only unfinished indexing/query/submission. A revised input
+    Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. Use the same fixed full-view lint Skill as manual checks. CheckReport exit0/phase=status=passed/complete=true/full
     scope must match final view after all consent/evidence checks. Exit1 routes directly to P2/P3/P4 by finding;
@@ -463,7 +473,7 @@ nodes:
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
     timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
-    Already applied content is never applied again; retry only unfinished indexing/query/submission. A revised input
+    Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. --action record binds exact scan_ref, semantic_plan_ref and all per-raw-unit
     dispositions. Copy authored maintenance_units as shared maintenance_dispositions and pending summaries even
@@ -494,14 +504,16 @@ nodes:
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
     timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
-    Already applied content is never applied again; retry only unfinished indexing/query/submission. A revised input
+    Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. --action run with v3_required true and ingest_record_ref. Content also needs
     view_ref/proof_ref (mixed proof_set), final lint_report_ref/content_review_ref, plus check_inputs identical
     to final lint fixed inputs (a code batch explicitly supplies code_checkout). Rerun the actual fixed checks;
     caller claims do not replace this gate. Record-only omits view/proofs and contains no card/nav/lock writes.
-    Recheck baseline and portable sources; update/revalidate only actual record apply facts in same transaction.
-    No Git commit yet. Already committed local transaction must return existing result, never reapply.
+    Recheck baseline and exact locally recoverable captured originals; update/revalidate only actual record apply
+    facts in the same transaction. Portable source availability for other clones belongs to subsequent human publishing.
+    Git submission, fixed CI and merge are subsequent human operations, not local completion prerequisites.
+    Already committed local transaction must return existing result, never reapply.
   exits:
   - id: applied
     label: applied
@@ -509,8 +521,8 @@ nodes:
     target: rebuild_index
   - id: record_only
     label: record only
-    condition: Only the valid processing record applied; indexing/query are not applicable.
-    target: publish_handoff
+    condition: Valid processing record applied; local ingest is complete with unresolved dispositions preserved; indexing/query and Git are not required.
+    target: __end__
   - id: recovery_required
     label: recovery required
     condition: Interrupted transaction; preserve exact original journal.
@@ -532,11 +544,11 @@ nodes:
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
     timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
-    Already applied content is never applied again; retry only unfinished indexing/query/submission. A revised input
+    Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. Inspect actual journal, locks, backups and final bytes. Resume or rollback only
     the original transaction. A recovered committed content batch continues unfinished indexing/query; recovered
-    record-only goes directly to its applicable submission. Do not create duplicate knowledge or rewrite prior history.
+    record-only completes local ingest immediately, preserving unresolved dispositions. Do not create duplicate knowledge or rewrite prior history.
   exits:
   - id: recovered
     label: recovered
@@ -544,8 +556,8 @@ nodes:
     target: rebuild_index
   - id: record_only
     label: record only
-    condition: Original record-only transaction recovered.
-    target: publish_handoff
+    condition: Original record-only transaction recovered; local ingest is complete and its recorded pending work remains pending.
+    target: __end__
   - id: rolled_back
     label: rolled back
     condition: Original transaction rolled back; new content preparation needed.
@@ -563,7 +575,7 @@ nodes:
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
     timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
-    Already applied content is never applied again; retry only unfinished indexing/query/submission. A revised input
+    Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. Build/verify actual applied content with current rules. Do not publish before
     full verification. Construction/runtime failure retries this finishing step only; content failure creates a
@@ -590,79 +602,22 @@ nodes:
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
     timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
-    Already applied content is never applied again; retry only unfinished indexing/query/submission. A revised input
+    Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
     failures save the gap and stop. Load representative cases from the frozen plan/view; v3 content cannot accept
     a caller-supplied empty cases list. Verify expected cards/Claims and current-context filtering on the exact
-    generation before activation and Git submission. Runtime failure retries this finishing step; content error
+    generation before activation. Verified activation completes local ingest; Git submission, fixed CI and merge
+    are subsequent human operations and never prerequisites for this success. Runtime failure retries this finishing step; content error
     starts a new correction operation and preserves prior apply fact.
   exits:
   - id: checked
     label: checked
-    condition: All frozen target cases passed and the verified generation is active.
-    target: publish_handoff
+    condition: All frozen target cases passed and the verified local generation is active; local ingest is complete without a Git commit, CI result or merge.
+    target: __end__
   - id: content_error
     label: content error
     condition: Materialized content fails expected queries; create correction operation.
     target: plan_change
-  - id: blocked
-    label: blocked
-    condition: Runtime/prerequisite failure; preserve input and stop, no completion claim.
-    target: __end__
-- id: publish_handoff
-  title: P7 Finish applicable repository submission
-  type: skill
-  owner: coder
-  skill: hs-knowledge-publish-handoff
-  prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
-    Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
-    timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
-    Already applied content is never applied again; retry only unfinished indexing/query/submission. A revised input
-    needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
-    failures save the gap and stop. Inspect actual local transaction, record and applicable full index/target-query
-    results. Record-only needs its record validation only. Produce exact batch file list including logs/ingest;
-    repository submission is an authorized host Git action and must occur only after applicable finishing checks.
-    Never stage the whole workspace/logs. Before retry inspect Git actual state to avoid duplicate commit; report
-    local stable, committed, CI and merged separately. Fixed CI runs trusted rules without Agent or data repair;
-    rejection starts local correction.
-  exits:
-  - id: ready_to_publish
-    label: ready to publish
-    condition: 'Actual phase ready_to_submit or record_only_ready: applicable checks complete and exact handoff
-      saved; not yet submitted.'
-    target: submit_batch
-  - id: blocked
-    label: blocked
-    condition: Runtime/prerequisite failure; preserve input and stop, no completion claim.
-    target: __end__
-- id: submit_batch
-  title: P7 Submit only the verified batch and verify the actual commit
-  type: skill
-  owner: coder
-  skill: hs-knowledge-publish-handoff
-  prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
-    Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material, silence,
-    timeout or runtime failure to approval. Before a retry inspect actual operation/source/rules/code/baseline state.
-    Already applied content is never applied again; retry only unfinished indexing/query/submission. A revised input
-    needs a new operation/view and renewed applicable review. Use a bounded revision budget; repeated no-progress
-    failures save the gap and stop. With repository authorization perform the host Git submission using the exact
-    commit_files list; do not stage unrelated workspace changes. Inspect actual Git state before retries. Then call
-    --action verify-submission with v3_required true, apply_result_ref, applicable query_report_ref and actual commit_sha;
-    verify the commit object contains the exact batch bytes/deletes and no extra paths. Without authorization or
-    a real matching commit, preserve pending submission and never report full ingest completion. CI pass and merge
-    remain separate facts.
-  exits:
-  - id: submitted
-    label: submitted
-    condition: 'Phase submitted from public verify-submission: actual exact batch commit verified; report unresolved
-      per-source dispositions and separate CI/merge state.'
-    target: __end__
-  - id: pending_submission
-    label: pending submission
-    condition: No authorized exact commit available; save explicit pending submission, not completed ingest.
-    target: __end__
   - id: blocked
     label: blocked
     condition: Runtime/prerequisite failure; preserve input and stop, no completion claim.

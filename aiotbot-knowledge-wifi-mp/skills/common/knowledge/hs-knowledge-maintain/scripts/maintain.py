@@ -539,8 +539,8 @@ def advance(context):
                 ):
                     remaining.append(block)
                     continue
-                # A fresh signed semantic proof for this exact view establishes
-                # current applicability; historical code evidence stays immutable.
+                # A fresh bound Agent review records the current applicability
+                # judgment; historical code evidence stays immutable.
                 cleared.append(block)
                 continue
             sources = {s["evidence_ref"]: s for s in metadata["sources"]}

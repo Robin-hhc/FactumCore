@@ -1,4 +1,4 @@
-"""Read-only code evidence gate; a signed semantic reviewer supplies support."""
+"""Check an Agent's independent review record against exact code and view inputs."""
 
 import base64
 import importlib
@@ -12,7 +12,6 @@ import time
 from support import (
     Blocked,
     Invalid,
-    canonical,
     checked_view,
     digest,
     safe_path,
@@ -42,7 +41,7 @@ def git_read(root, arguments):
         "remote.origin.url",
     ]:
         raise Invalid("unapproved Git read operation")
-    environment = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    environment = {k: v for k, v in os.environ.items() if not k.startswith("GIT_") or k == "GIT_TEST_ASSUME_DIFFERENT_OWNER"}
     environment.update(
         {
             "GIT_CONFIG_NOSYSTEM": "1",
@@ -68,6 +67,8 @@ def git_read(root, arguments):
         "protocol.allow=never",
         "-c",
         "protocol.file.allow=never",
+        "-c",
+        "safe.directory=" + pathlib.Path(root).resolve().as_posix(),
         "-C",
         str(root),
         *arguments,
@@ -98,61 +99,89 @@ def read_configuration(ctx, context):
     return config, trusted, raw
 
 
-def code_identity(ctx, context, config, policy, mode):
+def source_analysis_claim(claim):
+    """Only explicitly limited source knowledge may omit product build proof."""
+    scope = claim.get("scope", {})
+    return (
+        claim.get("usage") in {"historical", "guidance"}
+        and scope.get("applicability") == "unknown"
+        and scope.get("contexts") == []
+    )
+
+
+def artifact_requirements(claim):
+    requirements = set(claim.get("verification_requirements", []))
+    if requirements - {"semantic-support", "build-support", "runtime-support"}:
+        raise Incomplete("unsupported Claim verification requirement")
+    required = requirements & {"build-support", "runtime-support"}
+    if claim.get("evidence_kind") == "measurement":
+        required.add("runtime-support")
+    return required
+
+
+def code_identity(ctx, context, config, policy, mode, source_only=False, require_build=True):
     repos = context.get("repos")
     target = context.get("target")
-    if not isinstance(repos, dict) or not repos or not isinstance(target, dict):
+    check_build = require_build or context.get("build_evidence") is not None
+    require_target = not source_only or check_build
+    if not isinstance(repos, dict) or not repos:
+        raise Incomplete("fixed repositories are required")
+    if require_target and not isinstance(target, dict):
         raise Incomplete("fixed repositories and a real Target are required")
     registered = {item["repo_id"]: item for item in config["repos"]}
-    targets = [
-        item
-        for item in config["targets"]
-        if item["target_id"] == target.get("target_id")
-    ]
-    if len(targets) != 1:
-        raise Incomplete("Target is not uniquely registered")
-    declared_target = targets[0]
-    for field in ("target_id", "chip", "side", "build_profile"):
-        if not known(target.get(field)) or target[field] != declared_target.get(field):
-            raise Incomplete(
-                "Target/build profile is unknown or does not match registration"
-            )
-    if (
-        not declared_target["module_roots"]
-        or not declared_target["source_bindings"]
-        or not isinstance(target.get("features"), list)
-        or not isinstance(target.get("protocol_versions"), list)
-        or not known(target.get("revision"))
-    ):
-        raise Incomplete("Target code bindings/macros/protocol/revision are incomplete")
-    if not set(declared_target["required_features"]).issubset(
-        target["features"]
-    ) or not set(declared_target["protocol_versions"]).issubset(
-        target["protocol_versions"]
-    ):
-        raise Incomplete("Target required macros or protocols are not fixed")
+    declared_target = None
+    if target is not None:
+        if not isinstance(target, dict):
+            raise Incomplete("Target must be absent or an actual registered context")
+        targets = [item for item in config["targets"] if item["target_id"] == target.get("target_id")]
+        if len(targets) != 1:
+            raise Incomplete("Target is not uniquely registered")
+        declared_target = targets[0]
+        for field in ("target_id", "chip", "side", "build_profile"):
+            required = require_target and (field != "build_profile" or check_build)
+            if (required and not known(target.get(field))) or (
+                known(target.get(field)) and target[field] != declared_target.get(field)
+            ):
+                raise Incomplete("Target/build profile is unknown or does not match registration")
+        if require_target and (
+            not declared_target["module_roots"]
+            or not declared_target["source_bindings"]
+            or not isinstance(target.get("features"), list)
+            or not isinstance(target.get("protocol_versions"), list)
+            or not known(target.get("revision"))
+        ):
+            raise Incomplete("Target code bindings/macros/protocol/revision are incomplete")
+        if require_target and (
+            not set(declared_target["required_features"]).issubset(target["features"])
+            or not set(declared_target["protocol_versions"]).issubset(target["protocol_versions"])
+        ):
+            raise Incomplete("Target required macros or protocols are not fixed")
     build = context.get("build_evidence")
-    if (
-        not isinstance(build, dict)
-        or build.get("profile") != target["build_profile"]
-        or build.get("source_revision") != target["revision"]
-        or not re.fullmatch(r"[0-9a-f]{64}", str(build.get("macro_digest", "")))
-        or not build.get("artifacts")
-    ):
-        raise Incomplete("build/macro evidence is missing")
     build_files = {}
-    for item in build["artifacts"]:
-        path = ctx.path(item.get("path"), ("logs/evidence",))
-        raw = path.read_bytes()
-        if digest(raw) != item.get("sha256"):
-            raise Incomplete("build evidence bytes changed")
-        build_files[item["path"]] = item["sha256"]
+    if check_build:
+        if (
+            not isinstance(build, dict)
+            or not isinstance(target, dict)
+            or build.get("profile") != target.get("build_profile")
+            or build.get("source_revision") != target.get("revision")
+            or not re.fullmatch(r"[0-9a-f]{64}", str(build.get("macro_digest", "")))
+            or not build.get("artifacts")
+        ):
+            raise Incomplete("build/macro evidence is missing")
+        for item in build["artifacts"]:
+            path = ctx.path(item.get("path"), ("logs/evidence",))
+            raw = path.read_bytes()
+            if digest(raw) != item.get("sha256"):
+                raise Incomplete("build evidence bytes changed")
+            build_files[item["path"]] = item["sha256"]
     result = {
         "repos": {},
         "target": target,
         "build_files": build_files,
-        "macro_digest": build["macro_digest"],
+        "macro_digest": build["macro_digest"] if build is not None else None,
     }
+    if source_only or build is None:
+        result["basis"] = "source"
     for repo_id, item in repos.items():
         registered_repo = registered.get(repo_id)
         protected_root = policy.get("repo_roots", {}).get(repo_id)
@@ -211,7 +240,7 @@ def code_identity(ctx, context, config, policy, mode):
                 .decode("ascii")
                 .strip()
             )
-        if item.get("head") != head or target["revision"] != head:
+        if item.get("head") != head or (target and known(target.get("revision")) and target["revision"] != head):
             raise Incomplete("code revision differs from the fixed authorized identity")
         files = item.get("files")
         if not isinstance(files, dict) or not files:
@@ -219,7 +248,7 @@ def code_identity(ctx, context, config, policy, mode):
         actual_files, dirty = {}, False
         for relative, expected in files.items():
             path = safe_path(root, relative)
-            if not any(
+            if declared_target and declared_target["module_roots"] and not any(
                 module == "."
                 or relative == module
                 or relative.startswith(module.rstrip("/") + "/")
@@ -257,6 +286,7 @@ def claims_and_sources(ctx, view):
             ctx.domain.validate_shape("sources", source_lock, ctx.rules)
     rules = {**ctx.rules, "source_lock": source_lock}
     claims = {}
+    authors = set()
     for row in view["writes"]:
         if not row["path"].startswith("knowledge/") or pathlib.PurePosixPath(
             row["path"]
@@ -265,6 +295,7 @@ def claims_and_sources(ctx, view):
         card = knowledge.parse_card(
             base64.b64decode(row["bytes_b64"], validate=True), row["path"], rules
         )
+        authors.add(card["metadata"]["owner"])
         if card["metadata"]["review_mode"] != "code_gate":
             if view.get("review_mode") == "mixed":
                 continue
@@ -283,41 +314,57 @@ def claims_and_sources(ctx, view):
             }
     if not claims:
         raise Incomplete("code view contains no verifiable Claims")
-    return claims, source_lock, resources
+    return claims, source_lock, resources, authors
 
 
-def verify_report(ctx, report, view, context, mode):
-    trust = ctx.catalog.get("semantic_reviewers", {}).get(report.get("reviewer_id"))
-    if not trust:
-        raise Incomplete("trusted semantic reviewer is not available")
-    if trust.get("synthetic"):
-        marker = ctx.root / ".isolated-knowledge-fixture"
+def review_authors(ctx, view, authors):
+    """Read actual authorship declarations, without authenticating an identity."""
+    authors = set(authors)
+    plan_ref = view.get("semantic_plan_ref")
+    if plan_ref:
+        ctx.path(plan_ref, (f".build/operations/{view['operation_id']}",))
+        plan = ctx.read(plan_ref)
         if (
-            not trust.get("fixture_root")
-            or pathlib.Path(trust["fixture_root"]).resolve() != ctx.root
-            or not marker.is_file()
-            or marker.read_text(encoding="utf-8").strip()
-            != "AIOTBOT_SYNTHETIC_FIXTURE_V2"
+            plan.get("record_kind") != "semantic_plan"
+            or plan.get("operation_id") != view["operation_id"]
+            or plan.get("digest") != view.get("semantic_plan_digest")
         ):
-            raise Incomplete("synthetic semantic reviewer requires an isolated fixture")
+            raise Incomplete("review authors are not bound to the actual authored plan")
+        authors.add(plan.get("author_id"))
+        authors.update(row.get("author_id") for row in plan.get("card_actions", []))
+    elif view.get("v3_required"):
+        raise Incomplete("review author plan is missing")
+    if any(not isinstance(author, str) or not author.strip() for author in authors):
+        raise Incomplete("review author identity declaration is missing")
+    return authors
+
+
+def verify_report(ctx, report, view, context, mode, authors):
+    """Validate declared independence and bindings; do not certify semantics."""
+    try:
+        ctx.domain.validate_shape("semantic_review", report, ctx.rules)
+    except ctx.domain.ContractError as exc:
+        if exc.code == "SCHEMA_INVALID" and "is a required property" in exc.message:
+            raise Incomplete("Agent review record is incomplete: " + str(exc)) from exc
+        raise Failed("Agent review record shape is invalid: " + str(exc)) from exc
     payload = report.get("payload")
     if (
         report.get("schema_version") != "2.0"
         or report.get("record_kind") != "semantic_review"
         or not isinstance(payload, dict)
     ):
-        raise Failed("invalid signed semantic report")
-    try:
-        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-
-        public = Ed25519PublicKey.from_public_bytes(
-            base64.b64decode(trust["public_key_b64"], validate=True)
-        )
-        public.verify(
-            base64.b64decode(report["signature_b64"], validate=True), canonical(payload)
-        )
-    except Exception as exc:
-        raise Failed("semantic reviewer signature invalid") from exc
+        raise Failed("invalid Agent review record")
+    authors = review_authors(ctx, view, authors)
+    reviewer = report.get("reviewer_id")
+    author = payload.get("author_id")
+    if not isinstance(author, str) or not author.strip() or author not in authors:
+        raise Incomplete("review author does not match the actual plan or card author")
+    if not isinstance(reviewer, str) or not reviewer.strip() or reviewer in authors:
+        raise Incomplete("independent reviewer must differ from every declared author")
+    if not isinstance(payload.get("independent_context"), str) or not payload["independent_context"].strip():
+        raise Incomplete("independent review context declaration is missing")
+    if payload.get("findings") != []:
+        raise Incomplete("review findings are missing or unresolved")
     if (
         payload.get("view_digest") != view["digest"]
         or payload.get("context_digest") != context["digest"]
@@ -332,37 +379,42 @@ def verify_report(ctx, report, view, context, mode):
         or issued > time.time() + 60
     ):
         raise Failed("semantic report timestamp invalid")
-    return payload, "synthetic_code_reviewer" if trust.get(
-        "synthetic"
-    ) else "authenticated_code_reviewer"
+    return payload, "agent_content_review"
 
 
-def frozen_identity(ctx, context, mode):
-    """Validate persisted signed context/evidence without reading today's checkout."""
+def frozen_identity(ctx, context, mode, source_only=False, require_build=True):
+    """Validate retained review context/evidence without reading today's checkout."""
     target, build, repos = (
         context.get("target"),
         context.get("build_evidence"),
         context.get("repos"),
     )
     if (
-        not isinstance(target, dict)
-        or not isinstance(build, dict)
-        or not isinstance(repos, dict)
+        not isinstance(repos, dict)
         or not repos
-        or build.get("profile") != target.get("build_profile")
-        or build.get("source_revision") != target.get("revision")
-        or not re.fullmatch(r"[0-9a-f]{64}", str(build.get("macro_digest", "")))
+        or (target is not None and not isinstance(target, dict))
+        or (not source_only and not isinstance(target, dict))
     ):
         raise Incomplete("historical context/build identity is incomplete")
     result = {
         "repos": {},
         "target": target,
         "build_files": {},
-        "macro_digest": build["macro_digest"],
+        "macro_digest": build["macro_digest"] if isinstance(build, dict) else None,
     }
-    if not build.get("artifacts"):
-        raise Incomplete("historical build evidence is missing")
-    for item in build["artifacts"]:
+    if source_only or build is None:
+        result["basis"] = "source"
+    if build is not None or require_build:
+        if (
+            not isinstance(target, dict)
+            or not isinstance(build, dict)
+            or build.get("profile") != target.get("build_profile")
+            or build.get("source_revision") != target.get("revision")
+            or not re.fullmatch(r"[0-9a-f]{64}", str(build.get("macro_digest", "")))
+            or not build.get("artifacts")
+        ):
+            raise Incomplete("historical build evidence is missing")
+    for item in build["artifacts"] if build else []:
         raw = ctx.path(item.get("path"), ("logs/evidence",)).read_bytes()
         if digest(raw) != item.get("sha256"):
             raise Incomplete("historical build evidence bytes changed")
@@ -421,20 +473,22 @@ def evaluate(
         )
     ):
         raise Incomplete("code context is not a project context")
+    claims, source_lock, resources, authors = claims_and_sources(ctx, view)
+    source_only = all(source_analysis_claim(claim) for claim in claims.values())
+    require_build = any(artifact_requirements(claim) for claim in claims.values())
     if historical:
-        before = frozen_identity(ctx, context, mode)
+        before = frozen_identity(ctx, context, mode, source_only, require_build)
     else:
         config, policy, config_raw = read_configuration(ctx, context)
-        before = code_identity(ctx, context, config, policy, mode)
-    claims, source_lock, resources = claims_and_sources(ctx, view)
+        before = code_identity(ctx, context, config, policy, mode, source_only, require_build)
     selected_card = request.get("card_path")
     if selected_card and selected_card not in {
         claim["card_path"] for claim in claims.values()
     }:
-        raise Invalid("requested card is not in the signed code view")
+        raise Invalid("requested card is not in the reviewed code view")
     report_ref = request.get("semantic_report_ref")
     if report_override is None and not report_ref:
-        raise Incomplete("positive signed semantic evidence is missing")
+        raise Incomplete("independent Agent review record is missing")
     report = (
         report_override
         if report_override is not None
@@ -445,21 +499,25 @@ def evaluate(
             ).read_text(encoding="utf-8")
         )
     )
-    payload, tier = verify_report(ctx, report, view, context, mode)
+    payload, tier = verify_report(ctx, report, view, context, mode, authors)
     rows = payload.get("claims")
     if not isinstance(rows, list) or len(rows) != len(claims):
         raise Incomplete("semantic evidence does not cover every Claim exactly once")
     seen, verified_claims, checked_snapshots = set(), [], {}
     resource_map = {item["source_id"]: item for item in source_lock["resources"]}
     for row in rows:
+        if not isinstance(row, dict):
+            raise Failed("invalid review Claim record")
         key = (row.get("card_id"), row.get("claim_id"))
         if key not in claims or key in seen:
             raise Failed("duplicate or unexpected semantic Claim")
         seen.add(key)
+        if not isinstance(row.get("reason"), str) or not row["reason"].strip():
+            raise Incomplete("each Claim requires an explicit review reason")
         knowledge = importlib.import_module(ctx.domain.__package__ + ".knowledge")
         retired = claims[key]["card_lifecycle"] == "deprecated"
-        if not retired and not knowledge.match_scope(
-            claims[key], context["target"], "implementation"
+        if not retired and not source_analysis_claim(claims[key]) and not knowledge.match_scope(
+            claims[key], context.get("target") or {}, "implementation"
         ):
             raise Incomplete(
                 "Claim applicability is not supported by this fixed Target/build context"
@@ -473,10 +531,21 @@ def evaluate(
                 or row.get("replacement") != claims[key]["replacement"]
             ):
                 raise Failed(
-                    "retired Claim requires signed exact reason and replacement mapping"
+                    "retired Claim requires exact reason and replacement mapping"
                 )
         elif row.get("status") != "supported":
             raise Failed("semantic reviewer did not support every Claim")
+        if not retired:
+            for requirement in artifact_requirements(claims[key]):
+                matching_artifacts = [
+                    artifact for artifact in row.get("verification_evidence", [])
+                    if isinstance(artifact, dict)
+                    and artifact.get("requirement") == requirement
+                    and artifact.get("path") in before["build_files"]
+                    and artifact.get("sha256") == before["build_files"][artifact["path"]]
+                ]
+                if not matching_artifacts:
+                    raise Incomplete("Claim build/runtime requirement lacks recorded fixed artifact support")
         if selected_card and claims[key]["card_path"] != selected_card:
             verified_claims.append(row)
             continue
@@ -498,7 +567,7 @@ def evaluate(
             snapshot = resources.validate_source_ref(ref, source_lock)
             raw = resources.recover_snapshot(ctx.root, snapshot)
             if any(item.get("sha256") != digest(raw) for item in matching):
-                raise Failed("signed evidence digest does not match immutable snapshot")
+                raise Failed("review evidence digest does not match immutable snapshot")
             resource = resource_map[ref["source_id"]]
             if resource["kind"] == "code":
                 if retired:
@@ -519,7 +588,7 @@ def evaluate(
                         )
                         if actual != snapshot["sha256"]:
                             raise Incomplete(
-                                "latest code changed; independent signed checked_snapshot evidence is required"
+                                "latest code changed; independent checked_snapshot evidence is required"
                             )
                         continue
                     repo_id, relative = checked.get("repo_id"), checked.get("path")
@@ -589,9 +658,9 @@ def evaluate(
             raise Incomplete("code Claims require positive code-snapshot support")
         verified_claims.append(row)
     after = (
-        frozen_identity(ctx, context, mode)
+        frozen_identity(ctx, context, mode, source_only, require_build)
         if historical
-        else code_identity(ctx, context, config, policy, mode)
+        else code_identity(ctx, context, config, policy, mode, source_only, require_build)
     )
     if (
         before != after
@@ -667,7 +736,7 @@ def local_check(ctx, request, action="run"):
                 for snapshot in verified["checked_snapshots"]
             )
         ):
-            raise Invalid("code proof differs from current authenticated evidence")
+            raise Invalid("code check differs from the exact recorded review evidence")
         return {
             "proof_verified": True,
             "mode": mode,

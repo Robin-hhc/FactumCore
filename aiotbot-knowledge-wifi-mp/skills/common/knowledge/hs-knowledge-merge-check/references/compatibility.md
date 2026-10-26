@@ -2,4 +2,4 @@
 
 本包保留旧版签名语义复核协议，仅在调用方明确需要兼容能力时执行。现行流程在 P3/P4 完成必要语义核验，P5 使用只读 `hs-knowledge-lint`；现行 CI 入口是可信基线的领域 `check.py`，不会委托本包。
 
-旧安装 catalog、操作 FinalView 与 signed semantic evidence 的校验继续保留；缺真实人或代码证据仍不通过。包存在不代表固定 CI、宿主触发或权限策略已经部署。新接入遵循 `governance/specs/ci-runner.md`。
+操作 FinalView、确切代码上下文及逐 Claim 复核依据继续核对，代码复核不再要求 reviewer 公钥登记或签名。旧记录保留原字节；缺少作者、独立上下文、理由等新必需信息时应重新复核，不重签或补造旧记录。纯文档缺真实人动作仍不通过。包存在不代表固定 CI、宿主触发或权限策略已经部署。新接入遵循 `governance/specs/ci-runner.md`。

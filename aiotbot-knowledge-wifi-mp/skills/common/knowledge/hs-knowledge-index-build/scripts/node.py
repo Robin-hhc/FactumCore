@@ -83,7 +83,22 @@ def check_transactions(ctx):
     for path in sorted((ctx.root / "logs/operations").glob("*/journal.json")):
         ref = path.relative_to(ctx.root).as_posix()
         try:
-            journal = ctx.record(ref, "transaction_journal")
+            try:
+                journal = ctx.record(ref, "transaction_journal")
+            except NodeError as exc:
+                if exc.code != "STALE_RULES" or path.parent.name == ctx.operation:
+                    raise
+                # Only foreign terminal liveness may survive a rules upgrade.
+                # This does not supply qualification/proof for any card.
+                journal = read_json(safe(ctx.root, ref, ["logs/operations"]))
+                ctx.modules["records"].verify(journal)
+                ctx.modules["validation"].validate_shape("transaction_journal", journal, ctx.rules)
+                if journal.get("operation_id") != path.parent.name:
+                    raise ValueError("transaction journal operation/directory mismatch")
+                if journal.get("status") not in {"committed", "rolled_back"}:
+                    raise ValueError("old-rules transaction journal is not terminal")
+            if journal.get("status") in {"committed", "rolled_back"} and journal.get("operation_id") != path.parent.name:
+                raise ValueError("transaction journal operation/directory mismatch")
         except (ValueError, OSError, KeyError) as exc:
             raise NodeError(
                 "TRANSACTION_PENDING",
@@ -150,7 +165,7 @@ def git_read(workspace, args):
         raise NodeError(
             "INVALID_GIT_READ", "Only fixed Git object/ref reads are supported"
         )
-    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_") or k == "GIT_TEST_ASSUME_DIFFERENT_OWNER"}
     env.update(
         GIT_CONFIG_NOSYSTEM="1",
         GIT_CONFIG_GLOBAL=os.devnull,
@@ -175,6 +190,8 @@ def git_read(workspace, args):
             "protocol.allow=never",
             "-c",
             "protocol.file.allow=never",
+            "-c",
+            "safe.directory=" + Path(workspace).resolve().as_posix(),
             "-C",
             str(workspace),
             *args,

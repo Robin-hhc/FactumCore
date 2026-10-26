@@ -1,0 +1,664 @@
+{
+  "knowledge-change-plan:plan": {
+    "data": {
+      "semantic_plan_digest": "af24be472f64cebe9ec60e5e93aaf6b19a2796938f4590eb6754bf76dcd48924",
+      "semantic_plan_ref": ".build/operations/real-ingest-v6-07/semantic-plan.json",
+      "target_queries": [
+        {
+          "context": {},
+          "id": "author-topic-wifi-capwap-split-mac-boundary",
+          "purpose": "guidance",
+          "query": "CAPWAP 的 Split/Local MAC：与本仓 HMAC/DMAC 的边界",
+          "required": [
+            "wifi-capwap-split-mac-boundary"
+          ]
+        },
+        {
+          "context": {},
+          "id": "author-topic-wifi-historical-ba-negotiation",
+          "purpose": "historical",
+          "query": "历史 Host Block Ack：ADDBA 状态、超时 DELBA 与条件分支",
+          "required": [
+            "wifi-historical-ba-negotiation"
+          ]
+        },
+        {
+          "context": {},
+          "id": "author-topic-wifi-historical-llc-snap",
+          "purpose": "historical",
+          "query": "LLC/SNAP：RFC1042 常规封装与 AARP/IPX 例外分支",
+          "required": [
+            "wifi-historical-llc-snap"
+          ]
+        },
+        {
+          "context": {},
+          "id": "author-topic-wifi-historical-qos-tid-ac",
+          "purpose": "historical",
+          "query": "QoS：UP/TID 到 AC 的标准映射与两侧历史宏",
+          "required": [
+            "wifi-historical-qos-tid-ac"
+          ]
+        },
+        {
+          "context": {},
+          "id": "author-topic-wifi-historical-rx-event-boundary",
+          "purpose": "historical",
+          "query": "历史 RX 事件片段：Device 生产与 Host 消费的可见边界",
+          "required": [
+            "wifi-historical-rx-event-boundary"
+          ]
+        },
+        {
+          "context": {},
+          "id": "author-topic-wifi-historical-scan-lifecycle",
+          "purpose": "historical",
+          "query": "历史 Host 扫描：状态准入、完成事件与超时收尾",
+          "required": [
+            "wifi-historical-scan-lifecycle"
+          ]
+        }
+      ]
+    },
+    "diagnostics": [],
+    "digest": "b1d56b2303d07f56e740c78f067f6be1440a5e6a39f384e531ea35118afcafe1",
+    "phase": "content_planned",
+    "record_kind": "result",
+    "rules_digest": "301e71f65ce031d586f3e85cab771221c878a39b8862773a55c7297b5d744699",
+    "schema_version": "2.0",
+    "status": "ok",
+    "tool_identity": {
+      "package_digest": "36d7f7d96f601c0918ecc091ccb4c27bfbf8f02e95ba5606509755ff41bc7e5f",
+      "requirements_digest": "2ceae39895982f06f941e99910f1c6ce225aabf9b510f83dc0d97ddc2a1c3660",
+      "runtime": "3.12.14",
+      "skill": "hs-knowledge-change-plan"
+    }
+  },
+  "knowledge-change-plan": {
+    "data": {
+      "dispositions": [
+        {
+          "candidate_id": "wifi-capwap-split-mac-boundary",
+          "card_ids": [
+            "wifi-capwap-split-mac-boundary"
+          ],
+          "claim_mapping": {},
+          "decision": "create",
+          "reason": "本批对应的新主题草稿，待适用确认/核验",
+          "replaces": [],
+          "retired_claim_ids": []
+        },
+        {
+          "candidate_id": "wifi-historical-ba-negotiation",
+          "card_ids": [
+            "wifi-historical-ba-negotiation"
+          ],
+          "claim_mapping": {},
+          "decision": "create",
+          "reason": "本批对应的新主题草稿，待适用确认/核验",
+          "replaces": [],
+          "retired_claim_ids": []
+        },
+        {
+          "candidate_id": "wifi-historical-llc-snap",
+          "card_ids": [
+            "wifi-historical-llc-snap"
+          ],
+          "claim_mapping": {},
+          "decision": "create",
+          "reason": "本批对应的新主题草稿，待适用确认/核验",
+          "replaces": [],
+          "retired_claim_ids": []
+        },
+        {
+          "candidate_id": "wifi-historical-qos-tid-ac",
+          "card_ids": [
+            "wifi-historical-qos-tid-ac"
+          ],
+          "claim_mapping": {},
+          "decision": "create",
+          "reason": "本批对应的新主题草稿，待适用确认/核验",
+          "replaces": [],
+          "retired_claim_ids": []
+        },
+        {
+          "candidate_id": "wifi-historical-rx-event-boundary",
+          "card_ids": [
+            "wifi-historical-rx-event-boundary"
+          ],
+          "claim_mapping": {},
+          "decision": "create",
+          "reason": "本批对应的新主题草稿，待适用确认/核验",
+          "replaces": [],
+          "retired_claim_ids": []
+        },
+        {
+          "candidate_id": "wifi-historical-scan-lifecycle",
+          "card_ids": [
+            "wifi-historical-scan-lifecycle"
+          ],
+          "claim_mapping": {},
+          "decision": "create",
+          "reason": "本批对应的新主题草稿，待适用确认/核验",
+          "replaces": [],
+          "retired_claim_ids": []
+        }
+      ],
+      "plan_digest": "20a8c418f687cf3f5c3a86bbd9f5fb2350f0196f6f419d31da2d21d1f17ec7ef",
+      "plan_ref": ".build/operations/real-ingest-v6-07/plan.json"
+    },
+    "diagnostics": [],
+    "digest": "56541556b59382bdb0f1ee3c4f52ef0a024c6b2a8eda8e5fd20c9380823f09a8",
+    "phase": "planned",
+    "record_kind": "result",
+    "rules_digest": "301e71f65ce031d586f3e85cab771221c878a39b8862773a55c7297b5d744699",
+    "schema_version": "2.0",
+    "status": "ok",
+    "tool_identity": {
+      "package_digest": "36d7f7d96f601c0918ecc091ccb4c27bfbf8f02e95ba5606509755ff41bc7e5f",
+      "requirements_digest": "2ceae39895982f06f941e99910f1c6ce225aabf9b510f83dc0d97ddc2a1c3660",
+      "runtime": "3.12.14",
+      "skill": "hs-knowledge-change-plan"
+    }
+  },
+  "knowledge-view-materialize": {
+    "data": {
+      "review_mode": "mixed",
+      "view_digest": "30c3d1cb9fb87e386b683e7a2fc815237a9b856c4cdc751ae6737b87f14464e1",
+      "view_ref": ".build/operations/real-ingest-v6-07/final-view.json"
+    },
+    "diagnostics": [],
+    "digest": "1c8fa6c1663d88bae6d69e4996d28910a39693c3f46e108e98d8f62fa3306593",
+    "phase": "ready",
+    "record_kind": "result",
+    "rules_digest": "301e71f65ce031d586f3e85cab771221c878a39b8862773a55c7297b5d744699",
+    "schema_version": "2.0",
+    "status": "ok",
+    "tool_identity": {
+      "package_digest": "e72c63598bc9737de446326d58128127b18cc75cc4fc811845f410f201a80df5",
+      "requirements_digest": "2ceae39895982f06f941e99910f1c6ce225aabf9b510f83dc0d97ddc2a1c3660",
+      "runtime": "3.12.14",
+      "skill": "hs-knowledge-view-materialize"
+    }
+  },
+  "knowledge-lint": {
+    "checks": [
+      {
+        "check_id": "view.inputs",
+        "findings": [],
+        "group": "view",
+        "status": "passed"
+      },
+      {
+        "check_id": "format.cards",
+        "findings": [],
+        "group": "format",
+        "status": "passed"
+      },
+      {
+        "check_id": "source.references",
+        "findings": [],
+        "group": "source",
+        "inputs": [
+          {
+            "locator": {
+              "end": 603,
+              "kind": "lines",
+              "start": 541
+            },
+            "sha256": "994aea071cfae925d403ae5daabedd70e1dc62d1379e42b1cd1f05d0da96f1b2",
+            "snapshot_id": "code:4b8f4366beb32a9f7a7d8b2e827417ef0e7c3e476f8b37c73ffa5a0704d047a1"
+          },
+          {
+            "locator": {
+              "end": 1003,
+              "kind": "lines",
+              "start": 931
+            },
+            "sha256": "994aea071cfae925d403ae5daabedd70e1dc62d1379e42b1cd1f05d0da96f1b2",
+            "snapshot_id": "code:4b8f4366beb32a9f7a7d8b2e827417ef0e7c3e476f8b37c73ffa5a0704d047a1"
+          },
+          {
+            "locator": {
+              "end": 1124,
+              "kind": "lines",
+              "start": 1084
+            },
+            "sha256": "994aea071cfae925d403ae5daabedd70e1dc62d1379e42b1cd1f05d0da96f1b2",
+            "snapshot_id": "code:4b8f4366beb32a9f7a7d8b2e827417ef0e7c3e476f8b37c73ffa5a0704d047a1"
+          },
+          {
+            "locator": {
+              "end": 851,
+              "kind": "lines",
+              "start": 824
+            },
+            "sha256": "994aea071cfae925d403ae5daabedd70e1dc62d1379e42b1cd1f05d0da96f1b2",
+            "snapshot_id": "code:4b8f4366beb32a9f7a7d8b2e827417ef0e7c3e476f8b37c73ffa5a0704d047a1"
+          },
+          {
+            "locator": {
+              "end": 251,
+              "kind": "lines",
+              "start": 232
+            },
+            "sha256": "994aea071cfae925d403ae5daabedd70e1dc62d1379e42b1cd1f05d0da96f1b2",
+            "snapshot_id": "code:4b8f4366beb32a9f7a7d8b2e827417ef0e7c3e476f8b37c73ffa5a0704d047a1"
+          },
+          {
+            "locator": {
+              "end": 195,
+              "kind": "lines",
+              "start": 189
+            },
+            "sha256": "a6f6abf193e9e797dc890705044fa1cc2522c6aba0665471bdc1c7162a59abf7",
+            "snapshot_id": "code:b5189e742ecdeb58ddd29b637cbaf641db8ce0eeaa4c1dc3e83d9c2d7c6a740b"
+          },
+          {
+            "locator": {
+              "end": 1287,
+              "kind": "lines",
+              "start": 1245
+            },
+            "sha256": "994aea071cfae925d403ae5daabedd70e1dc62d1379e42b1cd1f05d0da96f1b2",
+            "snapshot_id": "code:4b8f4366beb32a9f7a7d8b2e827417ef0e7c3e476f8b37c73ffa5a0704d047a1"
+          },
+          {
+            "locator": {
+              "end": 816,
+              "kind": "lines",
+              "start": 793
+            },
+            "sha256": "994aea071cfae925d403ae5daabedd70e1dc62d1379e42b1cd1f05d0da96f1b2",
+            "snapshot_id": "code:4b8f4366beb32a9f7a7d8b2e827417ef0e7c3e476f8b37c73ffa5a0704d047a1"
+          },
+          {
+            "locator": {
+              "end": 1176,
+              "kind": "lines",
+              "start": 1166
+            },
+            "sha256": "994aea071cfae925d403ae5daabedd70e1dc62d1379e42b1cd1f05d0da96f1b2",
+            "snapshot_id": "code:4b8f4366beb32a9f7a7d8b2e827417ef0e7c3e476f8b37c73ffa5a0704d047a1"
+          },
+          {
+            "locator": {
+              "end": 1239,
+              "kind": "lines",
+              "start": 1182
+            },
+            "sha256": "994aea071cfae925d403ae5daabedd70e1dc62d1379e42b1cd1f05d0da96f1b2",
+            "snapshot_id": "code:4b8f4366beb32a9f7a7d8b2e827417ef0e7c3e476f8b37c73ffa5a0704d047a1"
+          },
+          {
+            "locator": {
+              "end": 1164,
+              "kind": "lines",
+              "start": 1120
+            },
+            "sha256": "76e76a11ac1098ad75c81dc9662408a7851e1327622ea8fc313ae7af6e7e888a",
+            "snapshot_id": "code:ad1d9c151f717fa659f6cc6197a7f7d0a8c6b36b72adddbeafaf459190ff12bb"
+          },
+          {
+            "locator": {
+              "end": 588,
+              "kind": "lines",
+              "start": 581
+            },
+            "sha256": "3f5d8e25d6b670ce7d46ea7dae10262a4052404d8f0f5ad343fed16a2a369f54",
+            "snapshot_id": "code:9404792fb6b35420bc8100cff7f194d942025b93963cb1f538cf4a4790cd3d7e"
+          },
+          {
+            "locator": {
+              "end": 232,
+              "kind": "lines",
+              "start": 220
+            },
+            "sha256": "273ead3083bb3de2efc3affaec6dab164076a01976a1d597a7632563cc171504",
+            "snapshot_id": "code:e3aaef2cc352951513220f25c2d55df4ba452091bcb3e8ad87e85122d4749146"
+          },
+          {
+            "locator": {
+              "end": 376,
+              "kind": "lines",
+              "start": 366
+            },
+            "sha256": "3740cad0021250af7539e23d96396b2c92a1d8b793d9f57c45e9655c5f956cbf",
+            "snapshot_id": "code:188d26c3759495d103f878fb763b32f1b1e94dec622a270f07590c9185cb989f"
+          },
+          {
+            "locator": {
+              "end": 522,
+              "kind": "lines",
+              "start": 515
+            },
+            "sha256": "3740cad0021250af7539e23d96396b2c92a1d8b793d9f57c45e9655c5f956cbf",
+            "snapshot_id": "code:188d26c3759495d103f878fb763b32f1b1e94dec622a270f07590c9185cb989f"
+          },
+          {
+            "locator": {
+              "end": 2178,
+              "kind": "lines",
+              "start": 2141
+            },
+            "sha256": "c31d2fc4f9ecc6e6bbfe68c76b6b02b3b9610014c35099387a52571e1dec8954",
+            "snapshot_id": "code:066798a07b3e3e93f7d7d5312b8c16f298161b99cb4a804e7a3f096d879635c1"
+          },
+          {
+            "locator": {
+              "end": 203,
+              "kind": "lines",
+              "start": 193
+            },
+            "sha256": "964d20e7312d33c020fa22ecadddf2e8eacae7b8351095a9385f4f530d70744b",
+            "snapshot_id": "code:9f70c627c2f15e716086966d45011f417c3baaa8d6df877742b4cea4aa225bba"
+          },
+          {
+            "locator": {
+              "end": 1888,
+              "kind": "lines",
+              "start": 1835
+            },
+            "sha256": "ea95d271ea8e8492d15bd3cc9f1d9979d8168791725a6a8cf0cebeeb930eec81",
+            "snapshot_id": "code:d03370f0620d559464e7c6367f3b18505cb0dbeef3b45e1f4ebe9bc37960843e"
+          },
+          {
+            "locator": {
+              "end": 2548,
+              "kind": "lines",
+              "start": 2484
+            },
+            "sha256": "ea95d271ea8e8492d15bd3cc9f1d9979d8168791725a6a8cf0cebeeb930eec81",
+            "snapshot_id": "code:d03370f0620d559464e7c6367f3b18505cb0dbeef3b45e1f4ebe9bc37960843e"
+          },
+          {
+            "locator": {
+              "end": 1775,
+              "kind": "lines",
+              "start": 1754
+            },
+            "sha256": "ea95d271ea8e8492d15bd3cc9f1d9979d8168791725a6a8cf0cebeeb930eec81",
+            "snapshot_id": "code:d03370f0620d559464e7c6367f3b18505cb0dbeef3b45e1f4ebe9bc37960843e"
+          },
+          {
+            "locator": {
+              "end": 1817,
+              "kind": "lines",
+              "start": 1787
+            },
+            "sha256": "ea95d271ea8e8492d15bd3cc9f1d9979d8168791725a6a8cf0cebeeb930eec81",
+            "snapshot_id": "code:d03370f0620d559464e7c6367f3b18505cb0dbeef3b45e1f4ebe9bc37960843e"
+          },
+          {
+            "locator": {
+              "end": 76,
+              "kind": "lines",
+              "start": 68
+            },
+            "sha256": "a6f6abf193e9e797dc890705044fa1cc2522c6aba0665471bdc1c7162a59abf7",
+            "snapshot_id": "code:b5189e742ecdeb58ddd29b637cbaf641db8ce0eeaa4c1dc3e83d9c2d7c6a740b"
+          },
+          {
+            "locator": {
+              "end": 36,
+              "kind": "lines",
+              "start": 32
+            },
+            "sha256": "ea95d271ea8e8492d15bd3cc9f1d9979d8168791725a6a8cf0cebeeb930eec81",
+            "snapshot_id": "code:d03370f0620d559464e7c6367f3b18505cb0dbeef3b45e1f4ebe9bc37960843e"
+          },
+          {
+            "locator": {
+              "end": 2480,
+              "kind": "lines",
+              "start": 2460
+            },
+            "sha256": "ea95d271ea8e8492d15bd3cc9f1d9979d8168791725a6a8cf0cebeeb930eec81",
+            "snapshot_id": "code:d03370f0620d559464e7c6367f3b18505cb0dbeef3b45e1f4ebe9bc37960843e"
+          },
+          {
+            "locator": {
+              "end": 2198,
+              "kind": "lines",
+              "start": 2145
+            },
+            "sha256": "ea95d271ea8e8492d15bd3cc9f1d9979d8168791725a6a8cf0cebeeb930eec81",
+            "snapshot_id": "code:d03370f0620d559464e7c6367f3b18505cb0dbeef3b45e1f4ebe9bc37960843e"
+          },
+          {
+            "locator": {
+              "end": 76,
+              "kind": "lines",
+              "start": 64
+            },
+            "sha256": "ef326f22d2302b43547dcad37fbc545b075dcae7941372b0569fd84e0f5a4af2",
+            "snapshot_id": "raw:6a80d7209ef4b041825c5b84f67d819e54e2ec42788cf3ba31dc8c37e04d46e1"
+          },
+          {
+            "locator": {
+              "end": 381,
+              "kind": "lines",
+              "start": 364
+            },
+            "sha256": "ef326f22d2302b43547dcad37fbc545b075dcae7941372b0569fd84e0f5a4af2",
+            "snapshot_id": "raw:6a80d7209ef4b041825c5b84f67d819e54e2ec42788cf3ba31dc8c37e04d46e1"
+          },
+          {
+            "locator": {
+              "end": 441,
+              "kind": "lines",
+              "start": 406
+            },
+            "sha256": "ef326f22d2302b43547dcad37fbc545b075dcae7941372b0569fd84e0f5a4af2",
+            "snapshot_id": "raw:6a80d7209ef4b041825c5b84f67d819e54e2ec42788cf3ba31dc8c37e04d46e1"
+          },
+          {
+            "locator": {
+              "end": 723,
+              "kind": "lines",
+              "start": 691
+            },
+            "sha256": "ef326f22d2302b43547dcad37fbc545b075dcae7941372b0569fd84e0f5a4af2",
+            "snapshot_id": "raw:6a80d7209ef4b041825c5b84f67d819e54e2ec42788cf3ba31dc8c37e04d46e1"
+          },
+          {
+            "locator": {
+              "end": 151,
+              "kind": "lines",
+              "start": 129
+            },
+            "sha256": "e8737abe7f7b80ae2e84b8cada0ea02d8cc3c4ad2414e902cc055e6953a01c55",
+            "snapshot_id": "raw:702dcfab4d60bf0bf69ce4a303baba281bee4ac70290b454ac92689065b9915e"
+          },
+          {
+            "locator": {
+              "end": 48,
+              "kind": "lines",
+              "start": 24
+            },
+            "sha256": "e8737abe7f7b80ae2e84b8cada0ea02d8cc3c4ad2414e902cc055e6953a01c55",
+            "snapshot_id": "raw:702dcfab4d60bf0bf69ce4a303baba281bee4ac70290b454ac92689065b9915e"
+          },
+          {
+            "locator": {
+              "end": 203,
+              "kind": "lines",
+              "start": 178
+            },
+            "sha256": "0574e8d94181d86dce2b83d5b43a98d6cc81d35daca79f019a4cf26cb03cf254",
+            "snapshot_id": "code:8eeddf82665e76d869cfc3c958cb8df7b2888b9bfccf1a5679d31f3a290ad3c6"
+          },
+          {
+            "locator": {
+              "end": 2498,
+              "kind": "lines",
+              "start": 2468
+            },
+            "sha256": "0a678883c5907d39988f89350d3c44232aec575fc10d2976c2c1c64a6b332114",
+            "snapshot_id": "code:18d36010b5507cdb147b418e16931db2b1ecbdfef51896025ca7c483bd050fe7"
+          },
+          {
+            "locator": {
+              "end": 205,
+              "kind": "lines",
+              "start": 178
+            },
+            "sha256": "0574e8d94181d86dce2b83d5b43a98d6cc81d35daca79f019a4cf26cb03cf254",
+            "snapshot_id": "code:8eeddf82665e76d869cfc3c958cb8df7b2888b9bfccf1a5679d31f3a290ad3c6"
+          },
+          {
+            "locator": {
+              "end": 2502,
+              "kind": "lines",
+              "start": 2468
+            },
+            "sha256": "0a678883c5907d39988f89350d3c44232aec575fc10d2976c2c1c64a6b332114",
+            "snapshot_id": "code:18d36010b5507cdb147b418e16931db2b1ecbdfef51896025ca7c483bd050fe7"
+          },
+          {
+            "locator": {
+              "end": 1527,
+              "kind": "lines",
+              "start": 1516
+            },
+            "sha256": "6a059ababe36062810b17a5d0f44424d783c9f77b8fd6c36e362d816d3b9e031",
+            "snapshot_id": "raw:c4326898461bfb0e6b4ea45ce4634e2dd0ea42c5bf70f0daf013986ff36313f1"
+          },
+          {
+            "locator": {
+              "end": 1576,
+              "kind": "lines",
+              "start": 1546
+            },
+            "sha256": "6a059ababe36062810b17a5d0f44424d783c9f77b8fd6c36e362d816d3b9e031",
+            "snapshot_id": "raw:c4326898461bfb0e6b4ea45ce4634e2dd0ea42c5bf70f0daf013986ff36313f1"
+          },
+          {
+            "locator": {
+              "end": 208,
+              "kind": "lines",
+              "start": 206
+            },
+            "sha256": "670c7b4b25497b378597adf914ba539a19f01aded9ad4dea9c70404dd907f3dd",
+            "snapshot_id": "code:204355743b2ca8c3a15999c08e21d7b68443bccf8be87cb718a97904284344f7"
+          },
+          {
+            "locator": {
+              "end": 167,
+              "kind": "lines",
+              "start": 163
+            },
+            "sha256": "f05b418dc2fc0d6885b1a977d63a9545c84f732b680ddae6e069c36b79d1c13c",
+            "snapshot_id": "code:4bef067bbab6bf87e1d72b4a7d7f8d54eb09376c1c12afa4811a783abab3428b"
+          },
+          {
+            "locator": {
+              "end": 908,
+              "kind": "lines",
+              "start": 903
+            },
+            "sha256": "994aea071cfae925d403ae5daabedd70e1dc62d1379e42b1cd1f05d0da96f1b2",
+            "snapshot_id": "code:4b8f4366beb32a9f7a7d8b2e827417ef0e7c3e476f8b37c73ffa5a0704d047a1"
+          }
+        ],
+        "status": "passed"
+      },
+      {
+        "check_id": "relation.graph",
+        "findings": [],
+        "group": "relation",
+        "status": "passed"
+      },
+      {
+        "check_id": "records.coverage",
+        "findings": [],
+        "group": "records",
+        "processing_state": {
+          "blocked_claims": [],
+          "complete": true,
+          "gaps": []
+        },
+        "status": "passed"
+      },
+      {
+        "check_id": "index.build",
+        "findings": [],
+        "group": "index",
+        "status": "passed",
+        "summary": {
+          "claims": 20,
+          "complete": true,
+          "documents": 6,
+          "postings": 2358,
+          "rows_digest": "d3c6018bfd3b3a48507e8a1197938604e49cbe835ce53593f95c4da465acdbd5",
+          "rules_digest": "301e71f65ce031d586f3e85cab771221c878a39b8862773a55c7297b5d744699",
+          "schema_version": "3.0",
+          "tokenizer_version": "2.0"
+        }
+      }
+    ],
+    "code_check_status": "not_applicable",
+    "complete": true,
+    "data": {
+      "check_status": "passed",
+      "full_scope": true,
+      "report_ref": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\calls\\0046\\output.json"
+    },
+    "digest": "cf73a109702964ec36d01b87eef0d3f90309a1bd47c628b8ecf8cd7df81b2396",
+    "exit_code": 0,
+    "findings": [],
+    "mode": "candidate",
+    "object": {
+      "files_digest": "22fa2246a04b9647c2c73650f2973c0367993743609c7d3a76bff2dd4b41f4a9",
+      "operation_id": "real-ingest-v6-07",
+      "view_digest": "30c3d1cb9fb87e386b683e7a2fc815237a9b856c4cdc751ae6737b87f14464e1"
+    },
+    "phase": "passed",
+    "report_version": "1.0",
+    "rules_digest": "301e71f65ce031d586f3e85cab771221c878a39b8862773a55c7297b5d744699",
+    "scope": {
+      "kind": "full",
+      "paths": []
+    },
+    "status": "passed"
+  },
+  "knowledge-local-check": {
+    "data": {
+      "check_status": "incomplete",
+      "local_check_ref": "logs/operations/real-ingest-v6-07/local-check.json",
+      "mode": "local"
+    },
+    "diagnostics": [],
+    "digest": "4b9b3565e9727e2dcc06b15f69fcd14f7864548cc0f04ca96b62654ff3169af2",
+    "phase": "incomplete",
+    "record_kind": "result",
+    "rules_digest": "301e71f65ce031d586f3e85cab771221c878a39b8862773a55c7297b5d744699",
+    "schema_version": "2.0",
+    "status": "ok",
+    "tool_identity": {
+      "package_digest": "1f36a496c0bbb8f6795633f6196329818ba4a5bd8e8af100758d205ca8ce5c8b",
+      "requirements_digest": "05c2b86cbc3161ddd8f330cbc26a38ac7638fa11fc33a57489ef7ea3746f3836",
+      "runtime": "3.12.14",
+      "skill": "hs-knowledge-local-check"
+    }
+  },
+  "knowledge-confirmation-prepare": {
+    "data": {
+      "display_digest": "b64e9779b9fab235f342f9a9a2bc5acf8cb6f11bbd4ebac81951473d6e4b0d9e",
+      "display_ref": ".build/operations/real-ingest-v6-07/confirmation-display.json"
+    },
+    "diagnostics": [],
+    "digest": "6d644f644eda5345b90612b9855cc040d4ab167a5fa0b98ef23f35698fc1af5b",
+    "phase": "awaiting_human",
+    "record_kind": "result",
+    "rules_digest": "301e71f65ce031d586f3e85cab771221c878a39b8862773a55c7297b5d744699",
+    "schema_version": "2.0",
+    "status": "ok",
+    "tool_identity": {
+      "package_digest": "95279afa180c10c489d6fe3090ab7425ad1361255fc9819f124b6b5b0b203ae0",
+      "requirements_digest": "05c2b86cbc3161ddd8f330cbc26a38ac7638fa11fc33a57489ef7ea3746f3836",
+      "runtime": "3.12.14",
+      "skill": "hs-knowledge-confirmation-prepare"
+    }
+  }
+}

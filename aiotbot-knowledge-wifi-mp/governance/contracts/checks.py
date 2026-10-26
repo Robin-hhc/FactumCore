@@ -28,13 +28,13 @@ def _record_resolver(cards, rules, inputs, root, identity):
         raise v.ContractError("RECORD_HISTORY_UNAVAILABLE", "historical_card_objects must map fingerprints to absolute files")
     objects, git_cache = {}, []
     history = {"loaded": False, "complete": False}
-    environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_") or key == "GIT_TEST_ASSUME_DIFFERENT_OWNER"}
     environment.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull, GIT_TERMINAL_PROMPT="0", GIT_OPTIONAL_LOCKS="0", GIT_NO_LAZY_FETCH="1", GIT_PAGER="cat")
     workspace = root.parent.resolve()
     prefix = root.relative_to(workspace).as_posix()
 
     def git(arguments):
-        command = ["git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + os.devnull, "-c", "core.pager=cat", "-c", "protocol.allow=never", "-C", str(workspace), *arguments]
+        command = ["git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + os.devnull, "-c", "core.pager=cat", "-c", "protocol.allow=never", "-c", "safe.directory=" + workspace.as_posix(), "-C", str(workspace), *arguments]
         result = subprocess.run(command, capture_output=True, timeout=30, env=environment)
         if result.returncode:
             raise v.ContractError("RECORD_HISTORY_UNAVAILABLE", "Required exact Git history is unavailable")

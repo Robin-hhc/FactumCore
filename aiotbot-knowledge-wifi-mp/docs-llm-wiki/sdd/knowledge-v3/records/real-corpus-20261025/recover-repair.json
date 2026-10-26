@@ -1,0 +1,134 @@
+{
+  "status": "passed",
+  "production_frozen": true,
+  "scope": "recover native path OS checks and immutable input protection; actual subprocess hard-exit recovery mechanism",
+  "changed_files": {
+    "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-recover/scripts/recover.py": "7c05e3145a0d97cbe852dd94502bb581208da4bdaf5df708029b746dc80eee57",
+    "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-recover/tests/test_recover.py": "74ba31ecd0ca62c63055d17033cdd393791286cc296a31eed54b1322e43891c6",
+    "aiotbot-knowledge-wifi-mp/evals/tests/test_process_recovery.py": "33c4e3076f9cccd2ac477f86828a3a7e02a3c607f108bc6ce8f153bd3f8fb867"
+  },
+  "original_full_summary": "E:\\FactumCore\\aiotbot-knowledge-wifi-mp\\artifacts\\test-tmp\\real-corpus-repair-20261025-01\\summary.json",
+  "original_full_summary_sha256": "cb667fe59e2f07a3b677bd182af263b441857e637e31dba8baef63cb62ad1f27",
+  "original_failure_junit": "aiotbot-knowledge-wifi-mp/artifacts/test-tmp/real-corpus-repair-20261025-01/20.xml",
+  "original_native_path_proof": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\recover-original-native-path-proof.json",
+  "specific_red_tmp_characters": 127,
+  "original_full_failure_tmp_characters": 126,
+  "final_green_tmp_characters": 129,
+  "final_green_responses": [
+    {
+      "path": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\recover-public-final-xxxxxxxxxxxxxxxxxxxxxxxxxxxx\\test_hard_exit_after_card_repl0\\w\\aiotbot-knowledge-wifi-mp\\.build\\operations\\crash-operation\\recover-inspect-inspect-after-exit-response-3d309394628bdc5c302c9c8f.json",
+      "characters": 265,
+      "ordinary_exists": false,
+      "native_exists": true,
+      "delegated_status": "ok",
+      "delegated_phase": "inspected",
+      "sha256": "ef4d89789aaea0b995757a2d64141b1c1dd544b32ac177d6fcb1825d1e2bd49a"
+    },
+    {
+      "path": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\recover-public-final-xxxxxxxxxxxxxxxxxxxxxxxxxxxx\\test_hard_exit_after_card_repl0\\w\\aiotbot-knowledge-wifi-mp\\.build\\operations\\crash-operation\\recover-resume-resume-after-resolution-response-b9f4a26382331364069e6d14.json",
+      "characters": 269,
+      "ordinary_exists": false,
+      "native_exists": true,
+      "delegated_status": "ok",
+      "delegated_phase": "committed",
+      "sha256": "7bb467a0974f85a877854f883c18536952de639b65fd92cf56506ab74dad7788"
+    },
+    {
+      "path": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\recover-public-final-xxxxxxxxxxxxxxxxxxxxxxxxxxxx\\test_hard_exit_after_card_repl0\\w\\aiotbot-knowledge-wifi-mp\\.build\\operations\\crash-operation\\recover-resume-resume-conflict-response-529805fea297f725ccf226f2.json",
+      "characters": 261,
+      "ordinary_exists": false,
+      "native_exists": true,
+      "delegated_status": "blocked",
+      "delegated_phase": "awaiting",
+      "sha256": "d58445a5963dc0c74fa2609fe543d078dbfaf90fc3b571d6f2376608f24a190e"
+    }
+  ],
+  "final": {
+    "name": "recover-final",
+    "xml": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\recover-final.xml",
+    "stdout": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\recover-final.txt",
+    "tests": 4,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "runs": [
+    {
+      "name": "recover-process-red",
+      "xml": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\recover-process-red.xml",
+      "stdout": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\recover-process-red.txt",
+      "tests": 1,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "recover-process-specific-red",
+      "xml": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\recover-process-specific-red.xml",
+      "stdout": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\recover-process-specific-red.txt",
+      "tests": 1,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "recover-input-guard-red",
+      "xml": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\recover-input-guard-red.xml",
+      "stdout": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\recover-input-guard-red.txt",
+      "tests": 1,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "recover-input-guard-specific-red",
+      "xml": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\recover-input-guard-specific-red.xml",
+      "stdout": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\recover-input-guard-specific-red.txt",
+      "tests": 1,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "recover-package-green",
+      "xml": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\recover-package-green.xml",
+      "stdout": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\recover-package-green.txt",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "recover-process-and-package-green",
+      "xml": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\recover-process-and-package-green.xml",
+      "stdout": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\recover-process-and-package-green.txt",
+      "tests": 4,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "recover-final",
+      "xml": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\recover-final.xml",
+      "stdout": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\recover-final.txt",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "actual_hard_exit_evidence": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\recover-final-process-evidence.json",
+  "hard_exit_injection_and_assertions_preserved": true,
+  "test_fixture_adjustment": "Only read source-lock backup through native Windows path; exact original bytes comparison unchanged.",
+  "final_runtime_manifest": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\recover-final-runtime-manifest.json",
+  "ruff": "passed",
+  "git_diff_check": "passed",
+  "additional_observed_limit": {
+    "description": "More extreme 147-character test temp root failed earlier in change-plan sibling call directory mkdir with WinError206; retained as separate unaddressed support-layer path depth limit, not used as recover root-cause RED.",
+    "evidence": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\recover-process-red.xml"
+  },
+  "limits": [
+    "Mechanism fixtures use synthetic signed approval; not real user acceptance, hardware durability or WiFi runtime verification.",
+    "No changes to apply, source scanner, shared contracts, rule lock, real trial installation or first-pass audit artifacts."
+  ]
+}

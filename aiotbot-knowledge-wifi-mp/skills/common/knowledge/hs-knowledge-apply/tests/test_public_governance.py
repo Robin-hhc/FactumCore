@@ -24,6 +24,128 @@ from support import canonical, digest, package_digest, seal  # noqa: E402 - isol
 
 
 class PublicGovernanceTests(unittest.TestCase):
+    def record_only_request(self, operation):
+        common = {"schema_version": "2.0", "operation_id": operation, "rules_digest": self.rules_digest,
+                  "tool_identity": {"skill": "hs-fixture", "package_digest": "0" * 64,
+                                    "runtime": "fixture", "requirements_digest": "0" * 64}}
+        scan = seal({**common, "record_kind": "source_inventory", "scope": ["docs-raw/specs"],
+                     "full_scan": True, "complete": False,
+                     "units": [{"unit_id": "u1", "path": "docs-raw/specs/missing.md", "source_id": "source",
+                                "observed_fingerprint": None, "previous_fingerprint": None, "change": "read_failed",
+                                "read_error": "unreadable", "progress": "blocked"}]})
+        record = seal({**common, "record_kind": "ingest_record", "record_id": operation,
+                       "target_path": "logs/ingest/" + operation + ".yaml", "batch_kind": "record_only",
+                       "scan_ref": ".build/operations/" + operation + "/scan.json", "scan_digest": scan["digest"],
+                       "inventory": scan, "progress": {}, "dispositions": [{"unit_id": "u1", "action": "failed",
+                       "reason": "unreadable", "observed_fingerprint": None, "adopted_fingerprint": None,
+                       "progress": "blocked", "card_refs": [], "claim_refs": []}]})
+        parent = self.root / ".build/operations" / operation
+        parent.mkdir(parents=True)
+        (parent / "record.yaml").write_bytes(canonical(record))
+        return {"operation_id": operation, "v3_required": True, "ingest_record_ref": ".build/operations/" + operation + "/record.yaml"}
+
+    def save_foreign_journal(self, **changes):
+        record = seal({"schema_version": "2.0", "record_kind": "transaction_journal", "operation_id": "legacy",
+                       "rules_digest": "a" * 64, "tool_identity": {"skill": "hs-knowledge-apply", "package_digest": "0" * 64,
+                       "runtime": "fixture", "requirements_digest": "0" * 64}, "status": "committed", "entries": [],
+                       "view_ref": ".build/operations/legacy/view.json", "view_digest": "1" * 64,
+                       "proof_ref": "logs/operations/legacy/proof.json", "proof_digest": "2" * 64, **changes})
+        path = self.root / "logs/operations/legacy/journal.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(canonical(record))
+        return path
+
+    def test_new_record_only_batch_skips_only_unrelated_old_terminal_liveness(self):
+        for status in ("committed", "rolled_back"):
+            with self.subTest(status=status):
+                old = self.save_foreign_journal(status=status)
+                before = old.read_bytes()
+                request = self.record_only_request("facts-" + status.replace("_", "-"))
+                result = self.invoke("hs-knowledge-apply", request)
+                self.assertEqual(result["phase"], "committed")
+                self.assertEqual(old.read_bytes(), before)
+                self.assertEqual((self.root / "knowledge/index.md").read_bytes(), b"old navigation")
+
+    def test_old_rules_nonterminal_journal_keeps_the_writer_barrier(self):
+        for number, status in enumerate(("prepared", "installing", "recovery_required", "unknown-terminal")):
+            with self.subTest(status=status):
+                old = self.save_foreign_journal(status=status)
+                before = old.read_bytes()
+                request = self.record_only_request("pending-facts-" + str(number))
+                result = self.invoke("hs-knowledge-apply", request, expected=3)
+                self.assertIn("requires recovery", result["diagnostics"][0]["message"])
+                self.assertFalse((self.root / "logs/ingest" / (request["operation_id"] + ".yaml")).exists())
+                self.assertEqual(old.read_bytes(), before)
+
+    def test_old_terminal_journal_requires_valid_seal_supported_schema_and_identity(self):
+        variants = [("seal", {}), ("schema", {"schema_version": "3.0"}),
+                    ("operation", {"operation_id": "different-directory"}),
+                    ("kind", {"record_kind": "apply_result"}), ("rules", {"rules_digest": "unknown"}),
+                    ("shape", {"entries": {}})]
+        for name, changes in variants:
+            with self.subTest(name=name):
+                old = self.save_foreign_journal(**changes)
+                if name == "seal":
+                    value = json.loads(old.read_bytes())
+                    value["digest"] = "0" * 64
+                    old.write_bytes(canonical(value))
+                before = old.read_bytes()
+                request = self.record_only_request("bad-old-" + name)
+                result = self.invoke("hs-knowledge-apply", request, expected=2)
+                self.assertEqual(result["phase"], "invalid")
+                self.assertFalse((self.root / "logs/ingest" / (request["operation_id"] + ".yaml")).exists())
+                self.assertEqual(old.read_bytes(), before)
+
+    def test_same_operation_old_rules_journal_cannot_be_read_or_resumed_under_new_rules(self):
+        old = self.save_foreign_journal()
+        before = old.read_bytes()
+        request = self.record_only_request("legacy")
+        for action in ("run", "inspect", "resume", "rollback"):
+            with self.subTest(action=action):
+                result = self.invoke("hs-knowledge-apply", request, action=action, expected=2)
+                self.assertIn("record rules identity mismatch", result["diagnostics"][0]["message"])
+                self.assertEqual(old.read_bytes(), before)
+        self.assertFalse((self.root / "logs/ingest/legacy.yaml").exists())
+
+    def test_old_terminal_journal_does_not_approve_a_forged_new_content_proof(self):
+        request = self.prepare_and_approve("new-forged-proof")
+        old = self.save_foreign_journal()
+        frozen = old.read_bytes()
+        proof_path = self.root / request["proof_ref"]
+        proof = json.loads(proof_path.read_bytes())
+        proof["host_event"]["payload"]["actor_id"] = "forged-actor"
+        proof_path.write_bytes(canonical(seal(proof)))
+        result = self.invoke("hs-knowledge-apply", request, expected=2)
+        self.assertIn("signature", result["diagnostics"][0]["message"])
+        self.assertEqual(old.read_bytes(), frozen)
+        self.assertEqual((self.root / "knowledge/index.md").read_bytes(), b"old navigation")
+
+    def test_old_terminal_journal_does_not_accept_an_old_rules_current_proof(self):
+        request = self.prepare_and_approve("new-old-proof")
+        old = self.save_foreign_journal()
+        frozen = old.read_bytes()
+        proof_path = self.root / request["proof_ref"]
+        proof = json.loads(proof_path.read_bytes())
+        proof["rules_digest"] = "a" * 64
+        proof_path.write_bytes(canonical(seal(proof)))
+        result = self.invoke("hs-knowledge-apply", request, expected=2)
+        self.assertIn("record rules identity mismatch", result["diagnostics"][0]["message"])
+        self.assertEqual(old.read_bytes(), frozen)
+        self.assertEqual((self.root / "knowledge/index.md").read_bytes(), b"old navigation")
+
+    def test_old_terminal_journal_does_not_accept_an_invalid_new_view(self):
+        request = self.prepare_and_approve("new-invalid-view")
+        old = self.save_foreign_journal()
+        frozen = old.read_bytes()
+        view_path = self.root / request["view_ref"]
+        view = json.loads(view_path.read_bytes())
+        view["operation_id"] = "other-view-owner"
+        view_path.write_bytes(canonical(seal(view)))
+        result = self.invoke("hs-knowledge-apply", request, expected=2)
+        self.assertIn("view identity", result["diagnostics"][0]["message"])
+        self.assertEqual(old.read_bytes(), frozen)
+        self.assertEqual((self.root / "knowledge/index.md").read_bytes(), b"old navigation")
+
     def test_v3_handoff_requires_batch_target_query_evidence(self):
         import yaml
 

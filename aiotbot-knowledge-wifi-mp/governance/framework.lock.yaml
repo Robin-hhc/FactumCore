@@ -1,6 +1,6 @@
 schema_version: '2.0'
 contract_family: aiot-wifi
-tool_version: 0.2.0
+tool_version: 0.2.2
 files:
   contracts/__init__.py:
     path: governance/contracts/__init__.py
@@ -13,7 +13,7 @@ files:
     sha256: 7c352e10e2ff2a47e551a2b513e58e4cb9a98b70f0e063a5f31184fa963c6fb7
   contracts/source_resources.py:
     path: governance/contracts/source_resources.py
-    sha256: e89eb242d2b6994f4223017024bae4787c15b7d6716aff089232cb097bd6ea0e
+    sha256: acaccf9899705a60e67c398e486162a2903a571652987f46546d85593feb84b8
   contracts/validation.py:
     path: governance/contracts/validation.py
     sha256: b4c62846869963b5925ece30dd806989d44765d538ec65e2a2cf251aaa90d547
@@ -25,7 +25,7 @@ files:
     sha256: ec9eae684e484dd79cfe0f546a336d95d68ba5da7345f88e93733483d0d638be
   schemas/records.schema.json:
     path: governance/schemas/records.schema.json
-    sha256: fa2394da1977e0e33a7bb1806a5e72836267e3c547035bf830f3fc162cc4d33a
+    sha256: 432648c5427281f0602f5e6ec967d476298bfdd214dfaf48a676fe2aa1302dd0
   schemas/registries.yaml:
     path: governance/schemas/registries.yaml
     sha256: fbeec766e654c3f8ee96f8eb07bdd03619974f8cad258251f3e91816b03f7ed5
@@ -76,7 +76,7 @@ files:
     sha256: 332960e7c606e1a4c0b86d6d49773ffc0e35f976c4434448bc11ed13900d9588
   contracts/checks.py:
     path: governance/contracts/checks.py
-    sha256: 3606a9f723fe8594f16b1f36dee5231e7ef4b387680dbae86be52024103df0e7
+    sha256: df168e4950dd4b5ac9690d6e95399fca457a532ad4b1505b314cd96d3d6dc34d
   contracts/indexing.py:
     path: governance/contracts/indexing.py
     sha256: 7d12d1dc4254fd5b66030796553f7fafa4ef5c461e988fb64b4954b9b83c8af5
@@ -85,7 +85,7 @@ files:
     sha256: 8afd7df6d6f45766b5b64ce025b98d6245e90a549d826e10a058449cea3346db
   specs/ci-runner.md:
     path: governance/specs/ci-runner.md
-    sha256: 4f5b705b3cfa5ab3d42296d1ca36c6ce74166d71aba1a5f3cb0ced47fe768e04
+    sha256: de3ece8450ad767e5695b34598ed910533ea9e8aa3303979f9d0985f5446d352
 capabilities:
   checks: '1.0'
   indexing: '1.0'

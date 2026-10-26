@@ -164,6 +164,8 @@ def execute(request, args, package):
             "core.fsmonitor=false",
             "-c",
             "core.hooksPath=NUL",
+            "-c",
+            "safe.directory=" + code_root.as_posix(),
             "-C",
             str(code_root),
         ]

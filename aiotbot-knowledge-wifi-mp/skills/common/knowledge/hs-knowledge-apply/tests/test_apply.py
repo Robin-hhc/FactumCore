@@ -234,6 +234,22 @@ class ApplyTests(unittest.TestCase):
                 execute(ctx, request, "run")
             self.assertFalse(ctx.path("knowledge/create.md").exists())
 
+    def test_unrelated_old_rules_terminal_journal_does_not_authorize_or_block_new_review(self):
+        from transaction import execute
+        from support import seal
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ctx, request = self.fixture(pathlib.Path(tmp))
+            old = seal({**ctx.record("transaction_journal", "legacy", status="committed", entries=[],
+                view_ref=".build/operations/legacy/view.json", view_digest="1" * 64,
+                proof_ref="logs/operations/legacy/proof.json", proof_digest="2" * 64), "rules_digest": "a" * 64})
+            ctx.save("logs/operations/legacy/journal.json", old)
+            frozen = ctx.path("logs/operations/legacy/journal.json").read_bytes()
+            result = execute(ctx, request, "run")
+            self.assertEqual(result["transaction_status"], "committed")
+            self.assertEqual(ctx.path("knowledge/create.md").read_bytes(), b"created")
+            self.assertEqual(ctx.path("logs/operations/legacy/journal.json").read_bytes(), frozen)
+
     def test_committed_reentry_is_read_only_during_another_recovery(self):
         from transaction import execute
 

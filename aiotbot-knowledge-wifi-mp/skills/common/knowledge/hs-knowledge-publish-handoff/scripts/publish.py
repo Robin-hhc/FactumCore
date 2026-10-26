@@ -108,6 +108,12 @@ def publish_handoff(ctx, request):
                 raise Blocked("batch deletion changed after apply")
         phase = "record_only_ready" if kind == "record_only" else "ready_to_submit"
         files = [row["path"] for row in verified["write_manifest"]] + verified["delete_manifest"]
+        obligations = [{"owner": "authorized_committer", "action": "commit exactly commit_files", "status": "pending"},
+                       {"owner": "fixed_ci", "action": "reuse lint deterministic checks on submitted content", "status": "pending"}]
+        if kind != "record_only":
+            obligations.append({"owner": "authorized_committer",
+                                "action": "provide exact originals and portable recovery locations for CI and other clones",
+                                "status": "pending"})
         record = ctx.record("publish_handoff", op, status=phase, apply_result_ref=apply_ref,
                             apply_result_digest=applied["digest"], view_ref=verified["view_ref"],
                             view_digest=view["digest"], proof_ref=verified["proof_ref"],
@@ -115,8 +121,7 @@ def publish_handoff(ctx, request):
                             query_report_ref=request.get("query_report_ref"), commit_files=files,
                             write_manifest=verified["write_manifest"], delete_manifest=verified["delete_manifest"],
                             git_merge_verified=False, remote_push_verified=False,
-                            external_obligations=[{"owner": "authorized_committer", "action": "commit exactly commit_files", "status": "pending"},
-                                                  {"owner": "fixed_ci", "action": "run deterministic checks on submitted content", "status": "pending"}])
+                            external_obligations=obligations)
         reference = f"logs/operations/{op}/submit-ready.json"
         ctx.save(reference, record)
         return {"publish_handoff_ref": reference, "publication_status": phase,
@@ -194,7 +199,7 @@ def verify_submission(ctx, request):
         raise Blocked("actual exact Git commit SHA is required; batch remains pending submission")
 
     def git(arguments, *, optional=False):
-        done = subprocess.run(["git", "--no-optional-locks", "-C", str(ctx.root),
+        done = subprocess.run(["git", "--no-optional-locks", "-c", "safe.directory=" + ctx.root.parent.resolve().as_posix(), "-C", str(ctx.root),
                                "-c", "core.hooksPath=__disabled_knowledge_hooks__", *arguments],
                               check=False, capture_output=True, timeout=60)
         if done.returncode and not optional:

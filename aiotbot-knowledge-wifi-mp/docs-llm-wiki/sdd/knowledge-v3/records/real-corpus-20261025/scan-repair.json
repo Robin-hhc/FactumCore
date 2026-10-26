@@ -1,0 +1,126 @@
+{
+  "status": "passed",
+  "scope": "source-scan public CLI mechanism regression over isolated synthetic inputs",
+  "production_frozen": true,
+  "changed_files": {
+    "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-source-scan/scripts/scan.py": "d1e37ca6e77d4b87e0fd7ead3d14274d8293330452c8e26148c616d32edb809b",
+    "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-source-scan/tests/test_cli.py": "a3a930b562cb699347a810ac256fc931361d9b4ba667492ca670617f2a86250e"
+  },
+  "contracts_or_rule_lock_edited_by_this_agent": false,
+  "trial_installation_edited_by_this_agent": false,
+  "frozen_runtime_manifest": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\scan-final-runtime-manifest.json",
+  "final": {
+    "name": "scan-complete",
+    "junit": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\scan-complete.xml",
+    "stdout": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\scan-complete.txt",
+    "tests": 34,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "runs": [
+    {
+      "name": "scan-change-red",
+      "junit": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\scan-change-red.xml",
+      "stdout": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\scan-change-red.txt",
+      "tests": 1,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "scan-change-green",
+      "junit": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\scan-change-green.xml",
+      "stdout": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\scan-change-green.txt",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "scan-progress-red",
+      "junit": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\scan-progress-red.xml",
+      "stdout": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\scan-progress-red.txt",
+      "tests": 5,
+      "failures": 5,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "scan-progress-green",
+      "junit": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\scan-progress-green.xml",
+      "stdout": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\scan-progress-green.txt",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "scan-final",
+      "junit": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\scan-final.xml",
+      "stdout": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\scan-final.txt",
+      "tests": 26,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "scan-fixed",
+      "junit": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\scan-fixed.xml",
+      "stdout": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\scan-fixed.txt",
+      "tests": 26,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "scan-old-rules-red",
+      "junit": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\scan-old-rules-red.xml",
+      "stdout": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\scan-old-rules-red.txt",
+      "tests": 1,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "scan-old-rules-green",
+      "junit": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\scan-old-rules-green.xml",
+      "stdout": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\scan-old-rules-green.txt",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "scan-old-rules-guards",
+      "junit": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\scan-old-rules-guards.xml",
+      "stdout": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\scan-old-rules-guards.txt",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "scan-complete",
+      "junit": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\scan-complete.xml",
+      "stdout": "E:\\FactumCore\\.scratch\\wifi-real-trial-20261025\\scan-complete.txt",
+      "tests": 34,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "real_initial_finding": {
+    "path": "docs-raw/protocols/rfc1042.txt",
+    "previous_fingerprint": "e8737abe7f7b80ae2e84b8cada0ea02d8cc3c4ad2414e902cc055e6953a01c55",
+    "observed_fingerprint": "bde85418d3f1024a61607bca381c6a7a716feca7071a93d5f1ce24b1172d7ec4",
+    "incorrect_change": "unfinished",
+    "incorrect_progress": null,
+    "actual_prior_progress": "blocked"
+  },
+  "original_full_run_failure": "Concurrent source-capture package edit caused PACKAGE_DIGEST_MISMATCH; retained original run, then reran whole group from immutable copied runtime",
+  "limits": [
+    "Root must reinstall frozen corrected packages and replay actual trial",
+    "These mechanism tests do not imply formal card acceptance, real Target build, host integration or hardware runtime"
+  ]
+}

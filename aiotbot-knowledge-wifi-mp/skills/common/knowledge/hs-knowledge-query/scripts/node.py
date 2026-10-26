@@ -134,7 +134,7 @@ def blocked(
             and entry.get("reason")
             in {"source_changed", "code_changed", "code_source_changed"}
         ):
-            # A new authenticated same-view proof can supersede stale code
+            # A new bound independently reviewed same-view proof can supersede stale code
             # identity, never a raw-source or arbitrary semantic block.
             continue
         conditions = entry.get("conditions") or {}

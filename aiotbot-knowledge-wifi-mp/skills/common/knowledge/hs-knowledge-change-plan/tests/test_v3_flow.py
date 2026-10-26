@@ -1,4 +1,4 @@
-"""Current public flow over committed synthetic raw and a fixture human signer."""
+"""Public local ingest and optional human publishing over synthetic originals."""
 
 import base64
 import hashlib
@@ -31,7 +31,7 @@ def pin_fixture(harness):
     harness.rules = hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-@pytest.mark.parametrize("unrelated_nav_changes", [False, True, "historical_fallback", "local_only"])
+@pytest.mark.parametrize("unrelated_nav_changes", [False, True, "historical_fallback", "local_only", "uncommitted_raw"])
 def test_current_ingest_plan_review_confirm_lint_record_apply_query_submit(harness, unrelated_nav_changes):
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
     from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
@@ -44,19 +44,25 @@ def test_current_ingest_plan_review_confirm_lint_record_apply_query_submit(harne
 
     (harness.base / "config.yml").write_text(yaml.safe_dump({"knowledge_roots": {"wifi": harness.root.name}, "repos": []}), encoding="utf-8")
     harness.write("docs-raw/specs/source.md", b"# Source\nSynthetic fixture statement.\n")
-    git("init", "-q")
-    git("add", "--", harness.root.name + "/docs-raw/specs/source.md")
-    git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "original")
+    if unrelated_nav_changes != "uncommitted_raw":
+        git("init", "-q")
+        git("add", "--", harness.root.name + "/docs-raw/specs/source.md")
+        git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "original")
+        initial_commit = git("rev-parse", "HEAD")
     scan_ref = harness.run("source-scan", {"operation_id": "op"}, "scan")["data"]["scan_ref"]
     scan = harness.record(scan_ref)
     unit = scan["units"][0]
     materials = harness.run("source-scan", {"operation_id": "op", "scan_ref": scan_ref}, "prepare")["data"]["material_ref"]
     material = harness.record(materials)
     bundle = harness.record(material["bundle_ref"])
-    assert bundle["snapshots"][0]["recovery"]["kind"] == "git"
+    if unrelated_nav_changes == "uncommitted_raw":
+        assert bundle["snapshots"][0]["recovery"]["method"] == "evidence_object"
+        assert not (harness.base / ".git").exists()
+    else:
+        assert bundle["snapshots"][0]["recovery"]["kind"] == "git"
     if unrelated_nav_changes in {"historical_fallback", "local_only"}:
-        # Negative fixture: the retained bytes are genuine capture output, but a
-        # local object must not stand in for actual cross-clone Git recovery.
+        # Local completion may use exact retained capture bytes. This does not
+        # claim that another clone can recover the same source.
         snapshot = bundle["snapshots"][0]
         local = {"method": "evidence_object", "path": "logs/evidence/objects/" + snapshot["sha256"] + ".bin"}
         assert (harness.root / local["path"]).is_file()
@@ -113,6 +119,19 @@ def test_current_ingest_plan_review_confirm_lint_record_apply_query_submit(harne
                           "progress": "completed", "card_refs": ["new"], "claim_refs": ["new#new-claim"]}]}, "record")["data"]["ingest_record_ref"]
     apply_request = {"operation_id": "op", "v3_required": True, "view_ref": view_ref, "proof_ref": proof,
                      "ingest_record_ref": record_ref, "lint_report_ref": lint_ref, "content_review_ref": review}
+    if unrelated_nav_changes == "uncommitted_raw":
+        original_path = harness.root / bundle["snapshots"][0]["recovery"]["path"]
+        original_bytes = original_path.read_bytes()
+        for defect in ("missing", "changed"):
+            if defect == "missing":
+                original_path.unlink()
+            else:
+                original_path.write_bytes(b"!" + original_bytes[1:])
+            rejected = harness.run("apply", apply_request, expected=3)
+            assert rejected["phase"] == "awaiting"
+            assert not (harness.root / "knowledge/rules/new.md").exists()
+            assert not (harness.root / "logs/ingest/op.yaml").exists()
+            original_path.write_bytes(original_bytes)
     if unrelated_nav_changes in {"historical_fallback", "local_only"}:
         configuration = (harness.base / "config.yml").read_bytes()
         if unrelated_nav_changes == "historical_fallback":
@@ -122,11 +141,8 @@ def test_current_ingest_plan_review_confirm_lint_record_apply_query_submit(harne
                                "source_ref": {"evidence_ref": "e1", "source_id": source["source_id"],
                                               "snapshot_id": source["snapshot_id"], "locator": {"kind": "lines", "start": 1, "end": 2}}}, "resolve-source")
         assert base64.b64decode(readable["data"]["bytes_b64"]) == b"# Source\nSynthetic fixture statement.\n"
-        blocked = harness.run("apply", apply_request, expected=3)
-        assert "recover" in blocked["diagnostics"][0]["message"] or "portable" in blocked["diagnostics"][0]["message"]
-        assert not (harness.root / "knowledge/rules/new.md").exists()
-        (harness.base / "config.yml").write_bytes(configuration)
-        return
+        # Keep the unavailable Git configuration absent through local admission.
+        # The immutable captured original remains available and hash checked.
     if unrelated_nav_changes is True:
         extra = harness.write("knowledge/unrelated/index.md", b"[Broken navigation](missing.md)\n")
         blocked = harness.run("apply", apply_request, expected=3)
@@ -151,12 +167,54 @@ def test_current_ingest_plan_review_confirm_lint_record_apply_query_submit(harne
     generation = harness.run("index-build", {"operation_id": "op"}, "build")["data"]["generation_ref"]
     queries = harness.run("query-regression", {"operation_id": "op", "v3_required": True,
         "apply_result_ref": applied, "generation_ref": generation})["data"]["report_ref"]
+    query = harness.run("query", {"operation_id": "local-query", "query": "Synthetic", "purpose": "guidance"}, "search")
+    assert query["data"]["matches"][0]["card_id"] == "new"
+    read = harness.run("query", {"operation_id": "local-read", "receipt_ref": query["data"]["receipt_ref"],
+        "card_id": "new"}, "read")["data"]
+    assert read["generation_ref"] == query["data"]["generation_ref"]
+    assert read["card_digest"] == query["data"]["matches"][0]["card_digest"]
+    assert {claim["id"] for claim in read["claims"]} == {"new-claim"}
+    if unrelated_nav_changes in {"historical_fallback", "local_only", "uncommitted_raw"}:
+        assert (harness.root / "knowledge/rules/new.md").is_file()
+        assert (harness.root / "artifacts/indexes/local/active.json").is_file()
+        assert not (harness.root / "logs/operations/op/submission-result.json").exists()
+        if unrelated_nav_changes == "uncommitted_raw":
+            assert not (harness.base / ".git").exists()
+        else:
+            assert git("rev-parse", "HEAD") == initial_commit
+        if unrelated_nav_changes == "historical_fallback":
+            (harness.base / "config.yml").write_bytes(configuration)
+        return
     ready = harness.run("publish-handoff", {"operation_id": "op", "v3_required": True,
         "apply_result_ref": applied, "query_report_ref": queries})
     assert ready["phase"] == "ready_to_submit"
+    handoff = harness.record(ready["data"]["publish_handoff_ref"])
+    assert {"owner": "authorized_committer", "action": "provide exact originals and portable recovery locations for CI and other clones",
+            "status": "pending"} in handoff["external_obligations"]
     git("add", "--", *[harness.root.name + "/" + ref for ref in ready["data"]["commit_files"]])
     git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "knowledge batch")
     commit = git("rev-parse", "HEAD")
     submitted = harness.run("publish-handoff", {"operation_id": "op", "v3_required": True,
         "apply_result_ref": applied, "query_report_ref": queries, "commit_sha": commit}, "verify-submission")
     assert submitted["phase"] == "submitted"
+
+
+def test_local_source_recovery_still_rejects_unsafe_paths_and_locators(harness):
+    bundle_ref, bundle = harness.capture("source-guards", b"# Source\nExact captured source.\n")
+    snapshot = bundle["snapshots"][0]
+    reference = {"evidence_ref": "e1", "source_id": snapshot["source_id"],
+                 "snapshot_id": snapshot["snapshot_id"], "locator": {"kind": "lines", "start": 1, "end": 2}}
+    request = {"operation_id": "source-guards", "bundle_ref": bundle_ref, "source_ref": reference}
+    resolved = harness.run("source-capture", request, "resolve-source")
+    assert base64.b64decode(resolved["data"]["bytes_b64"]) == b"# Source\nExact captured source.\n"
+    bad_locator = {**reference, "locator": {"kind": "lines", "start": 1, "end": 999}}
+    rejected = harness.run("source-capture", {**request, "source_ref": bad_locator}, "resolve-source", expected=2)
+    assert rejected["status"] == "error"
+    snapshot["recovery"] = {"method": "evidence_object", "path": "logs/evidence/../../outside.bin"}
+    bundle.pop("digest")
+    raw = json.dumps(bundle, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+    bundle["digest"] = hashlib.sha256(raw).hexdigest()
+    unsafe = harness.write(".build/operations/source-guards/unsafe-bundle.json", json.dumps(bundle).encode())
+    rejected = harness.run("source-capture", {**request, "bundle_ref": unsafe}, "resolve-source", expected=2)
+    assert rejected["status"] == "error"
+    assert not (harness.root / "knowledge/rules/new.md").exists()

@@ -1,0 +1,139 @@
+{
+  "changed_missing_new": {
+    "response": {
+      "data": {
+        "actionable_unit_ids": [
+          "raw-5001468bf29752a407d802fc",
+          "raw-a530eb22d73d3d0c85a16246",
+          "raw-a65d06b2de2e054424be7f32",
+          "raw-f34a402f2d338b0f3a180d23",
+          "raw-5dd923d7d46839098b12e72b",
+          "raw-7bc8f2bf00a18cba32135429"
+        ],
+        "affected_claims": [],
+        "complete": true,
+        "context_gaps": [],
+        "scan_digest": "3440d17fc6e5e863dcd95d7a9365b374d314b98ca16346a62080dbd29e17e217",
+        "scan_ref": ".build/operations/real-repair-perturb-08/source-inventory.json",
+        "unchanged_unit_ids": []
+      },
+      "diagnostics": [],
+      "digest": "fde7a4230d2008543f6eb885174758346364612d88de071c34da373f36fb289d",
+      "phase": "scanned",
+      "record_kind": "result",
+      "rules_digest": "301e71f65ce031d586f3e85cab771221c878a39b8862773a55c7297b5d744699",
+      "schema_version": "2.0",
+      "status": "ok",
+      "tool_identity": {
+        "package_digest": "d533ee2b9915e3325188f5c6a17787d3842a84518539b286fa10c6822acec036",
+        "requirements_digest": "6bbf50956d018ed1d5249d07ec029e16cc0338bac8ff8df42b6e1ee486955c16",
+        "runtime": "3.12.14",
+        "skill": "hs-knowledge-source-scan"
+      }
+    },
+    "units": [
+      {
+        "change": "changed",
+        "observed_fingerprint": "bde85418d3f1024a61607bca381c6a7a716feca7071a93d5f1ce24b1172d7ec4",
+        "path": "docs-raw/protocols/rfc1042.txt",
+        "previous_fingerprint": "e8737abe7f7b80ae2e84b8cada0ea02d8cc3c4ad2414e902cc055e6953a01c55",
+        "progress": "blocked",
+        "read_error": null,
+        "source_id": "raw:5001468bf29752a407d802fce264c745",
+        "unit_id": "raw-5001468bf29752a407d802fc"
+      },
+      {
+        "change": "missing",
+        "observed_fingerprint": null,
+        "path": "docs-raw/protocols/rfc5416.txt",
+        "previous_fingerprint": "ef326f22d2302b43547dcad37fbc545b075dcae7941372b0569fd84e0f5a4af2",
+        "progress": "blocked",
+        "read_error": null,
+        "source_id": "raw:a530eb22d73d3d0c85a16246c0f255a0",
+        "unit_id": "raw-a530eb22d73d3d0c85a16246"
+      },
+      {
+        "change": "unfinished",
+        "observed_fingerprint": "6a059ababe36062810b17a5d0f44424d783c9f77b8fd6c36e362d816d3b9e031",
+        "path": "docs-raw/protocols/rfc8325.txt",
+        "previous_fingerprint": "6a059ababe36062810b17a5d0f44424d783c9f77b8fd6c36e362d816d3b9e031",
+        "progress": "blocked",
+        "read_error": null,
+        "source_id": "raw:a65d06b2de2e054424be7f32448755e6",
+        "unit_id": "raw-a65d06b2de2e054424be7f32"
+      },
+      {
+        "change": "new",
+        "observed_fingerprint": "8af1eb4522f05b3897b42cc603e609365d6c79481edaa325dcd66ef362d802e6",
+        "path": "docs-raw/specs/corpus-readme-repair-check.md",
+        "previous_fingerprint": null,
+        "progress": null,
+        "read_error": null,
+        "source_id": "raw:f34a402f2d338b0f3a180d236a3b14f7",
+        "unit_id": "raw-f34a402f2d338b0f3a180d23"
+      },
+      {
+        "change": "unfinished",
+        "observed_fingerprint": null,
+        "path": "docs-raw/specs/corpus-readme.md",
+        "previous_fingerprint": null,
+        "progress": null,
+        "read_error": null,
+        "source_id": "raw:5dd923d7d46839098b12e72b66a7b8a3",
+        "unit_id": "raw-5dd923d7d46839098b12e72b"
+      },
+      {
+        "change": "unfinished",
+        "observed_fingerprint": "45febbb3409ba9453b9b247c8a738022720a829db561814a9e2e4a70b9c6ab9c",
+        "path": "docs-raw/storys/real-trial-request.md",
+        "previous_fingerprint": null,
+        "progress": null,
+        "read_error": null,
+        "source_id": "raw:7bc8f2bf00a18cba32135429d0388103",
+        "unit_id": "raw-7bc8f2bf00a18cba32135429"
+      }
+    ],
+    "complete": true
+  },
+  "narrow_scope": {
+    "response": {
+      "data": {
+        "actionable_unit_ids": [
+          "raw-a65d06b2de2e054424be7f32"
+        ],
+        "affected_claims": [],
+        "complete": true,
+        "context_gaps": [],
+        "scan_digest": "59e0270749bdc5f390dded608b73ddccc9ac2d0ba3f2e5a4490ce23201783882",
+        "scan_ref": ".build/operations/real-repair-narrow-09/source-inventory.json",
+        "unchanged_unit_ids": []
+      },
+      "diagnostics": [],
+      "digest": "c76049fa126ee0bda1770c0461293e70cdee4802fa79ffda1a0751ff9d617308",
+      "phase": "scanned",
+      "record_kind": "result",
+      "rules_digest": "301e71f65ce031d586f3e85cab771221c878a39b8862773a55c7297b5d744699",
+      "schema_version": "2.0",
+      "status": "ok",
+      "tool_identity": {
+        "package_digest": "d533ee2b9915e3325188f5c6a17787d3842a84518539b286fa10c6822acec036",
+        "requirements_digest": "6bbf50956d018ed1d5249d07ec029e16cc0338bac8ff8df42b6e1ee486955c16",
+        "runtime": "3.12.14",
+        "skill": "hs-knowledge-source-scan"
+      }
+    },
+    "units": [
+      {
+        "change": "unfinished",
+        "observed_fingerprint": "6a059ababe36062810b17a5d0f44424d783c9f77b8fd6c36e362d816d3b9e031",
+        "path": "docs-raw/protocols/rfc8325.txt",
+        "previous_fingerprint": "6a059ababe36062810b17a5d0f44424d783c9f77b8fd6c36e362d816d3b9e031",
+        "progress": "blocked",
+        "read_error": null,
+        "source_id": "raw:a65d06b2de2e054424be7f32448755e6",
+        "unit_id": "raw-a65d06b2de2e054424be7f32"
+      }
+    ],
+    "complete": true
+  }
+}

@@ -1,6 +1,22 @@
 """Exact logical-resource/snapshot resolution; source objects are always read-only."""
 
-from .validation import ContractError, load_yaml, safe_path, sha256_bytes
+from .validation import ContractError, canonical_bytes, load_yaml, safe_path, sha256_bytes
+
+
+def extract_code_text(data, extractor):
+    """Decode an explicitly fixed code adapter without changing original bytes."""
+    codecs = {"code-utf8:1": "utf-8-sig", "code-gb18030:1": "gb18030"}
+    if extractor not in codecs:
+        raise ContractError("SOURCE_ADAPTER_UNAVAILABLE", "Unknown fixed code extraction adapter")
+    try:
+        text = data.decode(codecs[extractor], errors="strict")
+        if "\0" in text:
+            raise UnicodeError("NUL in code text")
+    except UnicodeError as exc:
+        raise ContractError("SOURCE_ADAPTER_UNAVAILABLE", "Exact code bytes cannot be decoded by the declared adapter") from exc
+    locators = [{"kind": "lines", "start": index + 1, "end": index + 1, "text": line}
+                for index, line in enumerate(text.splitlines())]
+    return text, locators
 
 
 def read_source_lock(knowledge_root):
@@ -139,12 +155,12 @@ def _git_read(repository, *args):
     import subprocess
     if not args or args[0] not in {"rev-parse", "cat-file"}:
         raise ContractError("UNSAFE_GIT_READ", "Only fixed object/ref reads are supported")
-    env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_") or key == "GIT_TEST_ASSUME_DIFFERENT_OWNER"}
     env.update({"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull, "GIT_TERMINAL_PROMPT": "0",
                 "GIT_OPTIONAL_LOCKS": "0", "GIT_PAGER": "cat", "GIT_NO_LAZY_FETCH": "1"})
     command = ["git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + os.devnull,
                "-c", "diff.external=", "-c", "core.pager=cat", "-c", "protocol.allow=never", "-c", "protocol.file.allow=never",
-               "-C", str(repository), *args]
+               "-c", "safe.directory=" + str(repository.resolve()).replace("\\", "/"), "-C", str(repository), *args]
     try:
         process = subprocess.run(command, capture_output=True, env=env, check=False, timeout=30)
     except (OSError, subprocess.TimeoutExpired) as exc:
@@ -196,10 +212,18 @@ def validate_reference(ref, lock, resolver, *, allowed_kinds=None):
         raise ContractError("EVIDENCE_OBJECT_CHANGED", "Exact source fingerprint differs")
     kind = locator["kind"]
     if kind in {"lines", "paragraph", "paragraphs", "section"}:
-        try:
-            text = data.decode("utf-8-sig")
-        except UnicodeError as exc:
-            raise ContractError("SOURCE_ADAPTER_UNAVAILABLE", "Text locator requires a fixed extraction adapter") from exc
+        extraction = snapshot.get("extraction")
+        code = any(item.get("source_id") == snapshot["source_id"] and item.get("kind") == "code" for item in lock["resources"])
+        if code and extraction:
+            text, addresses = extract_code_text(data, extraction.get("extractor"))
+            if (sha256_bytes(text.encode("utf-8")) != extraction.get("text_sha256")
+                    or sha256_bytes(canonical_bytes({"locators": addresses})) != extraction.get("locator_sha256")):
+                raise ContractError("SOURCE_EXTRACTION_CHANGED", "Fixed code text or locator fingerprint differs")
+        else:
+            try:
+                text = data.decode("utf-8-sig")
+            except UnicodeError as exc:
+                raise ContractError("SOURCE_ADAPTER_UNAVAILABLE", "Text locator requires a fixed extraction adapter") from exc
         if kind == "section":
             from .validation import markdown_structure
             anchor = locator.get("anchor") or locator.get("id")
@@ -260,7 +284,7 @@ def validate_code_references(card, lock, checkout, rules):
     refs = [ref for ref in card["metadata"]["sources"] if resources.get(ref["source_id"], {}).get("kind") == "code"]
     if not refs:
         raise ContractError("CODE_INPUT_UNAVAILABLE", "A code card requires explicit fixed code references")
-    environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_") or key == "GIT_TEST_ASSUME_DIFFERENT_OWNER"}
     environment.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull, GIT_TERMINAL_PROMPT="0", GIT_OPTIONAL_LOCKS="0", GIT_NO_LAZY_FETCH="1")
     verified = []
     for ref in refs:
@@ -281,7 +305,7 @@ def validate_code_references(card, lock, checkout, rules):
         if not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", commit or ""):
             raise ContractError("CODE_INPUT_UNAVAILABLE", "An exact code commit is required")
         def git(arguments):
-            command = ["git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + os.devnull, "-c", "core.pager=cat", "-c", "protocol.allow=never", "-C", str(root), *arguments]
+            command = ["git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + os.devnull, "-c", "core.pager=cat", "-c", "protocol.allow=never", "-c", "safe.directory=" + str(root.resolve()).replace("\\", "/"), "-C", str(root), *arguments]
             result = subprocess.run(command, capture_output=True, timeout=30, env=environment)
             if result.returncode:
                 raise ContractError("CODE_INPUT_UNAVAILABLE", "Fixed Git code object is unavailable")
@@ -310,9 +334,9 @@ def _fixed_code_git(root, arguments):
     allowed = allowed or arguments == ["config", "--local", "--get", "remote.origin.url"]
     if not allowed:
         raise ContractError("UNSAFE_CODE_OPERATION", "Only fixed Git object/identity reads are allowed")
-    environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_") or key == "GIT_TEST_ASSUME_DIFFERENT_OWNER"}
     environment.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull, GIT_TERMINAL_PROMPT="0", GIT_OPTIONAL_LOCKS="0", GIT_NO_LAZY_FETCH="1", GIT_PAGER="cat")
-    command = ["git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + os.devnull, "-c", "core.pager=cat", "-c", "protocol.allow=never", "-c", "protocol.file.allow=never", "-C", str(root), *arguments]
+    command = ["git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + os.devnull, "-c", "core.pager=cat", "-c", "protocol.allow=never", "-c", "protocol.file.allow=never", "-c", "safe.directory=" + str(root.resolve()).replace("\\", "/"), "-C", str(root), *arguments]
     try:
         result = subprocess.run(command, capture_output=True, timeout=30, env=environment)
     except (OSError, subprocess.SubprocessError) as exc:
@@ -326,7 +350,7 @@ def validate_current_code_identity(identity, config_path, config_digest, rules, 
     """Recheck an accepted code identity against current protected inputs.
 
     This checks every accepted relevant file, including uncommitted bytes, the
-    fixed Target/build artifacts and exact Git identity. It never creates a new
+    provided Target/build artifacts and exact Git identity. It never creates a new
     semantic proof or treats an acceptance summary as authentication.
     """
     import os
@@ -346,8 +370,19 @@ def validate_current_code_identity(identity, config_path, config_digest, rules, 
         except OSError as exc:
             raise ContractError("CODE_INPUT_UNAVAILABLE", "An accepted code/build file is unavailable") from exc
 
-    if not isinstance(identity, dict) or not identity.get("repos") or not isinstance(identity.get("target"), dict) or not identity.get("build_files") or not re.fullmatch(r"[0-9a-f]{64}", str(identity.get("macro_digest", ""))):
+    if not isinstance(identity, dict) or identity.get("basis") not in (None, "source") or not identity.get("repos"):
         raise ContractError("CODE_IDENTITY_UNAVAILABLE", "Complete accepted code identity and build context are required")
+    source_basis = identity.get("basis") == "source"
+    target, build_files = identity.get("target"), identity.get("build_files")
+    if (
+        (target is not None and not isinstance(target, dict))
+        or (not source_basis and not isinstance(target, dict))
+        or not isinstance(build_files, dict)
+        or (not source_basis and not build_files)
+        or (build_files and not re.fullmatch(r"[0-9a-f]{64}", str(identity.get("macro_digest", ""))))
+        or (not build_files and identity.get("macro_digest") is not None)
+    ):
+        raise ContractError("CODE_IDENTITY_UNAVAILABLE", "Accepted source/build identity is inconsistent")
     configuration = Path(config_path)
     if not configuration.is_absolute() or configuration.is_symlink():
         raise ContractError("CODE_INPUT_UNAVAILABLE", "An explicit actual configuration is required")
@@ -358,20 +393,21 @@ def validate_current_code_identity(identity, config_path, config_digest, rules, 
     validate_shape("workspace", config, rules)
     if not isinstance(policy, dict) or not policy or config.get("code_policy") != policy:
         raise ContractError("CODE_POLICY_UNAVAILABLE", "Protected code policy must equal the configuration declaration")
-    target = identity["target"]
-    declared = [item for item in config["targets"] if item["target_id"] == target.get("target_id")]
-    if len(declared) != 1:
-        raise ContractError("CODE_TARGET_CHANGED", "Accepted Target is not uniquely registered")
-    declared = declared[0]
-    for field in ("target_id", "chip", "side", "build_profile"):
-        if not known(target.get(field)) or target[field] != declared.get(field):
-            raise ContractError("CODE_TARGET_CHANGED", "Current Target/build profile differs")
-    if not declared.get("module_roots") or not declared.get("source_bindings") or not known(target.get("revision")) or not isinstance(target.get("features"), list) or not isinstance(target.get("protocol_versions"), list):
-        raise ContractError("CODE_TARGET_UNAVAILABLE", "Target code bindings/features/protocol/revision are incomplete")
-    if not set(declared["required_features"]).issubset(target["features"]) or not set(declared["protocol_versions"]).issubset(target["protocol_versions"]):
-        raise ContractError("CODE_TARGET_CHANGED", "Required features or protocol versions differ")
+    declared = None
+    if target is not None:
+        matches = [item for item in config["targets"] if item["target_id"] == target.get("target_id")]
+        if len(matches) != 1:
+            raise ContractError("CODE_TARGET_CHANGED", "Accepted Target is not uniquely registered")
+        declared = matches[0]
+        for field in ("target_id", "chip", "side", "build_profile"):
+            if (not source_basis and not known(target.get(field))) or (known(target.get(field)) and target[field] != declared.get(field)):
+                raise ContractError("CODE_TARGET_CHANGED", "Current Target/build profile differs")
+        if not source_basis and (not declared.get("module_roots") or not declared.get("source_bindings") or not known(target.get("revision")) or not isinstance(target.get("features"), list) or not isinstance(target.get("protocol_versions"), list)):
+            raise ContractError("CODE_TARGET_UNAVAILABLE", "Target code bindings/features/protocol/revision are incomplete")
+        if build_files and (not set(declared["required_features"]).issubset(target.get("features") or []) or not set(declared["protocol_versions"]).issubset(target.get("protocol_versions") or [])):
+            raise ContractError("CODE_TARGET_CHANGED", "Required features or protocol versions differ")
     domain = Path(rules["knowledge_root"])
-    for relative, expected in identity["build_files"].items():
+    for relative, expected in build_files.items():
         path = safe_path(domain, relative, ["logs/evidence"])
         if sha256_bytes(read(path)) != expected:
             raise ContractError("CODE_BUILD_CHANGED", "Accepted build artifact bytes changed", relative)
@@ -390,13 +426,13 @@ def validate_current_code_identity(identity, config_path, config_digest, rules, 
         actual_root = Path(_fixed_code_git(root, ["rev-parse", "--show-toplevel"]).decode("utf-8").strip()).resolve()
         origin = _fixed_code_git(root, ["config", "--local", "--get", "remote.origin.url"]).decode("utf-8").strip()
         head = _fixed_code_git(root, ["rev-parse", "--verify", "HEAD^{commit}"]).decode("ascii").strip()
-        if actual_root != root or origin != mapping["expected_identity"] or head != item.get("head") or target["revision"] != head:
+        if actual_root != root or origin != mapping["expected_identity"] or head != item.get("head") or (target and known(target.get("revision")) and target["revision"] != head):
             raise ContractError("CODE_REPOSITORY_CHANGED", "Actual Git root/origin/HEAD differs from accepted identity")
         if not isinstance(item.get("files"), dict) or not item["files"] or not isinstance(item.get("checked_files_dirty"), bool):
             raise ContractError("CODE_IDENTITY_UNAVAILABLE", "Accepted relevant file manifest and dirty state are required")
         dirty = False
         for relative, expected in item["files"].items():
-            if not any(module == "." or relative == module or relative.startswith(module.rstrip("/") + "/") for module in declared["module_roots"]):
+            if declared and declared["module_roots"] and not any(module == "." or relative == module or relative.startswith(module.rstrip("/") + "/") for module in declared["module_roots"]):
                 raise ContractError("CODE_TARGET_CHANGED", "Accepted file is outside configured Target modules", relative)
             path = safe_path(root, relative)
             tree = _fixed_code_git(root, ["ls-tree", "-z", head, "--", relative])

@@ -5,7 +5,7 @@ import re
 import secrets
 import subprocess
 
-from support import Blocked, Invalid, atomic_bytes, canonical, package_digest
+from support import Blocked, Invalid, atomic_bytes, canonical, native_path, package_digest
 
 
 def recover(ctx, request, action):
@@ -37,13 +37,15 @@ def recover(ctx, request, action):
     child_request = {"operation_id": op}
     for ref, value in ((request_ref, child_request),):
         path = ctx.path(ref)
+        native_request = pathlib.Path(native_path(path))
         raw = canonical(value)
-        if path.exists() and path.read_bytes() != raw:
+        if native_request.exists() and native_request.read_bytes() != raw:
             raise Blocked("recovery attempt input changed; use a new attempt ID")
-        if not path.exists():
+        if not native_request.exists():
             atomic_bytes(path, raw)
     response_path = ctx.path(response_ref)
-    if not response_path.exists():
+    native_response = pathlib.Path(native_path(response_path))
+    if not native_response.exists():
         command = [
             spec["python"],
             str(entry),
@@ -66,7 +68,7 @@ def recover(ctx, request, action):
             )
         except (OSError, subprocess.TimeoutExpired) as exc:
             raise Blocked("public apply recovery process unavailable") from exc
-        if completed.returncode not in (0, 2, 3) or not response_path.is_file():
+        if completed.returncode not in (0, 2, 3) or not native_response.is_file():
             raise Blocked("public apply recovery process produced no valid result")
     response = ctx.read(response_ref)
     if (

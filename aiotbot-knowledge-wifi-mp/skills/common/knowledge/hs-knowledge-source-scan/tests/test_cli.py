@@ -3,6 +3,8 @@
 import hashlib
 import json
 
+import pytest
+
 
 def canonical(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
@@ -74,6 +76,200 @@ def test_record_only_defer_is_portable_and_remains_unfinished(harness):
     harness.write(record["target_path"], (harness.root / result["data"]["record_ref"]).read_bytes())
     later = harness.run("source-scan", {"operation_id": "later"}, "scan")
     assert harness.record(later["data"]["scan_ref"])["units"][0]["change"] == "unfinished"
+
+
+def persist_defer(harness, operation, progress="blocked"):
+    scanned = harness.run("source-scan", {"operation_id": operation}, "scan")
+    scan = harness.record(scanned["data"]["scan_ref"])
+    unit = scan["units"][0]
+    response = harness.run("source-scan", {
+        "operation_id": operation, "scan_ref": scanned["data"]["scan_ref"],
+        "dispositions": [{"unit_id": unit["unit_id"], "action": "defer", "reason": "Required review remains incomplete",
+                          "observed_fingerprint": unit["observed_fingerprint"], "adopted_fingerprint": None,
+                          "progress": progress, "card_refs": [], "claim_refs": []}],
+    }, "record")
+    record = harness.record(response["data"]["record_ref"])
+    # Isolated formalization fixture: only P7 owns this write in production.
+    record["status"] = "recorded"
+    record["progress"] = {"apply": {"status": "recorded", "operation_id": operation, "view_digest": None}}
+    record.pop("digest")
+    record["digest"] = hashed(canonical(record))
+    harness.write(record["target_path"], canonical(record))
+    return record
+
+
+def test_changed_bytes_remain_changed_when_previous_processing_is_pending(harness):
+    original = b"# Original\nFirst revision.\n"
+    changed = b"# Original\nUpdated revision.\n"
+    harness.write("docs-raw/specs/pending.md", original)
+    persist_defer(harness, "deferred-original")
+    harness.write("docs-raw/specs/pending.md", changed)
+
+    response = harness.run("source-scan", {"operation_id": "changed-after-defer"}, "scan")
+    unit = harness.record(response["data"]["scan_ref"])["units"][0]
+    assert unit["previous_fingerprint"] == hashed(original)
+    assert unit["observed_fingerprint"] == hashed(changed)
+    assert unit["change"] == "changed"
+
+
+@pytest.mark.parametrize(("prior_progress", "expected_progress", "change_bytes", "expected_change"), [
+    ("blocked", "blocked", False, "unfinished"),
+    ("blocked", "blocked", True, "changed"),
+    ({"status": "partial", "next_step": "Read the remaining section"}, "partial", False, "unfinished"),
+    ({"status": "partial", "next_step": "Read the remaining section"}, "partial", True, "changed"),
+    ("pending", "pending", False, "unfinished"),
+])
+def test_scan_preserves_unresolved_progress_separately_from_observation(
+        harness, prior_progress, expected_progress, change_bytes, expected_change):
+    harness.write("docs-raw/specs/pending.md", b"# Original\nFirst revision.\n")
+    persist_defer(harness, "deferred-progress", prior_progress)
+    if change_bytes:
+        harness.write("docs-raw/specs/pending.md", b"# Original\nUpdated revision.\n")
+
+    response = harness.run("source-scan", {"operation_id": "rescan-progress"}, "scan")
+    unit = harness.record(response["data"]["scan_ref"])["units"][0]
+    assert unit["change"] == expected_change
+    assert unit["progress"] == expected_progress
+
+
+def test_changed_bytes_do_not_resolve_conflicting_prior_branches(harness):
+    harness.write("docs-raw/specs/pending.md", b"First branch\n")
+    persist_defer(harness, "first-branch")
+    harness.write("docs-raw/specs/pending.md", b"Second branch\n")
+    branch = persist_defer(harness, "second-branch", "partial")
+    # Two independent historical leaves, rather than an ordered successor.
+    branch["prior_record_digests"] = []
+    branch["inventory"]["prior_record_digests"] = []
+    branch["inventory"].pop("digest")
+    branch["inventory"]["digest"] = hashed(canonical(branch["inventory"]))
+    branch["scan_digest"] = branch["inventory"]["digest"]
+    branch.pop("digest")
+    branch["digest"] = hashed(canonical(branch))
+    harness.write(branch["target_path"], canonical(branch))
+    harness.write("docs-raw/specs/pending.md", b"Third observation\n")
+
+    response = harness.run("source-scan", {"operation_id": "ambiguous-rescan"}, "scan")
+    unit = harness.record(response["data"]["scan_ref"])["units"][0]
+    assert unit["change"] == "unfinished"
+    assert unit["previous_fingerprint"] is None and unit["progress"] is None
+
+
+def test_missing_deferred_source_keeps_processing_progress(harness):
+    harness.write("docs-raw/specs/pending.md", b"Pending original\n")
+    persist_defer(harness, "deferred-before-delete")
+    (harness.root / "docs-raw/specs/pending.md").unlink()
+
+    response = harness.run("source-scan", {"operation_id": "deleted-rescan"}, "scan")
+    scan = harness.record(response["data"]["scan_ref"])
+    assert scan["complete"] is True
+    assert scan["units"][0]["change"] == "missing"
+    assert scan["units"][0]["progress"] == "blocked"
+
+
+def test_incomplete_scan_does_not_infer_missing_deferred_source(harness):
+    import os
+    import subprocess
+
+    harness.write("docs-raw/specs/pending.md", b"Pending original\n")
+    persist_defer(harness, "deferred-before-incomplete")
+    (harness.root / "docs-raw/specs/pending.md").unlink()
+    target = harness.base / "outside-scan"
+    target.mkdir()
+    link = harness.root / "docs-raw/specs/linked"
+    if os.name == "nt":
+        subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(target)], check=True, capture_output=True)
+    else:
+        link.symlink_to(target, target_is_directory=True)
+
+    response = harness.run("source-scan", {"operation_id": "incomplete-rescan"}, "scan")
+    scan = harness.record(response["data"]["scan_ref"])
+    units = {unit["path"]: unit for unit in scan["units"]}
+    assert scan["complete"] is False
+    assert units["docs-raw/specs/linked"]["change"] == "read_failed"
+    assert units["docs-raw/specs/linked"]["read_error"] == "LINKED_PATH"
+    assert units["docs-raw/specs/pending.md"]["change"] == "unfinished"
+    assert units["docs-raw/specs/pending.md"]["progress"] == "blocked"
+
+
+def stale_pending_inventory(harness):
+    harness.write("docs-raw/specs/pending.md", b"Original pending under old rules\n")
+    result = harness.run("source-scan", {"operation_id": "old-pending-rules"}, "scan")
+    ref = result["data"]["scan_ref"]
+    scan = harness.record(ref)
+    scan["rules_digest"] = "1" * 64
+    scan.pop("digest")
+    scan["digest"] = hashed(canonical(scan))
+    raw = canonical(scan)
+    harness.write(ref, raw)
+    return ref, scan, raw
+
+
+def test_new_scan_keeps_old_rule_pending_paths_without_resuming_old_operation(harness):
+    ref, _, old_bytes = stale_pending_inventory(harness)
+    response = harness.run("source-scan", {"operation_id": "new-rule-scan"}, "scan")
+    scan = harness.record(response["data"]["scan_ref"])
+    assert scan["rules_digest"] == harness.rules
+    assert scan["operation_id"] == "new-rule-scan"
+    assert scan["units"][0]["path"] == "docs-raw/specs/pending.md"
+    assert scan["units"][0]["change"] == "unfinished"
+    assert scan["units"][0]["progress"] is None
+    assert (harness.root / ref).read_bytes() == old_bytes
+    assert not (harness.root / "logs/ingest").exists()
+
+
+@pytest.mark.parametrize(("field", "value", "expected_code"), [
+    ("unit_path", "sources/outside.md", "UNSAFE_PATH"),
+    ("unit_path", "docs-raw/specs/../../outside.md", "UNSAFE_PATH"),
+    ("scope", "knowledge", "UNSAFE_PATH"),
+    ("operation_id", "unrelated-operation", "RECORD_BINDING_MISMATCH"),
+])
+def test_old_rule_pending_inventory_rejects_unsafe_or_misbound_hints(harness, field, value, expected_code):
+    ref, scan, _ = stale_pending_inventory(harness)
+    if field == "unit_path":
+        scan["units"][0]["path"] = value
+    elif field == "scope":
+        scan["scope"] = [value]
+    else:
+        scan[field] = value
+    scan.pop("digest")
+    scan["digest"] = hashed(canonical(scan))
+    original = canonical(scan)
+    harness.write(ref, original)
+
+    response = harness.run("source-scan", {"operation_id": "reject-old-hint"}, "scan", expected=2)
+    assert response["diagnostics"][0]["code"] == expected_code
+    assert (harness.root / ref).read_bytes() == original
+    assert not (harness.root / ".build/operations/reject-old-hint/source-inventory.json").exists()
+
+
+def test_old_rule_pending_inventory_does_not_ignore_a_broken_seal(harness):
+    ref, scan, _ = stale_pending_inventory(harness)
+    scan["units"][0]["progress"] = "completed"
+    original = canonical(scan)  # Deliberately retain the now-invalid digest.
+    harness.write(ref, original)
+
+    response = harness.run("source-scan", {"operation_id": "reject-broken-seal"}, "scan", expected=2)
+    assert response["diagnostics"][0]["code"] == "RECORD_DIGEST_MISMATCH"
+    assert (harness.root / ref).read_bytes() == original
+
+
+@pytest.mark.parametrize("remove_original", [False, True])
+def test_old_rule_pending_inventory_is_not_adoption_or_completion_evidence(harness, remove_original):
+    ref, scan, _ = stale_pending_inventory(harness)
+    scan["units"][0]["progress"] = "completed"
+    scan.pop("digest")
+    scan["digest"] = hashed(canonical(scan))
+    harness.write(ref, canonical(scan))
+    if remove_original:
+        (harness.root / "docs-raw/specs/pending.md").unlink()
+    else:
+        harness.write("docs-raw/specs/pending.md", b"Current bytes differ from the old pending scan\n")
+
+    response = harness.run("source-scan", {"operation_id": "old-hint-only"}, "scan")
+    unit = harness.record(response["data"]["scan_ref"])["units"][0]
+    assert unit["change"] == "unfinished"
+    assert unit["previous_fingerprint"] is None and unit["progress"] is None
+    assert not (harness.root / "logs/ingest").exists()
 
 
 def test_status_reports_actual_saved_stages_without_advancing_work(harness):

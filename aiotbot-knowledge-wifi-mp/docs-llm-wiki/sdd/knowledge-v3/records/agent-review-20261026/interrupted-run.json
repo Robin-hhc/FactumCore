@@ -1,0 +1,6 @@
+{
+  "reason": "Independent review found canonical semantic_review Schema still required a signature; fix the shared record contract and re-run all groups",
+  "output": "E:\\FactumCore\\.scratch\\sr1",
+  "status": "interrupted",
+  "process_count": 16
+}

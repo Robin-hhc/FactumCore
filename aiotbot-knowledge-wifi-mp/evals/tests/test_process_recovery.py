@@ -132,7 +132,11 @@ runpy.run_path(cli,run_name='__main__')
     assert (p.root / "docs-raw/specs/raw-source.md").read_bytes() == source_before
     assert (p.root / unrelated_ref).read_bytes() == b"unrelated external file\n"
     lock_entry = next(row for row in journal["entries"] if row["path"] == "governance/sources.lock.yaml")
-    assert (p.root / lock_entry["backup_ref"]).read_bytes() == source_lock_before
+    backup = (p.root / lock_entry["backup_ref"]).absolute()
+    if sys.platform == "win32" and not str(backup).startswith("\\\\?\\"):
+        text = str(backup)
+        backup = Path("\\\\?\\UNC\\" + text[2:] if text.startswith("\\\\") else "\\\\?\\" + text)
+    assert backup.read_bytes() == source_lock_before
     verified = p.call(
         "knowledge-apply",
         {

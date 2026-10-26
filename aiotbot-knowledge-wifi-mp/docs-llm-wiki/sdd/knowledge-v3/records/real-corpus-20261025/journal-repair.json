@@ -1,0 +1,71 @@
+{
+  "status": "passed",
+  "production_frozen": true,
+  "files": [
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-apply/scripts/transaction.py",
+      "sha256": "5a81f6cd8544cd419f37a4f6797ae280f29134016dcc615be63b2b635d2f278e"
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-apply/tests/test_apply.py",
+      "sha256": "5e58225b4c36e906596ea82e43bcb21c3a687284ea14b743718da9d9d09dd83e"
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-apply/tests/test_public_governance.py",
+      "sha256": "b58c0b91a3fd662e1c5316b8c161f25736b7c4ed241c2d1ffe16b7b6db105fe7"
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-index-build/scripts/node.py",
+      "sha256": "eb4ecef27ee9582d9b1464c6319a457812dfb640fe95b63c9f21de744c14ad16"
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-index-build/tests/test_journal_liveness.py",
+      "sha256": "d30d518a04175d916ca25d5b67d517bc5b783a14fd1bf1c385c169817aaf9f17"
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-candidate-inspect/scripts/inspect_candidate.py",
+      "sha256": "88d16ee9fcb390de59fe8f884ef5549a9793612f72399dc9dac425a07adf1991"
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/skills/common/knowledge/hs-knowledge-candidate-inspect/tests/test_journal_liveness.py",
+      "sha256": "9acf37de4d1621327dfbef6a7779538372734e499ead3a97486bffba3f7418de"
+    }
+  ],
+  "rules_digest": "301e71f65ce031d586f3e85cab771221c878a39b8862773a55c7297b5d744699",
+  "groups": [
+    {
+      "junit": "root-apply.xml",
+      "tests": 29,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "junit": "root-index.xml",
+      "tests": 26,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "junit": "root-inspect.xml",
+      "tests": 13,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "independent_root_cases": 68,
+  "no_history_or_proof_migration": true,
+  "additional_barrier_audit": {
+    "required_fixed": [
+      "apply global write barrier",
+      "index build/activate barrier",
+      "Workflow candidate-inspect readiness barrier"
+    ],
+    "not_changed": [
+      "source-scan status is read-only historical fact reporting",
+      "contracts/checks local journal status gate has no current-rules comparison; final apply/index independently enforce seal/schema/identity barriers"
+    ]
+  }
+}

@@ -21,9 +21,9 @@ from support import (
 )
 
 
-def git_read(root, arguments, *, optional=False):
+def git_read(root, arguments, *, optional=False, authorized_root=None):
     environment = {
-        key: value for key, value in os.environ.items() if not key.startswith("GIT_")
+        key: value for key, value in os.environ.items() if not key.startswith("GIT_") or key == "GIT_TEST_ASSUME_DIFFERENT_OWNER"
     }
     environment.update(
         GIT_CONFIG_NOSYSTEM="1",
@@ -48,6 +48,8 @@ def git_read(root, arguments, *, optional=False):
         "protocol.allow=never",
         "-c",
         "protocol.file.allow=never",
+        "-c",
+        "safe.directory=" + (authorized_root or root).resolve().as_posix(),
         "-C",
         str(root),
         *arguments,
@@ -224,7 +226,7 @@ def metadata(root, registered, relative, receipt=None):
         git_read(root, ["rev-parse", "--show-toplevel"]).decode().strip()
     ).resolve()
     selected_root = Path(
-        git_read((root / relative).parent, ["rev-parse", "--show-toplevel"])
+        git_read((root / relative).parent, ["rev-parse", "--show-toplevel"], authorized_root=root)
         .decode()
         .strip()
     ).resolve()
@@ -282,6 +284,11 @@ def current_code_hash(context, resource):
 
 def capture_code(context):
     request = context.request
+    encoding = request.get("text_encoding", "utf-8")
+    extractors = {"utf-8": "code-utf8:1", "gb18030": "code-gb18030:1"}
+    if not isinstance(encoding, str) or encoding not in extractors:
+        raise NodeError("INVALID_CODE_ENCODING", "text_encoding must be utf-8 or gb18030; encoding is never guessed")
+    extractor = extractors[encoding]
     repo_id, relative, source_id = (
         request.get("repo_id"),
         request.get("relative_path"),
@@ -333,14 +340,10 @@ def capture_code(context):
             "No Git revision exists for this export; version remains explicitly unknown"
         )
     try:
-        text = raw.decode("utf-8-sig")
-        if "\0" in text:
-            raise UnicodeError("NUL in source text")
-        locators = [
-            {"kind": "lines", "start": i + 1, "end": i + 1, "text": line}
-            for i, line in enumerate(text.splitlines())
-        ]
-    except UnicodeError:
+        text, locators = context.modules["source_resources"].extract_code_text(raw, extractor)
+    except context.modules["validation"].ContractError as exc:
+        if "text_encoding" in request:
+            raise NodeError("UNREADABLE_CODE_TEXT", "Selected code cannot be strictly decoded by the explicit encoding, or contains NUL") from exc
         text, locators = None, []
         limitations.append(
             "Code encoding is unsupported; original bytes retained without interpreted text"
@@ -356,6 +359,7 @@ def capture_code(context):
             "version": request.get("version", "unknown"),
             "text_digest": sha(text.encode()) if text is not None else None,
             "locators": digest(locators),
+            **({"extractor": extractor} if encoding != "utf-8" else {}),
         }
     )
     object_ref, locator_ref = (
@@ -396,7 +400,7 @@ def capture_code(context):
         payloads[text_ref] = text.encode()
         extraction = {
             "snapshot_id": snapshot_id,
-            "extractor": "code-utf8:1",
+            "extractor": extractor,
             "text_ref": text_ref,
             "text_sha256": sha(text.encode()),
             "locator_ref": locator_ref,

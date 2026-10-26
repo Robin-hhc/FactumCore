@@ -85,7 +85,7 @@ files:
     sha256: 8afd7df6d6f45766b5b64ce025b98d6245e90a549d826e10a058449cea3346db
   specs/ci-runner.md:
     path: governance/specs/ci-runner.md
-    sha256: de3ece8450ad767e5695b34598ed910533ea9e8aa3303979f9d0985f5446d352
+    sha256: 7c47b68bce2d489ad34081e607c42bddc88d95760f9b743c8da07f5fda3327a8
 capabilities:
   checks: '1.0'
   indexing: '1.0'

@@ -1,6 +1,6 @@
 # WiFi 知识库
 
-WiFi 知识库将原始材料提炼为可追溯知识卡，通过确认、核验和检索回归后供 Agent 使用。目录为 FactumCore 根下的 `aiotbot-knowledge-wifi-mp/`，Git 操作统一在 FactumCore 根执行；布局见[总体设计 §5.3](docs-llm-wiki/AIoTBot知识库架构设计.md#53-aiotbot-knowledge目录架构)。
+WiFi 知识库将原始材料提炼为可追溯知识卡，通过确认、核验和检索回归后供 Agent 使用。文档用 `repo/` 表示项目根目录，知识库位于其下的 `aiotbot-knowledge-wifi-mp/`，Git 操作统一在项目根执行；布局见[总体设计 §5.3](docs-llm-wiki/AIoTBot知识库架构设计.md#53-aiotbot-knowledge目录架构)。
 
 ```mermaid
 flowchart LR

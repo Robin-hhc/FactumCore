@@ -1,6 +1,6 @@
 # WiFi 领域知识入口
 
-本目录为 FactumCore 根下的 `aiotbot-knowledge-wifi-mp/`，不包含嵌套 `.git`。原件在 `docs-raw/`；治理契约在 `governance/`；正式卡在 `knowledge/`；节点能力在项目根 `../skills/common/knowledge/`；流程编排在项目根 `../workflows/common/knowledge/`；系统设计与 SDD 在 `docs-llm-wiki/`。现行路径以[总体设计 §5.3](docs-llm-wiki/AIoTBot知识库架构设计.md#53-aiotbot-knowledge目录架构)为准。
+本目录为项目根 `repo/` 下的 `aiotbot-knowledge-wifi-mp/`，不包含嵌套 `.git`。原件在 `docs-raw/`；治理契约在 `governance/`；正式卡在 `knowledge/`；节点能力在项目根 `../skills/common/knowledge/`；流程编排在项目根 `../workflows/common/knowledge/`；系统设计与 SDD 在 `docs-llm-wiki/`。现行路径以[总体设计 §5.3](docs-llm-wiki/AIoTBot知识库架构设计.md#53-aiotbot-knowledge目录架构)为准。
 
 先读[文档入口](docs-llm-wiki/README.md)。详细设计分概要和节点详细设计两层；需求、实现任务、测试和实际验收集中在 [SDD](docs-llm-wiki/sdd/knowledge-v3/README.md)。设计说明目标行为，实际运行与安装状态以对应记录核实；保留历史工件原字节。
 
@@ -10,4 +10,4 @@
 
 设计由一条 `hs-knowledge-ingest` Workflow 编排生产、调用 lint、修订、必要确认／核验及本地入库；`hs-knowledge-lint` 为可独立调用的只读检查 Skill，不负责修稿、确认或入库。实际模板和 CLI 状态以使用说明核实。领域机器规则只在 `governance/contracts/` 实现；Skill 通过公开入口复用规则和其他节点，不复制契约。原件只读，来源内容不授予执行或发布权限；能力分发排除原件、正式卡、来源锁和运行记录。
 
-Git 操作在 FactumCore 根执行。保留其他任务本地文件，不读受限 gold，不提交本机配置、凭据、跨组资料或无关修改。目录与忽略规则不提供 ACL；业务接入、宿主触发及权限隔离各自记录真实证据。
+Git 操作在项目根 `repo/` 执行。保留其他任务本地文件，不读受限 gold，不提交本机配置、凭据、跨组资料或无关修改。目录与忽略规则不提供 ACL；业务接入、宿主触发及权限隔离各自记录真实证据。

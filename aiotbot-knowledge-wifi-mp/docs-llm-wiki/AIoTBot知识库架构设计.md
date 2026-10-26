@@ -4,7 +4,7 @@
 
 aiotbot-knowledge知识库仓目录结构如下所示。
 
-本节目录树描述FactumCore的开发布局。默认将`aiotbot-knowledge-wifi-mp/`放在业务工作区根目录，与代码及配套能力共同管理。业务工作区可包含Host、Device、特性和算法等多个代码模块；知识库按配置中的相对路径读取实际文件，以内容指纹核对引用。
+本节以 `repo/` 表示项目根目录，实际目录名称和存放位置不限。默认将 `aiotbot-knowledge-wifi-mp/` 放在项目根，与代码及配套能力共同管理。业务工作区可包含 Host、Device、特性和算法等多个代码模块；知识库按配置中的相对路径读取实际文件，以内容指纹核对引用。
 
 需要独立放置知识库时，由本地`config.env`中的`project_root`提供代码相对引用的基准。默认部署按工作区根目录的配置读取已落地模块文件。路径约定与部署边界见[详细设计第7章](知识库详细设计.md#7-工作区路径与部署边界)。
 
@@ -20,7 +20,7 @@ aiotbot-knowledge知识库仓目录结构如下所示。
   - .build/ · logs/ · evals/ · artifacts/ · docs-llm-wiki/：配套支撑层
 
 ```text
-FactumCore/
+repo/
 ├── AGENTS.md                      # 项目入口与消费路由
 ├── config.yml                     # 代码根、模块相对路径与归属
 ├── main/                          # 业务代码工作区，可包含多个模块
@@ -83,7 +83,7 @@ FactumCore/
 
 节点 Skill 和 Workflow 随 WiFi 知识库维护：
 
-`skills/common/knowledge/` 和 `workflows/common/knowledge/` 位于 FactumCore 根，与 `AGENTS.md`、`config.yml` 同级管理，不包含嵌套 `.git`。一条 `hs-knowledge-ingest` Workflow 完成 P1—P7；`hs-knowledge-lint` 位于 Skill 目录，只执行只读检查。真实人工批准保留 user Gate，由准备和记录 Skill 连接可信动作。
+`skills/common/knowledge/` 和 `workflows/common/knowledge/` 位于项目根 `repo/`，与 `AGENTS.md`、`config.yml` 同级管理，不包含嵌套 `.git`。一条 `hs-knowledge-ingest` Workflow 完成 P1—P7；`hs-knowledge-lint` 位于 Skill 目录，只执行只读检查。真实人工批准保留 user Gate，由准备和记录 Skill 连接可信动作。
 
 
 

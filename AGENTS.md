@@ -1,6 +1,8 @@
-# FactumCore：AIoTBot 开发入口
+# AIoTBot 项目开发入口
 
-本仓按[总体设计 §5.3](aiotbot-knowledge-wifi-mp/docs-llm-wiki/AIoTBot知识库架构设计.md#53-aiotbot-knowledge目录架构)组织，Git 操作统一在 FactumCore 根执行。FactumCore 承载业务代码工作区、WiFi 知识及配套能力；`AGENTS.md`、`config.yml`、`skills/`、`workflows/` 位于项目根，原件、知识与治理位于 `aiotbot-knowledge-wifi-mp/`。知识根和能力目录不建立嵌套 `.git`；业务代码保留项目已有的多目录布局。
+本仓按[总体设计 §5.3](aiotbot-knowledge-wifi-mp/docs-llm-wiki/AIoTBot知识库架构设计.md#53-aiotbot-knowledge目录架构)组织，Git 操作统一在项目根执行。项目根以 `repo/` 为示意名称，承载业务代码工作区、WiFi 知识及配套能力；`AGENTS.md`、`config.yml`、`skills/`、`workflows/` 位于项目根，原件、知识与治理位于 `aiotbot-knowledge-wifi-mp/`。知识根和能力目录不建立嵌套 `.git`；业务代码保留项目已有的多目录布局。
+
+共享文档统一使用 `repo/` 表示项目根，不要求部署目录取此名称。目录、配置和命令示例使用相对路径并说明基准；接口要求绝对路径时，从实际部署位置解析取得，不写死机器盘符或用户目录。历史快照、验收记录和外部资源身份保留原样。
 
 涉及部署、运行环境或仓库操作时，如根目录存在 `LOCAL_DEPLOYMENT.md`，先读取其中的本机约定。该文件由 Git 本机排除规则管理，不作为共享设计、知识来源或能力包内容；其他机器可按自身环境维护同名文件。
 

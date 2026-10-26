@@ -15,7 +15,7 @@ flowchart LR
 | [AGENTS.md](AGENTS.md) | Agent 阅读入口和文档修改边界 |
 | [task.md](task.md) 与 [sdd/](sdd/knowledge-v3/README.md) | 实现任务、需求、测试计划、发布与实际验收记录 |
 
-业务代码工作区、`AGENTS.md`、`config.yml`、`skills/` 与 `workflows/` 位于 FactumCore 根；WiFi 原件、知识和治理位于 `aiotbot-knowledge-wifi-mp/`。能力目录分别为项目根的 `skills/common/knowledge/` 和 `workflows/common/knowledge/`，不包含嵌套 `.git`。业务代码可包含多个实际代码仓或模块目录。本目录只存系统说明与开发工件，正式领域知识只进入 `../knowledge/`。
+文档用 `repo/` 表示项目根目录的示意名称。业务代码工作区、`AGENTS.md`、`config.yml`、`skills/` 与 `workflows/` 位于该根目录；WiFi 原件、知识和治理位于 `aiotbot-knowledge-wifi-mp/`。能力目录分别为项目根的 `skills/common/knowledge/` 和 `workflows/common/knowledge/`，不包含嵌套 `.git`。业务代码可包含多个实际代码仓或模块目录。本目录只存系统说明与开发工件，正式领域知识只进入 `../knowledge/`。
 
 默认将知识库与代码放在同一业务工作区；独立放置时，以本地 `config.env` 的 `project_root` 指定代码引用基准。知识库按模块相对路径读取已落地文件，见[工作区路径与部署边界](知识库详细设计.md#7-工作区路径与部署边界)。
 

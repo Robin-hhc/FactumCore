@@ -1,0 +1,95 @@
+{
+  "kind": "post_layout_global_active_document_audit",
+  "base_commit": "5d1f8bb57d0f817de00fcc4f49950c877374e652",
+  "scope": {
+    "active_files_scanned": 355,
+    "markdown_documents": 140,
+    "top_level_docs": {
+      "aiotbot-knowledge-wifi-mp/docs-llm-wiki/AGENTS.md": "73f9e85798f2fd9c4a228af84b567701b57f5bbd88cce50f5f5c02212355073f",
+      "aiotbot-knowledge-wifi-mp/docs-llm-wiki/AIoTBot知识库架构设计.md": "be5e8a6180dc9436fb18218064023e4adf1de178999bbb7461b097f9a9fc8713",
+      "aiotbot-knowledge-wifi-mp/docs-llm-wiki/README.md": "3f859e7e8b05fcda40172cadc87b6ed784eb41ed10a9d822de49ac69ce594b16",
+      "aiotbot-knowledge-wifi-mp/docs-llm-wiki/task.md": "994b1f522897df76bd8d4d261c81016ab80ee9bee76a6ce723c616547946bf0b",
+      "aiotbot-knowledge-wifi-mp/docs-llm-wiki/使用说明.md": "5b74ff450b26efac4655055777599084956b39295bdac35f9e6c2e75f8bba3cd",
+      "aiotbot-knowledge-wifi-mp/docs-llm-wiki/知识库详细设计.md": "47eb2cd5c2a5e910ffc758917b6e3947dda5d78c0c1cdcb737f2d20db7a25a38"
+    },
+    "excluded": "Existing SDD history/frozen records and original business/raw content are not rewritten."
+  },
+  "findings_fixed": [
+    {
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/AIoTBot知识库架构设计.md",
+      "fixed": [
+        "project-root versus K path legend",
+        "source-scan capability inventory",
+        "P4 review / P5 lint / P6 record / P7 local index and target queries",
+        "manual submission CI and merge boundary",
+        "actual code mapping and optional CodeGraph",
+        "removed unsupported shadow/assist and old filter fields",
+        "submission and private-log boundary",
+        "query returns evidence; main Agent answers; no confidence field",
+        "sources registration marked reserved"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/知识库详细设计.md",
+      "fixed": [
+        "schemas/profiles.yaml and schemas/registries.yaml paths"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/task.md",
+      "fixed": [
+        "current task pointers; original historical text archived without byte changes"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/AGENTS.md",
+      "fixed": [
+        "daily-use guide purpose"
+      ]
+    },
+    {
+      "path": "aiotbot-knowledge-wifi-mp/CONTRIBUTING.md",
+      "fixed": [
+        "current SDD entry"
+      ]
+    }
+  ],
+  "checks": {
+    "old_active_capability_paths": [],
+    "broken_local_links": [],
+    "local_links_checked": 117,
+    "intentional_template_placeholders": [
+      {
+        "path": "aiotbot-knowledge-wifi-mp/governance/templates/index.md",
+        "target": "{{relative_path}}"
+      }
+    ],
+    "mermaid_parsed": 29,
+    "changed_diagrams_rendered_and_viewed": 3,
+    "architecture_skill_inventory_matches_disk": 20,
+    "source_package_layout_validator": "static_valid",
+    "detailed_ingest_2_1_bytes_unchanged": true,
+    "executable_files_unchanged": true
+  },
+  "history": {
+    "existing_sdd_files_unchanged": 230,
+    "task_archive": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/knowledge-v2/records/task-entry-20261021.md",
+    "original_task_path": "aiotbot-knowledge-wifi-mp/docs-llm-wiki/task.md",
+    "original_task_sha256": "07567bcce06d158b2eb0df28a0d2316dcbf5fad44d8ca1ccfffa99555f7f42c9",
+    "archive_byte_identity": true,
+    "archive_reference_base": "Original docs-llm-wiki directory at base_commit"
+  },
+  "local_cleanup": {
+    "empty_untracked_retired_lint_workflow_directory_removed": true
+  },
+  "independent_reviews": {
+    "architecture_and_detailed": "passed",
+    "remaining_top_level_entries": "passed",
+    "active_runtime_paths": "passed"
+  },
+  "validation_limits": [
+    "Documentation audit and package-layout validation only; full mechanism regression was not repeated because executable files are unchanged.",
+    "Pending query body/batch/lean API changes remain unimplemented.",
+    "This does not certify internal host integration or company deployment."
+  ]
+}

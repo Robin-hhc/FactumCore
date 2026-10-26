@@ -10,9 +10,9 @@
 | 运行依赖准备、部署后的日常命令与排错 | [使用说明.md](使用说明.md) |
 | 需求、实现任务与实际验证记录 | [task.md](task.md)、[SDD](sdd/knowledge-v3/README.md) |
 
-现行名称和目录以架构设计 §5.3 为准，用户后续明确决定优先。唯一领域根为 `aiotbot-knowledge-wifi-mp/`；项目根的 `skills/common/knowledge/` 存节点能力，`workflows/common/knowledge/` 承载 ingest 端到端编排。两者与根 AGENTS/config 同级管理。Git 在 FactumCore 根执行，知识根和能力目录不建立嵌套 `.git` 或隐藏能力目录；业务代码按内部 Git／mm 和 manifest 保留实际多仓结构。
+现行名称和目录以架构设计 §5.3 为准，用户后续明确决定优先。唯一领域根为 `aiotbot-knowledge-wifi-mp/`；项目根的 `skills/common/knowledge/` 存节点能力，`workflows/common/knowledge/` 承载 ingest 端到端编排。两者与根 AGENTS/config 同级管理。Git 在 FactumCore 根执行，知识根和能力目录不建立嵌套 `.git` 或隐藏能力目录；业务代码保留项目实际多目录结构。
 
-项目配置以 `code_root` 和 `modules` 的相对路径、芯片、端、特性及用途说明架构；不要求手填绝对代码根、六 Target／三 pair 或重复授权。新配置固定脚本只读取实际文件并固定内容指纹，不探测或执行 Git／mm／manifest；Agent 可按公司约定只读实际状态输出并保留原文与出处。版本只采用明确提供的材料，未知不阻断当前文件静态核验。目录标签不替代宏、构建或协议事实。使用说明讲填法和调用，详细设计第 5 章起与第 7 章讲共享映射和多仓文件核验；历史配置与验证记录按原版本解释。
+项目配置以 `code_root` 和 `modules` 的相对路径、芯片、端、特性及用途说明架构；不要求手填绝对代码根、六 Target／三 pair 或重复授权。新配置按模块范围读取实际文件并固定内容指纹；版本仅采用有出处的材料，未知不阻断当前文件静态核验。目录标签不替代宏、构建或协议事实。使用说明讲填法和调用，详细设计第 5 章起与第 7 章讲共享映射和多仓文件核验；历史配置与验证记录按原版本解释。
 
 架构设计解释分层与协作；详细设计分概要和节点设计两层，以流程图、分支条件和文件职责表达。设计正文不记开发轮次、票据状态、Agent 工作进度或历史测试成绩；这些进入 SDD 工件。系统设计不构成正式领域事实，Schema/Contract 机器规则归 `../governance/`，此处不另建执行契约。
 

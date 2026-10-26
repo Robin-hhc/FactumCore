@@ -1,6 +1,8 @@
 # FactumCore：AIoTBot 开发入口
 
-本仓按[总体设计 §5.3](aiotbot-knowledge-wifi-mp/docs-llm-wiki/AIoTBot知识库架构设计.md#53-aiotbot-knowledge目录架构)组织，Git 操作统一在 FactumCore 根执行。FactumCore 承载业务代码工作区、WiFi 知识及配套能力；`AGENTS.md`、`config.yml`、`skills/`、`workflows/` 位于项目根，原件、知识与治理位于 `aiotbot-knowledge-wifi-mp/`。知识根和能力目录不建立嵌套 `.git`；业务代码保留内部 Git／mm 与 manifest 已有的多仓布局。
+本仓按[总体设计 §5.3](aiotbot-knowledge-wifi-mp/docs-llm-wiki/AIoTBot知识库架构设计.md#53-aiotbot-knowledge目录架构)组织，Git 操作统一在 FactumCore 根执行。FactumCore 承载业务代码工作区、WiFi 知识及配套能力；`AGENTS.md`、`config.yml`、`skills/`、`workflows/` 位于项目根，原件、知识与治理位于 `aiotbot-knowledge-wifi-mp/`。知识根和能力目录不建立嵌套 `.git`；业务代码保留项目已有的多目录布局。
+
+涉及部署、运行环境或仓库操作时，如根目录存在 `LOCAL_DEPLOYMENT.md`，先读取其中的本机约定。该文件由 Git 本机排除规则管理，不作为共享设计、知识来源或能力包内容；其他机器可按自身环境维护同名文件。
 
 | 位置 | 职责 |
 |---|---|
@@ -25,7 +27,7 @@
 | 独立检查 | `hs-knowledge-lint`；只检查并报告，修订交回 ingest |
 | 查看进度 | `hs-knowledge-source-scan` 的 `status`；读取实际停点、待确认及材料缺口 |
 
-已有上下文直接调用；缺少知识库或代码入口信息时，才在业务命令前使用 `hs-workspace-explore`。`code_root` 相对项目根，模块 `path` 相对代码根；可覆盖多仓或共享模块，不要求手填六 Target／三 pair 或重复代码根授权。固定脚本按拉取好的文件工作，不探测 Git 元数据，不执行 Git、mm 或 manifest 命令；Agent 可按公司约定只读实际状态输出并保留原文与出处，公司视图与版本管理继续由既有系统负责。源码依据以确切文件和内容指纹留存，版本只采用已提供材料，未知就保持 unknown，不阻断当前文件的静态核验；模块标签不证明实际宏、构建或产品适用。
+已有上下文直接调用；缺少知识库或代码入口信息时，才在业务命令前使用 `hs-workspace-explore`。`code_root` 相对项目根，模块 `path` 相对代码根；可覆盖多目录或共享模块，不要求手填六 Target／三 pair 或重复代码根授权。源码依据以确切文件和内容指纹留存，可选版本材料须保留出处，未知就保持 unknown，不阻断当前文件的静态核验；模块标签不证明实际宏、构建或产品适用。
 
 原件只读，稿件保留在知识库 `.build/`，正式卡、导航、来源登记和处理记录由 ingest 统一落位。卡片未写全细节时继续回源，回答区分背景、历史依据、当前代码事实和推断。内容批本地入库、索引及目标查询通过后 ingest 结束；Git 提交、固定 CI 和合入由人后续处理。
 

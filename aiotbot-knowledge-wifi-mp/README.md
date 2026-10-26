@@ -25,6 +25,6 @@ flowchart LR
 
 从[架构设计](docs-llm-wiki/AIoTBot知识库架构设计.md)了解目录与三条链路，从[概要与详细设计](docs-llm-wiki/知识库详细设计.md)了解节点判断和文件分工，操作见[使用说明](docs-llm-wiki/使用说明.md)。贡献规则见 [CONTRIBUTING.md](CONTRIBUTING.md)，实现任务与实际验证记录见 [SDD](docs-llm-wiki/sdd/knowledge-v3/README.md)。
 
-业务环境首选将知识库部署在 repo 工作区根目录，与 CI 同级并随代码共同拉取；仓外手动部署以本机 `config.env` 的 `project_root` 解析代码引用。项目 manifest 视图由各项目适配，见[部署与视图配置](docs-llm-wiki/知识库详细设计.md#7-部署方式与manifest视图配置)。
+默认将知识库与代码放在同一业务工作区；独立放置时，以本机 `config.env` 的 `project_root` 解析代码引用。路径基准见[工作区路径与部署边界](docs-llm-wiki/知识库详细设计.md#7-工作区路径与部署边界)。
 
-六 Target/三 pair 的业务路径、宏、构建与版本由外层 `config.yml` 登记，未知项保持 unknown。纯文档经真人确认确切最终内容后 stable；代码卡在 ingest 内完成本地只读核验，上库 CI 复用确定性检查。目录结构和设计本身不代表真实业务、宿主或权限隔离已接入。
+外层 `config.yml` 以模块路径和归属整理逻辑 Target／pair；实际宏、构建与版本由明确材料支持，未知项保持 unknown。纯文档经真人确认确切最终内容后 stable；代码卡在 ingest 内完成本地只读核验，上库 CI 复用确定性检查。目录结构和设计本身不代表真实业务、宿主或权限隔离已接入。

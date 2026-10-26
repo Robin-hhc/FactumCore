@@ -4,7 +4,7 @@
 
 先读[文档入口](docs-llm-wiki/README.md)。详细设计分概要和节点详细设计两层；需求、实现任务、测试和实际验收集中在 [SDD](docs-llm-wiki/sdd/knowledge-v3/README.md)。设计说明目标行为，实际运行与安装状态以对应记录核实；保留历史工件原字节。
 
-业务范围沿用 chip12、chip08、chip07c 的 Host/Device 逻辑名称。项目根 `config.yml` 只维护 `code_root` 和模块相对路径、芯片／端／特性／用途，不要求逐项填写六 Target 或三 pair；共享模块可关联多个芯片和端。固定脚本只读实际文件并固定内容指纹，不探测或执行 Git／mm／manifest；Agent 可按公司约定只读实际状态输出并保留原文与出处。版本来自明确提供的材料，未知版本不阻断当前文件静态核验。未知构建和适用条件保持 unknown，不创建虚构源码，不从标签推断宏开启或产品兼容。文档仅接受 `docs-raw/conventions`、`chips`、`storys`、`specs`、`protocols` 内已落地原件，`sources/` 链接暂不接入。
+业务范围沿用 chip12、chip08、chip07c 的 Host/Device 逻辑名称。项目根 `config.yml` 只维护 `code_root` 和模块相对路径、芯片／端／特性／用途，不要求逐项填写六 Target 或三 pair；共享模块可关联多个芯片和端。模块读取以实际文件、配置和内容指纹为依据；可选版本材料须保留来源，未知版本不阻断当前文件静态核验。未知构建和适用条件保持 unknown，不创建虚构源码，不从标签推断宏开启或产品兼容。文档仅接受 `docs-raw/conventions`、`chips`、`storys`、`specs`、`protocols` 内已落地原件，`sources/` 链接暂不接入。
 
 纯文档由真实人确认确切最终视图后 stable，免代码实现核验；无回复、超时和 Agent 自报不算同意。代码卡本地只读检查通过后 stable，上库固定 CI 复用确定性的格式、索引及来源／代码引用检查。检查不改卡、来源锁、链接或源码。目录、Schema 与示例不证明业务接入、内容正确或权限隔离。
 

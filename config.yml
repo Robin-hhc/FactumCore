@@ -3,7 +3,7 @@ schema_version: '2.0'
 workspace_id: aiotbot-wifi-v1
 knowledge_roots:
   wifi: aiotbot-knowledge-wifi-mp
-# 相对本 config.yml；main/ 可由内部 Git／mm 和 manifest 管理多个代码仓。
+# 相对本 config.yml；main/ 可包含多个实际代码模块目录。
 code_root: main
 # 登记真实已拉取的模块。path 相对 code_root；chips、sides、features、description 按实际填写。
 # 多值表示共享或关联，不证明实际宏、构建或协议条件。未知目录不创建虚构映射。

@@ -1,16 +1,16 @@
 # 运行依赖安装
 
-用户部署环境为 Windows 和 Linux，已有 Python 3.11；只准备包环境，不安装解释器。入口放在项目根，与 AGENTS/config 及配套能力同级。日常命令和 ingest／lint／query 判断保持原设计。
+安装入口支持 Windows 和 Linux，使用现有 Python 3.11／3.12 准备独立运行环境。入口放在项目根，与 AGENTS/config 及配套能力同级。日常命令和 ingest／lint／query 判断保持原设计。
 
 ```mermaid
 flowchart TB
     W["install.ps1 / install.sh"] --> P["检查现有 Python 3.11 / 3.12"]
     P --> L["合并 20 个 Skill 的运行锁<br/>同名冲突则退出"]
     L --> V["仓外新目录<br/>创建独立 venv"]
-    V --> D["公司 pip 配置 / 指定包源<br/>或离线 wheel 目录"]
+    V --> D["现有 pip 配置 / 指定包源<br/>或离线 wheel 目录"]
     D --> C["安装固定运行包<br/>pip check + 版本核对"]
     C --> I["复用 install_catalog.py<br/>20 Skills + 1 Workflow + catalog"]
-    I --> H["输出路径<br/>人工接入内部 Agent"]
+    I --> H["输出路径<br/>人工接入Agent 宿主"]
 ```
 
 ## 文件与行为
@@ -23,7 +23,7 @@ flowchart TB
 | `install_catalog.py` | 原有能力完整性、摘要、独立目录、配置与规则登记；不重复实现 |
 | `tests/test_environment.py` | 锁冲突、离线调用、安装失败不发布、旧目录保护及版本检查 |
 
-默认沿用机器的 pip 配置，不写死公网镜像；支持明确指定公司源或 `--wheelhouse` 离线目录，两者互斥。只安装运行锁，不安装 pytest/ruff，不升级系统包或 pip。所有依赖要求有对应 wheel，避免内网临时准备编译器。支持范围以两平台实际验证为准，不把 x64 测试推断为其他 CPU／发行版已验收。
+默认沿用机器的 pip 配置，不写死公网镜像；支持明确指定包源或 `--wheelhouse` 离线目录，两者互斥。只安装运行锁，不安装 pytest/ruff，不升级系统包或 pip。所有依赖要求有对应 wheel，避免安装时临时准备编译器。支持范围以两平台实际验证为准，不把 x64 测试推断为其他 CPU／发行版已验收。
 
 沿用包源、认证和证书设置；安装前拒绝环境或 pip 配置中的 `target`、`prefix`、`root`、`python` 重定向，并使用明确的 venv prefix 和 `--no-user`，防止机器原配置将包写到项目、系统或旧环境。配置输出只在进程内检查键名，不打印可能含认证信息的值。
 
@@ -57,7 +57,7 @@ Python 3.11 没有 `Path.is_junction()`；相关目录检查统一使用兼容�
 
 CFFI 2.1 修复过删除指针／buffer 切片时的崩溃；本项目仅由 cryptography 间接使用 CFFI，未调用该接口，本次保留符合约束的 2.0.0。若后续直接使用该类接口，应重新评估版本。[官方修复](https://github.com/python-cffi/cffi/pull/235)
 
-验证覆盖：两端现有 Python 3.11 的真实 venv 和依赖安装，含空格路径；完整 catalog 产物；离线缺包拒绝；重复安装保护；业务原件、配置及规则原字节保持；完整机制回归。安装完成仅代表依赖与配套能力准备完成，真实内部 Agent 接入和公司 CI 仍需部署环境验证。
+验证覆盖：两端现有 Python 3.11 的真实 venv 和依赖安装，含空格路径；完整 catalog 产物；离线缺包拒绝；重复安装保护；业务原件、配置及规则原字节保持；完整机制回归。安装完成仅代表依赖与配套能力准备完成，真实Agent 宿主 接入和目标 CI 仍需部署环境验证。
 
 ## 实际验证
 
@@ -72,4 +72,4 @@ CFFI 2.1 修复过删除指针／buffer 切片时的崩溃；本项目仅由 cry
 | Linux Python 3.11 定向功能回归 | 87 通过、2 个 Windows 专用测试跳过，覆盖 PDF／DOCX 实际抽取、引用定位及安装／环境边界 |
 | 静态与文档 | Ruff、PowerShell 解析、Bash 语法、本次文档本地链接及 Mermaid 均通过；新图已渲染检查 |
 
-功能回归中的原件为测试文件；以上不证明公司主机、内部包源、内部 Agent、真实业务语义、六 Target、公司 CI 或权限隔离已验收。主架构与详细设计未改，真实业务源码、原件、正式知识、治理规则和 config 保持原字节。
+功能回归中的原件为测试文件；以上不证明目标主机、包源、Agent 宿主、真实业务语义、六 Target、目标 CI 或权限隔离已验收。主架构与详细设计未改，真实业务源码、原件、正式知识、治理规则和 config 保持原字节。

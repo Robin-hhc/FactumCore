@@ -11,8 +11,9 @@ flowchart LR
 |---|---|
 | [AIoTBot知识库架构设计.md](AIoTBot知识库架构设计.md) | 目录架构、分层职责与生产、治理、消费三条链路 |
 | [知识库详细设计.md](知识库详细设计.md) | 第 1 节说明前置发现和命令；第 2.1 节画完整 ingest P1—P7，第 3.1 节展开 lint 检查，第 3.2 节说明固定 CI，第 4 节说明查询；第 5 节起按节点解释文件设计 |
-| [使用说明.md](使用说明.md) | 日常生产治理、查询与维护；另列开发者 CLI 环境准备、能力接入及排错 |
+| [使用说明.md](使用说明.md) | 部署完成后的入库、查询、检查、增量更新与续办命令 |
 | [AGENTS.md](AGENTS.md) | Agent 阅读入口和文档修改边界 |
+| [project-root-files](../project-root-files/README.md) | 手动复制到真实业务项目根的 AGENTS.md、config.yml 基础文件 |
 | [task.md](task.md) 与 [sdd/](sdd/knowledge-v3/README.md) | 实现任务、需求、测试计划、发布与实际验收记录 |
 
 业务代码工作区和配置位于 FactumCore 根；WiFi 知识、节点 Skill 与 Workflow 位于 `aiotbot-knowledge-wifi-mp/`。能力目录分别为 `skills/common/knowledge/` 和 `workflows/common/knowledge/`，不包含嵌套 `.git`。本目录只存系统说明与开发工件，正式领域知识只进入 `../knowledge/`。
@@ -21,11 +22,11 @@ flowchart LR
 
 设计文档描述职责、流程与边界，能力安装、实际宿主、六 Target、CI 合入和权限验证以 SDD 记录为准。历史工件保留其原始版本身份，不据此推断当前部署状态。
 
-详设中的 `knowledge ...` 是统一入口的接口建议，须由宿主适配注册。实际安装、Workflow 和节点 CLI 的调用方式以[使用说明](使用说明.md)为准，不能直接把建议命令当作已有终端程序。
+详设中的 `knowledge ...` 是统一入口名称。部署完成后，按[使用说明](使用说明.md)向内部 Agent 点名调用 Workflow 或 Skill；底层接口参数见相应能力的 `SKILL.md` 与 `references/`。
 
 `knowledge ingest` 默认扫描五类允许 raw 并选择新增、变化及待处理来源；`--source` 仅为限制本次范围的可选参数，首次导入和日常增量使用相同入口。
 
-日常入口 `ingest` 用一条工作流完成扫描、写稿及必要确认／代码核验、调用 lint、登记处理记录和本地入库，`query` 消费正式知识。`hs-knowledge-lint` 设计为可复用的只读检查 Skill，既供 ingest 调用，也可手动或定期检查；发现问题由 ingest 返回对应节点修订，暂停后按原操作续办。
+日常入口 `ingest` 用一条工作流完成扫描、写稿及必要确认／代码核验、调用 lint、登记处理记录和本地入库，`query` 消费正式知识。`hs-knowledge-lint` 是可复用的只读检查 Skill，既供 ingest 调用，也可手动或定期检查；发现问题由 ingest 返回对应节点修订，暂停后按原操作续办。
 
 代码内容复核由独立 Agent 阅读原件／源码及稿件并记录逐 Claim 理由；脚本校验记录、引用和确切内容绑定，不要求复核者公钥或密码学签名。lint 与 CI 继续只检查确定性项。
 

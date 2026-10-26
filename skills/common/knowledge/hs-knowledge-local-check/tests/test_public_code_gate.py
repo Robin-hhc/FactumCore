@@ -31,7 +31,8 @@ class PublicCodeGateTests(unittest.TestCase):
             native = "\\\\?\\UNC\\" + native[2:] if native.startswith("\\\\") else "\\\\?\\" + native
         native_target = pathlib.Path(native).resolve(strict=True)
 
-        def remove_readonly(function, filename, error):
+        def remove_readonly(function, filename, exc_info):
+            error = exc_info[1]
             candidate = pathlib.Path(filename).resolve(strict=True)
             if (not isinstance(error, PermissionError) or function not in {os.unlink, os.rmdir}
                     or not candidate.is_relative_to(native_target)):
@@ -42,7 +43,7 @@ class PublicCodeGateTests(unittest.TestCase):
             os.chmod(filename, stat.S_IREAD | stat.S_IWRITE)
             function(filename)
 
-        shutil.rmtree(native, onexc=remove_readonly)
+        shutil.rmtree(native, onerror=remove_readonly)
         if os.path.exists(native):
             raise RuntimeError("Fixture cleanup left files in the verified target")
 

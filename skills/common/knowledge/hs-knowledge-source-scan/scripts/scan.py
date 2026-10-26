@@ -1,6 +1,7 @@
 """File observations only; semantic decisions belong to the reading Agent."""
 
 import os
+import stat
 from pathlib import PurePosixPath
 
 from support import NodeError, fixed_bytes, load_yaml, safe, sha
@@ -129,7 +130,11 @@ def observe(context, scope):
                 for parent, dirs, files in os.walk(path, followlinks=False, onerror=failed):
                     for name in list(dirs):
                         child = safe(context.root, ref) / PurePosixPath(os.path.relpath(parent, path)) / name
-                        if child.is_symlink() or getattr(child, "is_junction", lambda: False)():
+                        if child.is_symlink() or (
+                            os.path.lexists(child)
+                            and getattr(child.lstat(), "st_file_attributes", 0)
+                            & stat.FILE_ATTRIBUTE_REPARSE_POINT
+                        ):
                             dirs.remove(name)
                             complete = False
                             errors[(PurePosixPath(ref) / PurePosixPath(os.path.relpath(child, path).replace("\\", "/"))).as_posix()] = "LINKED_PATH"

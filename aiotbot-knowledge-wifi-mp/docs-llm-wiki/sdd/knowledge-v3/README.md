@@ -29,3 +29,5 @@ flowchart LR
 按“背景知识与具体索引、Agent 回源确认、准确率优先”的后续要求，拟采用[查询调整设计](background-retrieval-design.md)。该页列出主详细设计待确认的同步范围；扩展试验中的卡内答全率及 5 秒／32 KiB 建议不作为本次验收门槛。当前仅先补查询 Skill 的回源指引，正文返回及来源批次优化尚未实施。
 
 后续目录调整按用户确认的[配套能力迁至项目根](capability-root-layout.md)执行：根 AGENTS/config 与 skills/workflows 同级，知识根继续保存原件、知识和治理。历史快照、记录及旧路径保持原字节；查询正文与来源复用优化仍待确认。
+
+Windows／Linux 已有 Python 3.11 时的依赖准备入口、版本选择与安装验证见[运行依赖安装](runtime-installation.md)。它复用已有 catalog 安装器，内部 Agent 仍由部署方手动接入。

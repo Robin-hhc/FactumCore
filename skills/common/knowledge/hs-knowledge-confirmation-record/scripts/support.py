@@ -14,6 +14,7 @@ import os
 import pathlib
 import platform
 import re
+import stat
 import sys
 import tempfile
 import time
@@ -117,7 +118,9 @@ def safe_path(root, relative, prefixes=None):
                 raise Invalid("case alias is not permitted")
         current = current / part
         if current.is_symlink() or (
-            hasattr(current, "is_junction") and current.is_junction()
+            os.path.lexists(current)
+            and getattr(current.lstat(), "st_file_attributes", 0)
+            & stat.FILE_ATTRIBUTE_REPARSE_POINT
         ):
             raise Invalid("symlink or junction is not permitted")
         try:

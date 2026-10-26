@@ -5,6 +5,7 @@
 | 位置 | 职责 |
 |---|---|
 | `config.yml` | 代码、架构、领域实体、符号及六 Target/三 pair 的唯一映射；未提供的真实路径、构建、版本保持 unknown |
+| `install.ps1` / `install.sh` | 使用现有 Python 3.11／3.12 准备仓外独立运行依赖与能力包；内部 Agent 接入见使用说明 |
 | `main/` | 业务代码工作区；未接入真实代码时不创建虚构源码树 |
 | `aiotbot-knowledge-wifi-mp/` | 唯一领域根；原件、契约、知识及本地运行支撑按其 AGENTS 分层 |
 | `skills/common/knowledge/` | 节点 Skill 及其脚本、参考、产物模板与测试 |

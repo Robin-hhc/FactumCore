@@ -12,6 +12,7 @@ import json
 import os
 import platform
 import re
+import stat
 import subprocess
 import sys
 import tempfile
@@ -162,7 +163,9 @@ def safe(root, relative, prefixes=None):
                 )
         current = current / part
         if current.is_symlink() or (
-            hasattr(current, "is_junction") and current.is_junction()
+            os.path.lexists(current)
+            and getattr(current.lstat(), "st_file_attributes", 0)
+            & stat.FILE_ATTRIBUTE_REPARSE_POINT
         ):
             raise NodeError("UNSAFE_PATH", "Linked path is not permitted", relative)
         if not current.resolve().is_relative_to(root):

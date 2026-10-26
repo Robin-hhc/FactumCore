@@ -2,6 +2,9 @@
 
 import hashlib
 import json
+from pathlib import Path
+import subprocess
+import sys
 
 import pytest
 
@@ -12,6 +15,51 @@ def canonical(value):
 
 def hashed(data):
     return hashlib.sha256(data).hexdigest()
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows junction boundary")
+@pytest.mark.parametrize("dangling", [False, True], ids=["existing", "dangling"])
+@pytest.mark.parametrize(
+    "package",
+    sorted(Path(__file__).resolve().parents[2].glob("*/scripts/support.py")),
+    ids=lambda path: path.parents[1].name,
+)
+def test_node_paths_reject_same_root_junction_without_python312_api(tmp_path, package, dangling):
+    import _winapi
+
+    root = tmp_path / "knowledge"
+    target = root / "actual"
+    target.mkdir(parents=True)
+    (target / "source.md").write_text("Isolated junction fixture", encoding="utf-8")
+    link = root / "alias"
+    _winapi.CreateJunction(str(target), str(link))
+    if dangling:
+        (target / "source.md").unlink()
+        target.rmdir()
+    # Exercise the 3.11 boundary even when this regression runs under 3.12.
+    code = """import runpy,sys
+from pathlib import Path
+if hasattr(Path, 'is_junction'):
+    delattr(Path, 'is_junction')
+namespace = runpy.run_path(sys.argv[1])
+safe = namespace.get('safe') or namespace['safe_path']
+try:
+    safe(Path(sys.argv[2]), 'alias/source.md')
+except ValueError:
+    pass
+else:
+    raise SystemExit('same-root junction was accepted')
+"""
+    try:
+        process = subprocess.run(
+            [sys.executable, "-I", "-B", "-c", code, str(package), str(root)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert process.returncode == 0, process.stderr
+    finally:
+        link.rmdir()
 
 
 def test_default_scan_discovers_five_raw_classes_without_source_argument(harness):

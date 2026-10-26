@@ -1,0 +1,163 @@
+{
+  "source_baseline_commit": "78699ce202ca7d833571ceb0c9d0222f8427133e",
+  "verification_date": "2026-10-26",
+  "helper_sha256": "70dfafbeb29d546e3c5c775e559895585062867cc320e842bafa729164137c26",
+  "platforms": [
+    {
+      "platform": "Windows x64",
+      "python": "3.11.9",
+      "skills": 20,
+      "workflows": 1,
+      "runtime_packages": {
+        "attrs": "25.3.0",
+        "cffi": "2.0.0",
+        "cryptography": "50.0.2",
+        "jsonschema": "4.25.1",
+        "jsonschema-specifications": "2025.4.1",
+        "lxml": "6.1.3",
+        "pycparser": "2.23",
+        "pypdf": "6.21.2",
+        "python-docx": "1.2.0",
+        "pyyaml": "6.0.3",
+        "referencing": "0.36.2",
+        "rpds-py": "0.25.1",
+        "typing-extensions": "4.14.1"
+      },
+      "offline_install_seconds": 13.875,
+      "checks": {
+        "copied_package_digests": "passed",
+        "repeated_destination_unchanged": "passed",
+        "missing_wheels_no_publication": "passed",
+        "source_config_and_rules_unchanged": "passed"
+      },
+      "imports_and_pip_check": "passed",
+      "all_20_installed_clis_start": "passed",
+      "source_package_digest_match": "passed",
+      "redirect_protection": [
+        {
+          "scenario": "environment-target",
+          "exit_code": 3,
+          "protected_directory_unchanged": true,
+          "catalog_not_published": true
+        },
+        {
+          "scenario": "configuration-target",
+          "exit_code": 3,
+          "protected_directory_unchanged": true,
+          "catalog_not_published": true
+        }
+      ],
+      "local_evidence_directory": ".scratch/py311-validation/final-windows-install-validation",
+      "evidence_sha256": {
+        "summary.json": "d248b27e085f7d3eb771924527ebe97e5bea73286a384086edae70fd2bccac82",
+        "redirection-summary.json": "1ede0fbdfa62672e350a77c4fc6db3a89371bfbffb8975fe3c99f6119c8be1f2",
+        "source-digests-cli-startup.json": "7df4197c20ba30660f6a8129aa5d048acec56dcdcb6690067ef5f137ae54fc3a"
+      }
+    },
+    {
+      "platform": "WSL Ubuntu Linux x64",
+      "python": "3.11.15",
+      "skills": 20,
+      "workflows": 1,
+      "runtime_packages": {
+        "attrs": "25.3.0",
+        "cffi": "2.0.0",
+        "cryptography": "50.0.2",
+        "jsonschema": "4.25.1",
+        "jsonschema-specifications": "2025.4.1",
+        "lxml": "6.1.3",
+        "pycparser": "2.23",
+        "pypdf": "6.21.2",
+        "python-docx": "1.2.0",
+        "pyyaml": "6.0.3",
+        "referencing": "0.36.2",
+        "rpds-py": "0.25.1",
+        "typing-extensions": "4.14.1"
+      },
+      "offline_install_seconds": 16.511,
+      "checks": {
+        "copied_package_digests": "passed",
+        "repeated_destination_unchanged": "passed",
+        "missing_wheels_no_publication": "passed",
+        "source_config_and_rules_unchanged": "passed"
+      },
+      "imports_and_pip_check": "passed",
+      "all_20_installed_clis_start": "passed",
+      "source_package_digest_match": "passed",
+      "redirect_protection": [
+        {
+          "scenario": "environment-target",
+          "exit_code": 3,
+          "protected_directory_unchanged": true,
+          "catalog_not_published": true
+        },
+        {
+          "scenario": "configuration-target",
+          "exit_code": 3,
+          "protected_directory_unchanged": true,
+          "catalog_not_published": true
+        }
+      ],
+      "local_evidence_directory": ".scratch/py311-validation/final-linux-install-validation",
+      "evidence_sha256": {
+        "summary.json": "5cc0c74be897fec93954a6729828480a774fd64ed4b83e5a46dfb4a1247ce07b",
+        "redirection-summary.json": "29be40a317a3c09eca2c002ac7301e4d4501c6ebbc0b2d5b465e4bfc5ac86181",
+        "source-digests-cli-startup.json": "2f0592987ea770d1e6868eadd29633797882cfc43ccd4f9a8d4ef3b3f195169a"
+      }
+    }
+  ],
+  "review": {
+    "standards": "passed after refusing pip installation destination overrides",
+    "spec": "passed after destination override correction"
+  },
+  "limitations": [
+    "No company package-index integration verified",
+    "No internal Agent host registration verified",
+    "Linux is WSL Ubuntu x64; other distributions and CPU architectures are not runtime-tested",
+    "No production business-semantic, six-Target, company CI or ACL acceptance inferred"
+  ],
+  "linux_functional_regression": {
+    "platform": "WSL Ubuntu x64",
+    "python": "3.11.15",
+    "groups": {
+      "source-capture": {
+        "tests": 50,
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0
+      },
+      "workspace-explore": {
+        "tests": 39,
+        "errors": 0,
+        "failures": 0,
+        "skipped": 2
+      }
+    },
+    "source_files_unchanged": true,
+    "local_evidence": ".scratch/py311-validation/linux-functional-final/summary.json",
+    "evidence_sha256": "a66e11eefdcc25385723b6eda9c9e3c733fc5a2414adf459f5bb45bc4193bb14"
+  },
+  "windows_full_regression": {
+    "python": "3.11.9",
+    "verification_tier": "isolated_synthetic_mechanisms",
+    "groups": 21,
+    "totals": {
+      "tests": 437,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1
+    },
+    "passed": true,
+    "local_evidence": ".scratch/r311c/summary.json",
+    "evidence_sha256": "9f17aa9783fdda626e854d3e227e294d25de8f7e7467bd8c45f62bb9c5926050"
+  },
+  "static_checks": {
+    "ruff": "passed",
+    "powershell_parse": "passed",
+    "linux_bash_syntax": "passed",
+    "markdown_local_links": "passed",
+    "mermaid": "4 parsed; new installation diagram rendered and visually checked",
+    "detailed_design_and_architecture": "unchanged",
+    "business_config_rules_raw_knowledge_and_code": "unchanged"
+  }
+}

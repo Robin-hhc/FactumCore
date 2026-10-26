@@ -95,7 +95,7 @@ def public_bytes(data, relative):
 def no_links(path):
     for part in (path, *path.parents):
         if part.is_symlink() or (
-            part.exists()
+            os.path.lexists(part)
             and getattr(part.lstat(), "st_file_attributes", 0)
             & stat.FILE_ATTRIBUTE_REPARSE_POINT
         ):

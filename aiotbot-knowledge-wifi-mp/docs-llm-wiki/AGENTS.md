@@ -7,7 +7,7 @@
 | 目录职责、系统分层和三条链路 | [AIoTBot知识库架构设计.md](AIoTBot知识库架构设计.md) |
 | 流程节点、判断逻辑及节点内文件分工 | [知识库详细设计.md](知识库详细设计.md)，先概要、后详细 |
 | 文档导航与部署约定 | [README.md](README.md) |
-| 部署后的日常命令与排错 | [使用说明.md](使用说明.md) |
+| 运行依赖准备、部署后的日常命令与排错 | [使用说明.md](使用说明.md) |
 | 需求、实现任务与实际验证记录 | [task.md](task.md)、[SDD](sdd/knowledge-v3/README.md) |
 
 现行名称和目录以架构设计 §5.3 为准，用户后续明确决定优先。唯一领域根为 `aiotbot-knowledge-wifi-mp/`；项目根的 `skills/common/knowledge/` 存节点能力，`workflows/common/knowledge/` 承载 ingest 端到端编排。两者与根 AGENTS/config 同级管理。Git 在 FactumCore 根执行，不建立嵌套 `.git` 或隐藏能力目录。

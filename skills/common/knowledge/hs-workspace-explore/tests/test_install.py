@@ -3,6 +3,7 @@
 import hashlib
 import json
 from pathlib import Path
+import runpy
 import subprocess
 import sys
 
@@ -301,7 +302,8 @@ def test_private_key_in_an_allowed_text_resource_is_rejected(tmp_path, key_type)
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows junction boundary")
-def test_junction_package_directory_rejected(tmp_path):
+@pytest.mark.parametrize("dangling", [False, True], ids=["existing", "dangling"])
+def test_junction_package_directory_rejected(tmp_path, dangling):
     import _winapi
 
     source = fixture_source(tmp_path)
@@ -310,7 +312,15 @@ def test_junction_package_directory_rejected(tmp_path):
     target.mkdir()
     (target / "private.py").write_text("# outside\n", encoding="utf-8")
     _winapi.CreateJunction(str(target), str(link))
+    if dangling:
+        (target / "private.py").unlink()
+        target.rmdir()
+    installer = runpy.run_path(str(SCRIPT))
+    with pytest.raises(installer["InstallError"], match="LINKED_PATH"):
+        installer["no_links"](link)
     destination = tmp_path / "install"
     result = install(source, destination)
-    assert result.returncode != 0 and "LINKED_PATH" in result.stderr
+    assert result.returncode != 0
+    if not dangling:
+        assert "LINKED_PATH" in result.stderr
     assert not destination.exists()

@@ -1,0 +1,598 @@
+{
+  "schema_version": "1.0",
+  "record_kind": "independent_protocol_final_view_content_review",
+  "operation_id": "ex26-doc-candidates-r2",
+  "reviewer_id": "/root/review_real_protocol_view",
+  "independent_context": {
+    "is_author": false,
+    "authors": [
+      "/root/author_protocol_cards"
+    ],
+    "separate_agent": true,
+    "basis": "独立阅读四份 authoring、固定 final-view/plan/semantic-plan、capture 绑定的 RFC 原件及拟写 sources.lock；逐 Claim 依据实际 UTF-8 原字节 splitlines 复核。",
+    "excluded_materials": [
+      "restricted gold",
+      "旧问题与答案",
+      "其他审查记录",
+      "外部勘误及未落地网页"
+    ],
+    "no_subagents_spawned": true
+  },
+  "view_ref": ".build/operations/ex26-doc-candidates-r2/final-view.json",
+  "view_digest": "1fca60af7b2ccf7cf37bc73b3291f3acba4f5d531edbc3a7258fb15c392863de",
+  "plan_ref": ".build/operations/ex26-doc-candidates-r2/plan.json",
+  "plan_digest": "370813940eea197c012bd02017b08a15febb37e56866e144111268f15bda4623",
+  "semantic_plan_ref": ".build/operations/ex26-doc-candidates-r2/semantic-plan.json",
+  "semantic_plan_digest": "c45bdcc0ec8b5617a0174f08ada9bc0904d918493d6acc500cfd010943ebbae9",
+  "source_set_digest": "575237f4885b1da2c83d523bdccc0dc271ec269fae59c7c7997749e2ba62d215",
+  "digest_verification": {
+    "algorithm": "SHA-256 of UTF-8 JSON with sort_keys=True, ensure_ascii=False, separators=(comma,colon), omitting own digest field",
+    "view_recomputed": "1fca60af7b2ccf7cf37bc73b3291f3acba4f5d531edbc3a7258fb15c392863de",
+    "plan_recomputed": "370813940eea197c012bd02017b08a15febb37e56866e144111268f15bda4623",
+    "semantic_plan_recomputed": "c45bdcc0ec8b5617a0174f08ada9bc0904d918493d6acc500cfd010943ebbae9",
+    "capture_recomputed": "42b7e5ce706aae79d1fe3957c63a941c553a4e1708b80094f7b5b785f5542aed",
+    "source_set_recomputed": "575237f4885b1da2c83d523bdccc0dc271ec269fae59c7c7997749e2ba62d215",
+    "all_match": true,
+    "all_final_write_raw_sha256_match": true,
+    "plan_card_writes_equal_final_view_card_writes": true,
+    "additional_final_view_writes": [
+      "governance/sources.lock.yaml",
+      "knowledge/concepts/protocols/index.md"
+    ]
+  },
+  "source_verification": [
+    {
+      "path": "docs-raw/protocols/rfc5416.txt",
+      "source_id": "raw:a530eb22d73d3d0c85a16246c0f255a0",
+      "snapshot_id": "raw:6a80d7209ef4b041825c5b84f67d819e54e2ec42788cf3ba31dc8c37e04d46e1",
+      "raw_sha256": "ef326f22d2302b43547dcad37fbc545b075dcae7941372b0569fd84e0f5a4af2",
+      "bytes": 175870,
+      "utf8_splitlines_count": 4335,
+      "frozen_object_ref": "logs/evidence/objects/ef326f22d2302b43547dcad37fbc545b075dcae7941372b0569fd84e0f5a4af2.bin",
+      "extraction_ref": "logs/evidence/extractions/ef326f22d2302b43547dcad37fbc545b075dcae7941372b0569fd84e0f5a4af2.txt",
+      "locator_ref": "logs/evidence/locators/04ca09d9b52537f53999ca5eed14f21669c60696221149966897975d5275ca4f.json",
+      "locator_sha256": "f232af2f7e78c58e779df5c064db45901aa243b5419a2b09ab78b1098d9c2663",
+      "raw_frozen_extraction_byte_equal": true,
+      "capture_and_proposed_lock_binding_verified": true
+    },
+    {
+      "path": "docs-raw/protocols/rfc1042.txt",
+      "source_id": "raw:5001468bf29752a407d802fce264c745",
+      "snapshot_id": "raw:702dcfab4d60bf0bf69ce4a303baba281bee4ac70290b454ac92689065b9915e",
+      "raw_sha256": "e8737abe7f7b80ae2e84b8cada0ea02d8cc3c4ad2414e902cc055e6953a01c55",
+      "bytes": 34359,
+      "utf8_splitlines_count": 857,
+      "frozen_object_ref": "logs/evidence/objects/e8737abe7f7b80ae2e84b8cada0ea02d8cc3c4ad2414e902cc055e6953a01c55.bin",
+      "extraction_ref": "logs/evidence/extractions/e8737abe7f7b80ae2e84b8cada0ea02d8cc3c4ad2414e902cc055e6953a01c55.txt",
+      "locator_ref": "logs/evidence/locators/1b2d3cf743158cd471bd1bd7881ada0e0e95eb8ead65536c0f002ebf1da5c6f8.json",
+      "locator_sha256": "6f74d246d10aa24b4af28f59975f98c1a44bb4a203ebc07e57bb58aefba93fd7",
+      "raw_frozen_extraction_byte_equal": true,
+      "capture_and_proposed_lock_binding_verified": true
+    },
+    {
+      "path": "docs-raw/protocols/rfc8325.txt",
+      "source_id": "raw:a65d06b2de2e054424be7f32448755e6",
+      "snapshot_id": "raw:c4326898461bfb0e6b4ea45ce4634e2dd0ea42c5bf70f0daf013986ff36313f1",
+      "raw_sha256": "6a059ababe36062810b17a5d0f44424d783c9f77b8fd6c36e362d816d3b9e031",
+      "bytes": 91530,
+      "utf8_splitlines_count": 2112,
+      "frozen_object_ref": "logs/evidence/objects/6a059ababe36062810b17a5d0f44424d783c9f77b8fd6c36e362d816d3b9e031.bin",
+      "extraction_ref": "logs/evidence/extractions/6a059ababe36062810b17a5d0f44424d783c9f77b8fd6c36e362d816d3b9e031.txt",
+      "locator_ref": "logs/evidence/locators/14d3002384e901f0204c0467d499f5a6670e4fa16862a8842014fe64071a7998.json",
+      "locator_sha256": "e31c47f854567ad066688d984620a84d38839eec12c41871a322d6bb375d5986",
+      "raw_frozen_extraction_byte_equal": true,
+      "capture_and_proposed_lock_binding_verified": true
+    }
+  ],
+  "source_lock_verification": {
+    "proposed_lock_equals_plan_source_lock": true,
+    "proposed_lock_bytes_equal_existing_lock": true,
+    "raw_sha256": "8a711e6304a7a7dada704b1363c471aa0194862b208bcc88741987c01cd25c6b",
+    "all_three_rfc_resources_and_snapshots_bound": true,
+    "unrelated_entries_unchanged": true
+  },
+  "card_count": 4,
+  "claim_count": 12,
+  "cards": [
+    {
+      "card_id": "wifi-rfc1042-llc-snap",
+      "author_id": "/root/author_protocol_cards",
+      "target_path": "knowledge/concepts/protocols/wifi-rfc1042-llc-snap.md",
+      "target_currently_absent": true,
+      "authoring_sha256": "a055a12a9a250861630a7be171b9ec5b8c0e2733f0abef276aaa1cacb7d39a15",
+      "candidate_input_sha256": "a3a8c48ecc273c829fa9b8099d24f5611edd85b74ec8bcd10242b91409be51c2",
+      "final_bytes_sha256": "cdb8b5952efa311911f0c15926a7a8388fadd5a8ac38311713857e56d4b77d7a",
+      "review_mode": "manual_document",
+      "proposed_lifecycle": "stable",
+      "all_3_claims_preserved": true,
+      "all_sections_preserved": [
+        "机制",
+        "字段与状态",
+        "约束",
+        "标准版本",
+        "产品支持边界",
+        "证据"
+      ],
+      "all_limitations_preserved": [
+        "本卡尚未取得真人对确切最终视图的确认，不代表 stable 或已确认。",
+        "未由该 RFC 推导全部现代 IEEE 802.11 场景的封装行为。",
+        "行号采用 UTF-8 文本的 str.splitlines()，1 基闭区间；换页符也构成分行边界。"
+      ]
+    },
+    {
+      "card_id": "wifi-rfc5416-mac-modes",
+      "author_id": "/root/author_protocol_cards",
+      "target_path": "knowledge/concepts/protocols/wifi-rfc5416-mac-modes.md",
+      "target_currently_absent": true,
+      "authoring_sha256": "e2bd752a5561e3677b2e169f151f02180228ec6597194ed68ddf79902170fbfd",
+      "candidate_input_sha256": "182c045c67cdc0b497210ade7429e5eb43daa11ba3e04e6361ceffb97a3bbfc1",
+      "final_bytes_sha256": "e1571c0ffd2c084b48d83740691fe7013d2fb1f4c83a3aa076d167cde13ef1a7",
+      "review_mode": "manual_document",
+      "proposed_lifecycle": "stable",
+      "all_3_claims_preserved": true,
+      "all_sections_preserved": [
+        "机制",
+        "字段与状态",
+        "约束",
+        "标准版本",
+        "产品支持边界",
+        "证据"
+      ],
+      "all_limitations_preserved": [
+        "本卡尚未取得真人对确切最终视图的确认，不代表 stable 或已确认。",
+        "三条 Claim 不穷尽该 RFC 的安全、密钥管理及 CAPWAP 消息流程。",
+        "行号采用 UTF-8 文本的 str.splitlines()，1 基闭区间；换页符也构成分行边界。"
+      ]
+    },
+    {
+      "card_id": "wifi-rfc8325-dscp-up",
+      "author_id": "/root/author_protocol_cards",
+      "target_path": "knowledge/concepts/protocols/wifi-rfc8325-dscp-up.md",
+      "target_currently_absent": true,
+      "authoring_sha256": "732123c39dc7a0a3ff8a2837e267e93eb188c6c2df812ca08096b974be6b0848",
+      "candidate_input_sha256": "a2850ded0f778f0dac3c5f2383da2fa8d109e80617fe60d281fef631a2584a5f",
+      "final_bytes_sha256": "99eded411a5bfbc3935b88162b3f5e4db84db832431d738a32b370ba56622652",
+      "review_mode": "manual_document",
+      "proposed_lifecycle": "stable",
+      "all_3_claims_preserved": true,
+      "all_sections_preserved": [
+        "机制",
+        "字段与状态",
+        "约束",
+        "标准版本",
+        "产品支持边界",
+        "证据"
+      ],
+      "all_limitations_preserved": [
+        "本卡尚未取得真人对确切最终视图的确认，不代表 stable 或已确认。",
+        "RFC 原文 §4.2.6 对 Broadcast Video 的一句映射说明与其服务类标记及 §4.3 汇总表存在 CS4/CS3 不一致；未读取外部勘误，也未改动原件。",
+        "不把下行 DSCP→UP 建议反向用作上行 UP→DSCP 规则。",
+        "行号采用 UTF-8 文本的 str.splitlines()，1 基闭区间；换页符也构成分行边界。"
+      ]
+    },
+    {
+      "card_id": "wifi-rfc8325-up-ac",
+      "author_id": "/root/author_protocol_cards",
+      "target_path": "knowledge/concepts/protocols/wifi-rfc8325-up-ac.md",
+      "target_currently_absent": true,
+      "authoring_sha256": "12f4e3ebdb5b6ad3129010bbd3546d7770352b8f7c04e9c056c5d4e049c5e8b4",
+      "candidate_input_sha256": "7ff4c91a4ba0bbb75abeaaabcb7479206ae116acec96a5623e050cc43d506c82",
+      "final_bytes_sha256": "d6c37551704eb6f099e751edbd1b5f5aca827fd595ae2df178ad9c2554431ff4",
+      "review_mode": "manual_document",
+      "proposed_lifecycle": "stable",
+      "all_3_claims_preserved": true,
+      "all_sections_preserved": [
+        "机制",
+        "字段与状态",
+        "约束",
+        "标准版本",
+        "产品支持边界",
+        "证据"
+      ],
+      "all_limitations_preserved": [
+        "本卡尚未取得真人对确切最终视图的确认，不代表 stable 或已确认。",
+        "本卡仅沉淀 RFC 对 IEEE 802.11-2016 的说明，未逐条核验该 IEEE 标准或后续版本。",
+        "行号采用 UTF-8 文本的 str.splitlines()，1 基闭区间；换页符也构成分行边界。"
+      ]
+    }
+  ],
+  "claims": [
+    {
+      "card_id": "wifi-rfc1042-llc-snap",
+      "claim_id": "wifi-rfc1042-llc-snap-c1",
+      "status": "supported",
+      "reason": "Header Format 的 LLC 三格、SNAP 五格及第 144 行的 8-octets 文字一致支持 1/1/1、3/2 字节布局及 8 字节总长；限定于 RFC 1042 的头格式。",
+      "source_refs": [
+        {
+          "evidence_ref": "e1",
+          "source_id": "raw:5001468bf29752a407d802fce264c745",
+          "snapshot_id": "raw:702dcfab4d60bf0bf69ce4a303baba281bee4ac70290b454ac92689065b9915e",
+          "path": "docs-raw/protocols/rfc1042.txt",
+          "raw_sha256": "e8737abe7f7b80ae2e84b8cada0ea02d8cc3c4ad2414e902cc055e6953a01c55",
+          "locator": {
+            "kind": "lines",
+            "start": 129,
+            "end": 145
+          }
+        }
+      ]
+    },
+    {
+      "card_id": "wifi-rfc1042-llc-snap",
+      "claim_id": "wifi-rfc1042-llc-snap-c2",
+      "status": "supported",
+      "reason": "第 137/141 行标明 K1/K2 所属字段，第 147/149/151 行给出 170、0、3/UI；93–97 行说明 SNAP Organization Code 后的 16 位为 EtherType。170 换算 0xAA 正确。",
+      "source_refs": [
+        {
+          "evidence_ref": "e2",
+          "source_id": "raw:5001468bf29752a407d802fce264c745",
+          "snapshot_id": "raw:702dcfab4d60bf0bf69ce4a303baba281bee4ac70290b454ac92689065b9915e",
+          "path": "docs-raw/protocols/rfc1042.txt",
+          "raw_sha256": "e8737abe7f7b80ae2e84b8cada0ea02d8cc3c4ad2414e902cc055e6953a01c55",
+          "locator": {
+            "kind": "lines",
+            "start": 93,
+            "end": 97
+          }
+        },
+        {
+          "evidence_ref": "e3",
+          "source_id": "raw:5001468bf29752a407d802fce264c745",
+          "snapshot_id": "raw:702dcfab4d60bf0bf69ce4a303baba281bee4ac70290b454ac92689065b9915e",
+          "path": "docs-raw/protocols/rfc1042.txt",
+          "raw_sha256": "e8737abe7f7b80ae2e84b8cada0ea02d8cc3c4ad2414e902cc055e6953a01c55",
+          "locator": {
+            "kind": "lines",
+            "start": 136,
+            "end": 151
+          }
+        }
+      ]
+    },
+    {
+      "card_id": "wifi-rfc1042-llc-snap",
+      "claim_id": "wifi-rfc1042-llc-snap-c3",
+      "status": "supported",
+      "reason": "19–23 行给出 IP/ARP 封装规范范围，40–54 行把语境限定为 802.3/802.4/802.5；99–105 行明确 Type 1 必须支持，Type 2 仅供同网双方验证支持后使用，验证机制为 XID。未外推现代 WiFi 或当前产品。",
+      "source_refs": [
+        {
+          "evidence_ref": "e4",
+          "source_id": "raw:5001468bf29752a407d802fce264c745",
+          "snapshot_id": "raw:702dcfab4d60bf0bf69ce4a303baba281bee4ac70290b454ac92689065b9915e",
+          "path": "docs-raw/protocols/rfc1042.txt",
+          "raw_sha256": "e8737abe7f7b80ae2e84b8cada0ea02d8cc3c4ad2414e902cc055e6953a01c55",
+          "locator": {
+            "kind": "lines",
+            "start": 19,
+            "end": 23
+          }
+        },
+        {
+          "evidence_ref": "e5",
+          "source_id": "raw:5001468bf29752a407d802fce264c745",
+          "snapshot_id": "raw:702dcfab4d60bf0bf69ce4a303baba281bee4ac70290b454ac92689065b9915e",
+          "path": "docs-raw/protocols/rfc1042.txt",
+          "raw_sha256": "e8737abe7f7b80ae2e84b8cada0ea02d8cc3c4ad2414e902cc055e6953a01c55",
+          "locator": {
+            "kind": "lines",
+            "start": 40,
+            "end": 54
+          }
+        },
+        {
+          "evidence_ref": "e6",
+          "source_id": "raw:5001468bf29752a407d802fce264c745",
+          "snapshot_id": "raw:702dcfab4d60bf0bf69ce4a303baba281bee4ac70290b454ac92689065b9915e",
+          "path": "docs-raw/protocols/rfc1042.txt",
+          "raw_sha256": "e8737abe7f7b80ae2e84b8cada0ea02d8cc3c4ad2414e902cc055e6953a01c55",
+          "locator": {
+            "kind": "lines",
+            "start": 99,
+            "end": 105
+          }
+        }
+      ]
+    },
+    {
+      "card_id": "wifi-rfc5416-mac-modes",
+      "claim_id": "wifi-rfc5416-mac-modes-c1",
+      "status": "supported",
+      "reason": "427–435 行直接给出 Split MAC 的 AC Distribution/Integration、全部用户数据隧道、WTP 实时 Beacon/Probe Response 以及 AC 其余 MAC 管理帧（含 Association Request）分工。",
+      "source_refs": [
+        {
+          "evidence_ref": "e1",
+          "source_id": "raw:a530eb22d73d3d0c85a16246c0f255a0",
+          "snapshot_id": "raw:6a80d7209ef4b041825c5b84f67d819e54e2ec42788cf3ba31dc8c37e04d46e1",
+          "path": "docs-raw/protocols/rfc5416.txt",
+          "raw_sha256": "ef326f22d2302b43547dcad37fbc545b075dcae7941372b0569fd84e0f5a4af2",
+          "locator": {
+            "kind": "lines",
+            "start": 427,
+            "end": 435
+          }
+        }
+      ]
+    },
+    {
+      "card_id": "wifi-rfc5416-mac-modes",
+      "claim_id": "wifi-rfc5416-mac-modes-c2",
+      "status": "supported",
+      "reason": "712–723 行直接支持 Local MAC 的 Integration=WTP、Distribution 可选 WTP/AC、后者使用 802.3 封装；718–723 行明确 Association Request 转交 AC 与失败 Association Response 后 WTP 发 Disassociation 的 MUST 条件。",
+      "source_refs": [
+        {
+          "evidence_ref": "e2",
+          "source_id": "raw:a530eb22d73d3d0c85a16246c0f255a0",
+          "snapshot_id": "raw:6a80d7209ef4b041825c5b84f67d819e54e2ec42788cf3ba31dc8c37e04d46e1",
+          "path": "docs-raw/protocols/rfc5416.txt",
+          "raw_sha256": "ef326f22d2302b43547dcad37fbc545b075dcae7941372b0569fd84e0f5a4af2",
+          "locator": {
+            "kind": "lines",
+            "start": 712,
+            "end": 723
+          }
+        }
+      ]
+    },
+    {
+      "card_id": "wifi-rfc5416-mac-modes",
+      "claim_id": "wifi-rfc5416-mac-modes-c3",
+      "status": "supported",
+      "reason": "415–418 行的 Split MAC 表与 443–446 行实时调度/排队说明被同时保留，未抹去表中 WTP/AC 调度与正文实时职责的细分；700–703 行把 Local MAC 三个 QoS 项均列为 WTP。",
+      "source_refs": [
+        {
+          "evidence_ref": "e3",
+          "source_id": "raw:a530eb22d73d3d0c85a16246c0f255a0",
+          "snapshot_id": "raw:6a80d7209ef4b041825c5b84f67d819e54e2ec42788cf3ba31dc8c37e04d46e1",
+          "path": "docs-raw/protocols/rfc5416.txt",
+          "raw_sha256": "ef326f22d2302b43547dcad37fbc545b075dcae7941372b0569fd84e0f5a4af2",
+          "locator": {
+            "kind": "lines",
+            "start": 415,
+            "end": 418
+          }
+        },
+        {
+          "evidence_ref": "e4",
+          "source_id": "raw:a530eb22d73d3d0c85a16246c0f255a0",
+          "snapshot_id": "raw:6a80d7209ef4b041825c5b84f67d819e54e2ec42788cf3ba31dc8c37e04d46e1",
+          "path": "docs-raw/protocols/rfc5416.txt",
+          "raw_sha256": "ef326f22d2302b43547dcad37fbc545b075dcae7941372b0569fd84e0f5a4af2",
+          "locator": {
+            "kind": "lines",
+            "start": 443,
+            "end": 446
+          }
+        },
+        {
+          "evidence_ref": "e5",
+          "source_id": "raw:a530eb22d73d3d0c85a16246c0f255a0",
+          "snapshot_id": "raw:6a80d7209ef4b041825c5b84f67d819e54e2ec42788cf3ba31dc8c37e04d46e1",
+          "path": "docs-raw/protocols/rfc5416.txt",
+          "raw_sha256": "ef326f22d2302b43547dcad37fbc545b075dcae7941372b0569fd84e0f5a4af2",
+          "locator": {
+            "kind": "lines",
+            "start": 700,
+            "end": 703
+          }
+        }
+      ]
+    },
+    {
+      "card_id": "wifi-rfc8325-dscp-up",
+      "claim_id": "wifi-rfc8325-dscp-up-c1",
+      "status": "supported",
+      "reason": "1110–1114 行规定 Figure 1 为 downstream 汇总；1130–1135 与 1147–1159 行逐项支持全部所列服务类/码点/UP。Broadcast Video 依据表中 CS3，不擅自把正文 990 行的 CS4 改成原文一致；差异已在约束与 limitations 显式保留。",
+      "source_refs": [
+        {
+          "evidence_ref": "e1",
+          "source_id": "raw:a65d06b2de2e054424be7f32448755e6",
+          "snapshot_id": "raw:c4326898461bfb0e6b4ea45ce4634e2dd0ea42c5bf70f0daf013986ff36313f1",
+          "path": "docs-raw/protocols/rfc8325.txt",
+          "raw_sha256": "6a059ababe36062810b17a5d0f44424d783c9f77b8fd6c36e362d816d3b9e031",
+          "locator": {
+            "kind": "lines",
+            "start": 1110,
+            "end": 1114
+          }
+        },
+        {
+          "evidence_ref": "e2",
+          "source_id": "raw:a65d06b2de2e054424be7f32448755e6",
+          "snapshot_id": "raw:c4326898461bfb0e6b4ea45ce4634e2dd0ea42c5bf70f0daf013986ff36313f1",
+          "path": "docs-raw/protocols/rfc8325.txt",
+          "raw_sha256": "6a059ababe36062810b17a5d0f44424d783c9f77b8fd6c36e362d816d3b9e031",
+          "locator": {
+            "kind": "lines",
+            "start": 1130,
+            "end": 1135
+          }
+        },
+        {
+          "evidence_ref": "e3",
+          "source_id": "raw:a65d06b2de2e054424be7f32448755e6",
+          "snapshot_id": "raw:c4326898461bfb0e6b4ea45ce4634e2dd0ea42c5bf70f0daf013986ff36313f1",
+          "path": "docs-raw/protocols/rfc8325.txt",
+          "raw_sha256": "6a059ababe36062810b17a5d0f44424d783c9f77b8fd6c36e362d816d3b9e031",
+          "locator": {
+            "kind": "lines",
+            "start": 1147,
+            "end": 1159
+          }
+        }
+      ]
+    },
+    {
+      "card_id": "wifi-rfc8325-dscp-up",
+      "claim_id": "wifi-rfc8325-dscp-up-c2",
+      "status": "supported",
+      "reason": "1161–1178 行表格逐项支持 AF2x→3、CS2/AF1x/DF→0、CS1→1，并明确所有 unused codepoints 建议映射 UP 0；候选以 recommendation 而非产品实现陈述。",
+      "source_refs": [
+        {
+          "evidence_ref": "e4",
+          "source_id": "raw:a65d06b2de2e054424be7f32448755e6",
+          "snapshot_id": "raw:c4326898461bfb0e6b4ea45ce4634e2dd0ea42c5bf70f0daf013986ff36313f1",
+          "path": "docs-raw/protocols/rfc8325.txt",
+          "raw_sha256": "6a059ababe36062810b17a5d0f44424d783c9f77b8fd6c36e362d816d3b9e031",
+          "locator": {
+            "kind": "lines",
+            "start": 1161,
+            "end": 1178
+          }
+        }
+      ]
+    },
+    {
+      "card_id": "wifi-rfc8325-dscp-up",
+      "claim_id": "wifi-rfc8325-dscp-up-c3",
+      "status": "supported",
+      "reason": "1120–1128 行确实为 CS7/CS6 给出 7 OR 0 并指向安全考虑；729–754 行明确 downstream、可定制非默认 DSCP-to-UP 以及 AP/终端排队出队能力假设。未把 UP7 说成无条件固定配置。",
+      "source_refs": [
+        {
+          "evidence_ref": "e5",
+          "source_id": "raw:a65d06b2de2e054424be7f32448755e6",
+          "snapshot_id": "raw:c4326898461bfb0e6b4ea45ce4634e2dd0ea42c5bf70f0daf013986ff36313f1",
+          "path": "docs-raw/protocols/rfc8325.txt",
+          "raw_sha256": "6a059ababe36062810b17a5d0f44424d783c9f77b8fd6c36e362d816d3b9e031",
+          "locator": {
+            "kind": "lines",
+            "start": 729,
+            "end": 754
+          }
+        },
+        {
+          "evidence_ref": "e6",
+          "source_id": "raw:a65d06b2de2e054424be7f32448755e6",
+          "snapshot_id": "raw:c4326898461bfb0e6b4ea45ce4634e2dd0ea42c5bf70f0daf013986ff36313f1",
+          "path": "docs-raw/protocols/rfc8325.txt",
+          "raw_sha256": "6a059ababe36062810b17a5d0f44424d783c9f77b8fd6c36e362d816d3b9e031",
+          "locator": {
+            "kind": "lines",
+            "start": 1120,
+            "end": 1128
+          }
+        }
+      ]
+    },
+    {
+      "card_id": "wifi-rfc8325-up-ac",
+      "claim_id": "wifi-rfc8325-up-ac-c1",
+      "status": "supported",
+      "reason": "1516–1527 行直接说明 QoS Control 的 3 位 UP、0–7、标记本身不直接改变空口处理，以及标准规定且不可配置的 UP-to-AC 映射；候选注明这是 RFC 对 IEEE 802.11-2016 的说明。",
+      "source_refs": [
+        {
+          "evidence_ref": "e1",
+          "source_id": "raw:a65d06b2de2e054424be7f32448755e6",
+          "snapshot_id": "raw:c4326898461bfb0e6b4ea45ce4634e2dd0ea42c5bf70f0daf013986ff36313f1",
+          "path": "docs-raw/protocols/rfc8325.txt",
+          "raw_sha256": "6a059ababe36062810b17a5d0f44424d783c9f77b8fd6c36e362d816d3b9e031",
+          "locator": {
+            "kind": "lines",
+            "start": 1516,
+            "end": 1527
+          }
+        }
+      ]
+    },
+    {
+      "card_id": "wifi-rfc8325-up-ac",
+      "claim_id": "wifi-rfc8325-up-ac-c2",
+      "status": "supported",
+      "reason": "1546–1576 行 Figure 2 对每个 UP 的 AC 对应及 top-down relative priority 均直接支持 Claim；没有把数值顺序误当作优先级，也没有扩展到未读 IEEE 后续版本。",
+      "source_refs": [
+        {
+          "evidence_ref": "e2",
+          "source_id": "raw:a65d06b2de2e054424be7f32448755e6",
+          "snapshot_id": "raw:c4326898461bfb0e6b4ea45ce4634e2dd0ea42c5bf70f0daf013986ff36313f1",
+          "path": "docs-raw/protocols/rfc8325.txt",
+          "raw_sha256": "6a059ababe36062810b17a5d0f44424d783c9f77b8fd6c36e362d816d3b9e031",
+          "locator": {
+            "kind": "lines",
+            "start": 1546,
+            "end": 1576
+          }
+        }
+      ]
+    },
+    {
+      "card_id": "wifi-rfc8325-up-ac",
+      "claim_id": "wifi-rfc8325-up-ac-c3",
+      "status": "supported",
+      "reason": "1578–1581 行直接说明主要通过调节发送前必须等待的 fixed 与 random timers 实现四个 AC 的空口差异化；不据此承诺本仓实测带宽或时延。",
+      "source_refs": [
+        {
+          "evidence_ref": "e3",
+          "source_id": "raw:a65d06b2de2e054424be7f32448755e6",
+          "snapshot_id": "raw:c4326898461bfb0e6b4ea45ce4634e2dd0ea42c5bf70f0daf013986ff36313f1",
+          "path": "docs-raw/protocols/rfc8325.txt",
+          "raw_sha256": "6a059ababe36062810b17a5d0f44424d783c9f77b8fd6c36e362d816d3b9e031",
+          "locator": {
+            "kind": "lines",
+            "start": 1578,
+            "end": 1581
+          }
+        }
+      ]
+    }
+  ],
+  "scope_checks": {
+    "existing_code_card_count": 10,
+    "existing_code_card_paths": [
+      "knowledge/concepts/flows/wifi-historical-addba-setup.md",
+      "knowledge/concepts/flows/wifi-historical-delba-cleanup.md",
+      "knowledge/concepts/flows/wifi-historical-pno-scan.md",
+      "knowledge/concepts/flows/wifi-historical-rx-defrag.md",
+      "knowledge/concepts/flows/wifi-historical-scan-lifecycle.md",
+      "knowledge/concepts/flows/wifi-historical-sta-assoc.md",
+      "knowledge/concepts/flows/wifi-historical-sta-auth.md",
+      "knowledge/concepts/flows/wifi-historical-sta-join.md",
+      "knowledge/concepts/flows/wifi-historical-tx-amsdu.md",
+      "knowledge/concepts/flows/wifi-historical-tx-qos.md"
+    ],
+    "existing_code_cards_not_in_writes_or_deletes": true,
+    "existing_code_cards_not_semantically_re_reviewed": true,
+    "no_rfc_to_current_host_device_implementation_inference": true,
+    "normative_descriptions_vs_mapping_recommendations_preserved": true,
+    "rfc_version_and_product_limitations_preserved": true,
+    "rfc8325_cs4_cs3_difference": {
+      "status": "preserved_without_modifying_original",
+      "path": "docs-raw/protocols/rfc8325.txt",
+      "locators": [
+        {
+          "kind": "lines",
+          "start": 982,
+          "end": 982
+        },
+        {
+          "kind": "lines",
+          "start": 990,
+          "end": 990
+        },
+        {
+          "kind": "lines",
+          "start": 1159,
+          "end": 1159
+        }
+      ],
+      "reason": "同一落地原件分别写 Broadcast Video CS3、映射句 CS4、汇总表 CS3；候选 c1 明确依据 §4.3 表，并在约束与范围限制暴露差异。"
+    }
+  },
+  "candidate_state": {
+    "review_mode": "manual_document",
+    "human_confirmation": false,
+    "candidate_only": true,
+    "targets_currently_absent": true,
+    "meaning": "final-view 中 lifecycle: stable 是拟入库最终字节，不是当前入库事实或真人确认凭证；所有卡正文保留尚未真人确认的限制。",
+    "human_event_created": false,
+    "signature_created": false,
+    "manual_review_approval_created": false,
+    "apply_executed": false
+  },
+  "outcome": "supported_within_cited_document_scope",
+  "findings": [],
+  "validation_limits": [
+    "本复核是 Agent 的内容复核，不构成真实人对确切最终视图的确认。",
+    "未校验未提供的 IEEE 标准全文、后续版本或外部勘误。",
+    "未验证当前芯片、六 Target、Host/Device、CAPWAP 或 QoS 的实际实现与运行。",
+    "十张既有代码卡仅核实不在本次写入/删除集合，本复核不替代其独立内容或代码实现核验。"
+  ]
+}

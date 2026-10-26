@@ -1,0 +1,870 @@
+{
+  "schema_version": "ex26-candidate-component-v1",
+  "run_utc": "2026-10-26T05:18:54.289863+00:00",
+  "boundary": {
+    "kind": "candidate_lexical_component_only",
+    "formal_eligibility_gate_called": false,
+    "formal_admission_checked": false,
+    "lifecycle_review_confirmation_checked": false,
+    "source_freshness_checked": false,
+    "context_scope_checked": false,
+    "active_index_published": false,
+    "stable_or_confirmation_fabricated": false,
+    "public_query_pass_claim": false,
+    "non_statistical_exploratory_set": true,
+    "restricted_gold": false,
+    "topic_hit_is_not_answer_sufficiency": true,
+    "semantic_answer_generation_or_coverage_judgment": false,
+    "statement": "仅测真实候选的解析、SQLite postings 召回与词面排序组件。不包含正式入库资格、来源新鲜度、上下文范围、真人确认或活动索引门禁；不能算公开 query 已通过。document/mixed 必须与代码和正式公开链路成绩分开。",
+    "purpose_rule": "只复用 governance.knowledge.match_scope 的 purpose/usage 部分：current 仅 usage=current；historical/guidance 不限制 usage。不调用 match_scope 的 applicability/context 条件，也不调用 query qualification evaluator。"
+  },
+  "cases_sha256": "c14dff76cbacd88e2ae96f9d47838372b559cb47aedee7d4b0c16143fcea95b2",
+  "rules_digest": "0ab804a3cf63e4e2edcd153e58400490b08be2e52556ba4edfba6da9fd707cba",
+  "runtime_implementation_sha256": {
+    "E:\\FactumCore\\aiotbot-knowledge-wifi-mp\\governance\\contracts\\indexing.py": "7d12d1dc4254fd5b66030796553f7fafa4ef5c461e988fb64b4954b9b83c8af5",
+    "E:\\FactumCore\\aiotbot-knowledge-wifi-mp\\governance\\contracts\\knowledge.py": "833f55179ea674f87d39928cb5dab145c362a78ad0d81299b0a4da290718512e",
+    "E:\\FactumCore\\aiotbot-knowledge-wifi-mp\\governance\\contracts\\validation.py": "b4c62846869963b5925ece30dd806989d44765d538ec65e2a2cf251aaa90d547",
+    "E:\\FactumCore\\aiotbot-knowledge-wifi-mp\\skills\\common\\knowledge\\hs-knowledge-query\\scripts\\node.py": "13e01d1c20d080cf845ce16240b8ef08a7fc7e92dc622ffb0ed1f8bf8956f03b",
+    "E:\\FactumCore\\aiotbot-knowledge-wifi-mp\\skills\\common\\knowledge\\hs-knowledge-query\\scripts\\support.py": "78f617aa42df7515e440f05fa3ff9700798894219f6a2d26edca8e1de1b27063",
+    "E:\\FactumCore\\aiotbot-knowledge-wifi-mp\\governance\\framework.lock.yaml": "0ab804a3cf63e4e2edcd153e58400490b08be2e52556ba4edfba6da9fd707cba"
+  },
+  "database_sha256": "094ed0a6752d92e3f9f2266203b806ed5c0b2058ed8861f651da8d0fc6059852",
+  "index_verification": {
+    "complete": true,
+    "documents": 14,
+    "claims": 43,
+    "postings": 4753,
+    "schema_version": "3.0",
+    "tokenizer_version": "2.0",
+    "rules_digest": "0ab804a3cf63e4e2edcd153e58400490b08be2e52556ba4edfba6da9fd707cba",
+    "rows_digest": "e5e8be44d3ee762ec3de2530a2596777a526de0ed6713a6676247eb41c017427"
+  },
+  "candidate_count": 14,
+  "candidate_manifest": [
+    {
+      "card_id": "wifi-historical-scan-lifecycle",
+      "group": "code",
+      "path": "E:\\FactumCore\\.scratch\\ex26\\workspace\\aiotbot-knowledge-wifi-mp\\.build\\operations\\ex26-code-r2\\authored\\wifi-historical-scan-lifecycle.md",
+      "sha256": "93512260bbd96b79736fa60c0b146605d89f75faa95cdad4edfd14dfa13bf8d5",
+      "lifecycle": "draft",
+      "review_mode": "code_gate",
+      "claim_usage_counts": {
+        "historical": 4
+      }
+    },
+    {
+      "card_id": "wifi-historical-pno-scan",
+      "group": "code",
+      "path": "E:\\FactumCore\\.scratch\\ex26\\workspace\\aiotbot-knowledge-wifi-mp\\.build\\operations\\ex26-code-r2\\authored\\wifi-historical-pno-scan.md",
+      "sha256": "0a18a24fd7ace61f64d1803ce8e806d351ee6e453b544faebb4cd50ca177e361",
+      "lifecycle": "draft",
+      "review_mode": "code_gate",
+      "claim_usage_counts": {
+        "historical": 3
+      }
+    },
+    {
+      "card_id": "wifi-historical-sta-join",
+      "group": "code",
+      "path": "E:\\FactumCore\\.scratch\\ex26\\workspace\\aiotbot-knowledge-wifi-mp\\.build\\operations\\ex26-code-r2\\authored\\wifi-historical-sta-join.md",
+      "sha256": "4a8dc469641c97be6661e618601b1577880edd91393e86f1a55a35f1a1335606",
+      "lifecycle": "draft",
+      "review_mode": "code_gate",
+      "claim_usage_counts": {
+        "historical": 3
+      }
+    },
+    {
+      "card_id": "wifi-historical-sta-auth",
+      "group": "code",
+      "path": "E:\\FactumCore\\.scratch\\ex26\\workspace\\aiotbot-knowledge-wifi-mp\\.build\\operations\\ex26-code-r2\\authored\\wifi-historical-sta-auth.md",
+      "sha256": "fb00576645892b1a07a48bbc9aff297077bb8473682d96ea8ce0f279254c7530",
+      "lifecycle": "draft",
+      "review_mode": "code_gate",
+      "claim_usage_counts": {
+        "historical": 3
+      }
+    },
+    {
+      "card_id": "wifi-historical-sta-assoc",
+      "group": "code",
+      "path": "E:\\FactumCore\\.scratch\\ex26\\workspace\\aiotbot-knowledge-wifi-mp\\.build\\operations\\ex26-code-r2\\authored\\wifi-historical-sta-assoc.md",
+      "sha256": "190b492833b81dca8635007f2795b3a212c42c8e9d78ef973edb28efcf6362f7",
+      "lifecycle": "draft",
+      "review_mode": "code_gate",
+      "claim_usage_counts": {
+        "historical": 3
+      }
+    },
+    {
+      "card_id": "wifi-historical-addba-setup",
+      "group": "code",
+      "path": "E:\\FactumCore\\.scratch\\ex26\\workspace\\aiotbot-knowledge-wifi-mp\\.build\\operations\\ex26-code-r2\\authored\\wifi-historical-addba-setup.md",
+      "sha256": "8ee1d68e04331349ef01e1c578f319c5be1bdd39284556ac28a0b6539317f4c2",
+      "lifecycle": "draft",
+      "review_mode": "code_gate",
+      "claim_usage_counts": {
+        "historical": 3
+      }
+    },
+    {
+      "card_id": "wifi-historical-delba-cleanup",
+      "group": "code",
+      "path": "E:\\FactumCore\\.scratch\\ex26\\workspace\\aiotbot-knowledge-wifi-mp\\.build\\operations\\ex26-code-r2\\authored\\wifi-historical-delba-cleanup.md",
+      "sha256": "e74430cb2bc33272d183055bff767a8f8b223c7b59a0a482104374fc81b6c046",
+      "lifecycle": "draft",
+      "review_mode": "code_gate",
+      "claim_usage_counts": {
+        "historical": 3
+      }
+    },
+    {
+      "card_id": "wifi-historical-rx-defrag",
+      "group": "code",
+      "path": "E:\\FactumCore\\.scratch\\ex26\\workspace\\aiotbot-knowledge-wifi-mp\\.build\\operations\\ex26-code-r2\\authored\\wifi-historical-rx-defrag.md",
+      "sha256": "4a22cc30564114ee163fcd1116f46c41868a066fe1c47ff8e23dd06bcc0cc96e",
+      "lifecycle": "draft",
+      "review_mode": "code_gate",
+      "claim_usage_counts": {
+        "historical": 3
+      }
+    },
+    {
+      "card_id": "wifi-historical-tx-amsdu",
+      "group": "code",
+      "path": "E:\\FactumCore\\.scratch\\ex26\\workspace\\aiotbot-knowledge-wifi-mp\\.build\\operations\\ex26-code-r2\\authored\\wifi-historical-tx-amsdu.md",
+      "sha256": "8d0deb61beab1a40c89784cd772ee49572eed4e89b0b1b54632a84ef90dc4843",
+      "lifecycle": "draft",
+      "review_mode": "code_gate",
+      "claim_usage_counts": {
+        "historical": 3
+      }
+    },
+    {
+      "card_id": "wifi-historical-tx-qos",
+      "group": "code",
+      "path": "E:\\FactumCore\\.scratch\\ex26\\workspace\\aiotbot-knowledge-wifi-mp\\.build\\operations\\ex26-code-r2\\authored\\wifi-historical-tx-qos.md",
+      "sha256": "cb1bc9d8204854a5209ee710e88fc0f4b1bef2804eacb57d51c33b16d14ba901",
+      "lifecycle": "draft",
+      "review_mode": "code_gate",
+      "claim_usage_counts": {
+        "historical": 3
+      }
+    },
+    {
+      "card_id": "wifi-rfc1042-llc-snap",
+      "group": "document",
+      "path": "E:\\FactumCore\\.scratch\\ex26\\workspace\\aiotbot-knowledge-wifi-mp\\.build\\operations\\ex26-doc-candidates-r2\\authored\\wifi-rfc1042-llc-snap.md",
+      "sha256": "a3a8c48ecc273c829fa9b8099d24f5611edd85b74ec8bcd10242b91409be51c2",
+      "lifecycle": "draft",
+      "review_mode": "manual_document",
+      "claim_usage_counts": {
+        "guidance": 3
+      }
+    },
+    {
+      "card_id": "wifi-rfc8325-dscp-up",
+      "group": "document",
+      "path": "E:\\FactumCore\\.scratch\\ex26\\workspace\\aiotbot-knowledge-wifi-mp\\.build\\operations\\ex26-doc-candidates-r2\\authored\\wifi-rfc8325-dscp-up.md",
+      "sha256": "a2850ded0f778f0dac3c5f2383da2fa8d109e80617fe60d281fef631a2584a5f",
+      "lifecycle": "draft",
+      "review_mode": "manual_document",
+      "claim_usage_counts": {
+        "guidance": 3
+      }
+    },
+    {
+      "card_id": "wifi-rfc8325-up-ac",
+      "group": "document",
+      "path": "E:\\FactumCore\\.scratch\\ex26\\workspace\\aiotbot-knowledge-wifi-mp\\.build\\operations\\ex26-doc-candidates-r2\\authored\\wifi-rfc8325-up-ac.md",
+      "sha256": "7ff4c91a4ba0bbb75abeaaabcb7479206ae116acec96a5623e050cc43d506c82",
+      "lifecycle": "draft",
+      "review_mode": "manual_document",
+      "claim_usage_counts": {
+        "guidance": 3
+      }
+    },
+    {
+      "card_id": "wifi-rfc5416-mac-modes",
+      "group": "document",
+      "path": "E:\\FactumCore\\.scratch\\ex26\\workspace\\aiotbot-knowledge-wifi-mp\\.build\\operations\\ex26-doc-candidates-r2\\authored\\wifi-rfc5416-mac-modes.md",
+      "sha256": "182c045c67cdc0b497210ade7429e5eb43daa11ba3e04e6361ceffb97a3bbfc1",
+      "lifecycle": "draft",
+      "review_mode": "manual_document",
+      "claim_usage_counts": {
+        "guidance": 3
+      }
+    }
+  ],
+  "elapsed_seconds": 0.323209,
+  "by_scope": {
+    "code": {
+      "case_count": 26,
+      "positive_case_count": 26,
+      "required_card_items": 33,
+      "expected_empty_case_count": 0,
+      "topk": {
+        "1": {
+          "any_required_hit": {
+            "n": 23,
+            "denominator": 26,
+            "rate": 0.8846153846153846
+          },
+          "all_required_covered": {
+            "n": 17,
+            "denominator": 26,
+            "rate": 0.6538461538461539
+          },
+          "required_items_covered": {
+            "n": 23,
+            "denominator": 33,
+            "rate": 0.696969696969697
+          },
+          "forbidden_violating_cases": 0,
+          "expected_empty": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "frozen_expectations_met": {
+            "n": 17,
+            "denominator": 26,
+            "rate": 0.6538461538461539
+          }
+        },
+        "3": {
+          "any_required_hit": {
+            "n": 26,
+            "denominator": 26,
+            "rate": 1.0
+          },
+          "all_required_covered": {
+            "n": 25,
+            "denominator": 26,
+            "rate": 0.9615384615384616
+          },
+          "required_items_covered": {
+            "n": 32,
+            "denominator": 33,
+            "rate": 0.9696969696969697
+          },
+          "forbidden_violating_cases": 0,
+          "expected_empty": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "frozen_expectations_met": {
+            "n": 25,
+            "denominator": 26,
+            "rate": 0.9615384615384616
+          }
+        },
+        "5": {
+          "any_required_hit": {
+            "n": 26,
+            "denominator": 26,
+            "rate": 1.0
+          },
+          "all_required_covered": {
+            "n": 26,
+            "denominator": 26,
+            "rate": 1.0
+          },
+          "required_items_covered": {
+            "n": 33,
+            "denominator": 33,
+            "rate": 1.0
+          },
+          "forbidden_violating_cases": 0,
+          "expected_empty": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "frozen_expectations_met": {
+            "n": 26,
+            "denominator": 26,
+            "rate": 1.0
+          }
+        }
+      },
+      "top5_failed_case_ids": []
+    },
+    "document": {
+      "case_count": 10,
+      "positive_case_count": 10,
+      "required_card_items": 10,
+      "expected_empty_case_count": 0,
+      "topk": {
+        "1": {
+          "any_required_hit": {
+            "n": 10,
+            "denominator": 10,
+            "rate": 1.0
+          },
+          "all_required_covered": {
+            "n": 10,
+            "denominator": 10,
+            "rate": 1.0
+          },
+          "required_items_covered": {
+            "n": 10,
+            "denominator": 10,
+            "rate": 1.0
+          },
+          "forbidden_violating_cases": 0,
+          "expected_empty": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "frozen_expectations_met": {
+            "n": 10,
+            "denominator": 10,
+            "rate": 1.0
+          }
+        },
+        "3": {
+          "any_required_hit": {
+            "n": 10,
+            "denominator": 10,
+            "rate": 1.0
+          },
+          "all_required_covered": {
+            "n": 10,
+            "denominator": 10,
+            "rate": 1.0
+          },
+          "required_items_covered": {
+            "n": 10,
+            "denominator": 10,
+            "rate": 1.0
+          },
+          "forbidden_violating_cases": 0,
+          "expected_empty": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "frozen_expectations_met": {
+            "n": 10,
+            "denominator": 10,
+            "rate": 1.0
+          }
+        },
+        "5": {
+          "any_required_hit": {
+            "n": 10,
+            "denominator": 10,
+            "rate": 1.0
+          },
+          "all_required_covered": {
+            "n": 10,
+            "denominator": 10,
+            "rate": 1.0
+          },
+          "required_items_covered": {
+            "n": 10,
+            "denominator": 10,
+            "rate": 1.0
+          },
+          "forbidden_violating_cases": 0,
+          "expected_empty": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "frozen_expectations_met": {
+            "n": 10,
+            "denominator": 10,
+            "rate": 1.0
+          }
+        }
+      },
+      "top5_failed_case_ids": []
+    },
+    "mixed": {
+      "case_count": 2,
+      "positive_case_count": 2,
+      "required_card_items": 5,
+      "expected_empty_case_count": 0,
+      "topk": {
+        "1": {
+          "any_required_hit": {
+            "n": 2,
+            "denominator": 2,
+            "rate": 1.0
+          },
+          "all_required_covered": {
+            "n": 0,
+            "denominator": 2,
+            "rate": 0.0
+          },
+          "required_items_covered": {
+            "n": 2,
+            "denominator": 5,
+            "rate": 0.4
+          },
+          "forbidden_violating_cases": 0,
+          "expected_empty": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "frozen_expectations_met": {
+            "n": 0,
+            "denominator": 2,
+            "rate": 0.0
+          }
+        },
+        "3": {
+          "any_required_hit": {
+            "n": 2,
+            "denominator": 2,
+            "rate": 1.0
+          },
+          "all_required_covered": {
+            "n": 2,
+            "denominator": 2,
+            "rate": 1.0
+          },
+          "required_items_covered": {
+            "n": 5,
+            "denominator": 5,
+            "rate": 1.0
+          },
+          "forbidden_violating_cases": 0,
+          "expected_empty": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "frozen_expectations_met": {
+            "n": 2,
+            "denominator": 2,
+            "rate": 1.0
+          }
+        },
+        "5": {
+          "any_required_hit": {
+            "n": 2,
+            "denominator": 2,
+            "rate": 1.0
+          },
+          "all_required_covered": {
+            "n": 2,
+            "denominator": 2,
+            "rate": 1.0
+          },
+          "required_items_covered": {
+            "n": 5,
+            "denominator": 5,
+            "rate": 1.0
+          },
+          "forbidden_violating_cases": 0,
+          "expected_empty": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "frozen_expectations_met": {
+            "n": 2,
+            "denominator": 2,
+            "rate": 1.0
+          }
+        }
+      },
+      "top5_failed_case_ids": []
+    },
+    "negative": {
+      "case_count": 6,
+      "positive_case_count": 0,
+      "required_card_items": 0,
+      "expected_empty_case_count": 6,
+      "topk": {
+        "1": {
+          "any_required_hit": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "all_required_covered": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "required_items_covered": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "forbidden_violating_cases": 0,
+          "expected_empty": {
+            "n": 4,
+            "denominator": 6,
+            "rate": 0.6666666666666666
+          },
+          "frozen_expectations_met": {
+            "n": 4,
+            "denominator": 6,
+            "rate": 0.6666666666666666
+          }
+        },
+        "3": {
+          "any_required_hit": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "all_required_covered": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "required_items_covered": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "forbidden_violating_cases": 0,
+          "expected_empty": {
+            "n": 4,
+            "denominator": 6,
+            "rate": 0.6666666666666666
+          },
+          "frozen_expectations_met": {
+            "n": 4,
+            "denominator": 6,
+            "rate": 0.6666666666666666
+          }
+        },
+        "5": {
+          "any_required_hit": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "all_required_covered": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "required_items_covered": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "forbidden_violating_cases": 0,
+          "expected_empty": {
+            "n": 4,
+            "denominator": 6,
+            "rate": 0.6666666666666666
+          },
+          "frozen_expectations_met": {
+            "n": 4,
+            "denominator": 6,
+            "rate": 0.6666666666666666
+          }
+        }
+      },
+      "top5_failed_case_ids": [
+        "EX26-N05",
+        "EX26-N06"
+      ]
+    }
+  },
+  "by_purpose": {
+    "historical": {
+      "case_count": 28,
+      "positive_case_count": 28,
+      "required_card_items": 38,
+      "expected_empty_case_count": 0,
+      "topk": {
+        "1": {
+          "any_required_hit": {
+            "n": 25,
+            "denominator": 28,
+            "rate": 0.8928571428571429
+          },
+          "all_required_covered": {
+            "n": 17,
+            "denominator": 28,
+            "rate": 0.6071428571428571
+          },
+          "required_items_covered": {
+            "n": 25,
+            "denominator": 38,
+            "rate": 0.6578947368421053
+          },
+          "forbidden_violating_cases": 0,
+          "expected_empty": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "frozen_expectations_met": {
+            "n": 17,
+            "denominator": 28,
+            "rate": 0.6071428571428571
+          }
+        },
+        "3": {
+          "any_required_hit": {
+            "n": 28,
+            "denominator": 28,
+            "rate": 1.0
+          },
+          "all_required_covered": {
+            "n": 27,
+            "denominator": 28,
+            "rate": 0.9642857142857143
+          },
+          "required_items_covered": {
+            "n": 37,
+            "denominator": 38,
+            "rate": 0.9736842105263158
+          },
+          "forbidden_violating_cases": 0,
+          "expected_empty": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "frozen_expectations_met": {
+            "n": 27,
+            "denominator": 28,
+            "rate": 0.9642857142857143
+          }
+        },
+        "5": {
+          "any_required_hit": {
+            "n": 28,
+            "denominator": 28,
+            "rate": 1.0
+          },
+          "all_required_covered": {
+            "n": 28,
+            "denominator": 28,
+            "rate": 1.0
+          },
+          "required_items_covered": {
+            "n": 38,
+            "denominator": 38,
+            "rate": 1.0
+          },
+          "forbidden_violating_cases": 0,
+          "expected_empty": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "frozen_expectations_met": {
+            "n": 28,
+            "denominator": 28,
+            "rate": 1.0
+          }
+        }
+      },
+      "top5_failed_case_ids": []
+    },
+    "guidance": {
+      "case_count": 12,
+      "positive_case_count": 10,
+      "required_card_items": 10,
+      "expected_empty_case_count": 2,
+      "topk": {
+        "1": {
+          "any_required_hit": {
+            "n": 10,
+            "denominator": 10,
+            "rate": 1.0
+          },
+          "all_required_covered": {
+            "n": 10,
+            "denominator": 10,
+            "rate": 1.0
+          },
+          "required_items_covered": {
+            "n": 10,
+            "denominator": 10,
+            "rate": 1.0
+          },
+          "forbidden_violating_cases": 0,
+          "expected_empty": {
+            "n": 0,
+            "denominator": 2,
+            "rate": 0.0
+          },
+          "frozen_expectations_met": {
+            "n": 10,
+            "denominator": 12,
+            "rate": 0.8333333333333334
+          }
+        },
+        "3": {
+          "any_required_hit": {
+            "n": 10,
+            "denominator": 10,
+            "rate": 1.0
+          },
+          "all_required_covered": {
+            "n": 10,
+            "denominator": 10,
+            "rate": 1.0
+          },
+          "required_items_covered": {
+            "n": 10,
+            "denominator": 10,
+            "rate": 1.0
+          },
+          "forbidden_violating_cases": 0,
+          "expected_empty": {
+            "n": 0,
+            "denominator": 2,
+            "rate": 0.0
+          },
+          "frozen_expectations_met": {
+            "n": 10,
+            "denominator": 12,
+            "rate": 0.8333333333333334
+          }
+        },
+        "5": {
+          "any_required_hit": {
+            "n": 10,
+            "denominator": 10,
+            "rate": 1.0
+          },
+          "all_required_covered": {
+            "n": 10,
+            "denominator": 10,
+            "rate": 1.0
+          },
+          "required_items_covered": {
+            "n": 10,
+            "denominator": 10,
+            "rate": 1.0
+          },
+          "forbidden_violating_cases": 0,
+          "expected_empty": {
+            "n": 0,
+            "denominator": 2,
+            "rate": 0.0
+          },
+          "frozen_expectations_met": {
+            "n": 10,
+            "denominator": 12,
+            "rate": 0.8333333333333334
+          }
+        }
+      },
+      "top5_failed_case_ids": [
+        "EX26-N05",
+        "EX26-N06"
+      ]
+    },
+    "current": {
+      "case_count": 4,
+      "positive_case_count": 0,
+      "required_card_items": 0,
+      "expected_empty_case_count": 4,
+      "topk": {
+        "1": {
+          "any_required_hit": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "all_required_covered": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "required_items_covered": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "forbidden_violating_cases": 0,
+          "expected_empty": {
+            "n": 4,
+            "denominator": 4,
+            "rate": 1.0
+          },
+          "frozen_expectations_met": {
+            "n": 4,
+            "denominator": 4,
+            "rate": 1.0
+          }
+        },
+        "3": {
+          "any_required_hit": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "all_required_covered": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "required_items_covered": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "forbidden_violating_cases": 0,
+          "expected_empty": {
+            "n": 4,
+            "denominator": 4,
+            "rate": 1.0
+          },
+          "frozen_expectations_met": {
+            "n": 4,
+            "denominator": 4,
+            "rate": 1.0
+          }
+        },
+        "5": {
+          "any_required_hit": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "all_required_covered": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "required_items_covered": {
+            "n": 0,
+            "denominator": 0,
+            "rate": null
+          },
+          "forbidden_violating_cases": 0,
+          "expected_empty": {
+            "n": 4,
+            "denominator": 4,
+            "rate": 1.0
+          },
+          "frozen_expectations_met": {
+            "n": 4,
+            "denominator": 4,
+            "rate": 1.0
+          }
+        }
+      },
+      "top5_failed_case_ids": []
+    }
+  },
+  "metric_definitions": {
+    "any_required_hit": "至少一张 required 出现在 top-k，分母仅含有 required 的题",
+    "all_required_covered": "全部 required 出现在 top-k，组合题不会降为任意命中",
+    "required_items_covered": "top-k 命中的 required 项数 / 全部 required 项数",
+    "frozen_expectations_met": "全部 required 覆盖、无 forbidden，且 expected_empty 题无任何排序结果",
+    "scores": "真实 score_card；title5 aliases4 search_terms3 summary2 eligible-claim-body1",
+    "ties": "与真实 query 相同：score 降序，card_id 升序",
+    "overall_scope_mix": "不提供混合总通过率；四种 scope 分开报告"
+  }
+}

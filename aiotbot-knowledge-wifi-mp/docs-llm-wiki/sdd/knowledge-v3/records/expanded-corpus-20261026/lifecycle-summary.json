@@ -1,0 +1,645 @@
+{
+  "scope": "Twenty controlled public-interface lifecycle/governance probes; not WiFi semantic-grade, real human approval, production publication, six Target, build/runtime, or external ACL evidence",
+  "plan_ref": "test-plan-v3.json",
+  "plan_sha256": "5d222953720e078930da08f12a6fda108e47ffcae119b84d546eb915578f2c1a",
+  "unique_cases": 20,
+  "final_unique_counts": {
+    "pass": 20
+  },
+  "attempts": 32,
+  "initial_counts": {
+    "pass": 10,
+    "fail": 9,
+    "blocked": 1
+  },
+  "retries_are_not_new_cases": true,
+  "fixed_oracles_unchanged": true,
+  "layer_counts": {
+    "copied_real_baseline": 13,
+    "synthetic_governance_fixture": 7
+  },
+  "product_findings": "No remaining failure at a reached frozen target assertion. This is limited to the declared probes.",
+  "harness_findings": [
+    "Capture/plan operation IDs differed",
+    "Selected-card historical verify request omitted card_digest",
+    "Copied real baseline had flows/index.md but no root knowledge/index.md",
+    "requires fixture omitted Schema-required context_ids",
+    "Updated candidate lint needed exact historical_card_objects for old accepted body",
+    "Pure-document fixture needed an empty valid source registry"
+  ],
+  "repair_manifests": [
+    "harness-repair-r2.json",
+    "harness-repair-r3.json"
+  ],
+  "master_integrity": {
+    "status": "unchanged",
+    "scope": "All pre-existing readable workspace paths and hashes from all six execution snapshots remain intact; new approved query call logs are separately enumerated",
+    "checks": [
+      {
+        "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-01-02-03-04-05-06-07-08-09-10-20261026T133233-08f66aa7.json",
+        "report_sha256": "c4b8763c1731d91f017e910900b3bbae4ff60a06edd229926428f2be7831a6c0",
+        "protected_manifest": "E:\\FactumCore\\.scratch\\ex26\\probes\\integrity-baseline-cases-01-02-03-04-05-06-07-08-09-10-20261026T133233-08f66aa7.json",
+        "protected_manifest_sha256": "5ff767d52f933aaf8503f1f1d9d9df0dca615e413af940de3e2788f08e219632",
+        "protected_file_count": 3437,
+        "run_integrity": "unchanged",
+        "final_recheck": {
+          "status": "unchanged",
+          "missing": [],
+          "changed": [],
+          "unexpected_new": [],
+          "allowed_new_operation_file_count": 8495,
+          "allowed_new_operation_file_list_sha256": "bc6b59d8bfc3e7d748030e9b95a16f0fc33ccbbe2a2f8ecdea112875312e2913"
+        }
+      },
+      {
+        "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-11-12-13-14-15-16-17-18-19-20-20261026T133233-acc88c96.json",
+        "report_sha256": "92d5ad1103f8f14508ca5035ca0ddac4cc33d41749393da2d30c4133d296395e",
+        "protected_manifest": "E:\\FactumCore\\.scratch\\ex26\\probes\\integrity-baseline-cases-11-12-13-14-15-16-17-18-19-20-20261026T133233-acc88c96.json",
+        "protected_manifest_sha256": "5ff767d52f933aaf8503f1f1d9d9df0dca615e413af940de3e2788f08e219632",
+        "protected_file_count": 3437,
+        "run_integrity": "unchanged",
+        "final_recheck": {
+          "status": "unchanged",
+          "missing": [],
+          "changed": [],
+          "unexpected_new": [],
+          "allowed_new_operation_file_count": 8495,
+          "allowed_new_operation_file_list_sha256": "bc6b59d8bfc3e7d748030e9b95a16f0fc33ccbbe2a2f8ecdea112875312e2913"
+        }
+      },
+      {
+        "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-07-09-12-r2-20261026T135716-eb031425.json",
+        "report_sha256": "07332975220412037d1d29fbbc8498e8f9b3db7c7393b957aaf57e73d729743e",
+        "protected_manifest": "E:\\FactumCore\\.scratch\\ex26\\probes\\integrity-baseline-cases-07-09-12-r2-20261026T135716-eb031425.json",
+        "protected_manifest_sha256": "a412619727b9bc8da8acee725e9a3200da22579583714988b26dfb4c2732d9da",
+        "protected_file_count": 10503,
+        "run_integrity": "unchanged",
+        "final_recheck": {
+          "status": "unchanged",
+          "missing": [],
+          "changed": [],
+          "unexpected_new": [],
+          "allowed_new_operation_file_count": 1429,
+          "allowed_new_operation_file_list_sha256": "e8c1787bacaeb33f102701bfe46d1eb88d5c263736cf9c5039b76f7f2909b29c"
+        }
+      },
+      {
+        "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-14-15-16-17-18-19-20-r2-20261026T135716-671dbed5.json",
+        "report_sha256": "1682f48c3c37d00c71d1156e3b2e2e6271605d81d829be89951bdc6fdd2003b5",
+        "protected_manifest": "E:\\FactumCore\\.scratch\\ex26\\probes\\integrity-baseline-cases-14-15-16-17-18-19-20-r2-20261026T135716-671dbed5.json",
+        "protected_manifest_sha256": "a412619727b9bc8da8acee725e9a3200da22579583714988b26dfb4c2732d9da",
+        "protected_file_count": 10503,
+        "run_integrity": "unchanged",
+        "final_recheck": {
+          "status": "unchanged",
+          "missing": [],
+          "changed": [],
+          "unexpected_new": [],
+          "allowed_new_operation_file_count": 1429,
+          "allowed_new_operation_file_list_sha256": "e8c1787bacaeb33f102701bfe46d1eb88d5c263736cf9c5039b76f7f2909b29c"
+        }
+      },
+      {
+        "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-07-r3-20261026T140041-90918dc5.json",
+        "report_sha256": "92eb4adbb6d9ade2a415e19bf2b8161f609df4b99e8582f31f2a1cf8dd650a0d",
+        "protected_manifest": "E:\\FactumCore\\.scratch\\ex26\\probes\\integrity-baseline-cases-07-r3-20261026T140041-90918dc5.json",
+        "protected_manifest_sha256": "8a6b4ee59734674419e13accc68bc92a2822ec27721f3c759396d14487c525e2",
+        "protected_file_count": 11352,
+        "run_integrity": "unchanged",
+        "final_recheck": {
+          "status": "unchanged",
+          "missing": [],
+          "changed": [],
+          "unexpected_new": [],
+          "allowed_new_operation_file_count": 580,
+          "allowed_new_operation_file_list_sha256": "2659c625334e42c32a10fa335588fa80c4702506ad8c96cf44c74931cdad678d"
+        }
+      },
+      {
+        "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-19-r3-20261026T140041-6e654233.json",
+        "report_sha256": "8568dde984b8aa05ae85efe1bc2e7c52c3445ff609024d87be474b06d1a325ac",
+        "protected_manifest": "E:\\FactumCore\\.scratch\\ex26\\probes\\integrity-baseline-cases-19-r3-20261026T140041-6e654233.json",
+        "protected_manifest_sha256": "8a6b4ee59734674419e13accc68bc92a2822ec27721f3c759396d14487c525e2",
+        "protected_file_count": 11352,
+        "run_integrity": "unchanged",
+        "final_recheck": {
+          "status": "unchanged",
+          "missing": [],
+          "changed": [],
+          "unexpected_new": [],
+          "allowed_new_operation_file_count": 580,
+          "allowed_new_operation_file_list_sha256": "2659c625334e42c32a10fa335588fa80c4702506ad8c96cf44c74931cdad678d"
+        }
+      }
+    ]
+  },
+  "limits": [
+    "Case 07 old-proof refusal is cross-operation scope/exact-view binding; no new semantic approval was generated",
+    "Recovery probe inspects a genuine newly committed record-only journal; it does not cover interrupted resume/rollback",
+    "Index probe rejects the damaged copied database and builds/verifies a fresh generation; it does not activate that copied replacement",
+    "Pure-document and mixed confirmation probes omit the real human event and remain awaiting; no manual-review approval exists",
+    "Original E:/Hi1105/wifi was never a write target; this run does not separately rehash that external original checkout"
+  ],
+  "cases": [
+    {
+      "id": "01",
+      "name": "new_raw_discovered",
+      "layer": "copied_real_baseline",
+      "expected": "Complete scoped scan reports exactly that path as new; no formal card changes.",
+      "final_status": "pass",
+      "attempts": [
+        {
+          "revision": "v3",
+          "status": "pass",
+          "stage": null,
+          "seconds": 155.484,
+          "reason": null,
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-01-02-03-04-05-06-07-08-09-10-20261026T133233-08f66aa7.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\01\\result.json",
+          "result_sha256": "5867578d2929c2e217fb40906deed78ae3c8a446070097b2cff25c792509be20"
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "name": "changed_raw_keeps_partial",
+      "layer": "copied_real_baseline",
+      "expected": "Rescan reports changed and progress partial with correct old/new SHA-256.",
+      "final_status": "pass",
+      "attempts": [
+        {
+          "revision": "v3",
+          "status": "pass",
+          "stage": null,
+          "seconds": 230.953,
+          "reason": null,
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-01-02-03-04-05-06-07-08-09-10-20261026T133233-08f66aa7.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\02\\result.json",
+          "result_sha256": "5b22068673ae60ddb48403fed50d869bdea2ce4cbd96e2966890785a05a4f595"
+        }
+      ]
+    },
+    {
+      "id": "03",
+      "name": "missing_raw_complete_scope",
+      "layer": "copied_real_baseline",
+      "expected": "Complete same-scope scan reports missing and preserves blocked progress; no card deletion.",
+      "final_status": "pass",
+      "attempts": [
+        {
+          "revision": "v3",
+          "status": "pass",
+          "stage": null,
+          "seconds": 233.735,
+          "reason": null,
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-01-02-03-04-05-06-07-08-09-10-20261026T133233-08f66aa7.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\03\\result.json",
+          "result_sha256": "6c62ea0f34c9341060af5c489cc7af238489beed841ebc7b80d742a46c55d86d"
+        }
+      ]
+    },
+    {
+      "id": "04",
+      "name": "narrow_scan_preserves_outside_history",
+      "layer": "copied_real_baseline",
+      "expected": "Narrow scan does not report the second path missing; later complete scope does report it missing.",
+      "final_status": "pass",
+      "attempts": [
+        {
+          "revision": "v3",
+          "status": "pass",
+          "stage": null,
+          "seconds": 306.296,
+          "reason": null,
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-01-02-03-04-05-06-07-08-09-10-20261026T133233-08f66aa7.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\04\\result.json",
+          "result_sha256": "6cc391d02ca6b4dba18fa320946c75fa51083a682424d26e5df3264789ff89d3"
+        }
+      ]
+    },
+    {
+      "id": "05",
+      "name": "partial_is_not_unchanged_skip",
+      "layer": "copied_real_baseline",
+      "expected": "Next scan is unfinished with partial progress and an actionable unit; no substantive skip or adoption.",
+      "final_status": "pass",
+      "attempts": [
+        {
+          "revision": "v3",
+          "status": "pass",
+          "stage": null,
+          "seconds": 237.984,
+          "reason": null,
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-01-02-03-04-05-06-07-08-09-10-20261026T133233-08f66aa7.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\05\\result.json",
+          "result_sha256": "15b506d19dd8bc03df68da94ddf0983975960f866a401f0c24a299f00c1c933d"
+        }
+      ]
+    },
+    {
+      "id": "06",
+      "name": "unreviewed_substantive_skip_rejected",
+      "layer": "copied_real_baseline",
+      "expected": "record returns nonzero with SKIP_SAMPLE_REQUIRED and creates no formal processing record.",
+      "final_status": "pass",
+      "attempts": [
+        {
+          "revision": "v3",
+          "status": "pass",
+          "stage": null,
+          "seconds": 163.531,
+          "reason": null,
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-01-02-03-04-05-06-07-08-09-10-20261026T133233-08f66aa7.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\06\\result.json",
+          "result_sha256": "88dbfd6586739a44febee6e3d91e56ed68fcbff86c3d1a540f4d961a914efffc"
+        }
+      ]
+    },
+    {
+      "id": "07",
+      "name": "post_lint_edit_rejects_old_proof",
+      "layer": "copied_real_baseline",
+      "expected": "Initial new-view lint passes; candidate-inspect rejects FINAL_BYTES_CHANGED; unchanged old proof from another operation cannot authorize the new operation/view (structural scope/binding rejection, not a new semantic review); copied official cards stay unchanged. Public recover inspect checks a new record-only fact transaction created within this case and preserves that journal.",
+      "final_status": "pass",
+      "attempts": [
+        {
+          "revision": "v3",
+          "status": "fail",
+          "stage": "probe",
+          "seconds": 14.922,
+          "reason": "{'skill': 'hs-knowledge-change-plan', 'action': None, 'returncode': 2, 'timed_out': False, 'seconds': 2.656, 'status': 'error', 'phase': 'invalid', 'diagnostics': [{'code': 'OPERATION_MISMATCH', 'message': 'Capture and plan must belong to the same operation', 'path': ''}], 'findings': None}",
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-01-02-03-04-05-06-07-08-09-10-20261026T133233-08f66aa7.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\07\\result.json",
+          "result_sha256": "1b83554b3887887b23b738151280aaef7e9ad0a71addc5a9cbe153f079f77800"
+        },
+        {
+          "revision": "r2",
+          "status": "fail",
+          "stage": "probe",
+          "seconds": 42.141,
+          "reason": "Prerequisite new exact-view lint did not pass",
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-07-09-12-r2-20261026T135716-eb031425.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\07-r2\\result.json",
+          "result_sha256": "23d73638c564876b935dc5cf5a897e4ed46574ec93caa52e040556f067282ebf"
+        },
+        {
+          "revision": "r3",
+          "status": "pass",
+          "stage": null,
+          "seconds": 129.25,
+          "reason": null,
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-07-r3-20261026T140041-90918dc5.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\07-r3\\result.json",
+          "result_sha256": "3a9042586d6a44614a50401cf1797ad72b308c4b778eea8afd238be4bcb21998"
+        }
+      ]
+    },
+    {
+      "id": "08",
+      "name": "bad_frontmatter_rejected",
+      "layer": "copied_real_baseline",
+      "expected": "Formal lint fails with a format finding for that card and never repairs bytes.",
+      "final_status": "pass",
+      "attempts": [
+        {
+          "revision": "v3",
+          "status": "pass",
+          "stage": null,
+          "seconds": 19.531,
+          "reason": null,
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-01-02-03-04-05-06-07-08-09-10-20261026T133233-08f66aa7.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\08\\result.json",
+          "result_sha256": "6925fbe175fa54150667fdcd1f5efa9a096713a5654560a1852a608ad9c4d53f"
+        }
+      ]
+    },
+    {
+      "id": "09",
+      "name": "broken_navigation_rejected",
+      "layer": "copied_real_baseline",
+      "expected": "Formal lint fails in relation/navigation checking and never repairs the index.",
+      "final_status": "pass",
+      "attempts": [
+        {
+          "revision": "v3",
+          "status": "fail",
+          "stage": "probe",
+          "seconds": 12.407,
+          "reason": "[Errno 2] No such file or directory: 'E:\\\\FactumCore\\\\.scratch\\\\ex26\\\\.p\\\\09\\\\aiotbot-knowledge-wifi-mp\\\\knowledge\\\\index.md'",
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-01-02-03-04-05-06-07-08-09-10-20261026T133233-08f66aa7.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\09\\result.json",
+          "result_sha256": "f7bb1ddcc85a155f4aed2faec1115e3a2b5ff91dcd95b2bbbb86d06f7d3ee353"
+        },
+        {
+          "revision": "r2",
+          "status": "pass",
+          "stage": null,
+          "seconds": 22.032,
+          "reason": null,
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-07-09-12-r2-20261026T135716-eb031425.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\09-r2\\result.json",
+          "result_sha256": "6abdc187ab8ac39a402e7069d016d93759af7a7abcf38133a3fb645e3dba7e01"
+        }
+      ]
+    },
+    {
+      "id": "10",
+      "name": "out_of_range_locator_rejected",
+      "layer": "copied_real_baseline",
+      "expected": "Formal lint fails in source checking for that card and leaves all other cards unchanged.",
+      "final_status": "pass",
+      "attempts": [
+        {
+          "revision": "v3",
+          "status": "pass",
+          "stage": null,
+          "seconds": 20.782,
+          "reason": null,
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-01-02-03-04-05-06-07-08-09-10-20261026T133233-08f66aa7.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\10\\result.json",
+          "result_sha256": "2e4c5c04ce3ff857bb68321e1b843575b0533e1082ef6f3c7f79586fb9bb7508"
+        }
+      ]
+    },
+    {
+      "id": "11",
+      "name": "source_hash_mismatch_rejected",
+      "layer": "copied_real_baseline",
+      "expected": "Source integrity checking rejects the mismatching bytes; source finding paths are a nonempty subset of cards actually using that snapshot.",
+      "final_status": "pass",
+      "attempts": [
+        {
+          "revision": "v3",
+          "status": "pass",
+          "stage": null,
+          "seconds": 15.453,
+          "reason": null,
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-11-12-13-14-15-16-17-18-19-20-20261026T133233-acc88c96.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\11\\result.json",
+          "result_sha256": "cc189cf163d4cd4a04e58397af5d5c8b8584653890a73df6f7869f7ea0d1a6b9"
+        }
+      ]
+    },
+    {
+      "id": "12",
+      "name": "corrupt_index_rebuild_preserves_cards",
+      "layer": "copied_real_baseline",
+      "expected": "Corrupt generation verification rejects; rebuilt generation verifies complete; all formal card/navigation/source-lock bytes remain identical.",
+      "final_status": "pass",
+      "attempts": [
+        {
+          "revision": "v3",
+          "status": "blocked",
+          "stage": "assembly",
+          "seconds": 11.687,
+          "reason": "copied historical proof cannot be verified; index perturbation not started",
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-11-12-13-14-15-16-17-18-19-20-20261026T133233-acc88c96.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\12\\result.json",
+          "result_sha256": "c2d0e47b7d157a3dd4285e92501e73bb98974d1bc594137b92bfafa810f83aa6"
+        },
+        {
+          "revision": "r2",
+          "status": "pass",
+          "stage": null,
+          "seconds": 51.078,
+          "reason": null,
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-07-09-12-r2-20261026T135716-eb031425.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\12-r2\\result.json",
+          "result_sha256": "d20d16279af1feb9e8b0cc30575cf75ffb7b7f3e83262d4c637fee1bad6f869d"
+        }
+      ]
+    },
+    {
+      "id": "13",
+      "name": "source_change_claim_lineage",
+      "layer": "synthetic_governance_fixture",
+      "expected": "Prepared candidates contain only card A, with adopted source claim_ids exactly A's Claim; card B and its source are unchanged. This is impact discovery, not automatic semantic invalidation.",
+      "final_status": "pass",
+      "attempts": [
+        {
+          "revision": "v3",
+          "status": "pass",
+          "stage": null,
+          "seconds": 11.656,
+          "reason": null,
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-11-12-13-14-15-16-17-18-19-20-20261026T133233-acc88c96.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\13\\result.json",
+          "result_sha256": "f5af7503d382138faaeb0fd6603bd7d12246ab8cede386b357c5eec28bce7177"
+        }
+      ]
+    },
+    {
+      "id": "14",
+      "name": "merge_complete_destinations",
+      "layer": "synthetic_governance_fixture",
+      "expected": "Plan/materialize/inspect pass; both old cards are deprecated in the proposed complete view; formal fixture bytes remain unchanged.",
+      "final_status": "pass",
+      "attempts": [
+        {
+          "revision": "v3",
+          "status": "fail",
+          "stage": "probe",
+          "seconds": 3.109,
+          "reason": "{'skill': 'hs-knowledge-change-plan', 'action': None, 'returncode': 2, 'timed_out': False, 'seconds': 1.391, 'status': 'error', 'phase': 'invalid', 'diagnostics': [{'code': 'OPERATION_MISMATCH', 'message': 'Capture and plan must belong to the same operation', 'path': ''}], 'findings': None}",
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-11-12-13-14-15-16-17-18-19-20-20261026T133233-acc88c96.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\14\\result.json",
+          "result_sha256": "111be29300963f77beff8c9cfe7efd902f3698470d080dbe19209ed87101656b"
+        },
+        {
+          "revision": "r2",
+          "status": "pass",
+          "stage": null,
+          "seconds": 22.938,
+          "reason": null,
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-14-15-16-17-18-19-20-r2-20261026T135716-671dbed5.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\14-r2\\result.json",
+          "result_sha256": "fd0fcc017f583ff29c31c76049d4adca0d3aa4710cb892dfd2fb81352754191a"
+        }
+      ]
+    },
+    {
+      "id": "15",
+      "name": "merge_missing_destination_rejected",
+      "layer": "synthetic_governance_fixture",
+      "expected": "Planning rejects CLAIM_DESTINATION_REQUIRED before formal writes.",
+      "final_status": "pass",
+      "attempts": [
+        {
+          "revision": "v3",
+          "status": "fail",
+          "stage": "probe",
+          "seconds": 2.984,
+          "reason": "",
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-11-12-13-14-15-16-17-18-19-20-20261026T133233-acc88c96.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\15\\result.json",
+          "result_sha256": "065b144e021791538d96cab17b976e96cd012909bb7c574913dfdbc2b68f718f"
+        },
+        {
+          "revision": "r2",
+          "status": "pass",
+          "stage": null,
+          "seconds": 3.109,
+          "reason": null,
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-14-15-16-17-18-19-20-r2-20261026T135716-671dbed5.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\15-r2\\result.json",
+          "result_sha256": "c440e3f9d3586d2db322f0d46058e54e6dbd14cfafacc060fbf1075d9e184388"
+        }
+      ]
+    },
+    {
+      "id": "16",
+      "name": "split_complete_destinations",
+      "layer": "synthetic_governance_fixture",
+      "expected": "Plan/materialize/inspect pass; old card is deprecated and both destinations exist in the proposed view; formal fixture bytes unchanged.",
+      "final_status": "pass",
+      "attempts": [
+        {
+          "revision": "v3",
+          "status": "fail",
+          "stage": "probe",
+          "seconds": 2.985,
+          "reason": "{'skill': 'hs-knowledge-change-plan', 'action': None, 'returncode': 2, 'timed_out': False, 'seconds': 1.375, 'status': 'error', 'phase': 'invalid', 'diagnostics': [{'code': 'OPERATION_MISMATCH', 'message': 'Capture and plan must belong to the same operation', 'path': ''}], 'findings': None}",
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-11-12-13-14-15-16-17-18-19-20-20261026T133233-acc88c96.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\16\\result.json",
+          "result_sha256": "dc94467718d850a2ccfc57415e12fc38fecf1bab77e87e566c7a7780cc47d20b"
+        },
+        {
+          "revision": "r2",
+          "status": "pass",
+          "stage": null,
+          "seconds": 22.172,
+          "reason": null,
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-14-15-16-17-18-19-20-r2-20261026T135716-671dbed5.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\16-r2\\result.json",
+          "result_sha256": "9e1cb4defb967110565ff95f504a8e32b690eb30e5f831843a4e21dd007432b3"
+        }
+      ]
+    },
+    {
+      "id": "17",
+      "name": "split_unknown_destination_rejected",
+      "layer": "synthetic_governance_fixture",
+      "expected": "Planning rejects the unknown Claim destination before formal writes.",
+      "final_status": "pass",
+      "attempts": [
+        {
+          "revision": "v3",
+          "status": "fail",
+          "stage": "probe",
+          "seconds": 3.0,
+          "reason": "",
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-11-12-13-14-15-16-17-18-19-20-20261026T133233-acc88c96.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\17\\result.json",
+          "result_sha256": "91822ded34882449f3d8997c50a137de84ed982885d3bf7f3f647c93e34bf8e3"
+        },
+        {
+          "revision": "r2",
+          "status": "pass",
+          "stage": null,
+          "seconds": 3.094,
+          "reason": null,
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-14-15-16-17-18-19-20-r2-20261026T135716-671dbed5.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\17-r2\\result.json",
+          "result_sha256": "31447d1beee0572a7290f5a83c274d06e44b6d52190ebd22274009f92e41a14e"
+        }
+      ]
+    },
+    {
+      "id": "18",
+      "name": "deprecate_live_requires_rejected",
+      "layer": "synthetic_governance_fixture",
+      "expected": "Planning rejects the live incoming dependency; formal old and dependent cards remain unchanged.",
+      "final_status": "pass",
+      "attempts": [
+        {
+          "revision": "v3",
+          "status": "fail",
+          "stage": "probe",
+          "seconds": 2.922,
+          "reason": "",
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-11-12-13-14-15-16-17-18-19-20-20261026T133233-acc88c96.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\18\\result.json",
+          "result_sha256": "8aeafd02f6ef67575bfd00268fc11bd24760ab08f81c3f73e1927d7b95d7bc4f"
+        },
+        {
+          "revision": "r2",
+          "status": "pass",
+          "stage": null,
+          "seconds": 3.75,
+          "reason": null,
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-14-15-16-17-18-19-20-r2-20261026T135716-671dbed5.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\18-r2\\result.json",
+          "result_sha256": "e268bdf83e578b823ad7882dd2be3d098d47417940111b466a369fedc87c8896"
+        }
+      ]
+    },
+    {
+      "id": "19",
+      "name": "document_without_human_awaits",
+      "layer": "synthetic_governance_fixture",
+      "expected": "confirmation-record returns exit 3 / phase awaiting and no approved manual-review record or formal content write.",
+      "final_status": "pass",
+      "attempts": [
+        {
+          "revision": "v3",
+          "status": "fail",
+          "stage": "probe",
+          "seconds": 2.922,
+          "reason": "{'skill': 'hs-knowledge-change-plan', 'action': None, 'returncode': 2, 'timed_out': False, 'seconds': 1.344, 'status': 'error', 'phase': 'invalid', 'diagnostics': [{'code': 'OPERATION_MISMATCH', 'message': 'Capture and plan must belong to the same operation', 'path': ''}], 'findings': None}",
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-11-12-13-14-15-16-17-18-19-20-20261026T133233-acc88c96.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\19\\result.json",
+          "result_sha256": "eafc0d211987fc4bd04492ac7acb0a25cab566410324ee6121b7aa7dbff1a1a6"
+        },
+        {
+          "revision": "r2",
+          "status": "fail",
+          "stage": "probe",
+          "seconds": 10.078,
+          "reason": "{'skill': 'hs-knowledge-confirmation-prepare', 'action': None, 'returncode': 2, 'timed_out': False, 'seconds': 1.391, 'status': 'error', 'phase': 'invalid', 'diagnostics': [{'code': 'invalid_input', 'message': \"[Errno 2] No such file or directory: 'E:\\\\\\\\FactumCore\\\\\\\\.scratch\\\\\\\\ex26\\\\\\\\.p\\\\\\\\19-r2\\\\\\\\aiotbot-knowledge-wifi-mp\\\\\\\\governance\\\\\\\\sources.lock.yaml'\"}], 'findings': None}",
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-14-15-16-17-18-19-20-r2-20261026T135716-671dbed5.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\19-r2\\result.json",
+          "result_sha256": "3936eb1117db0cbbc46a1d6d997c142b14dd31b5eb96b2096003735f3eba35ff"
+        },
+        {
+          "revision": "r3",
+          "status": "pass",
+          "stage": null,
+          "seconds": 13.61,
+          "reason": null,
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-19-r3-20261026T140041-6e654233.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\19-r3\\result.json",
+          "result_sha256": "fe78360d712da27fb0add2752669136c26df782c11d341ae77dbfa8b642d9faa"
+        }
+      ]
+    },
+    {
+      "id": "20",
+      "name": "mixed_without_human_awaits",
+      "layer": "copied_real_baseline",
+      "expected": "View review_mode is mixed; confirmation-record returns exit 3 / phase awaiting; no approved manual-review record or formal content write.",
+      "final_status": "pass",
+      "attempts": [
+        {
+          "revision": "v3",
+          "status": "fail",
+          "stage": "probe",
+          "seconds": 10.906,
+          "reason": "{'skill': 'hs-knowledge-change-plan', 'action': None, 'returncode': 2, 'timed_out': False, 'seconds': 1.359, 'status': 'error', 'phase': 'invalid', 'diagnostics': [{'code': 'OPERATION_MISMATCH', 'message': 'Capture and plan must belong to the same operation', 'path': ''}], 'findings': None}",
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-11-12-13-14-15-16-17-18-19-20-20261026T133233-acc88c96.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\20\\result.json",
+          "result_sha256": "4b87c6e03980387135aed1e3753574bacc6e7371eddcb2983124e4a409e2dbd1"
+        },
+        {
+          "revision": "r2",
+          "status": "pass",
+          "stage": null,
+          "seconds": 49.875,
+          "reason": null,
+          "report": "E:\\FactumCore\\.scratch\\ex26\\probes\\report-cases-14-15-16-17-18-19-20-r2-20261026T135716-671dbed5.json",
+          "result": "E:\\FactumCore\\.scratch\\ex26\\.p\\20-r2\\result.json",
+          "result_sha256": "621b2cc7ff0cffd6b616e8a8077298f739ddea391d76ef5f4f8480a65f5bd454"
+        }
+      ]
+    }
+  ]
+}

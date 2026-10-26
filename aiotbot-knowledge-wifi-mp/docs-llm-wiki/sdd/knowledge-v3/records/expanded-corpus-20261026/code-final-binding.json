@@ -1,0 +1,439 @@
+{
+  "record_type": "final_code_review_binding",
+  "record_version": 1,
+  "reviewer_id": "/root/review_expanded_code_content",
+  "issued_at": 1792992054,
+  "checked_at_utc": "2026-10-26 05:20:54 UTC",
+  "status": "passed",
+  "operation_id": "ex26-code-r2",
+  "root": "E:\\FactumCore\\.scratch\\ex26\\workspace\\aiotbot-knowledge-wifi-mp",
+  "view_ref": ".build/operations/ex26-code-r2/final-view.json",
+  "view_digest": "59fa008942a44701e7edc67a63f59e176cc326d023dcd16d99c843e3efebe7e8",
+  "context_ref": ".build/operations/ex26-code-r2/trial-fixed-source-context.json",
+  "context_digest": "d47ef759398c476ce066adc228a641bdcc628413af16a2fcff9b3558c0595152",
+  "plan_ref": ".build/operations/ex26-code-r2/plan.json",
+  "plan_digest": "6e6040f1d17af16233d29d3bd20d6548fc419ca01cbdffeb25cd4a2231635ee3",
+  "semantic_plan_ref": ".build/operations/ex26-code-r2/semantic-plan.json",
+  "semantic_plan_digest": "ea7f394a93658356b17909663d5e4c6ace89a043d7066e5a6072a6b4f2fc2f40",
+  "rules_digest": "0ab804a3cf63e4e2edcd153e58400490b08be2e52556ba4edfba6da9fd707cba",
+  "authors": [
+    "/root",
+    "/root/author_code_connection_cards",
+    "/root/author_code_data_cards"
+  ],
+  "reviewer_differs_from_all_authors": true,
+  "independence_process": "我是 /root/review_expanded_code_content，未参与这些卡的作者工作。先独立阅读 existing/connection/data 的10张JSON候选，并按GB18030严格解码实际 E:/Hi1105/wifi 源码，逐条核对31个Claim的断言、早退、条件、引用范围及Host/Device边界；必要时补读计数、BA接收复位、A-MSDU支持位和XHT辅助实现。首轮提出5处问题，作者保留首稿并在r1修订后复核；随后核对真实r2 view.writes与候选全部Claim、六类正文及30条范围限制，重算view/context/P3 plan摘要，验证每Claim全部source_ref的原始snapshot整份SHA、GB18030定位、实际原源码与固定context代码副本。内容判定依据均为上述原始源码；31条判定及r1绑定完成后，等待r2时一次list_agents状态调用自动显示过其他代理终态摘要，未打开其审查文件，也未据此调整判定。过程与检查范围另见final-binding.json。本记录只支持历史静态源码结论，不证明六Target、构建、运行、Device执行、真人决定或宿主身份认证。",
+  "checks": {
+    "view_context_plan_semantic_plan_canonical_digests_recomputed": true,
+    "view_plan_card_writes_exact_match": true,
+    "view_source_lock_matches_plan": true,
+    "all_write_bytes_match_final_digest": true,
+    "all_31_claim_texts_and_sources_match_reviewed_json": true,
+    "all_six_sections_per_card_match_reviewed_json": true,
+    "all_30_authoring_limitations_in_final_body": true,
+    "all_10_frozen_source_objects_match_actual_code_and_context_copy": true,
+    "all_frozen_locator_maps_and_extractions_match_gb18030_original_lines": true,
+    "all_13_inspected_original_source_file_hashes_unchanged": true,
+    "all_claim_source_refs_covered": true,
+    "all_evidence_sha256_are_whole_raw_snapshot_hashes": true,
+    "target_and_build_remain_unknown": true,
+    "compilation_performed": false,
+    "runtime_performed": false
+  },
+  "counts": {
+    "cards": 10,
+    "claims": 31,
+    "source_snapshots": 10,
+    "evidence_references": 59,
+    "limitations": 30
+  },
+  "cards": [
+    {
+      "card_id": "wifi-historical-pno-scan",
+      "authoring_path": "E:\\FactumCore\\.scratch\\ex26\\authoring\\connection\\wifi-historical-pno-scan.json",
+      "authoring_sha256": "a1b68656a19e793bf30a9fe3db4a072dc197febde340db376bb07d04e2d13934",
+      "view_write_path": "knowledge/concepts/flows/wifi-historical-pno-scan.md",
+      "view_write_sha256": "933611eed5bac92e53287c2dbb8a9e56004934ca84ac46ac2dc82be27acd3a1c",
+      "claims": 3,
+      "sections_match": true,
+      "metadata_match": true,
+      "limitation_count": 3,
+      "all_limitations_present": true
+    },
+    {
+      "card_id": "wifi-historical-sta-assoc",
+      "authoring_path": "E:\\FactumCore\\.scratch\\ex26\\authoring\\connection\\wifi-historical-sta-assoc.json",
+      "authoring_sha256": "d84638371f6b991e905ca3905be6ea4f32f36788aa3573061ee484eceed0f9fc",
+      "view_write_path": "knowledge/concepts/flows/wifi-historical-sta-assoc.md",
+      "view_write_sha256": "112a08ec00ab0a3dc7c9c2d92fc12a567845fc4039343a319fdff7d4638735c7",
+      "claims": 3,
+      "sections_match": true,
+      "metadata_match": true,
+      "limitation_count": 3,
+      "all_limitations_present": true
+    },
+    {
+      "card_id": "wifi-historical-sta-auth",
+      "authoring_path": "E:\\FactumCore\\.scratch\\ex26\\authoring\\connection\\wifi-historical-sta-auth.json",
+      "authoring_sha256": "45eeacb031c612d3b3dbc85420f16de54d2dfba8701bbd102da3bb8054feea28",
+      "view_write_path": "knowledge/concepts/flows/wifi-historical-sta-auth.md",
+      "view_write_sha256": "154052a8bf40f304b11aec893edec9daae9905a82c50f88e8a72dd8dab3a2a30",
+      "claims": 3,
+      "sections_match": true,
+      "metadata_match": true,
+      "limitation_count": 3,
+      "all_limitations_present": true
+    },
+    {
+      "card_id": "wifi-historical-sta-join",
+      "authoring_path": "E:\\FactumCore\\.scratch\\ex26\\authoring\\connection\\wifi-historical-sta-join.json",
+      "authoring_sha256": "f8822581f1be4116eebb9593bfbd9a9ff7d15efeef56f4d6177c477939dd0d6a",
+      "view_write_path": "knowledge/concepts/flows/wifi-historical-sta-join.md",
+      "view_write_sha256": "3d4a369ac6587bb47c906ac69c0cfbad3070f66dc32a4f779fac0598e4804077",
+      "claims": 3,
+      "sections_match": true,
+      "metadata_match": true,
+      "limitation_count": 2,
+      "all_limitations_present": true
+    },
+    {
+      "card_id": "wifi-historical-addba-setup",
+      "authoring_path": "E:\\FactumCore\\.scratch\\ex26\\revisions\\r1\\wifi-historical-addba-setup.json",
+      "authoring_sha256": "10ce465d39bb18bb32f645d8691b9a969861cd4d8f91f37566367a0d78e64bf6",
+      "view_write_path": "knowledge/concepts/flows/wifi-historical-addba-setup.md",
+      "view_write_sha256": "09e38b05759c7d79259bf74b38e5b572753a8045a1a3138b79613e9687f8ce9a",
+      "claims": 3,
+      "sections_match": true,
+      "metadata_match": true,
+      "limitation_count": 3,
+      "all_limitations_present": true
+    },
+    {
+      "card_id": "wifi-historical-delba-cleanup",
+      "authoring_path": "E:\\FactumCore\\.scratch\\ex26\\revisions\\r1\\wifi-historical-delba-cleanup.json",
+      "authoring_sha256": "dc249a57662e6e060ba02b5303d09ea92ccb06c220017ddc2727f07058ceb0c9",
+      "view_write_path": "knowledge/concepts/flows/wifi-historical-delba-cleanup.md",
+      "view_write_sha256": "d940dbf2d8fe0b48a04916ca5fae8e31aea2bd13447c23df46c5cd1bb833b2d1",
+      "claims": 3,
+      "sections_match": true,
+      "metadata_match": true,
+      "limitation_count": 3,
+      "all_limitations_present": true
+    },
+    {
+      "card_id": "wifi-historical-rx-defrag",
+      "authoring_path": "E:\\FactumCore\\.scratch\\ex26\\authoring\\data\\wifi-historical-rx-defrag.json",
+      "authoring_sha256": "75db42c0ee46321f46154a7e38a783b4b456c538587fc53585735fe99f11c132",
+      "view_write_path": "knowledge/concepts/flows/wifi-historical-rx-defrag.md",
+      "view_write_sha256": "44b9922c54b41b1f650d1397d6fa96986ec10c232733739a2cc3b1657f8ccf62",
+      "claims": 3,
+      "sections_match": true,
+      "metadata_match": true,
+      "limitation_count": 3,
+      "all_limitations_present": true
+    },
+    {
+      "card_id": "wifi-historical-tx-amsdu",
+      "authoring_path": "E:\\FactumCore\\.scratch\\ex26\\authoring\\data\\wifi-historical-tx-amsdu.json",
+      "authoring_sha256": "b95a808169cb571df2e53cfd1c18625676107c878a7bd946100c6838eb052fdb",
+      "view_write_path": "knowledge/concepts/flows/wifi-historical-tx-amsdu.md",
+      "view_write_sha256": "2bc779362f3206d8ce9225400a3f17dcfaf162e66e37d56449ce562e3a7d550d",
+      "claims": 3,
+      "sections_match": true,
+      "metadata_match": true,
+      "limitation_count": 3,
+      "all_limitations_present": true
+    },
+    {
+      "card_id": "wifi-historical-tx-qos",
+      "authoring_path": "E:\\FactumCore\\.scratch\\ex26\\authoring\\data\\wifi-historical-tx-qos.json",
+      "authoring_sha256": "3452d3608b51b41f68a35f42e909744fce6734aed976167f60a4fd72b9218bed",
+      "view_write_path": "knowledge/concepts/flows/wifi-historical-tx-qos.md",
+      "view_write_sha256": "474bb1a567e34e856cca44011c0a74ddc78c705adf822413a8a634d8b497a1c8",
+      "claims": 3,
+      "sections_match": true,
+      "metadata_match": true,
+      "limitation_count": 3,
+      "all_limitations_present": true
+    },
+    {
+      "card_id": "wifi-historical-scan-lifecycle",
+      "authoring_path": "E:\\FactumCore\\.scratch\\ex26\\revisions\\r1\\wifi-historical-scan-lifecycle.json",
+      "authoring_sha256": "ae14a4b3124acb7de28071c212686a1d26a3cb9b0cd5c73f6dda472477f1917f",
+      "view_write_path": "knowledge/concepts/flows/wifi-historical-scan-lifecycle.md",
+      "view_write_sha256": "5c7597b3cf28f9b4f50920076d47ff8616ec7539cf2c3920c246dec9096b673b",
+      "claims": 4,
+      "sections_match": true,
+      "metadata_match": true,
+      "limitation_count": 4,
+      "all_limitations_present": true
+    }
+  ],
+  "sources": [
+    {
+      "source_id": "ex26-code-10",
+      "snapshot_id": "code:248e6de6706c5c9576ea6a26ac91324494970423d21b0d2dcb46b0a843983e27",
+      "path": "hi1105_host/inc/hd_common/wlan_types.h",
+      "sha256": "670c7b4b25497b378597adf914ba539a19f01aded9ad4dea9c70404dd907f3dd",
+      "bytes": 46379,
+      "raw_object_matches_actual_and_context_copy": true,
+      "locator_map_matches_all_original_lines": true,
+      "utf8_extraction_matches_gb18030_lines": true,
+      "context_manifest_matches": true
+    },
+    {
+      "source_id": "ex26-code-03",
+      "snapshot_id": "code:3d719c7517cbd225f78c32b82c4af0c3d3041aff46a6932fbca219290f5be93c",
+      "path": "hi1105_host/hmac/hmac_mgmt_bss_comm.c",
+      "sha256": "994aea071cfae925d403ae5daabedd70e1dc62d1379e42b1cd1f05d0da96f1b2",
+      "bytes": 121415,
+      "raw_object_matches_actual_and_context_copy": true,
+      "locator_map_matches_all_original_lines": true,
+      "utf8_extraction_matches_gb18030_lines": true,
+      "context_manifest_matches": true
+    },
+    {
+      "source_id": "ex26-code-05",
+      "snapshot_id": "code:6edb037cc3a93532bfe18b4890ffceee07669d577657bdde16c56d098e958b28",
+      "path": "hi1105_host/hmac/hmac_scan.c",
+      "sha256": "ea95d271ea8e8492d15bd3cc9f1d9979d8168791725a6a8cf0cebeeb930eec81",
+      "bytes": 113884,
+      "raw_object_matches_actual_and_context_copy": true,
+      "locator_map_matches_all_original_lines": true,
+      "utf8_extraction_matches_gb18030_lines": true,
+      "context_manifest_matches": true
+    },
+    {
+      "source_id": "ex26-code-06",
+      "snapshot_id": "code:79160f77fade59b2817833dc303487fe234236ee5965444092a80e656c50d1ac",
+      "path": "hi1105_host/hmac/hmac_sme_sta.c",
+      "sha256": "ad084c524e82a5df0b7db49d4853e8ca842b90d1060195d532d2d02fd444c38d",
+      "bytes": 55779,
+      "raw_object_matches_actual_and_context_copy": true,
+      "locator_map_matches_all_original_lines": true,
+      "utf8_extraction_matches_gb18030_lines": true,
+      "context_manifest_matches": true
+    },
+    {
+      "source_id": "ex26-code-09",
+      "snapshot_id": "code:7adcd5136999200e16e0626a28b1a77769fe55ee90291ec9b4ceda76c52bb094",
+      "path": "hi1105_host/inc/hd_common/wlan_spec.h",
+      "sha256": "a6f6abf193e9e797dc890705044fa1cc2522c6aba0665471bdc1c7162a59abf7",
+      "bytes": 14784,
+      "raw_object_matches_actual_and_context_copy": true,
+      "locator_map_matches_all_original_lines": true,
+      "utf8_extraction_matches_gb18030_lines": true,
+      "context_manifest_matches": true
+    },
+    {
+      "source_id": "ex26-code-07",
+      "snapshot_id": "code:9df9f019b49105b2269e9427bc3f289f2f7b9c52ac9df358af9fcdacfae2f91a",
+      "path": "hi1105_host/hmac/hmac_tx_amsdu.c",
+      "sha256": "8cb2b6d032bd99bd4311eb5e15bb6c3a18cad6a41178b4beaf36456e4296dfc6",
+      "bytes": 25227,
+      "raw_object_matches_actual_and_context_copy": true,
+      "locator_map_matches_all_original_lines": true,
+      "utf8_extraction_matches_gb18030_lines": true,
+      "context_manifest_matches": true
+    },
+    {
+      "source_id": "ex26-code-08",
+      "snapshot_id": "code:cc340ca4992b3053f46b49d8d0c5de5834e828c088cbea53db4648119b0f8707",
+      "path": "hi1105_host/hmac/hmac_tx_data.c",
+      "sha256": "570410298a340607749c376f0bf60ac5bff140f514f285be7aa4d705306b3b3d",
+      "bytes": 103238,
+      "raw_object_matches_actual_and_context_copy": true,
+      "locator_map_matches_all_original_lines": true,
+      "utf8_extraction_matches_gb18030_lines": true,
+      "context_manifest_matches": true
+    },
+    {
+      "source_id": "ex26-code-01",
+      "snapshot_id": "code:dfd433e046667a7cafb06a92abd5436502c477e174cebd4a2f96347f06e1d991",
+      "path": "hi1105_host/hmac/hmac_frag.c",
+      "sha256": "5e512aae8f66c68667f4e1aa61f279491c39f1742f066d0b18df319270ea7d6f",
+      "bytes": 13736,
+      "raw_object_matches_actual_and_context_copy": true,
+      "locator_map_matches_all_original_lines": true,
+      "utf8_extraction_matches_gb18030_lines": true,
+      "context_manifest_matches": true
+    },
+    {
+      "source_id": "ex26-code-04",
+      "snapshot_id": "code:e2575ab02a3af488c2e1843dc55d726f852bfba5aa9fd9b22d731b391d7a8bec",
+      "path": "hi1105_host/hmac/hmac_mgmt_sta.c",
+      "sha256": "c93dedcd9df90bdace3390c82dfe5412f79db3f658d641a175fea2f5391117fe",
+      "bytes": 74905,
+      "raw_object_matches_actual_and_context_copy": true,
+      "locator_map_matches_all_original_lines": true,
+      "utf8_extraction_matches_gb18030_lines": true,
+      "context_manifest_matches": true
+    },
+    {
+      "source_id": "ex26-code-02",
+      "snapshot_id": "code:fbdc3b346a9aab1acbb893cc899b83b21d32ea41db435e589e975026043f7741",
+      "path": "hi1105_host/hmac/hmac_fsm.c",
+      "sha256": "964d20e7312d33c020fa22ecadddf2e8eacae7b8351095a9385f4f530d70744b",
+      "bytes": 22894,
+      "raw_object_matches_actual_and_context_copy": true,
+      "locator_map_matches_all_original_lines": true,
+      "utf8_extraction_matches_gb18030_lines": true,
+      "context_manifest_matches": true
+    }
+  ],
+  "inspected_source_files": [
+    {
+      "path": "main/hi1105_host/hmac/hmac_fsm.c",
+      "sha256": "964d20e7312d33c020fa22ecadddf2e8eacae7b8351095a9385f4f530d70744b",
+      "unchanged_since_source_review": true
+    },
+    {
+      "path": "main/hi1105_host/hmac/hmac_scan.c",
+      "sha256": "ea95d271ea8e8492d15bd3cc9f1d9979d8168791725a6a8cf0cebeeb930eec81",
+      "unchanged_since_source_review": true
+    },
+    {
+      "path": "main/hi1105_host/inc/hd_common/wlan_spec.h",
+      "sha256": "a6f6abf193e9e797dc890705044fa1cc2522c6aba0665471bdc1c7162a59abf7",
+      "unchanged_since_source_review": true
+    },
+    {
+      "path": "main/hi1105_host/hmac/hmac_sme_sta.c",
+      "sha256": "ad084c524e82a5df0b7db49d4853e8ca842b90d1060195d532d2d02fd444c38d",
+      "unchanged_since_source_review": true
+    },
+    {
+      "path": "main/hi1105_host/hmac/hmac_mgmt_sta.c",
+      "sha256": "c93dedcd9df90bdace3390c82dfe5412f79db3f658d641a175fea2f5391117fe",
+      "unchanged_since_source_review": true
+    },
+    {
+      "path": "main/hi1105_host/hmac/hmac_mgmt_bss_comm.c",
+      "sha256": "994aea071cfae925d403ae5daabedd70e1dc62d1379e42b1cd1f05d0da96f1b2",
+      "unchanged_since_source_review": true
+    },
+    {
+      "path": "main/hi1105_host/hmac/hmac_frag.c",
+      "sha256": "5e512aae8f66c68667f4e1aa61f279491c39f1742f066d0b18df319270ea7d6f",
+      "unchanged_since_source_review": true
+    },
+    {
+      "path": "main/hi1105_host/hmac/hmac_tx_amsdu.c",
+      "sha256": "8cb2b6d032bd99bd4311eb5e15bb6c3a18cad6a41178b4beaf36456e4296dfc6",
+      "unchanged_since_source_review": true
+    },
+    {
+      "path": "main/hi1105_host/hmac/hmac_tx_data.c",
+      "sha256": "570410298a340607749c376f0bf60ac5bff140f514f285be7aa4d705306b3b3d",
+      "unchanged_since_source_review": true
+    },
+    {
+      "path": "main/hi1105_host/inc/hd_common/wlan_types.h",
+      "sha256": "670c7b4b25497b378597adf914ba539a19f01aded9ad4dea9c70404dd907f3dd",
+      "unchanged_since_source_review": true
+    },
+    {
+      "path": "main/hi1105_host/hmac/hmac_user.h",
+      "sha256": "affd3b0f42c926df0c47ce213e57b23bc3264ee7fb16627857d78297f744cde7",
+      "unchanged_since_source_review": true
+    },
+    {
+      "path": "main/hi1105_host/hmac/hmac_blockack.c",
+      "sha256": "fea36fef8bd4862248e030481f2a0ce959dfe77cd87f7f192cd8489822718157",
+      "unchanged_since_source_review": true
+    },
+    {
+      "path": "main/hi1105_host/hmac/mac_mib.h",
+      "sha256": "5cef09b01d15143dfacefd438a68290fb722654dfe9c2a802c79b8914655174a",
+      "unchanged_since_source_review": true
+    }
+  ],
+  "view_writes": [
+    {
+      "path": "governance/sources.lock.yaml",
+      "final_digest": "8a711e6304a7a7dada704b1363c471aa0194862b208bcc88741987c01cd25c6b",
+      "expected_old_digest": "a175f32aff1abf6cb6617a5337a4478587ced98f8bf5fac520deb07c3d1add59"
+    },
+    {
+      "path": "knowledge/concepts/flows/index.md",
+      "final_digest": "3aa8729b3ca961a6caece8ffbce5f9acb1b27ee9d2d04a9ad3e5f9f41d470100",
+      "expected_old_digest": null
+    },
+    {
+      "path": "knowledge/concepts/flows/wifi-historical-addba-setup.md",
+      "final_digest": "09e38b05759c7d79259bf74b38e5b572753a8045a1a3138b79613e9687f8ce9a",
+      "expected_old_digest": null
+    },
+    {
+      "path": "knowledge/concepts/flows/wifi-historical-delba-cleanup.md",
+      "final_digest": "d940dbf2d8fe0b48a04916ca5fae8e31aea2bd13447c23df46c5cd1bb833b2d1",
+      "expected_old_digest": null
+    },
+    {
+      "path": "knowledge/concepts/flows/wifi-historical-pno-scan.md",
+      "final_digest": "933611eed5bac92e53287c2dbb8a9e56004934ca84ac46ac2dc82be27acd3a1c",
+      "expected_old_digest": null
+    },
+    {
+      "path": "knowledge/concepts/flows/wifi-historical-rx-defrag.md",
+      "final_digest": "44b9922c54b41b1f650d1397d6fa96986ec10c232733739a2cc3b1657f8ccf62",
+      "expected_old_digest": null
+    },
+    {
+      "path": "knowledge/concepts/flows/wifi-historical-scan-lifecycle.md",
+      "final_digest": "5c7597b3cf28f9b4f50920076d47ff8616ec7539cf2c3920c246dec9096b673b",
+      "expected_old_digest": null
+    },
+    {
+      "path": "knowledge/concepts/flows/wifi-historical-sta-assoc.md",
+      "final_digest": "112a08ec00ab0a3dc7c9c2d92fc12a567845fc4039343a319fdff7d4638735c7",
+      "expected_old_digest": null
+    },
+    {
+      "path": "knowledge/concepts/flows/wifi-historical-sta-auth.md",
+      "final_digest": "154052a8bf40f304b11aec893edec9daae9905a82c50f88e8a72dd8dab3a2a30",
+      "expected_old_digest": null
+    },
+    {
+      "path": "knowledge/concepts/flows/wifi-historical-sta-join.md",
+      "final_digest": "3d4a369ac6587bb47c906ac69c0cfbad3070f66dc32a4f779fac0598e4804077",
+      "expected_old_digest": null
+    },
+    {
+      "path": "knowledge/concepts/flows/wifi-historical-tx-amsdu.md",
+      "final_digest": "2bc779362f3206d8ce9225400a3f17dcfaf162e66e37d56449ce562e3a7d550d",
+      "expected_old_digest": null
+    },
+    {
+      "path": "knowledge/concepts/flows/wifi-historical-tx-qos.md",
+      "final_digest": "474bb1a567e34e856cca44011c0a74ddc78c705adf822413a8a634d8b497a1c8",
+      "expected_old_digest": null
+    }
+  ],
+  "deletes": [],
+  "prior_content_report": {
+    "path": ".scratch/ex26/review/code-content.json",
+    "sha256": "e547e3c011059951672a20e8118180b132e71f03ecf5ee00dba134b04066c34b",
+    "preserved": true
+  },
+  "prior_binding_observation": {
+    "operation_id": "ex26-code-r1",
+    "view_digest": "3770199ad3a7bdbee6eba32257c2f641e304b1fa166aca5b18518c55c15e88c3",
+    "status": "superseded_without_semantic_review",
+    "finding": "This scratch JSON-to-Markdown assembly omitted the 30 authoring limitations; r2 includes them. No production template defect is asserted."
+  },
+  "findings": [],
+  "limitations": [
+    "The ordinary Agent record declares the actual reviewer context and byte/content binding; it does not authenticate an Agent identity or a human decision.",
+    "Static source inspection supports historical unknown-applicability cards only; Target mappings, macro selections, build artifacts, hardware execution and current product applicability remain unverified.",
+    "No admission, apply, indexing, activation, Git submission or publication was performed by this reviewer."
+  ],
+  "schema_validation": {
+    "status": "passed",
+    "schema_path": "E:\\FactumCore\\.scratch\\ex26\\workspace\\aiotbot-knowledge-wifi-mp\\governance\\schemas\\records.schema.json",
+    "schema_sha256": "432648c5427281f0602f5e6ec967d476298bfdd214dfaf48a676fe2aa1302dd0",
+    "validator": "jsonschema.Draft202012Validator",
+    "record_sha256": "c523974b7c836887de0b4d28fe7c6163c0679c954dcfbda9f5afdbff59d1e420",
+    "scope": "Canonical records schema and exact required ordinary Agent record fields; public local-check not invoked by this reviewer."
+  }
+}

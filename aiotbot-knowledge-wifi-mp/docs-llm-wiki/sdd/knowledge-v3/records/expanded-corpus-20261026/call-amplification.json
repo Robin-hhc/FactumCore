@@ -1,0 +1,46 @@
+{
+  "samples": [
+    {
+      "case_id": "EX26-C01",
+      "source_resolution_calls": 78,
+      "unique_full_source_refs": 26,
+      "unique_snapshot_locators": 26,
+      "unique_snapshots": 7,
+      "apply_verify_calls": 8,
+      "unique_apply_card_bindings": 4
+    },
+    {
+      "case_id": "EX26-C03",
+      "source_resolution_calls": 103,
+      "unique_full_source_refs": 43,
+      "unique_snapshot_locators": 42,
+      "unique_snapshots": 8,
+      "apply_verify_calls": 13,
+      "unique_apply_card_bindings": 8
+    },
+    {
+      "case_id": "EX26-N01",
+      "source_resolution_calls": 0,
+      "unique_full_source_refs": 0,
+      "unique_snapshot_locators": 0,
+      "unique_snapshots": 0,
+      "apply_verify_calls": 10,
+      "unique_apply_card_bindings": 10
+    },
+    {
+      "case_id": "EX26-N05",
+      "source_resolution_calls": 117,
+      "unique_full_source_refs": 47,
+      "unique_snapshot_locators": 46,
+      "unique_snapshots": 10,
+      "apply_verify_calls": 12,
+      "unique_apply_card_bindings": 7
+    }
+  ],
+  "document_p1_scan_seconds": 67.25,
+  "target_query_regression_seconds": 486.657,
+  "limits": [
+    "Direct caller invocation counts; no CPU/component time attribution.",
+    "Public timing is under concurrent test load; pure database timing is separately labelled."
+  ]
+}

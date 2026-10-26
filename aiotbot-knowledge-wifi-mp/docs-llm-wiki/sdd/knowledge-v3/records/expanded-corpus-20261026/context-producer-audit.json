@@ -1,0 +1,32 @@
+{
+  "implementation_commit": "3d853a91e98378187374f0ac521ec5d7ba2f3718",
+  "reviewer": "/root/prepush_spec_review",
+  "status": "documented_external_assembly_not_spec_violation",
+  "facts": [
+    {
+      "path": "skills/common/knowledge/hs-workspace-explore/scripts/node.py",
+      "lines": "175-185,206-231",
+      "finding": "E0 outputs discovery context, unknown commit/dirty and empty files; not a full accepted code identity."
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-source-capture/scripts/code_capture.py",
+      "lines": "327-334,370-425",
+      "finding": "Each actual code snapshot carries revision/hash/config identity; producer returns a source_bundle."
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-source-scan/scripts/prepare.py",
+      "lines": "54-86,142-148",
+      "finding": "P2 validates and merges code bundles and forwards supplied context_ref; no full project_context assembler found."
+    },
+    {
+      "path": "skills/common/knowledge/hs-knowledge-local-check/SKILL.md",
+      "lines": "20",
+      "finding": "Current contract explicitly allows P2/P4 Agent or host to separately record the actual full code context."
+    }
+  ],
+  "proposal": "Add optional deterministic context aggregation to existing P2 prepare using actual captures/config/current protected checkout; E0 remains pre-command discovery. Preserve unknown Target/build conditions; no init/binding/key registry.",
+  "limits": [
+    "This is an automation/ergonomics proposal, not evidence that accepted current external-input behavior violates specification.",
+    "Trial context was explicitly harness-constructed from actual Git/capture identities, not an E0-native artifact or automatic host integration."
+  ]
+}

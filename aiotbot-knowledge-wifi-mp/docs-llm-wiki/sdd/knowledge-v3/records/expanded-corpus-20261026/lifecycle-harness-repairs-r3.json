@@ -1,0 +1,40 @@
+{
+  "scope": "Further authorized assembly-only retry after r2 terminal results; fixed v3 assertions unchanged",
+  "prior_runner": "runner-r2.py",
+  "prior_runner_sha256": "b9fb6dd0791004d17d9c8af26be15c3e5f755b97cf516456c6ab4a7ec3ada15a",
+  "retry_runner": "runner-r3.py",
+  "retry_runner_sha256": "c150432c7f41cff6bc673191e38dc7cbc415f2f284df4a96dc0f141257d84b72",
+  "unchanged_plan": "test-plan-v3.json",
+  "unchanged_plan_sha256": "5d222953720e078930da08f12a6fda108e47ffcae119b84d546eb915578f2c1a",
+  "retry_case_ids": [
+    "07",
+    "19"
+  ],
+  "changes": [
+    {
+      "reason": "Only new retry roots; previous v3/r2 evidence is retained",
+      "old": "self.home = CASE_HOME / (case[\"id\"] + \"-r2\")",
+      "new": "self.home = CASE_HOME / (case[\"id\"] + \"-r3\")"
+    },
+    {
+      "reason": "The candidate overlays the old card; public lint needs the exact accepted prior body to validate retained ingest history in a non-Git knowledge copy",
+      "old": "def postlint(case):\n    ref = real_card_update(case, \"p07\")\n    report = case.lint(\"p07\", view_ref=ref)",
+      "new": "def postlint(case):\n    prior = case.first_card()\n    prior_digest = sha(prior[\"raw\"])\n    prior_file = case.home / (\"historical-card-\" + prior_digest + \".md\")\n    save(prior_file, prior[\"raw\"])\n    ref = real_card_update(case, \"p07\")\n    report = case.lint(\"p07\", view_ref=ref, inputs={\"historical_card_objects\": {prior_digest: str(prior_file)}})"
+    },
+    {
+      "reason": "A fresh pure-document fixture requires an empty legal source registry before the human-display node reads it; no source adoption or human approval is asserted",
+      "old": "    else:\n        bundle_ref, bundle = case.synthetic_capture(op)\n        candidate = case.write(\".build/candidates/new.md\",",
+      "new": "    else:\n        case.source_lock()\n        bundle_ref, bundle = case.synthetic_capture(op)\n        candidate = case.write(\".build/candidates/new.md\","
+    },
+    {
+      "reason": "Mark r3 reports explicitly",
+      "old": "run_id = \"r2-\" + time.strftime",
+      "new": "run_id = \"r3-\" + time.strftime"
+    },
+    {
+      "reason": "Record exact retry identity",
+      "old": "\"harness_revision\": \"r2\"",
+      "new": "\"harness_revision\": \"r3\""
+    }
+  ]
+}

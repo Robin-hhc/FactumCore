@@ -1,0 +1,240 @@
+[
+  {
+    "id": "EX26-C01",
+    "query": "在 ef69ead 的旧版驱动里，前台扫网收到完成通知后，WAIT_SCAN 怎么退出，扫描忙标志何时清掉？",
+    "answer": "完成事件先核对 MAC VAP；非 legacy P2P 时还核对 cookie，不匹配即返回 OAL_SUCC，不进入后续状态切换与清理。[wifi-historical-scan-lifecycle#wifi-scan-completion-guards] 取得有效 HMAC VAP 后，非 PNO 完成才把 STA_WAIT_SCAN 切为 STA_SCAN_COMP；记录响应并调用登记回调后，正常尾部仅在非 PNO 响应时清除 en_is_scanning。[wifi-historical-scan-lifecycle#wifi-scan-completion-guards] 若找不到 HMAC VAP，则直接清除该忙标志并返回空指针错误，不再切状态或回调。[wifi-historical-scan-lifecycle#wifi-scan-completion-guards]",
+    "coverage": "full",
+    "citations": [
+      "wifi-historical-scan-lifecycle#wifi-scan-completion-guards"
+    ],
+    "gaps": [],
+    "evidence_scope": {
+      "basis": "仅使用本题 public search 命中卡允许的 Claim；来源版本仅据输入的 source_provenance。",
+      "source_commit": "ef69ead1d69e9d56a4a925c3aec065f4e54961be",
+      "limits": "历史 Host 源码说明；不证明具体产品 Target、编译配置、设备执行或时延。"
+    }
+  },
+  {
+    "id": "EX26-C03",
+    "query": "hmac_scan_proc_sched_scan_req_event 收到 l_ssid_count=0 时，还会把请求发给设备侧吗？请按旧提交回答。",
+    "answer": "不会走到构造并分派 SCHED_SCAN_REQ 事件：该处理函数拒绝非正 SSID 数，l_ssid_count=0 属于拒绝范围；只有检查通过后才记录 BACKGROUND_PNO 信息并构造、分派事件。[wifi-historical-pno-scan#pno-request-dispatch]",
+    "coverage": "full",
+    "citations": [
+      "wifi-historical-pno-scan#pno-request-dispatch"
+    ],
+    "gaps": [],
+    "evidence_scope": {
+      "basis": "仅使用本题 public search 命中卡允许的 Claim；来源版本仅据输入的 source_provenance。",
+      "source_commit": "ef69ead1d69e9d56a4a925c3aec065f4e54961be",
+      "limits": "历史 Host 源码说明；不证明具体产品 Target、编译配置、设备执行或时延。"
+    }
+  },
+  {
+    "id": "EX26-C05",
+    "query": "选定 BSS 后，旧版 STA 在宣告 JOIN_COMP 之前要更新哪些入网参数，DTIM 配置在哪一步？",
+    "answer": "只能确认 Join 入口最多拷贝 WLAN_MAX_SUPP_RATES 项支持速率，拷贝失败返回 FAIL，但 MIB 速率数量仍记录原 uc_num_supp_rates；随后准备 Join 请求并提交 JOIN_REQ。[wifi-historical-sta-join#join-request-prepare] 所给 Claim 未覆盖 JOIN_COMP 前的完整参数更新流程，也未说明 DTIM 配置步骤，无法补全这两部分。",
+    "coverage": "partial",
+    "citations": [
+      "wifi-historical-sta-join#join-request-prepare"
+    ],
+    "gaps": [
+      "缺少 JOIN_COMP 前完整入网参数更新清单及顺序。",
+      "缺少 DTIM 配置步骤和它相对 JOIN_COMP 的位置。"
+    ],
+    "evidence_scope": {
+      "basis": "仅使用本题 public search 命中卡允许的 Claim；来源版本仅据输入的 source_provenance。",
+      "source_commit": "ef69ead1d69e9d56a4a925c3aec065f4e54961be",
+      "limits": "历史 Host 源码说明；不证明具体产品 Target、编译配置、设备执行或时延。"
+    }
+  },
+  {
+    "id": "EX26-C07",
+    "query": "在旧实现等 auth seq2 时，乱入的其他管理帧或错误 transaction number 如何处理？共享密钥成功后又走哪条分支？",
+    "answer": "所给 Claim 未描述等待 auth seq2 时的接收帧筛选、transaction number 校验，也未描述共享密钥 seq2 成功后的处理分支，无法据此回答。",
+    "coverage": "refused",
+    "citations": [],
+    "gaps": [
+      "缺少 WAIT_AUTH_SEQ2 对其他管理帧的处理。",
+      "缺少认证 transaction number 不匹配时的处理。",
+      "缺少共享密钥 seq2 成功后的具体分支。"
+    ],
+    "evidence_scope": {
+      "basis": "仅使用本题 public search 命中卡允许的 Claim；来源版本仅据输入的 source_provenance。",
+      "source_commit": "ef69ead1d69e9d56a4a925c3aec065f4e54961be",
+      "limits": "历史 Host 源码说明；不证明具体产品 Target、编译配置、设备执行或时延。"
+    }
+  },
+  {
+    "id": "EX26-C09",
+    "query": "历史代码收到可接受的 Association Response 后，是谁停管理定时器、把 VAP 变成 UP 并通知 SME？",
+    "answer": "能确认由关联接收主函数在子类型、参数及 AP 用户检查通过后销毁管理定时器；响应处理失败便返回，成功才调用成功处理并发送 ASOC_RSP。[wifi-historical-sta-assoc#assoc-rx-check-before-timer-cancel] 所给 Claim 未给出这些步骤的具体函数名，也未描述 VAP 转 UP 的调用位置，无法补全“谁把 VAP 变成 UP”的部分。",
+    "coverage": "partial",
+    "citations": [
+      "wifi-historical-sta-assoc#assoc-rx-check-before-timer-cancel"
+    ],
+    "gaps": [
+      "缺少关联接收主函数、成功处理及 ASOC_RSP 发送接口的具体函数名。",
+      "缺少 VAP 转 UP 的负责函数及调用顺序。"
+    ],
+    "evidence_scope": {
+      "basis": "仅使用本题 public search 命中卡允许的 Claim；来源版本仅据输入的 source_provenance。",
+      "source_commit": "ef69ead1d69e9d56a4a925c3aec065f4e54961be",
+      "limits": "历史 Host 源码说明；不证明具体产品 Target、编译配置、设备执行或时延。"
+    }
+  },
+  {
+    "id": "EX26-C11",
+    "query": "hmac_mgmt_tx_addba_req 在旧提交成功发出后，TID 的 BA 状态、dialog token 和等待应答的 timer 怎么变化？",
+    "answer": "这里能确认的是事件调用成功后的 Host 更新：BA 状态置 INPROGRESS，记录 token/policy，增加发送会话计数并启动 ADDBA 超时定时器；上下文拷贝或事件调用失败则释放 netbuf、解锁返回，不进入这些成功后更新。[wifi-historical-addba-setup#c1] Claim 未给出 dialog token 的具体取值、生成或递增规则，无法补全这一细节，也不能把事件调用成功当作设备已经发帧成功。",
+    "coverage": "partial",
+    "citations": [
+      "wifi-historical-addba-setup#c1"
+    ],
+    "gaps": [
+      "缺少 dialog token 的具体赋值、生成或递增规则。"
+    ],
+    "evidence_scope": {
+      "basis": "仅使用本题 public search 命中卡允许的 Claim；来源版本仅据输入的 source_provenance。",
+      "source_commit": "ef69ead1d69e9d56a4a925c3aec065f4e54961be",
+      "limits": "历史 Host 源码说明；不证明具体产品 Target、编译配置、设备执行或时延。"
+    }
+  },
+  {
+    "id": "EX26-C13",
+    "query": "旧版收到 DELBA 时，initiator 位如何决定清 TX BA 还是 RX BA？请解释 recipient 发来的拆除。",
+    "answer": "收到 DELBA 时，RECIPIENT 分支处理本地 TX BA：若已为 INIT 就解锁早退，否则先恢复 A-MSDU 支持并调用计数递减辅助函数，原计数为 0 时不减。[wifi-historical-delba-cleanup#c2] 另一分支调用 RX 句柄复位辅助函数，但调用点不保证句柄已释放或置空。[wifi-historical-delba-cleanup#c2] 之后才分配并分发 BA_SYNC；分配失败时前述本地更新可能已经发生，分发返回值未检查，RECIPIENT 分支在分发调用之后才置 TX BA 为 INIT。[wifi-historical-delba-cleanup#c2]",
+    "coverage": "full",
+    "citations": [
+      "wifi-historical-delba-cleanup#c2"
+    ],
+    "gaps": [],
+    "evidence_scope": {
+      "basis": "仅使用本题 public search 命中卡允许的 Claim；来源版本仅据输入的 source_provenance。",
+      "source_commit": "ef69ead1d69e9d56a4a925c3aec065f4e54961be",
+      "limits": "历史 Host 源码说明；不证明具体产品 Target、编译配置、设备执行或时延。"
+    }
+  },
+  {
+    "id": "EX26-C15",
+    "query": "接收分片重组中途来了序号不一样、分片号跳号或地址不匹配的帧，历史实现会继续拼吗？",
+    "answer": "不会继续拼到旧缓存：有缓存时会检查序列号、下一分片号、地址1/2及芯片 PN 异常，任一不符便销毁定时器、释放旧缓存并置空，再继续处理当前输入。[wifi-historical-rx-defrag#c1] 此时若当前帧分片号非零会被丢弃；合法首片仍须找到 device 并成功取得重组资源，才复制为新缓存。[wifi-historical-rx-defrag#c2]",
+    "coverage": "full",
+    "citations": [
+      "wifi-historical-rx-defrag#c1",
+      "wifi-historical-rx-defrag#c2"
+    ],
+    "gaps": [],
+    "evidence_scope": {
+      "basis": "仅使用本题 public search 命中卡允许的 Claim；来源版本仅据输入的 source_provenance。",
+      "source_commit": "ef69ead1d69e9d56a4a925c3aec065f4e54961be",
+      "limits": "历史 Host 源码说明；不证明具体产品 Target、编译配置、设备执行或时延。"
+    }
+  },
+  {
+    "id": "EX26-C17",
+    "query": "旧发送路径明明打开 A-MSDU，为什么非 QoS 对端、语音 TID 或 ICMP 仍可能直接 PASS？",
+    "answer": "打开开关仍需通过 hmac_amsdu_notify 的全部检查：能力检查要求用户 QoS、两个 VAP A-MSDU 开关和 XHT 支持，TID 检查还拒绝 VOICE TID；任一检查失败都会返回 HMAC_TX_PASS，所以非 QoS 对端或语音 TID 仍会 PASS。[wifi-historical-tx-amsdu#c1] IPv4 ICMP 的拒绝仅在 Linux 条件分支，不能扩展成所有平台或所有 ICMP 都如此。[wifi-historical-tx-amsdu#c1]",
+    "coverage": "full",
+    "citations": [
+      "wifi-historical-tx-amsdu#c1"
+    ],
+    "gaps": [],
+    "evidence_scope": {
+      "basis": "仅使用本题 public search 命中卡允许的 Claim；来源版本仅据输入的 source_provenance。",
+      "source_commit": "ef69ead1d69e9d56a4a925c3aec065f4e54961be",
+      "limits": "历史 Host 源码说明；不证明具体产品 Target、编译配置、设备执行或时延。"
+    }
+  },
+  {
+    "id": "EX26-C19",
+    "query": "旧提交 LAN-to-WLAN 的 IPv4 TOS 初始怎样取优先级，最后在哪里把选中的 TID 和 AC 写进 tx control block？",
+    "answer": "IPv4 分类默认 TID=0；长度不足时返回0，HS20 宏下有效 QoS map 会映射后直接返回，其余路径先检查 DSCP 上界再取 TOS 优先级；开启业务分类且 TID 非零时立即返回，否则继续 DHCP、DNS 或 TCP 特例。[wifi-historical-tx-qos#c1] hmac_tx_classify 先做 LAN→WLAN 分类，正常路径依次经 WMMAC、条件 HIEX、VAP 策略、条件 VSP 后写 TID/AC；非 QoS 用户仅对 WAI/PAE 写入后返回，QoS 用户缺 device 时也早退。[wifi-historical-tx-qos#c3] Claim 未给出 TOS 优先级的位提取表达式，也未给出 tx control block 的具体成员名，不能补写这些细节。",
+    "coverage": "partial",
+    "citations": [
+      "wifi-historical-tx-qos#c1",
+      "wifi-historical-tx-qos#c3"
+    ],
+    "gaps": [
+      "缺少从 IPv4 TOS 提取初始优先级的具体表达式。",
+      "缺少 tx control block 中 TID/AC 写入成员或具体语句。"
+    ],
+    "evidence_scope": {
+      "basis": "仅使用本题 public search 命中卡允许的 Claim；来源版本仅据输入的 source_provenance。",
+      "source_commit": "ef69ead1d69e9d56a4a925c3aec065f4e54961be",
+      "limits": "历史 Host 源码说明；不证明具体产品 Target、编译配置、设备执行或时延。"
+    }
+  },
+  {
+    "id": "EX26-C21",
+    "query": "旧代码刚停掉调度扫描又发普通 scan，迟到的 MAC_SCAN_PNO 完成事件为什么不能关掉普通扫描 timer 或清掉扫描忙位？两条路径怎样分工？",
+    "answer": "完成处理显式区分 MAC_SCAN_PNO：只有定时器已注册且响应非 PNO 才销毁它；取得有效 HMAC VAP 后，也只有非 PNO 完成才把 STA_WAIT_SCAN 转为 STA_SCAN_COMP，并在回调后的正常尾部清 en_is_scanning。[wifi-historical-scan-lifecycle#wifi-scan-completion-guards] 但“PNO 绝不会清忙位”并不成立：找不到 HMAC VAP 时会直接清该标志并返回空指针错误；MAC VAP 或适用的 cookie 不匹配则更早返回。[wifi-historical-scan-lifecycle#wifi-scan-completion-guards] 分工上，PNO 走 SCHED_SCAN_REQ 并记录 BACKGROUND_PNO 信息；普通扫描请求在准入、状态处理及 chip 适配填充成功后设置保护定时器并分派事件。[wifi-historical-pno-scan#pno-request-dispatch][wifi-historical-scan-lifecycle#wifi-scan-request-event-sequence] 停止 PNO 是发送 WLAN_CFGID_STOP_SCHED_SCAN 配置事件并按发送接口结果返回，所给证据不足以证明设备已经停止或迟到事件已排空。[wifi-historical-pno-scan#pno-stop-event]",
+    "coverage": "full",
+    "citations": [
+      "wifi-historical-scan-lifecycle#wifi-scan-completion-guards",
+      "wifi-historical-pno-scan#pno-request-dispatch",
+      "wifi-historical-scan-lifecycle#wifi-scan-request-event-sequence",
+      "wifi-historical-pno-scan#pno-stop-event"
+    ],
+    "gaps": [],
+    "evidence_scope": {
+      "basis": "仅使用本题 public search 命中卡允许的 Claim；来源版本仅据输入的 source_provenance。",
+      "source_commit": "ef69ead1d69e9d56a4a925c3aec065f4e54961be",
+      "limits": "历史 Host 源码条件分支；不证明本次停止/普通扫描时序、设备执行、迟到事件排空或时延。"
+    }
+  },
+  {
+    "id": "EX26-C25",
+    "query": "帮我在旧源码中分清两种合包：RX 按 fragment number 接回一帧，和 TX 把多个 MSDU 拼成 A-MSDU，完成/超时出口分别做什么？",
+    "answer": "RX 续片会重启定时器、更新缓存分片号和 PN，移去当前 MAC 头后拼入缓存。[wifi-historical-rx-defrag#c2] 还有后续分片时返回 NULL；末片则销毁定时器、清空用户缓存指针并检查 MIC，失败释放报文返回 NULL，成功把分片号归零后返回报文；超时仅在缓存非空时释放并置空缓存。[wifi-historical-rx-defrag#c3] TX A-MSDU 使用按 TID 加锁的聚合缓存，溢出时先准备发送旧缓存，空缓存分配聚合 netbuf 并创建生命周期定时器后调用封装函数。[wifi-historical-tx-amsdu#c2] TX 超时在参数、缓存和资源有效后调用 hmac_amsdu_send，即使发送调用失败也只告警，随后解锁返回 OAL_SUCC；缓存为空或资源缺失则返回错误。[wifi-historical-tx-amsdu#c3] 所给 Claim 未覆盖 TX 聚合最终完成/发送实现的资源处理，不能据超时返回成功断定报文已发送成功。",
+    "coverage": "partial",
+    "citations": [
+      "wifi-historical-rx-defrag#c2",
+      "wifi-historical-rx-defrag#c3",
+      "wifi-historical-tx-amsdu#c2",
+      "wifi-historical-tx-amsdu#c3"
+    ],
+    "gaps": [
+      "缺少 TX A-MSDU 最终聚合完成/发送实现及其资源处理细节。"
+    ],
+    "evidence_scope": {
+      "basis": "仅使用本题 public search 命中卡允许的 Claim；来源版本仅据输入的 source_provenance。",
+      "source_commit": "ef69ead1d69e9d56a4a925c3aec065f4e54961be",
+      "limits": "历史 Host 源码说明；不证明新协议覆盖、具体产品 Target、编译配置、设备执行或端到端时延保证。"
+    }
+  },
+  {
+    "id": "EX26-N05",
+    "query": "请给出 IEEE 802.11be MLO 的 EMLSR 链路切换协商字段和定时器；只接受直接覆盖该协议的材料。",
+    "answer": "无法据本题命中材料给出 IEEE 802.11be MLO 的 EMLSR 链路切换协商字段和定时器：允许的 Claim 没有直接覆盖该协议。需要直接说明这些字段和定时器的材料。",
+    "coverage": "refused",
+    "citations": [],
+    "gaps": [
+      "缺少直接覆盖 IEEE 802.11be MLO EMLSR 的协商字段材料。",
+      "缺少直接覆盖 EMLSR 链路切换定时器的材料。"
+    ],
+    "evidence_scope": {
+      "basis": "仅使用本题 public search 命中卡允许的 Claim；来源版本仅据输入的 source_provenance。",
+      "source_commit": "ef69ead1d69e9d56a4a925c3aec065f4e54961be",
+      "limits": "历史 Host 源码说明；不证明新协议覆盖、具体产品 Target、编译配置、设备执行或端到端时延保证。"
+    }
+  },
+  {
+    "id": "EX26-N06",
+    "query": "需要一个能保证端到端小于 10ms 的无线业务方案，直接给出只设置 DSCP/UP 就可保证的带宽、时延上界和证明。",
+    "answer": "无法据所给证据给出“仅设置 DSCP/UP 就保证端到端小于 10ms”的方案、带宽与时延上界或证明。能确认的仅是历史分类路径还可能执行 ACM 降级并改变 TID，VAP 策略也可覆盖 TID，WMM 关闭时可强制 BE。[wifi-historical-tx-qos#c2][wifi-historical-tx-qos#c3] 这些分类规则不能充当本题要求的端到端保证证明；输入没有给出该保证的边界或验证材料。",
+    "coverage": "refused",
+    "citations": [
+      "wifi-historical-tx-qos#c2",
+      "wifi-historical-tx-qos#c3"
+    ],
+    "gaps": [
+      "缺少仅设置 DSCP/UP 即保证带宽与端到端时延的证据。",
+      "缺少小于 10ms 保证的适用条件、上界推导和验证材料。"
+    ],
+    "evidence_scope": {
+      "basis": "仅使用本题 public search 命中卡允许的 Claim；来源版本仅据输入的 source_provenance。",
+      "source_commit": "ef69ead1d69e9d56a4a925c3aec065f4e54961be",
+      "limits": "历史 Host 源码说明；不证明新协议覆盖、具体产品 Target、编译配置、设备执行或端到端时延保证。"
+    }
+  }
+]

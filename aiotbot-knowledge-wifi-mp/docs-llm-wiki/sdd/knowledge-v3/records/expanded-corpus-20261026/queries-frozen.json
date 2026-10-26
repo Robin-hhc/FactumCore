@@ -1,0 +1,697 @@
+{
+  "schema_version": "ex26-independent-freeze-v1",
+  "frozen_on": "2026-10-26",
+  "status": "frozen-before-retrieval",
+  "description": "独立于卡 authoring、旧题答案和检索结果的 44 题探索性查询集。非统计基准，不是受限 gold，不可据此宣称生产语义或六 Target 真实接入已验收。",
+  "freeze_policy": {
+    "allowed_inputs": [
+      "E:/Hi1105/wifi 的真实 GB18030 源码，所引用文件已核实与 HEAD 相同",
+      "三份指定 RFC TXT",
+      "委派消息提供的 14 个主题到卡 ID 映射"
+    ],
+    "not_read": [
+      "authoring 卡与候选卡",
+      "旧问题和答案",
+      "gold",
+      "sources.md",
+      "检索输出",
+      "审查结论"
+    ],
+    "immutable_expectations": "SHA-256 冻结后不得根据检索输出、命中率或审查反馈更改 query、required、forbidden、expected_empty 或理由；确需改题必须另立版本并保留本文件。",
+    "required_semantics": "required 只列回答问题不可缺少的主题；不把所有词面相关卡列为 forbidden。未设 forbidden 不代表该卡必需，也不评价其 rank。",
+    "negative_semantics": "expected_empty 指本题限定证据范围和 purpose 下不应有可用于回答的卡；可返回说明缺少证据的拒绝响应，不要求系统完全静默。",
+    "candidate_boundary": "文档协议卡尚未获真人确认。scope=document 和 scope=mixed 仅用于候选临时索引组件测评，必须单列，不得混入真实公开 stable 查询成绩。negative 中 N03 同时验证候选不能冒充 stable。",
+    "scope_boundary": "历史源码只证明所列提交与文件的实现。任何题都不证明当前产品版本、构建选项、部署、真实宿主触发、权限隔离或六 Target 接入。"
+  },
+  "source_snapshot": {
+    "code_root": "E:/Hi1105/wifi/",
+    "code_head": "ef69ead1d69e9d56a4a925c3aec065f4e54961be",
+    "code_encoding": "GB18030",
+    "cited_working_files_match_head": true,
+    "documents": [
+      {
+        "path": "E:/FactumCore/.scratch/wifi-real-trial-20261025/protocols/rfc1042.txt",
+        "sha256": "e8737abe7f7b80ae2e84b8cada0ea02d8cc3c4ad2414e902cc055e6953a01c55"
+      },
+      {
+        "path": "E:/FactumCore/.scratch/wifi-real-trial-20261025/protocols/rfc8325.txt",
+        "sha256": "6a059ababe36062810b17a5d0f44424d783c9f77b8fd6c36e362d816d3b9e031"
+      },
+      {
+        "path": "E:/FactumCore/.scratch/wifi-real-trial-20261025/protocols/rfc5416.txt",
+        "sha256": "ef326f22d2302b43547dcad37fbc545b075dcae7941372b0569fd84e0f5a4af2"
+      }
+    ]
+  },
+  "grouping": {
+    "scope": {
+      "code": 26,
+      "document": 10,
+      "mixed": 2,
+      "negative": 6
+    },
+    "purpose": {
+      "historical": 28,
+      "guidance": 12,
+      "current": 4
+    },
+    "evaluation_groups": {
+      "historical_code": "EX26-C01..EX26-C26；只单列历史源码主题检索",
+      "candidate_document": "EX26-D01..EX26-D10；候选临时索引组件题",
+      "candidate_mixed": "EX26-M01..EX26-M02；候选协议与历史源码组合组件题",
+      "current_refusal": "EX26-N01..EX26-N04；当前范围与发布状态拒绝题",
+      "uncovered_refusal": "EX26-N05..EX26-N06；未覆盖/不可保证的拒绝题"
+    },
+    "coverage_notes": [
+      "含自然改写、英文与函数名",
+      "含普通扫描/PNO、JOIN/AUTH/ASSOC、BA 建立/不同超时、RX 分片/TX 聚合区分",
+      "含多卡组合、标准建议/历史实现区别",
+      "未读检索结果，未按候选卡具体内容适配题目"
+    ]
+  },
+  "cases": [
+    {
+      "id": "EX26-C01",
+      "query": "在 ef69ead 的旧版驱动里，前台扫网收到完成通知后，WAIT_SCAN 怎么退出，扫描忙标志何时清掉？",
+      "purpose": "historical",
+      "required": [
+        "wifi-historical-scan-lifecycle"
+      ],
+      "scope": "code",
+      "groundtruth_reason": "完成事件在 STA_WAIT_SCAN 且非 MAC_SCAN_PNO 时切换为 STA_SCAN_COMP，并只对非 PNO 完成清除 en_is_scanning；问题要求普通扫描完成生命周期。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_scan.c:1787-1817"
+      ]
+    },
+    {
+      "id": "EX26-C02",
+      "query": "旧源码扫网卡死，没有收到 DMAC 的 scan complete，HMAC 保护超时会向谁回调、会不会下发 abort？",
+      "purpose": "historical",
+      "required": [
+        "wifi-historical-scan-lifecycle"
+      ],
+      "scope": "code",
+      "groundtruth_reason": "hmac_scan_proc_scan_timeout_fn 写 MAC_SCAN_TIMEOUT、调用已登记回调、执行 hmac_config_scan_abort 并清除扫描状态，必须使用普通扫描超时主题。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_scan.c:2145-2198"
+      ]
+    },
+    {
+      "id": "EX26-C03",
+      "query": "hmac_scan_proc_sched_scan_req_event 收到 l_ssid_count=0 时，还会把请求发给设备侧吗？请按旧提交回答。",
+      "purpose": "historical",
+      "required": [
+        "wifi-historical-pno-scan"
+      ],
+      "scope": "code",
+      "groundtruth_reason": "调度扫描入口对 l_ssid_count<=0 直接返回 OAL_FAIL，发生在设备获取和事件分发之前，属于 PNO 请求校验。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_scan.c:2552-2589"
+      ]
+    },
+    {
+      "id": "EX26-C04",
+      "query": "Which event and scan mode does the historical scheduled-scan path use, and where is its callback saved?",
+      "purpose": "historical",
+      "required": [
+        "wifi-historical-pno-scan"
+      ],
+      "scope": "code",
+      "groundtruth_reason": "PNO 请求把 p_fn_cb 保存到扫描记录，设 WLAN_SCAN_MODE_BACKGROUND_PNO，发送 DMAC_WLAN_CTX_EVENT_SUB_TYPE_SCHED_SCAN_REQ，三点均是调度扫描专属路径。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_scan.c:2592-2628"
+      ]
+    },
+    {
+      "id": "EX26-C05",
+      "query": "选定 BSS 后，旧版 STA 在宣告 JOIN_COMP 之前要更新哪些入网参数，DTIM 配置在哪一步？",
+      "purpose": "historical",
+      "required": [
+        "wifi-historical-sta-join"
+      ],
+      "scope": "code",
+      "groundtruth_reason": "hmac_sta_wait_join 先更新 JOIN 参数到 MIB/MAC，再配置 DTIM，成功才切换 JOIN_COMP 并上报 JOIN_RSP。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_mgmt_join.c:366-415"
+      ]
+    },
+    {
+      "id": "EX26-C06",
+      "query": "hmac_sta_wait_join 为什么可能报 device busy？如果更新 join 参数失败，旧代码会继续做 DTIM 和成功上报吗？",
+      "purpose": "historical",
+      "required": [
+        "wifi-historical-sta-join"
+      ],
+      "scope": "code",
+      "groundtruth_reason": "入口的 P2P 状态检查失败返回 CONFIG_BUSY，参数更新失败立即返回，因此需要加入流程的失败短路信息。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_mgmt_join.c:377-408"
+      ]
+    },
+    {
+      "id": "EX26-C07",
+      "query": "在旧实现等 auth seq2 时，乱入的其他管理帧或错误 transaction number 如何处理？共享密钥成功后又走哪条分支？",
+      "purpose": "historical",
+      "required": [
+        "wifi-historical-sta-auth"
+      ],
+      "scope": "code",
+      "groundtruth_reason": "hmac_sta_wait_auth_seq2_rx 忽略非认证帧及事务号非 TWO 的帧，成功的 shared-key 算法走发送 seq3 分支，均属于认证接收状态机。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_mgmt_join.c:750-806"
+      ]
+    },
+    {
+      "id": "EX26-C08",
+      "query": "旧日志里 MAC_AUTH_RSP2_TIMEOUT 和 MAC_AUTH_RSP4_TIMEOUT 有何区别，认证请求发送失败状态会覆盖它们吗？",
+      "purpose": "historical",
+      "required": [
+        "wifi-historical-sta-auth"
+      ],
+      "scope": "code",
+      "groundtruth_reason": "hmac_sta_auth_timeout 按 WAIT_AUTH_SEQ2/SEQ4 给不同超时码，若 uc_auth_req_st>0 则改成发送失败区间码并清理发送状态。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_mgmt_sta.c:1243-1271"
+      ]
+    },
+    {
+      "id": "EX26-C09",
+      "query": "历史代码收到可接受的 Association Response 后，是谁停管理定时器、把 VAP 变成 UP 并通知 SME？",
+      "purpose": "historical",
+      "required": [
+        "wifi-historical-sta-assoc"
+      ],
+      "scope": "code",
+      "groundtruth_reason": "hmac_sta_wait_asoc_rx 完成检查后取消管理定时器，处理关联响应，成功处理函数切 UP，随后上报 HMAC_SME_ASOC_RSP。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_mgmt_sta.c:1108-1189"
+      ]
+    },
+    {
+      "id": "EX26-C10",
+      "query": "旧版连 AP 发出了关联请求却没等到应答：WAIT_ASOC 的定时器如何设置，最终报什么结果和发送失败原因？",
+      "purpose": "historical",
+      "required": [
+        "wifi-historical-sta-assoc"
+      ],
+      "scope": "code",
+      "groundtruth_reason": "关联发送后设置 WAIT_ASOC 并启动管理定时器；关联超时函数写 HMAC_MGMT_TIMEOUT、保留超时参数状态，必要时换为关联请求发送失败码，再发 ASOC_RSP。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_mgmt_join.c:927-937",
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_mgmt_join.c:993-1006",
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_mgmt_sta.c:1791-1820"
+      ]
+    },
+    {
+      "id": "EX26-C11",
+      "query": "hmac_mgmt_tx_addba_req 在旧提交成功发出后，TID 的 BA 状态、dialog token 和等待应答的 timer 怎么变化？",
+      "purpose": "historical",
+      "required": [
+        "wifi-historical-addba-setup"
+      ],
+      "scope": "code",
+      "groundtruth_reason": "ADDBA 发送成功后设置 DMAC_BA_INPROGRESS、记录 token/policy、增加会话数并建立 st_addba_timer，是 BA 建立而非拆除。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_mgmt_bss_comm.c:541-603"
+      ]
+    },
+    {
+      "id": "EX26-C12",
+      "query": "收到对端 ADDBA Request 后，旧驱动先检查什么能力和 TID 边界，又怎样取 SSN、窗口大小并回复？",
+      "purpose": "historical",
+      "required": [
+        "wifi-historical-addba-setup"
+      ],
+      "scope": "code",
+      "groundtruth_reason": "接收建立 BA 路径检查帧长及双方 HT 能力、TID 越界，解析会话参数和窗口，初始化接收句柄、评估状态并发送 ADDBA Response。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_mgmt_bss_comm.c:824-925"
+      ]
+    },
+    {
+      "id": "EX26-C13",
+      "query": "旧版收到 DELBA 时，initiator 位如何决定清 TX BA 还是 RX BA？请解释 recipient 发来的拆除。",
+      "purpose": "historical",
+      "required": [
+        "wifi-historical-delba-cleanup"
+      ],
+      "scope": "code",
+      "groundtruth_reason": "hmac_mgmt_rx_delba 解析 TID/initiator/reason；MAC_RECIPIENT_DELBA 分支处理发送 BA，会话已 INIT 时直接返回，另一分支重置接收句柄。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_mgmt_bss_comm.c:1130-1198"
+      ]
+    },
+    {
+      "id": "EX26-C14",
+      "query": "旧源码里的 hmac_ba_timeout_fn 是否每次超时都删 BA？它和 hmac_mgmt_tx_addba_timeout 发 DELBA 的行为有何不同？",
+      "purpose": "historical",
+      "required": [
+        "wifi-historical-delba-cleanup"
+      ],
+      "scope": "code",
+      "groundtruth_reason": "接收重排序超时按缓存数冲刷并决定是否重启定时器，TX 方向也重启 timer；ADDBA 等待超时则构造 ORIGINATOR_DELBA、MAC_QSTA_TIMEOUT 并调用发送 DELBA。不能把所有 BA timer 都解释成拆除。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_blockack.c:809-859",
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_mgmt_bss_comm.c:1245-1287"
+      ]
+    },
+    {
+      "id": "EX26-C15",
+      "query": "接收分片重组中途来了序号不一样、分片号跳号或地址不匹配的帧，历史实现会继续拼吗？",
+      "purpose": "historical",
+      "required": [
+        "wifi-historical-rx-defrag"
+      ],
+      "scope": "code",
+      "groundtruth_reason": "hmac_defrag_same_frag_netbuf_check 比较序列号、连续分片号、两个 MAC 地址和 PN；异常则销毁 timer、释放旧重组缓冲并置空。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_frag.c:135-164"
+      ]
+    },
+    {
+      "id": "EX26-C16",
+      "query": "In hmac_defrag_process at the old commit, why can a received fragment return NULL, and what happens on final-fragment MIC failure or reassembly timeout?",
+      "purpose": "historical",
+      "required": [
+        "wifi-historical-rx-defrag"
+      ],
+      "scope": "code",
+      "groundtruth_reason": "more_frag 尚在时返回 NULL；完成时停止 timer、脱离用户缓存并校验 MIC，失败释放；独立重组超时回调同样释放缓存。NULL 不只代表分配错误。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_frag.c:117-132",
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_frag.c:258-280",
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_frag.c:313-340"
+      ]
+    },
+    {
+      "id": "EX26-C17",
+      "query": "旧发送路径明明打开 A-MSDU，为什么非 QoS 对端、语音 TID 或 ICMP 仍可能直接 PASS？",
+      "purpose": "historical",
+      "required": [
+        "wifi-historical-tx-amsdu"
+      ],
+      "scope": "code",
+      "groundtruth_reason": "A-MSDU 的 VAP/用户能力检查拒绝非 QoS、关闭开关和非 HT/VHT 用户；TID 能力检查拒绝 voice TID、不支持 A-MSDU 的 TID，Linux IPv4 ICMP 也直接拒绝聚合。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_tx_amsdu.c:471-558"
+      ]
+    },
+    {
+      "id": "EX26-C18",
+      "query": "旧版聚合发送在凑 A-MSDU 子帧时怎样做 4 字节 padding？尾部空间不够或帧数到上限时怎么处理缓存？",
+      "purpose": "historical",
+      "required": [
+        "wifi-historical-tx-amsdu"
+      ],
+      "scope": "code",
+      "groundtruth_reason": "hmac_amsdu_tx_encap_mpdu 计算四字节对齐长度再加 SNAP 长度，空间不足先尝试去掉尾 pad，仍不足则发已有聚合；剩余空间太少或达到最大子帧数也触发发送。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_tx_amsdu.c:248-310"
+      ]
+    },
+    {
+      "id": "EX26-C19",
+      "query": "旧提交 LAN-to-WLAN 的 IPv4 TOS 初始怎样取优先级，最后在哪里把选中的 TID 和 AC 写进 tx control block？",
+      "purpose": "historical",
+      "required": [
+        "wifi-historical-tx-qos"
+      ],
+      "scope": "code",
+      "groundtruth_reason": "IPv4 分支从 TOS 右移 WLAN_IP_PRI_SHIFT 获得初始值，完整分类经后续调整后在 hmac_tx_classify 末尾写 TID 及 WLAN_WME_TID_TO_AC 的 AC。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_tx_data.c:381-432",
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_tx_data.c:703-745"
+      ]
+    },
+    {
+      "id": "EX26-C20",
+      "query": "按 ef69ead 代码，DHCP 与 DHCPv6 会照原来的 IP 优先级发吗？请沿发送分类看队列 TID 和重试标记。",
+      "purpose": "historical",
+      "required": [
+        "wifi-historical-tx-qos"
+      ],
+      "scope": "code",
+      "groundtruth_reason": "IPv4 DHCP 改成 WLAN_TIDNO_BCAST 并填 DHCP 控制信息，IPv6 DHCPv6 也改 TID 并标记数据子类型与 needretry；它们是分类中的特殊业务分支。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_tx_data.c:425-432",
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_tx_data.c:444-465"
+      ]
+    },
+    {
+      "id": "EX26-C21",
+      "query": "旧代码刚停掉调度扫描又发普通 scan，迟到的 MAC_SCAN_PNO 完成事件为什么不能关掉普通扫描 timer 或清掉扫描忙位？两条路径怎样分工？",
+      "purpose": "historical",
+      "required": [
+        "wifi-historical-scan-lifecycle",
+        "wifi-historical-pno-scan"
+      ],
+      "scope": "code",
+      "groundtruth_reason": "PNO 请求仅登记 BACKGROUND_PNO 回调/模式；共享完成路径特判 MAC_SCAN_PNO，不销毁普通扫描超时 timer、不改普通 WAIT_SCAN 状态、不清 en_is_scanning。需同时区分调度扫描及普通扫描生命周期。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_scan.c:1769-1816",
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_scan.c:2595-2601"
+      ]
+    },
+    {
+      "id": "EX26-C22",
+      "query": "旧驱动打印 Join AP SUCC 是否已经等于连网成功？从 join 回调到认证，再到关联成功变 UP 的顺序是什么？",
+      "purpose": "historical",
+      "required": [
+        "wifi-historical-sta-join",
+        "wifi-historical-sta-auth",
+        "wifi-historical-sta-assoc"
+      ],
+      "scope": "code",
+      "groundtruth_reason": "JOIN 成功仅进入 JOIN_COMP 并发 JOIN_RSP；SME 随即发起 auth，认证成功才发起 asoc；关联响应成功处理才切 UP。完整阶段区别需要三张卡。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_mgmt_join.c:403-413",
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_sme_sta.c:881-895",
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_sme_sta.c:1117-1128",
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_mgmt_sta.c:1108-1119"
+      ]
+    },
+    {
+      "id": "EX26-C23",
+      "query": "历史管理 timer 都叫超时：等认证帧2/4与等关联响应，送回 SME 的消息类型和状态码如何区分？",
+      "purpose": "historical",
+      "required": [
+        "wifi-historical-sta-auth",
+        "wifi-historical-sta-assoc"
+      ],
+      "scope": "code",
+      "groundtruth_reason": "认证超时依状态生成 RSP2/RSP4 码并发送 AUTH_RSP；关联超时填写 asoc result/status 后发送 ASOC_RSP。共享 timer 名称不能混淆阶段。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_mgmt_sta.c:1243-1269",
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_mgmt_sta.c:1791-1818"
+      ]
+    },
+    {
+      "id": "EX26-C24",
+      "query": "用旧实现说明一个 TID 从 ADDBA 请求等待、收到成功应答到等待超时发 DELBA 的分叉；不要把开始协商当成 BA 已建成。",
+      "purpose": "historical",
+      "required": [
+        "wifi-historical-addba-setup",
+        "wifi-historical-delba-cleanup"
+      ],
+      "scope": "code",
+      "groundtruth_reason": "发送 ADDBA 后状态是 INPROGRESS，成功 Response 才设 COMPLETE，等待超时会发送带 TIMEOUT reason 的 DELBA。问题跨建立和超时清理两种主题。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_mgmt_bss_comm.c:592-600",
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_mgmt_bss_comm.c:974-1003",
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_mgmt_bss_comm.c:1275-1285"
+      ]
+    },
+    {
+      "id": "EX26-C25",
+      "query": "帮我在旧源码中分清两种合包：RX 按 fragment number 接回一帧，和 TX 把多个 MSDU 拼成 A-MSDU，完成/超时出口分别做什么？",
+      "purpose": "historical",
+      "required": [
+        "wifi-historical-rx-defrag",
+        "wifi-historical-tx-amsdu"
+      ],
+      "scope": "code",
+      "groundtruth_reason": "RX 分片重组以 more_frag 和序号决定缓冲/完成，超时释放；TX A-MSDU 按子帧长度、计数与 timer 发缓存。方向、输入及超时目的不同，不能用其中一张替代另一张。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_frag.c:117-132",
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_frag.c:283-340",
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_tx_amsdu.c:248-310",
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_tx_amsdu.c:580-634"
+      ]
+    },
+    {
+      "id": "EX26-C26",
+      "query": "旧代码最终分类得到的 TID 如何传到 A-MSDU 的 per-TID 缓存？为什么语音分类可能使聚合被跳过？",
+      "purpose": "historical",
+      "required": [
+        "wifi-historical-tx-qos",
+        "wifi-historical-tx-amsdu"
+      ],
+      "scope": "code",
+      "groundtruth_reason": "hmac_tx_classify 把最终 TID 写进 CB；hmac_amsdu_notify 从相同 CB 字段取 TID 选择 ast_hmac_amsdu，能力检查明确排除 WLAN_TIDNO_VOICE。需要分类和聚合两条路径。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_tx_data.c:738-745",
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_tx_amsdu.c:481-505",
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_tx_amsdu.c:543-561"
+      ]
+    },
+    {
+      "id": "EX26-D01",
+      "query": "在 RFC1042 的封装里，看到 AA AA 03 00 00 00 后面那两字节该怎么解释？LLC 加 SNAP 一共多长？",
+      "purpose": "guidance",
+      "required": [
+        "wifi-rfc1042-llc-snap"
+      ],
+      "scope": "document",
+      "groundtruth_reason": "RFC1042 Header Format 规定总长八字节；Frame Format and MAC Level Issues 给出 DSAP/SSAP=170、UI control=3、零 OUI 和 EtherType。题目是报文字节自然改写。",
+      "source_refs": [
+        "E:/FactumCore/.scratch/wifi-real-trial-20261025/protocols/rfc1042.txt §Header Format (lines 127-145)",
+        "E:/FactumCore/.scratch/wifi-real-trial-20261025/protocols/rfc1042.txt §Frame Format and MAC Level Issues (lines 231-241)"
+      ]
+    },
+    {
+      "id": "EX26-D02",
+      "query": "According to RFC1042, where do IPv4 and ARP protocol identifiers go, and does MAC minimum-frame padding count toward the IP total length?",
+      "purpose": "guidance",
+      "required": [
+        "wifi-rfc1042-llc-snap"
+      ],
+      "scope": "document",
+      "groundtruth_reason": "同一封装规定 EtherType 字段区分 IP=2048/ARP=2054；满足 MAC 最短帧的 padding 不是 IP datagram 的组成部分，不计入 IP total length。",
+      "source_refs": [
+        "E:/FactumCore/.scratch/wifi-real-trial-20261025/protocols/rfc1042.txt §Frame Format and MAC Level Issues (lines 231-247)"
+      ]
+    },
+    {
+      "id": "EX26-D03",
+      "query": "只按 RFC8325 的下行建议，EF 电话流和 AF41 视频会议应各标成哪个 UP？",
+      "purpose": "guidance",
+      "required": [
+        "wifi-rfc8325-dscp-up"
+      ],
+      "scope": "document",
+      "groundtruth_reason": "RFC8325 §4.3 的下行建议摘要分别映射 Telephony EF 到 UP6、Multimedia Conferencing AF41/42/43 到 UP4，题目仅要求 DSCP 到 UP。",
+      "source_refs": [
+        "E:/FactumCore/.scratch/wifi-real-trial-20261025/protocols/rfc8325.txt §4.3, Figure 1 (lines 1091-1130)"
+      ]
+    },
+    {
+      "id": "EX26-D04",
+      "query": "网络边缘只有无线终端时，CS6/CS7 是否一律该拿最高无线优先级？RFC8325 对未授权 codepoint 怎么建议？",
+      "purpose": "guidance",
+      "required": [
+        "wifi-rfc8325-dscp-up"
+      ],
+      "scope": "document",
+      "groundtruth_reason": "§8.2 说明默认 CS6/CS7 高优先级有 DoS 风险，未授权/未配置 codepoint 推荐 UP0，Wi-Fi-at-the-edge 部署下 CS6/CS7 也推荐 UP0；不能脱离信任边界只看数值大小。",
+      "source_refs": [
+        "E:/FactumCore/.scratch/wifi-real-trial-20261025/protocols/rfc8325.txt §8.2 (lines 1768-1838)"
+      ]
+    },
+    {
+      "id": "EX26-D05",
+      "query": "把 DSCP 直接截取高三位就足够吗？RFC8325 为什么会把 AF31/AF32/AF33 的推荐 UP 与这种默认算法分开？",
+      "purpose": "guidance",
+      "required": [
+        "wifi-rfc8325-dscp-up"
+      ],
+      "scope": "document",
+      "groundtruth_reason": "§2.3 定义高三位默认映射并指出 AF3x 会落 UP3；§4.2.5 明确推荐 AF31/32/33 到 UP4。问题是默认行为与推荐策略的区分。",
+      "source_refs": [
+        "E:/FactumCore/.scratch/wifi-real-trial-20261025/protocols/rfc8325.txt §2.3 (lines 547-585)",
+        "E:/FactumCore/.scratch/wifi-real-trial-20261025/protocols/rfc8325.txt §4.2.5 (lines 935-949)"
+      ]
+    },
+    {
+      "id": "EX26-D06",
+      "query": "UP 数字越大就越优先吗？按 RFC8325 解释为什么 UP3 与 UP0 同类，而 UP2 与 UP1 同类。",
+      "purpose": "guidance",
+      "required": [
+        "wifi-rfc8325-up-ac"
+      ],
+      "scope": "document",
+      "groundtruth_reason": "§6.2.1 说明 UP 标记自身不直接决定空口待遇；§6.2.2 固定配对 UP3/0 为 BE、UP2/1 为 BK，所以不能把八个 UP 当八条线性优先队列。",
+      "source_refs": [
+        "E:/FactumCore/.scratch/wifi-real-trial-20261025/protocols/rfc8325.txt §6.2.1-6.2.2, Figure 2 (lines 1490-1549)"
+      ]
+    },
+    {
+      "id": "EX26-D07",
+      "query": "What are the four WMM access categories for UP pairs 6/7, 4/5, 0/3, and 1/2 in RFC8325?",
+      "purpose": "guidance",
+      "required": [
+        "wifi-rfc8325-up-ac"
+      ],
+      "scope": "document",
+      "groundtruth_reason": "§6.2.2 Figure 2 给出四对 UP 与 AC 的固定映射，分别 VO、VI、BE、BK；并非 DSCP 到 UP 选择策略题。",
+      "source_refs": [
+        "E:/FactumCore/.scratch/wifi-real-trial-20261025/protocols/rfc8325.txt §6.2.2, Figure 2 (lines 1519-1549)"
+      ]
+    },
+    {
+      "id": "EX26-D08",
+      "query": "CAPWAP 的 Split MAC 与 Local MAC，beacon、关联处理和 QoS 分类各主要落在 WTP 还是控制器 AC？",
+      "purpose": "guidance",
+      "required": [
+        "wifi-rfc5416-mac-modes"
+      ],
+      "scope": "document",
+      "groundtruth_reason": "RFC5416 §2.2.1/2.2.2 的功能表对比 beacon 均由 WTP、Split 的关联及分类在 AC、Local 的关联为 WTP/AC 而分类在 WTP。这里 AC 是控制器。",
+      "source_refs": [
+        "E:/FactumCore/.scratch/wifi-real-trial-20261025/protocols/rfc5416.txt §2.2.1, Figure 1 (lines 399-424)",
+        "E:/FactumCore/.scratch/wifi-real-trial-20261025/protocols/rfc5416.txt §2.2.2, Figure 4 (lines 679-711)"
+      ]
+    },
+    {
+      "id": "EX26-D09",
+      "query": "Local MAC 是否就表示用户数据绝不去 AC、Association Request 也不用转交？请依据 RFC5416 说明。",
+      "purpose": "guidance",
+      "required": [
+        "wifi-rfc5416-mac-modes"
+      ],
+      "scope": "document",
+      "groundtruth_reason": "§2.2.2 规定 Local MAC 的 distribution 可在 WTP 或 AC；在 AC 时用户帧按 802.3 封装，同时 WTP 仍必须转发 Association Request 给 AC，不能把本地 MAC 等同完全本地控制。",
+      "source_refs": [
+        "E:/FactumCore/.scratch/wifi-real-trial-20261025/protocols/rfc5416.txt §2.2.2 (lines 679-717)"
+      ]
+    },
+    {
+      "id": "EX26-D10",
+      "query": "RFC5416 Add WLAN 里 MAC Mode 的 0/1 各是什么？Split MAC 能不能同时选 802.3 Tunnel，管理帧使用什么隧道格式？",
+      "purpose": "guidance",
+      "required": [
+        "wifi-rfc5416-mac-modes"
+      ],
+      "scope": "document",
+      "groundtruth_reason": "§6.1 枚举 Local=0、Split=1；管理帧必须用 802.11 Tunnel，802.3 Tunnel 明确不得与 Split MAC 同选。",
+      "source_refs": [
+        "E:/FactumCore/.scratch/wifi-real-trial-20261025/protocols/rfc5416.txt §6.1, MAC Mode and Tunnel Mode (lines 1868-1895)"
+      ]
+    },
+    {
+      "id": "EX26-M01",
+      "query": "对照 ef69ead 的默认 IPv4 分类与 RFC8325：AF31 若只取高位会走向什么类别，RFC 推荐怎样改 UP 并映射 AC？请分开说旧代码与规范建议。",
+      "purpose": "historical",
+      "required": [
+        "wifi-historical-tx-qos",
+        "wifi-rfc8325-dscp-up",
+        "wifi-rfc8325-up-ac"
+      ],
+      "scope": "mixed",
+      "groundtruth_reason": "旧代码从 TOS 取初始优先级、再经 TOS-to-TID/AC；RFC §2.3 描述 AF3x 的默认 UP3/BE，§4.2.5 推荐 UP4，§6.2.2 将 UP4 映射 VI。需三种主题才能比较实现与规范链，不证明当前部署已采用建议。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_tx_data.c:406-432",
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_tx_data_macro.h:36-38",
+        "E:/Hi1105/wifi/hi1105_host/inc/hd_common/wlan_types.h:206-208",
+        "E:/FactumCore/.scratch/wifi-real-trial-20261025/protocols/rfc8325.txt §2.3 (lines 547-585)",
+        "E:/FactumCore/.scratch/wifi-real-trial-20261025/protocols/rfc8325.txt §4.2.5 (lines 935-949)",
+        "E:/FactumCore/.scratch/wifi-real-trial-20261025/protocols/rfc8325.txt §6.2.2 (lines 1519-1545)"
+      ]
+    },
+    {
+      "id": "EX26-M02",
+      "query": "旧版 A-MSDU 子帧为什么把原 Ethernet type 拷进 SNAP、把子帧原 type 位置改成长？再用 RFC1042 解释 SNAP 内的协议标识。",
+      "purpose": "historical",
+      "required": [
+        "wifi-historical-tx-amsdu",
+        "wifi-rfc1042-llc-snap"
+      ],
+      "scope": "mixed",
+      "groundtruth_reason": "hmac_amsdu_append_submsdu 复制 Ethernet 头并填 LLC/SNAP，把原 EtherType 写到 SNAP、将子帧字段改为含 SNAP 的长度；RFC1042 解释零 OUI 后 16 位 EtherType 的含义。需实现和封装规范两张卡。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_tx_amsdu.c:206-244",
+        "E:/FactumCore/.scratch/wifi-real-trial-20261025/protocols/rfc1042.txt §Header Format (lines 127-145)",
+        "E:/FactumCore/.scratch/wifi-real-trial-20261025/protocols/rfc1042.txt §Frame Format and MAC Level Issues (lines 231-241)"
+      ]
+    },
+    {
+      "id": "EX26-N01",
+      "query": "只给当前线上真实 Target 的证据：我们现在发布的扫描超时到底是多少？不要用 ef69ead 历史实现替代现网构建证明。",
+      "purpose": "current",
+      "required": [],
+      "scope": "negative",
+      "groundtruth_reason": "可读源码只证明固定旧提交：普通扫描 timer 使用 WLAN_DEFAULT_MAX_TIME_PER_SCAN 等历史常量选择，不能提供当前 Target 的构建、运行或发布证据；本题拒绝历史替代，期望无可用卡。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_scan.c:2460-2480"
+      ],
+      "forbidden": [
+        "wifi-historical-scan-lifecycle"
+      ],
+      "expected_empty": true
+    },
+    {
+      "id": "EX26-N02",
+      "query": "我只接受当前六个真实 Target 已验证的行为：线上 BA 应答超时是否都会发送 DELBA？没有当前版本证据就请拒绝。",
+      "purpose": "current",
+      "required": [],
+      "scope": "negative",
+      "groundtruth_reason": "历史快照分别实现 ADDBA 协商超时发送 DELBA 与 BA 重排序 timer 刷新/重启，且没有六 Target 当前构建/实测材料；不能把这些历史主题作为当前断言的证据。",
+      "source_refs": [
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_mgmt_bss_comm.c:1245-1287",
+        "E:/Hi1105/wifi/hi1105_host/hmac/hmac_blockack.c:809-859"
+      ],
+      "forbidden": [
+        "wifi-historical-addba-setup",
+        "wifi-historical-delba-cleanup"
+      ],
+      "expected_empty": true
+    },
+    {
+      "id": "EX26-N03",
+      "query": "只从已由真人确认并发布为 stable 的当前知识回答：EF 到 UP 再到 AC 的正式映射是什么？候选协议条目不能算已确认。",
+      "purpose": "current",
+      "required": [],
+      "scope": "negative",
+      "groundtruth_reason": "RFC8325 本身能支持 EF/UP6/VO 映射，但任务给定四张协议卡尚无真人确认；原 RFC 文字和候选临时索引都不能证明卡的 stable 发布状态，故当前 stable-only 查询应为空。",
+      "source_refs": [
+        "E:/FactumCore/.scratch/wifi-real-trial-20261025/protocols/rfc8325.txt §4.3, Figure 1 (lines 1091-1116)",
+        "E:/FactumCore/.scratch/wifi-real-trial-20261025/protocols/rfc8325.txt §6.2.2, Figure 2 (lines 1519-1545)"
+      ],
+      "forbidden": [
+        "wifi-rfc8325-dscp-up",
+        "wifi-rfc8325-up-ac"
+      ],
+      "expected_empty": true
+    },
+    {
+      "id": "EX26-N04",
+      "query": "当前我们这套已上线 WiFi 产品究竟采用 Split MAC 还是 Local MAC？只要当前部署结论，不要给 RFC 的两种模式介绍。",
+      "purpose": "current",
+      "required": [],
+      "scope": "negative",
+      "groundtruth_reason": "RFC5416 §2.2 给出通用可选架构，§6.1 给出配置枚举并要求匹配 WTP 宣告能力；均不是本产品当前部署选择、构建配置或宿主运行证明，14 张主题中没有当前部署证据。",
+      "source_refs": [
+        "E:/FactumCore/.scratch/wifi-real-trial-20261025/protocols/rfc5416.txt §2.2 (lines 358-375)",
+        "E:/FactumCore/.scratch/wifi-real-trial-20261025/protocols/rfc5416.txt §6.1, MAC Mode (lines 1868-1878)"
+      ],
+      "forbidden": [
+        "wifi-rfc5416-mac-modes"
+      ],
+      "expected_empty": true
+    },
+    {
+      "id": "EX26-N05",
+      "query": "请给出 IEEE 802.11be MLO 的 EMLSR 链路切换协商字段和定时器；只接受直接覆盖该协议的材料。",
+      "purpose": "guidance",
+      "required": [],
+      "scope": "negative",
+      "groundtruth_reason": "14 主题只覆盖旧 STA/扫描/BA/数据路径、LLC/SNAP、Diffserv 和 CAPWAP 模式；RFC5416 的模式划分及 Add WLAN 枚举不能外推成 802.11be EMLSR 协商。此次限定语料没有对应卡，因此应拒绝直接回答，而不是捞 MAC mode 近词条。",
+      "source_refs": [
+        "E:/FactumCore/.scratch/wifi-real-trial-20261025/protocols/rfc5416.txt §2.2.1-2.2.2 (lines 371-424,666-717)",
+        "E:/FactumCore/.scratch/wifi-real-trial-20261025/protocols/rfc5416.txt §6.1, MAC Mode (lines 1868-1878)"
+      ],
+      "expected_empty": true
+    },
+    {
+      "id": "EX26-N06",
+      "query": "需要一个能保证端到端小于 10ms 的无线业务方案，直接给出只设置 DSCP/UP 就可保证的带宽、时延上界和证明。",
+      "purpose": "guidance",
+      "required": [],
+      "scope": "negative",
+      "groundtruth_reason": "RFC8325 明确 UP 标记自身不直接决定空口待遇，AC 通过固定/随机等待计时器实现相对服务区分；给定主题不能证明端到端时延和带宽保证。请求的是保证及证明，不是映射概述，应拒绝用映射卡冒充确定性 SLA。",
+      "source_refs": [
+        "E:/FactumCore/.scratch/wifi-real-trial-20261025/protocols/rfc8325.txt §6.2.1-6.2.2 (lines 1490-1501,1519-1554)"
+      ],
+      "expected_empty": true
+    }
+  ]
+}

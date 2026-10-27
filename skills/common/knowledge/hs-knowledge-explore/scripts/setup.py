@@ -112,7 +112,7 @@ def main(argv=None):
             return 2
         if missing:
             command = [sys.executable, "-m", "pip", "--disable-pip-version-check", "--no-cache-dir",
-                       "install", "--no-user", "--only-binary=:all:", "-r", str(lock)]
+                       "install", "--user", "--only-binary=:all:", "-r", str(lock)]
             if args.wheelhouse:
                 command += ["--no-index", "--find-links", str(Path(args.wheelhouse).expanduser().absolute())]
             elif args.index_url:

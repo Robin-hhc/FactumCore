@@ -45,6 +45,10 @@ def execute(ctx):
                 "INVALID_REGRESSION_CASE", "Unique case IDs and queries are required"
             )
         seen.add(case["id"])
+        if case.get("purpose", "current") not in (
+            "current", "implementation", "guidance", "historical"
+        ):
+            raise NodeError("INVALID_PURPOSE", "Invalid regression query purpose")
         for field in ("required", "forbidden", "expected_order"):
             if field in case and (
                 not isinstance(case[field], list)

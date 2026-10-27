@@ -120,6 +120,41 @@ def assert_scan_succeeded(layout, catalog_path, operation, *, expected_change="n
                child["tool_identity"]["skill"] == "hs-knowledge-maintain" for child in children)
 
 
+def test_nested_domain_uses_registered_workspace_for_capture_and_scan(deployed):
+    layout = deployed
+    nested = layout["project"] / "aiotbot/aiotbot-knowledge-wifi-mp"
+    assert nested.resolve().is_relative_to(layout["project"].resolve())
+    nested.parent.mkdir()
+    layout["knowledge"].rename(nested)
+    layout["knowledge"] = nested
+    config_path = layout["project"] / "config.yml"
+    config = json.loads(config_path.read_bytes())
+    config["knowledge_roots"]["wifi"] = "aiotbot/aiotbot-knowledge-wifi-mp"
+    config["modules"] = [{"path": "device", "chips": ["chip12"], "sides": ["device"]}]
+    config_path.write_bytes(canonical(config))
+    module = layout["project"] / "main/device"
+    module.mkdir()
+    source = module / "source.c"
+    source.write_bytes(b"int nested_fixture(void) { return 1; }\n")
+    destination = layout["base"] / "nested-registration"
+    registered = register(layout, destination)
+    assert registered.returncode == 0, registered.stderr.decode(errors="replace")
+    catalog_path = destination / "catalog.json"
+    process, result = call(layout, catalog_path, "hs-workspace-explore", "nested-e0",
+                           request={"target_path": str(source)})
+    assert process.returncode == 0, result
+    context_ref = result["data"]["context_ref"]
+    context = json.loads((nested / context_ref).read_bytes())
+    assert Path(context["workspace_root"]) == layout["project"]
+    repo_id = next(iter(context["repos"]))
+    process, result = call(layout, catalog_path, "hs-knowledge-source-capture", "nested-code",
+                           request={"kind": "code", "repo_id": repo_id, "relative_path": "source.c",
+                                    "source_id": "nested-code", "context_ref": context_ref})
+    assert process.returncode == 0, result
+    assert_scan_succeeded(layout, catalog_path, "nested-scan")
+
+
+
 @pytest.mark.parametrize("keep_dev_lock", [False, True])
 def test_existing_agent_packages_work_without_project_capability_folders(deployed, keep_dev_lock):
     layout = deployed

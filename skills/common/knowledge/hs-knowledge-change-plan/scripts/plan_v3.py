@@ -21,6 +21,8 @@ def validate_queries(cases):
         ids.add(case["id"])
         require(case.get("required") or case.get("forbidden") or "expected_order" in case,
                 "INVALID_TARGET_QUERY", "A query needs independently declared expected behavior")
+        require(case.get("purpose", "current") in ("current", "implementation", "guidance", "historical"),
+                "INVALID_TARGET_QUERY_PURPOSE", "Declare current, implementation, guidance or historical query purpose")
     return cases
 
 

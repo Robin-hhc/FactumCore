@@ -9,7 +9,9 @@ param(
     [string]$Wheelhouse,
     [string]$IndexUrl,
     [string]$SkillsRoot,
-    [string]$WorkflowsRoot
+    [string]$WorkflowsRoot,
+    [string]$WorkspaceConfig,
+    [string]$SourceRoot
 )
 
 $ErrorActionPreference = 'Stop'
@@ -27,8 +29,9 @@ if (-not $Python) {
     }
 }
 $helper = Join-Path $PSScriptRoot 'install_environment.py'
-$projectRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../..'))
-$helperArgs = @('-X', 'utf8', $helper, '--source-root', $projectRoot)
+$helperArgs = @('-X', 'utf8', $helper)
+if ($WorkspaceConfig) { $helperArgs += @('--workspace-config', $WorkspaceConfig) }
+if ($SourceRoot) { $helperArgs += @('--source-root', $SourceRoot) }
 if ($Destination) { $helperArgs += @('--destination', $Destination) }
 if ($Wheelhouse) { $helperArgs += @('--wheelhouse', $Wheelhouse) }
 if ($IndexUrl) { $helperArgs += @('--index-url', $IndexUrl) }

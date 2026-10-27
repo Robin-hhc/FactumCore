@@ -29,12 +29,28 @@ contract_spec.loader.exec_module(contract)
 from source_admission_contract import source_resources, validation  # noqa: E402
 
 
-@pytest.mark.parametrize("usage, with_target", [("historical", False), ("guidance", True), ("current", True)])
-def test_source_identity_is_rechecked_without_build_artifacts(tmp_path, monkeypatch, usage, with_target):
+@pytest.mark.parametrize("usage, with_target, nested", [
+    ("historical", False, False), ("guidance", True, False), ("current", True, False),
+    ("current", True, True),
+])
+def test_source_identity_is_rechecked_without_build_artifacts(tmp_path, monkeypatch, usage, with_target, nested):
     monkeypatch.setenv("AIOTBOT_TEST_TMP", str(tmp_path))
     environment = fixture.PublicCodeGateTests(methodName="test_signed_positive_support_then_apply_and_verify")
     environment.setUp()
     try:
+        if nested:
+            moved = environment.workspace / "aiotbot" / environment.root.name
+            assert moved.resolve().is_relative_to(environment.workspace.resolve())
+            moved.parent.mkdir()
+            environment.root.rename(moved)
+            environment.root = moved
+            config_path = environment.workspace / "config.yml"
+            config = yaml.safe_load(config_path.read_bytes())
+            config["knowledge_roots"]["wifi"] = moved.relative_to(environment.workspace).as_posix()
+            config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+            context = json.loads((environment.root / environment.context_ref).read_bytes())
+            context.update(knowledge_root=str(moved), config_digest=fixture.digest(config_path.read_bytes()))
+            environment.save(environment.context_ref, fixture.seal(context))
         # Re-pin this newly created synthetic copy during parallel development.
         lock_path = environment.root / "governance/framework.lock.yaml"
         framework = yaml.safe_load(lock_path.read_bytes())

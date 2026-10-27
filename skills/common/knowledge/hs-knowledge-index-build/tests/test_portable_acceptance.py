@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import pytest
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
@@ -16,10 +17,22 @@ fixture = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fixture)
 
 
-def test_accepted_repository_works_without_machine_private_review_files(tmp_path):
+@pytest.mark.parametrize("nested", [False, True], ids=["flat", "nested-without-config"])
+def test_accepted_repository_works_without_machine_private_review_files(tmp_path, nested):
     # This isolated test key signs publication receipts only.
     publication_key = Ed25519PrivateKey.generate()
     pipeline = fixture.Pipeline(tmp_path)
+    workspace = pipeline.root.parent
+    if nested:
+        moved = workspace / "aiotbot" / pipeline.root.name
+        assert moved.resolve().is_relative_to(workspace.resolve())
+        moved.parent.mkdir()
+        pipeline.root.rename(moved)
+        pipeline.root = moved
+        pipeline.catalog["test_fixture_root"] = str(moved)
+        pipeline.catalog["workspaces"] = {}
+        pipeline.catalog_path.write_bytes(fixture.canonical(pipeline.catalog))
+    domain_path = pipeline.root.relative_to(workspace).as_posix()
     bundle_ref, bundle = pipeline.capture("create", b"# Fixture\nPublished capture rule.\n")
     view_ref = pipeline.view("create", bundle_ref, "portable-rule", pipeline.card("portable-rule", bundle))
     pipeline.apply("create", view_ref)
@@ -46,7 +59,6 @@ def test_accepted_repository_works_without_machine_private_review_files(tmp_path
     }
     record["digest"] = fixture.sha(fixture.canonical(record))
     record_ref = pipeline.write("logs/ingest/create.yaml", fixture.canonical(record))
-    workspace = pipeline.root.parent
 
     def git(*args):
         return subprocess.run(["git", "-c", "core.hooksPath=" + os.devnull, "-C", str(workspace), *args],
@@ -54,7 +66,7 @@ def test_accepted_repository_works_without_machine_private_review_files(tmp_path
 
     git("init", "--initial-branch=main", "-q")
     git("config", "core.autocrlf", "false")
-    git("add", "aiotbot-knowledge-wifi-mp/knowledge", "aiotbot-knowledge-wifi-mp/governance", "aiotbot-knowledge-wifi-mp/logs/ingest", "aiotbot-knowledge-wifi-mp/logs/evidence")
+    git("add", *[domain_path + "/" + ref for ref in ("knowledge", "governance", "logs/ingest", "logs/evidence")])
     git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "commit", "-qm", "accepted synthetic repository")
     pipeline.catalog["publication_trust"] = {"fixture-publication": {"synthetic": True, "fixture_root": str(pipeline.root),
         "public_key_b64": base64.b64encode(publication_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)).decode()}}
@@ -69,10 +81,23 @@ def test_accepted_repository_works_without_machine_private_review_files(tmp_path
         target = (pipeline.root / relative).resolve()
         assert target.is_relative_to(pipeline.root.resolve())
         shutil.rmtree(target)
+    assert not (workspace / "config.yml").exists()
     built = pipeline.call("knowledge-index-build", {"operation_id": "portable-build", "channel": "shared", "publication_receipt_ref": receipt_ref})["data"]
     pipeline.call("knowledge-index-build", {"operation_id": "portable-activate", "generation_ref": built["generation_ref"], "expected_active": None}, "activate")
     result = pipeline.call("knowledge-query", {"operation_id": "portable-search", "channel": "shared", "purpose": "current", "query": "capture"})["data"]
     assert [match["card_id"] for match in result["matches"]] == ["portable-rule"]
+    # A nonempty explicit registration is a promise and must not silently
+    # fall back to Git discovery when it belongs to another workspace.
+    registration = pipeline.catalog.get("workspaces")
+    pipeline.catalog["workspaces"] = {"wrong-workspace": {"config": str(pipeline.catalog_path), "rules_digest": pipeline.rules}}
+    pipeline.catalog_path.write_bytes(fixture.canonical(pipeline.catalog))
+    denied = pipeline.call("knowledge-query", {"operation_id": "wrong-registration", "channel": "shared", "purpose": "current", "query": "capture"}, expected=2)
+    assert denied["diagnostics"][0]["code"] == "WORKSPACE_CONFIG_UNAVAILABLE"
+    if registration is None:
+        pipeline.catalog.pop("workspaces")
+    else:
+        pipeline.catalog["workspaces"] = registration
+    pipeline.catalog_path.write_bytes(fixture.canonical(pipeline.catalog))
     # A dirty local summary cannot acquire accepted-repository authority.
     pipeline.write(record_ref, (pipeline.root / record_ref).read_bytes() + b"\n")
     denied = pipeline.call("knowledge-query", {"operation_id": "dirty-summary", "channel": "shared", "purpose": "current", "query": "capture"}, expected=2)

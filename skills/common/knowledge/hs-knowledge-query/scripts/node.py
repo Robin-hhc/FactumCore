@@ -362,9 +362,11 @@ def load_card(ctx, manifest, card_id, purpose="current"):
         card = ctx.modules["indexing"].read_document(raw, row["path"], ctx.rules, card_id=card_id, sha256=row["sha256"])
         code_current = True
         if card["metadata"]["review_mode"] == "code_gate" and purpose != "historical":
-            config = ctx.root.parent / "config.yml"
             try:
                 catalog = read_json(ctx.args.catalog)
+                config = ctx.modules["validation"].workspace_config_path(
+                    ctx.root, catalog.get("workspaces"), ctx.args.rules_digest
+                )
                 ctx.modules["source_resources"].validate_current_code_identity(
                     proof.get("code_identity"), config, proof.get("config_digest"),
                     ctx.rules, catalog.get("code_policy"),
@@ -675,6 +677,8 @@ def execute(ctx):
     search_receipt, original_hit = None, None
     if action == "read" and request.get("receipt_ref"):
         request, search_receipt, original_hit = read_search_binding(ctx, request)
+    if request.get("purpose", "current") not in ("current", "implementation", "guidance", "historical"):
+        raise NodeError("INVALID_PURPOSE", "Declare current, implementation, guidance or historical query purpose")
     generation_ref, manifest, db, active_observation = load_generation(
         ctx, request, search_receipt
     )
@@ -701,7 +705,7 @@ def execute(ctx):
         ):
             raise NodeError("INVALID_QUERY_BUDGET", "Invalid top_k or scan_limit")
         with closing(
-            sqlite3.connect(db.as_uri() + "?mode=ro&immutable=1", uri=True)
+            sqlite3.connect(ctx.modules["indexing"].sqlite_readonly_uri(db), uri=True)
         ) as connection:
             ids = (
                 []

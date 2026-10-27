@@ -9,11 +9,12 @@ from __future__ import annotations
 from collections import Counter
 from contextlib import closing
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 import re
 import sqlite3
 import tempfile
 import unicodedata
+from urllib.parse import quote
 
 from .validation import ContractError, canonical_bytes, sha256_bytes
 
@@ -56,6 +57,36 @@ def _native(path):
     if os.name == "nt" and not value.startswith("\\\\?\\"):
         return "\\\\?\\UNC\\" + value[2:] if value.startswith("\\\\") else "\\\\?\\" + value
     return value
+
+
+def sqlite_readonly_uri(path):
+    """Open an absolute, immutable generation without a SQLite URI authority.
+
+    SQLite normally rejects file://server/share; a UNC name belongs in the
+    URI path (file:////server/share). Extended Windows namespaces also stay
+    in the path, with their ? escaped; dropping them breaks long filenames.
+    Escape the filename, never an already constructed URI.
+    Callers still validate the authorized path and generation fingerprint.
+    """
+    value = os.fspath(path)
+    windows = isinstance(path, PureWindowsPath) or (
+        not isinstance(path, PurePosixPath)
+        and (os.name == "nt" or value.startswith(("\\\\", "//?/"))
+             or re.match(r"^[A-Za-z]:", value))
+    )
+    if windows:
+        normalized = PureWindowsPath(value)
+        value = normalized.as_posix()
+        if not normalized.is_absolute() or value.startswith("//./"):
+            raise ValueError("An absolute filesystem path is required for SQLite")
+        if len(str(normalized)) >= 260 and not value.startswith("//?/"):
+            value = "//?/UNC/" + value[2:] if value.startswith("//") else "//?/" + value
+        uri = ("file://" + quote(value, safe="/:")
+               if value.startswith("//") else normalized.as_uri())
+    else:
+        normalized = path if isinstance(path, PurePosixPath) else Path(path)
+        uri = normalized.as_uri()
+    return uri + "?mode=ro&immutable=1"
 
 
 def _rows(cards, rules_digest):
@@ -114,12 +145,7 @@ def verify_database(cards, rules_digest, path):
     if not path.is_file():
         raise ContractError("INDEX_MISSING", "Database does not exist", path)
     # Opening the existing file with mode=ro also prevents a missing input becoming an empty DB.
-    uri_path = str(path)
-    if uri_path.startswith("\\\\?\\UNC\\"):
-        uri_path = "\\\\" + uri_path[8:]
-    elif uri_path.startswith("\\\\?\\"):
-        uri_path = uri_path[4:]
-    uri = Path(uri_path).as_uri() + "?mode=ro&immutable=1"
+    uri = sqlite_readonly_uri(path)
     try:
         with closing(sqlite3.connect(uri, uri=True)) as connection:
             if connection.execute("PRAGMA integrity_check").fetchall() != [("ok",)]:

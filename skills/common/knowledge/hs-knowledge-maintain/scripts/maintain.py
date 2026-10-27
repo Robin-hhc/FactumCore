@@ -590,8 +590,14 @@ def inspect_context(context):
     cards = domain_cards(context)
     lock = context.modules["source_resources"].read_source_lock(context.root)
     resources = {row["source_id"]: row for row in lock["resources"]}
-    config_path = context.root.parent / "config.yml"
-    config_digest = sha(config_path.read_bytes()) if config_path.is_file() else None
+    try:
+        catalog = read_json(context.args.catalog) if context.args.catalog else {}
+        config_path = context.modules["validation"].workspace_config_path(
+            context.root, catalog.get("workspaces"), context.args.rules_digest
+        )
+        config_digest = sha(config_path.read_bytes())
+    except (ValueError, OSError):
+        config_digest = None
     cached, affected, gaps, processing_records = {}, [], [], []
     summaries = {}
     record_root = context.root / "logs/ingest"

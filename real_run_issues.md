@@ -2,6 +2,24 @@
 
 > 本文件供另一个开发 agent 接手解决。以**最新版 FactumCore**（`D:\knowledge_graph\FactumCore`，commit `2379f7b`）状态为准，只保留**当前仍未解决**的问题、各自的实际部署背景、根因与当前临时规避方案。已修复/已解决的历史问题不在此列。
 
+> **2026-10-27 开发修复状态**：以下现场问题的原始描述与历史成绩保留，按其原版本解释；现行状态以此表及复核结论为准。当前开发工作区已落实 A、B，以及 D 的调用防误用和 E 的规则升级续办验证；C 按用户要求暂不改动。SSH 配置与测量入口见 [`tools/deploy/EXECUTION.md`](aiotbot-knowledge-wifi-mp/tools/deploy/EXECUTION.md)。尚未提交或推送；开发测试及合成共享盘试验不代替内部部署验收。
+
+| 项目 | 当前开发实现及验证边界 |
+|---|---|
+| A：SQLite UNC | index-build 与 query 共用只读 SQLite URI 构造，保留 Windows 扩展长路径并正确编码；真实 Samba 的 UNC／长路径用例通过，不再依赖本地镜像绕过 |
+| B：嵌套知识根 | 部署准备、登记及运行消费者按真实 `config.yml` 定位知识根与代码根；校验明确映射、链接与歧义，不靠固定父目录层数 |
+| C：timeout | 用户已确认内部现场超时节点为 `hs-knowledge-change-plan`；具体 action、计时边界和原始报错待补。原有预算保持不变；VPS 的 query→apply 超时为另一条独立记录 |
+| D：purpose | 保留用途资格设计；P3／query／P7 提前拒绝无效用途。逐项复查又补齐独立 query 的空索引／无候选漏校验，回执 read 仍继承原用途，说明文档明确 guidance／historical 用法 |
+| E：rules-digest | 规则锁升级后仍拒绝旧记录；用新 operation 重跑验证未改字节的卡，不改旧记录、不自动重签，已补完整链路回归 |
+| Windows／Linux／SSH | 用户后续确定服务器工作区统一经 SSH 执行完整节点及子 CLI，不经 Samba／UNC／映射盘运行；调用端工具和配置置于本机磁盘。真正本机部署仍可直接执行；不再等待具体 case 的收益报告。原有测量只按其当时版本与范围解释，能力改动后须重新登记 |
+| 原现场 7 项部署测试失败 | 原文只有依赖／Unicode 的概要归因，缺逐项 ID、trace 和环境版本；当前配套环境的部署测试通过，但未将旧环境这 7 项逐项认定为已闭环 |
+
+前一修复批次的本机节点回归为 667 passed／3 skipped，部署组为 173 passed／2 skipped。其真实 Windows SMB 子集为 44 passed／5 failed：五项分别停在该共享的 NTFS junction 创建权限或跨所有者 Git 仓库的夹具前提；同五项改用本机 NTFS 临时目录为 5 passed。没有关闭 Git 所有权检查或把这些失败记作通过；远端全量组中途停止，不能声明全量通过。这些是当时版本的证据，当前服务器项目不再通过共享盘执行。
+
+本轮统一 SSH 的部署工具测试在 Windows 分两组覆盖全部目录，共 215 passed／4 skipped；WSL 执行组 91 passed／11 skipped，Workflow 9 passed／1 skipped。UNC／映射盘路径拒绝及本机、服务器 worker 正常路径均有回归；真实内部 ingest 尚待按新包部署验证，不将旧 SMB 数据或隔离测试当作新版本的完整现场验收。原 timeout 和规则锁未改动。
+
+再次按本清单逐项复核后，B 已修，D 的用途隔离设计保留且入口漏校验已补，E 的旧记录拒绝／新操作重验证已通过完整链路；C 仍明确暂缓。当前源码新增定向验证共 84 passed、0 failed、0 skipped（query 38、嵌套及修订／规则升级 21、P3 18、P7 5、嵌套部署 2）。这些不表示旧内部两卡或旧 7 项环境失败已经现场重验。后续须分发最终新包、在服务器重新登记并取回 catalog，再在实际内部 SSH 环境复跑 status、目标 query 和 ingest；query 包也需包含本次新增校验。
+
 ## 一、实际部署场景（背景，务必先读）
 
 1. **代码仓布局**：`aiotbot-knowledge-wifi-mp/` 是唯一领域根，**并非一定固定在代码仓根目录**——后续可能被前置文件夹嵌套，例如 `repo/aiotbot/aiotbot-knowledge-wifi-mp/`。`config.yml` 的 `knowledge_roots.wifi` 记录相对 `config.yml` 的相对路径，嵌套时值为 `aiotbot/aiotbot-knowledge-wifi-mp`。
@@ -9,7 +27,7 @@
 3. **运行环境**：**Windows电脑和linux服务器都支持运行agent，Windows 电脑上的 agent 需要通过网络盘/ssh访问 Linux 服务器上的代码仓**（`Y:` 映射 `\\7.151.107.107\workcode\...`）。网络盘延迟高 + venv 冷启动慢，跨节点 subprocess 调用实测单次可达 3 分钟+。
 4. **运行时依赖**：skill 跨节点调用（如 materialize 调 maintain、index-build 调 apply verify）通过 `subprocess.run(..., timeout=...)` 硬编码超时执行。网络盘环境下默认值偏小。
 
-## 二、当前未解决的问题
+## 二、原始现场问题描述（当前状态见开头）
 
 ### 问题 A：UNC 网络盘 SQLite URI bug（index-build / query 阻塞）★最关键
 
@@ -70,6 +88,8 @@ lock = config.parent / "aiotbot-knowledge-wifi-mp/governance/framework.lock.yaml
 
 ### 问题 C：跨节点 subprocess 超时偏小（网络盘性能瓶颈）
 
+> **2026-10-27 现场补充**：用户确认内部现场的超时节点是 `hs-knowledge-change-plan`。目前尚未取得该次 `--action`、调用者／完整命令、原始超时报错、确切耗时及 600 秒临时补丁后的稳定性结果，不能仅凭节点名认定超时发生在它内部的某条 120 秒子调用。`plan`／`review` 路径未直接调用 `Context.call`；默认生成／`rederive` 和 `verify` 则有来源解析及嵌套子调用，且该节点也可能作为其他节点的子进程受外层预算限制。此前 VPS 记录的是 query→apply verify-result 的超时，耗时和结论不移用为本次 change-plan 的现场证据。下述原始归因和补丁思路保留供后续验证，本轮仍不修改 timeout。
+
 **背景**：Windows agent 经网络盘访问代码仓，网络盘延迟高 + venv 冷启动慢，跨节点 subprocess 调用实测单次可达 3 分钟+。
 
 **现象**：materialize/verify 等跨节点调用在 `timeout=120` 下失败。
@@ -88,7 +108,7 @@ lock = config.parent / "aiotbot-knowledge-wifi-mp/governance/framework.lock.yaml
 - **问题 D：`purpose: guidance` 查询**：`governance/contracts/knowledge.py:match_scope`——`purpose in ("current","implementation")` 时要求 `claim.usage == "current"`；纯文档卡 `usage: guidance` 仅 `guidance`/`historical` 目的可见。**这是设计行为**。使用方：query 带 `purpose: guidance`；P7 query-regression 的 target_queries 需显式带 `"purpose": "guidance"`（view 的 target_queries 已支持 purpose 字段）。
 - **问题 E：rules-digest 连锁变化**：契约文件受 `framework.lock.yaml` 锁定，改契约 → 需更新 lock sha256 → rules-digest 变化 → 已提交记录变 stale。这是治理设计，不是 bug；修复问题 A 时需规划重跑。
 
-## 四、当前验证状态（供接手 agent 参照基线）
+## 四、原始现场验证状态（历史基线）
 
 - **ingest P1→P7 全通过**（operation `ingest-hwdl-v3`，新版本流程，真人确认门已移除）：两卡 `hwdl-frame-flow`（flow）与 `hwdl-snap-protocol`（protocol）已落库并登记 `logs/ingest/ingest-hwdl-v3.yaml`。
 - **index-build / query 已在本地盘镜像跑通**：gen-02f994d06c68725ebbf838dd，2 docs/2 claims/894 postings；query-regression passed（2 case 全绿）；query 命中两卡（目标卡排首位）。网络盘直接跑仍因问题 A 失败。
@@ -102,7 +122,7 @@ lock = config.parent / "aiotbot-knowledge-wifi-mp/governance/framework.lock.yaml
   - 测试文档：`docs-raw/storys/HWDL收发设计三分之二说明书_v1.md`
   - 最新版来源：`D:\knowledge_graph\FactumCore`（commit `2379f7b`）
 
-## 五、建议修复顺序
+## 五、原始建议修复顺序
 
 1. **问题 A（UNC URI）**——最优先，网络盘部署的硬阻塞，改动面明确（两处代码 + lock + 重跑）。
 2. **问题 B（嵌套部署）**——影响后续真实仓部署形态，改动小（一个函数动态化 + 补测试）。

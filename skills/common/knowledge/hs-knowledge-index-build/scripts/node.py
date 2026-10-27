@@ -209,6 +209,26 @@ def git_read(workspace, args):
     return process.stdout
 
 
+def publication_workspace(ctx, catalog=None):
+    """Use exact installed mapping, or the actual Git root for portable readers.
+
+    A pure-document shared consumer needs no machine-private workspace registry.
+    Git discovery is read-only and its exact commit/blobs are still verified by
+    the caller. An invalid explicit registration never falls back to discovery.
+    """
+    catalog = catalog if catalog is not None else read_json(ctx.args.catalog)
+    registrations = catalog.get("workspaces")
+    if registrations is not None and registrations != {}:
+        workspace = ctx.modules["validation"].workspace_config_path(
+            ctx.root, registrations, ctx.args.rules_digest
+        ).parent
+    else:
+        workspace = Path(git_read(ctx.root, ["rev-parse", "--show-toplevel"]).decode("utf-8").strip()).resolve()
+    if not ctx.root.resolve().is_relative_to(workspace):
+        raise NodeError("PUBLICATION_REPOSITORY_MISMATCH", "Knowledge root escapes the actual publication repository")
+    return workspace
+
+
 def validate_publication(ctx, request, cards, qualifications=None, purpose="current"):
     ref = request.get("publication_receipt_ref")
     if not ref or not ctx.args.catalog:
@@ -261,7 +281,8 @@ def validate_publication(ctx, request, cards, qualifications=None, purpose="curr
         raise NodeError(
             "PUBLICATION_CONTENT_MISMATCH", "Merged content identity differs"
         )
-    workspace, commit = ctx.root.parent.resolve(), payload["knowledge_commit"]
+    workspace = publication_workspace(ctx, catalog)
+    commit = payload["knowledge_commit"]
     top = Path(
         git_read(workspace, ["rev-parse", "--show-toplevel"]).decode().strip()
     ).resolve()
@@ -415,7 +436,8 @@ def repository_acceptance(ctx, receipt, cards):
     declared = payload.get("acceptance_records")
     if not isinstance(declared, dict) or not declared:
         raise NodeError("ACCEPTANCE_RECORD_REQUIRED", "Accepted repository summaries are required")
-    workspace, commit = ctx.root.parent.resolve(), payload["knowledge_commit"]
+    workspace = publication_workspace(ctx)
+    commit = payload["knowledge_commit"]
     prefix = ctx.root.relative_to(workspace).as_posix()
     available = {}
     for ref, expected in sorted(declared.items()):

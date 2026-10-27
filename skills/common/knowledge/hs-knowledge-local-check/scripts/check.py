@@ -82,9 +82,12 @@ def git_read(root, arguments):
 
 
 def read_configuration(ctx, context):
-    path = ctx.root.parent / "config.yml"
-    if not path.is_file() or ctx.domain is None:
+    if ctx.domain is None:
         raise Incomplete("registered workspace configuration unavailable")
+    try:
+        path = ctx.domain.workspace_config_path(ctx.root, ctx.catalog.get("workspaces"), ctx.rules_digest)
+    except (ValueError, OSError) as exc:
+        raise Incomplete("registered workspace configuration unavailable; installed workspace registration required") from exc
     raw = path.read_bytes()
     if context.get("config_digest") != digest(raw):
         raise Incomplete("code context does not fix current workspace configuration")
@@ -162,7 +165,7 @@ def mapped_code_identity(ctx, context, config, mode, source_only=False, require_
         mapping = registered.get(repo_id)
         if not mapping or not mapping.get("root"):
             raise Incomplete("repository is outside the module mapping")
-        root = (ctx.root.parent / mapping["root"]).resolve()
+        root = (pathlib.Path(config["workspace_root"]) / mapping["root"]).resolve()
         if root != pathlib.Path(item.get("root", "")).resolve():
             raise Incomplete("fixed repository path differs from the module mapping")
         if any(item.get(field) != mapping[field] for field in ("kind", "evidence_basis", "workspace_path")):
@@ -288,7 +291,7 @@ def code_identity(ctx, context, config, policy, mode, source_only=False, require
             raise Incomplete("repository root/identity is not authorized")
         root = pathlib.Path(registered_repo["root"])
         root = (
-            (ctx.root.parent / root).resolve()
+            (ctx.domain.workspace_config_path(ctx.root, ctx.catalog.get("workspaces"), ctx.rules_digest).parent / root).resolve()
             if not root.is_absolute()
             else root.resolve()
         )
@@ -767,7 +770,7 @@ def evaluate(
         before != after
         or (
             not historical
-            and (ctx.root.parent / "config.yml").read_bytes() != config_raw
+            and ctx.domain.workspace_config_path(ctx.root, ctx.catalog.get("workspaces"), ctx.rules_digest).read_bytes() != config_raw
         )
         or ctx.read(context_ref)["digest"] != context["digest"]
         or checked_view(ctx, request)["digest"] != view["digest"]

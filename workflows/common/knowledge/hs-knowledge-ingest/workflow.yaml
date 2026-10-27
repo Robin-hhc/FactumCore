@@ -14,6 +14,19 @@ nodes:
   owner: coder
   skill: hs-knowledge-source-scan
   prompt: 'Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
+    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
+    For a project stored on another server or reached through a remote share, run this entire node through
+    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
+    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
+    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
+    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
+    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
+    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
+    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
+    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
+    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
+    After SSH failure inspect the original remote process, records, journal and active index before any retry;
+    never fall back to Samba, switch endpoints or repeat an applied write automatically.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
@@ -24,7 +37,10 @@ nodes:
     --action scan without source scans the five allowed raw directories. Optional source only narrows scope. Consume
     portable ingest history and inspect-context affected Claims; unchanged raw does not prove code validity. Resume
     recoverable transactions first. A draft made under older rules remains historical: create a new operation and
-    obtain current independent content review rather than reusing old proofs. Unchanged-completed units become
+    obtain current independent content review rather than reusing old proofs. Other old terminal journals only
+    establish writer liveness; they do not authorize current cards. A committed apply remains committed even if
+    indexing failed. Under new rules explicitly include existing cards and originals, handle rules_changed
+    maintenance units in P3/P6 and obtain new acceptance without rewriting old digests. Unchanged-completed units become
     scan_unchanged dispositions only when no user correction is requested. A user request to revise an existing
     card is actionable even when raw fingerprints are unchanged: route to P2 with explicit unit_ids for the
     relevant inventory units and candidate_card_ids for the requested cards; never take the unchanged shortcut.
@@ -56,6 +72,19 @@ nodes:
   owner: coder
   skill: hs-knowledge-source-scan
   prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
+    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
+    For a project stored on another server or reached through a remote share, run this entire node through
+    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
+    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
+    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
+    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
+    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
+    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
+    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
+    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
+    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
+    After SSH failure inspect the original remote process, records, journal and active index before any retry;
+    never fall back to Samba, switch endpoints or repeat an applied write automatically.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
@@ -89,6 +118,19 @@ nodes:
   owner: coder
   skill: hs-knowledge-change-plan
   prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
+    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
+    For a project stored on another server or reached through a remote share, run this entire node through
+    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
+    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
+    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
+    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
+    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
+    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
+    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
+    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
+    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
+    After SSH failure inspect the original remote process, records, journal and active index before any retry;
+    never fall back to Samba, switch endpoints or repeat an applied write automatically.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
@@ -101,8 +143,11 @@ nodes:
     with unit_id maintenance:<card_id>#<claim_id>, card_id, claim_id, outcome and reason; Claim/card.unit_ids may
     refer to these without inventing raw files. This also supports code-only changes with an empty raw list. Single
     writer per target card; fuse multi-source evidence. Missing material returns P2 or defer. Emit semantic_plan_ref
-    and target_queries cases [{id,query,required,forbidden?,context?,expected_claim_ids?}]. Never treat doc design
-    declarations as implemented-code proof.
+    and target_queries cases [{id,query,purpose,required,forbidden?,context?,expected_claim_ids?}]. Explicitly choose
+    purpose for every new case. Use guidance for design/specification background, historical for fixed old versions,
+    current or implementation only with the corresponding current evidence and scope. An omitted purpose keeps
+    the API's current default; it never includes guidance-only Claims. Never treat doc design declarations as
+    implemented-code proof.
   exits:
   - id: planned
     label: planned
@@ -122,6 +167,19 @@ nodes:
   owner: reviewer
   skill: hs-knowledge-change-plan
   prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
+    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
+    For a project stored on another server or reached through a remote share, run this entire node through
+    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
+    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
+    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
+    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
+    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
+    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
+    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
+    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
+    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
+    After SSH failure inspect the original remote process, records, journal and active index before any retry;
+    never fall back to Samba, switch endpoints or repeat an applied write automatically.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
@@ -159,6 +217,19 @@ nodes:
   owner: coder
   skill: hs-knowledge-view-materialize
   prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
+    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
+    For a project stored on another server or reached through a remote share, run this entire node through
+    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
+    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
+    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
+    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
+    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
+    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
+    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
+    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
+    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
+    After SSH failure inspect the original remote process, records, journal and active index before any retry;
+    never fall back to Samba, switch endpoints or repeat an applied write automatically.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
@@ -188,6 +259,19 @@ nodes:
   owner: reviewer
   skill: hs-knowledge-change-plan
   prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
+    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
+    For a project stored on another server or reached through a remote share, run this entire node through
+    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
+    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
+    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
+    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
+    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
+    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
+    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
+    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
+    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
+    After SSH failure inspect the original remote process, records, journal and active index before any retry;
+    never fall back to Samba, switch endpoints or repeat an applied write automatically.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
@@ -224,6 +308,19 @@ nodes:
   owner: reviewer
   skill: hs-knowledge-lint
   prompt: 'Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
+    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
+    For a project stored on another server or reached through a remote share, run this entire node through
+    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
+    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
+    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
+    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
+    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
+    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
+    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
+    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
+    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
+    After SSH failure inspect the original remote process, records, journal and active index before any retry;
+    never fall back to Samba, switch endpoints or repeat an applied write automatically.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
@@ -261,6 +358,19 @@ nodes:
   owner: coder
   skill: hs-knowledge-candidate-inspect
   prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
+    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
+    For a project stored on another server or reached through a remote share, run this entire node through
+    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
+    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
+    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
+    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
+    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
+    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
+    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
+    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
+    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
+    After SSH failure inspect the original remote process, records, journal and active index before any retry;
+    never fall back to Samba, switch endpoints or repeat an applied write automatically.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
@@ -302,6 +412,19 @@ nodes:
   owner: reviewer
   skill: hs-knowledge-local-check
   prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
+    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
+    For a project stored on another server or reached through a remote share, run this entire node through
+    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
+    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
+    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
+    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
+    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
+    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
+    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
+    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
+    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
+    After SSH failure inspect the original remote process, records, journal and active index before any retry;
+    never fall back to Samba, switch endpoints or repeat an applied write automatically.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
@@ -343,6 +466,19 @@ nodes:
   owner: coder
   skill: hs-knowledge-candidate-revise
   prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
+    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
+    For a project stored on another server or reached through a remote share, run this entire node through
+    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
+    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
+    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
+    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
+    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
+    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
+    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
+    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
+    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
+    After SSH failure inspect the original remote process, records, journal and active index before any retry;
+    never fall back to Samba, switch endpoints or repeat an applied write automatically.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
@@ -379,6 +515,19 @@ nodes:
   owner: reviewer
   skill: hs-knowledge-lint
   prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
+    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
+    For a project stored on another server or reached through a remote share, run this entire node through
+    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
+    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
+    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
+    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
+    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
+    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
+    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
+    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
+    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
+    After SSH failure inspect the original remote process, records, journal and active index before any retry;
+    never fall back to Samba, switch endpoints or repeat an applied write automatically.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
@@ -418,6 +567,19 @@ nodes:
   owner: coder
   skill: hs-knowledge-source-scan
   prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
+    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
+    For a project stored on another server or reached through a remote share, run this entire node through
+    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
+    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
+    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
+    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
+    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
+    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
+    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
+    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
+    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
+    After SSH failure inspect the original remote process, records, journal and active index before any retry;
+    never fall back to Samba, switch endpoints or repeat an applied write automatically.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
@@ -450,6 +612,19 @@ nodes:
   owner: coder
   skill: hs-knowledge-apply
   prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
+    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
+    For a project stored on another server or reached through a remote share, run this entire node through
+    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
+    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
+    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
+    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
+    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
+    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
+    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
+    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
+    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
+    After SSH failure inspect the original remote process, records, journal and active index before any retry;
+    never fall back to Samba, switch endpoints or repeat an applied write automatically.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
@@ -493,6 +668,19 @@ nodes:
   owner: coder
   skill: hs-knowledge-recover
   prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
+    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
+    For a project stored on another server or reached through a remote share, run this entire node through
+    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
+    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
+    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
+    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
+    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
+    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
+    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
+    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
+    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
+    After SSH failure inspect the original remote process, records, journal and active index before any retry;
+    never fall back to Samba, switch endpoints or repeat an applied write automatically.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
@@ -525,6 +713,19 @@ nodes:
   owner: coder
   skill: hs-knowledge-index-build
   prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
+    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
+    For a project stored on another server or reached through a remote share, run this entire node through
+    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
+    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
+    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
+    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
+    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
+    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
+    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
+    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
+    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
+    After SSH failure inspect the original remote process, records, journal and active index before any retry;
+    never fall back to Samba, switch endpoints or repeat an applied write automatically.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
@@ -553,6 +754,19 @@ nodes:
   owner: reviewer
   skill: hs-knowledge-query-regression
   prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
+    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
+    For a project stored on another server or reached through a remote share, run this entire node through
+    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
+    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
+    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
+    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
+    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
+    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
+    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
+    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
+    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
+    After SSH failure inspect the original remote process, records, journal and active index before any retry;
+    never fall back to Samba, switch endpoints or repeat an applied write automatically.
     Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
     Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.

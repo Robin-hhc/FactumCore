@@ -38,10 +38,10 @@ def hashed(data):
     return hashlib.sha256(data).hexdigest()
 
 
-@pytest.fixture
-def mapped(tmp_path, monkeypatch):
+@pytest.fixture(params=["aiotbot-knowledge-wifi-mp", "aiotbot/aiotbot-knowledge-wifi-mp"], ids=["flat", "nested"])
+def mapped(tmp_path, monkeypatch, request):
     workspace = tmp_path / "workspace"
-    domain = workspace / "aiotbot-knowledge-wifi-mp"
+    domain = workspace / request.param
     domain.mkdir(parents=True)
     modules = [
         {"path": "host/core", "chips": ["chip12"], "sides": ["host"], "description": "Host source"},
@@ -57,7 +57,7 @@ def mapped(tmp_path, monkeypatch):
         # Internal metadata can exist, but this configuration never consumes it.
         (path.parents[1] / ".git").write_text("opaque internal mm metadata", encoding="utf-8")
     config = {"schema_version": "2.0", "workspace_id": "mapped-wifi",
-              "knowledge_roots": {"wifi": "aiotbot-knowledge-wifi-mp"},
+              "knowledge_roots": {"wifi": request.param},
               "code_root": "main", "modules": modules}
     config_path = workspace / "config.yml"
     config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
@@ -128,7 +128,7 @@ def test_relative_evidence_can_be_rechecked_at_another_deployment_root(mapped, t
     identity = checked(mapped)
     relocated = tmp_path / "other-deployment"
     shutil.copytree(mapped.workspace, relocated)
-    rules = {**mapped.rules, "knowledge_root": str(relocated / mapped.domain.name)}
+    rules = {**mapped.rules, "knowledge_root": str(relocated / mapped.domain.relative_to(mapped.workspace))}
     assert resources.validate_current_code_identity(identity, relocated / "config.yml", mapped.context["config_digest"], rules, None) == identity
 
 

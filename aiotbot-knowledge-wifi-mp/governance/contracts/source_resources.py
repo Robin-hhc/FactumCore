@@ -1,6 +1,6 @@
 """Exact logical-resource/snapshot resolution; source objects are always read-only."""
 
-from .validation import ContractError, canonical_bytes, load_yaml, safe_path, sha256_bytes
+from .validation import ContractError, canonical_bytes, load_yaml, safe_path, sha256_bytes, workspace_config_path
 
 
 def extract_code_text(data, extractor):
@@ -106,10 +106,11 @@ def _recover_git(knowledge_root, recovery):
     import re
 
     root = Path(knowledge_root).resolve()
-    workspace = root.parent
-    config_path = safe_path(workspace, "config.yml")
-    if not config_path.is_file():
-        raise ContractError("RECOVERY_CONFIG_REQUIRED", "Git recovery requires the actual workspace config")
+    try:
+        config_path = workspace_config_path(root)
+    except ContractError as exc:
+        raise ContractError("RECOVERY_CONFIG_REQUIRED", "Git recovery requires one exact workspace config") from exc
+    workspace = config_path.parent
     config = load_yaml(config_path)
     if not isinstance(config, dict):
         raise ContractError("RECOVERY_CONFIG_MISMATCH", "Configured workspace mapping is unavailable")
@@ -177,17 +178,20 @@ def git_recovery_for_current(knowledge_root, source_path, expected_bytes):
     from pathlib import Path
 
     root = Path(knowledge_root).resolve()
-    if not (root.parent / "config.yml").is_file():
+    try:
+        config_path = workspace_config_path(root)
+    except (OSError, ContractError):
         return None
-    configuration = load_yaml(root.parent / "config.yml")
+    workspace = config_path.parent
+    configuration = load_yaml(config_path)
     if isinstance(configuration, dict) and "code_root" in configuration:
         return None
     try:
-        commit = _git_read(root.parent, "rev-parse", "--verify", "HEAD").decode().strip()
+        commit = _git_read(workspace, "rev-parse", "--verify", "HEAD").decode().strip()
     except ContractError:
         return None
     recovery = {"method": "git", "kind": "git", "commit": commit,
-                "path": root.name + "/" + source_path, "status": "available"}
+                "path": root.relative_to(workspace).as_posix() + "/" + source_path, "status": "available"}
     try:
         return recovery if _recover_git(root, recovery) == expected_bytes else None
     except (OSError, ContractError):
@@ -373,8 +377,10 @@ def _validate_mapped_current_identity(identity, configuration, config, rules, re
     from .validation import workspace_file_allowed
 
     domain = Path(rules["knowledge_root"])
-    if configuration.resolve() != (domain.parent / "config.yml").resolve():
-        raise ContractError("CODE_CONFIGURATION_CHANGED", "Module configuration is outside the registered knowledge workspace")
+    try:
+        workspace_config_path(domain, config_path=configuration)
+    except ContractError as exc:
+        raise ContractError("CODE_CONFIGURATION_CHANGED", "Module configuration does not map to the selected knowledge root") from exc
     source_basis = identity.get("basis") == "source"
     target, build_files = identity.get("target"), identity["build_files"]
     declared = None

@@ -24,7 +24,17 @@ import install_catalog as catalog
 
 def runtime_pins(source):
     """Read the knowledge-owned lock; installed Skills may live anywhere."""
-    lock = Path(source) / "aiotbot-knowledge-wifi-mp/tools/deploy/requirements.runtime.lock.txt"
+    source = Path(source).absolute()
+    # Bootstrap must work before PyYAML exists. Prefer this tool's explicit
+    # knowledge root over any unrelated flat sibling; registration later
+    # checks its actual project mapping with the newly locked runtime.
+    own_domain = Path(__file__).absolute().parents[2]
+    if source == own_domain or source in own_domain.parents:
+        lock = own_domain / "tools/deploy/requirements.runtime.lock.txt"
+    else:
+        lock = source / "aiotbot-knowledge-wifi-mp/tools/deploy/requirements.runtime.lock.txt"
+        if not lock.is_file():
+            lock = source / "tools/deploy/requirements.runtime.lock.txt"
     catalog.no_links(lock)
     if not lock.is_file():
         raise catalog.InstallError("RUNTIME_LOCK_MISSING")
@@ -37,6 +47,18 @@ def runtime_pins(source):
     if not pins:
         raise catalog.InstallError("EMPTY_RUNTIME_LOCK")
     return dict(sorted(pins.items()))
+
+
+def project_source(knowledge_root):
+    """Bootstrap discovery only; registration later validates the exact mapping."""
+    domain = Path(knowledge_root).absolute()
+    catalog.no_links(domain)
+    candidates = [parent / "config.yml" for parent in domain.parents if (parent / "config.yml").is_file()]
+    for config in candidates:
+        catalog.no_links(config)
+    if len(candidates) != 1:
+        raise catalog.InstallError("WORKSPACE_CONFIG_REQUIRED: supply --workspace-config for missing or ambiguous project roots")
+    return candidates[0].parent
 
 
 def default_destination(source):
@@ -71,7 +93,7 @@ def validate_pip_destination(python):
 
 
 def prepare(source, destination, *, wheelhouse=None, index_url=None,
-            skills_root=None, workflows_root=None):
+            skills_root=None, workflows_root=None, workspace_config=None):
     if sys.version_info[:2] not in {(3, 11), (3, 12)}:
         raise catalog.InstallError("PYTHON_VERSION: use existing Python 3.11 (3.12 is also supported)")
     for name in ("PIP_TARGET", "PIP_PREFIX", "PIP_ROOT", "PIP_PYTHON"):
@@ -104,7 +126,9 @@ def prepare(source, destination, *, wheelhouse=None, index_url=None,
         if parsed.username or parsed.password:
             raise catalog.InstallError("INDEX_CREDENTIALS: configure authentication in pip, not command arguments")
     pins = runtime_pins(source)
-    config = source / "config.yml"
+    config = catalog.absolute(str(Path(workspace_config).absolute())) if workspace_config else source / "config.yml"
+    if config.parent != source:
+        raise catalog.InstallError("WORKSPACE_CONFIG_MISMATCH: source-root must be the config directory")
     catalog.no_links(config)
     if not config.is_file():
         raise catalog.InstallError("WORKSPACE_CONFIG_MISSING")
@@ -127,6 +151,10 @@ def prepare(source, destination, *, wheelhouse=None, index_url=None,
     run([str(python), "-m", "pip", "--disable-pip-version-check", "check"], "Checking dependency consistency...")
     catalog.validate_interpreter(python, pins)
     catalog_path = None
+    own_domain = Path(__file__).absolute().parents[2]
+    registry = None
+    if source == own_domain or source in own_domain.parents:
+        _, registry = catalog.workspace_registration(config, python, expected_root=own_domain)
     if skills_root:
         installed = destination / "registration"
         catalog_path = catalog.install(source, installed, python, config,
@@ -134,7 +162,8 @@ def prepare(source, destination, *, wheelhouse=None, index_url=None,
                                        register_existing=True)
         registry_path = installed / "workspace-registry.json"
     else:
-        _, registry = catalog.workspace_registration(config, python)
+        if registry is None:
+            _, registry = catalog.workspace_registration(config, python)
         registry_path = destination / "workspace-registry.json"
         registry_path.write_bytes(catalog.canonical(registry) + b"\n")
     report = {
@@ -157,7 +186,8 @@ def prepare(source, destination, *, wheelhouse=None, index_url=None,
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source-root", default=str(Path(__file__).resolve().parents[3]))
+    parser.add_argument("--source-root", help="project directory containing the workspace config")
+    parser.add_argument("--workspace-config", help="explicit actual config path; resolves nested deployment without guessing")
     parser.add_argument("--destination", help="new private directory outside the source project")
     parser.add_argument("--skills-root", help="final Agent directory containing the hs-* Skill packages")
     parser.add_argument("--workflows-root", help="final Agent directory containing hs-knowledge-ingest")
@@ -165,11 +195,14 @@ def main():
     sources.add_argument("--wheelhouse", help="offline wheel directory for this OS, CPU and Python")
     sources.add_argument("--index-url", help="internal pip index; otherwise uses existing pip configuration")
     args = parser.parse_args()
-    source = Path(args.source_root).absolute()
-    destination = Path(args.destination).absolute() if args.destination else default_destination(source)
     try:
+        source = (Path(args.source_root).absolute() if args.source_root else
+                  Path(args.workspace_config).absolute().parent if args.workspace_config else
+                  project_source(Path(__file__).absolute().parents[2]))
+        destination = Path(args.destination).absolute() if args.destination else default_destination(source)
         report = prepare(source, destination, wheelhouse=args.wheelhouse, index_url=args.index_url,
-                         skills_root=args.skills_root, workflows_root=args.workflows_root)
+                         skills_root=args.skills_root, workflows_root=args.workflows_root,
+                         workspace_config=args.workspace_config)
     except (catalog.InstallError, OSError, ValueError, subprocess.SubprocessError) as exc:
         # CalledProcessError includes the command, potentially containing a private
         # index URL. Print the stage failure only; pip supplies its own diagnostics.
@@ -177,7 +210,8 @@ def main():
             print(f"INSTALL_FAILED: subprocess exit {exc.returncode}; no completed installation was published", file=sys.stderr)
         else:
             print(str(exc), file=sys.stderr)
-        print(f"Installation directory: {destination}. A failed private directory can be inspected; rerun with a new directory.", file=sys.stderr)
+        if "destination" in locals():
+            print(f"Installation directory: {destination}. A failed private directory can be inspected; rerun with a new directory.", file=sys.stderr)
         return 3
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0

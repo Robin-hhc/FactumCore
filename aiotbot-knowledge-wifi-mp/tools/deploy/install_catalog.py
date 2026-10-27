@@ -10,7 +10,7 @@ import argparse
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import shutil
 import stat
@@ -313,7 +313,7 @@ def validate_metadata(python, packages, templates):
             raise InstallError(f"INVALID_WORKFLOW_LAYOUT: {identity}")
 
 
-def workspace_registration(config_path, python):
+def workspace_registration(config_path, python, *, expected_root=None):
     if not config_path:
         return {}, {"schema_version": "2.0", "workspaces": []}
     config = absolute(config_path)
@@ -325,11 +325,30 @@ def workspace_registration(config_path, python):
     identity = value.get("workspace_id", "")
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,95}", identity):
         raise InstallError("INVALID_WORKSPACE_ID")
-    if value.get("schema_version") != "2.0" or value.get("knowledge_roots") != {
-        "wifi": "aiotbot-knowledge-wifi-mp"
-    }:
+    roots = value.get("knowledge_roots")
+    if value.get("schema_version") != "2.0" or not isinstance(roots, dict) or set(roots) != {"wifi"}:
         raise InstallError("INVALID_WORKSPACE_MAPPING")
-    lock = config.parent / "aiotbot-knowledge-wifi-mp/governance/framework.lock.yaml"
+    relative = roots["wifi"]
+    if (not isinstance(relative, str) or not relative or relative.startswith("/")
+            or "\\" in relative or ":" in relative or str(PurePosixPath(relative)) != relative
+            or any(part in {".", ".."} or part != part.rstrip(" .")
+                   or any(ord(char) < 32 or char in '<>"|?*' for char in part)
+                   or re.fullmatch(r"(?i)(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\..*)?", part)
+                   for part in relative.split("/"))):
+        raise InstallError("INVALID_WORKSPACE_MAPPING")
+    knowledge = config.parent
+    for part in PurePosixPath(relative).parts:
+        aliases = [path.name for path in knowledge.iterdir() if path.name.casefold() == part.casefold()]
+        if aliases and part not in aliases:
+            raise InstallError("INVALID_WORKSPACE_MAPPING: case alias")
+        knowledge = knowledge / part
+        no_links(knowledge)
+    knowledge = absolute(knowledge)
+    if not knowledge.is_relative_to(config.parent) or not knowledge.is_dir():
+        raise InstallError("INVALID_WORKSPACE_MAPPING")
+    if expected_root is not None and knowledge != absolute(expected_root):
+        raise InstallError("WORKSPACE_KNOWLEDGE_ROOT_MISMATCH: config must select the invoking tool's knowledge root")
+    lock = knowledge / "governance/framework.lock.yaml"
     no_links(lock)
     lock_bytes = lock.read_bytes()
     if config.read_bytes() != before or lock.read_bytes() != lock_bytes:

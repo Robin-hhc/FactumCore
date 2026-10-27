@@ -10,6 +10,8 @@ __pycache__/
 .ruff_cache/
 *.pyc
 config.local.yml
+# Machine-owned execution connection data. The distributable template remains tracked.
+config.env
 
 # Project development artifacts stay local; shared design and usage remain versioned.
 /aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/

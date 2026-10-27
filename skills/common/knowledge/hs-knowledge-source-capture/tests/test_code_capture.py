@@ -471,8 +471,10 @@ def test_code_capture_enforces_current_wifi_domain_mapping(harness, field):
         },
         expected=2 if field == "binding_domain" else 3,
     )
+    # Exact workspace authorization now runs before code-policy loading. A
+    # mapping to another knowledge root cannot authorize this root at all.
     assert result["diagnostics"][0]["code"] == (
-        "SCHEMA_INVALID" if field == "binding_domain" else "CODE_DOMAIN_MISMATCH"
+        "SCHEMA_INVALID" if field == "binding_domain" else "CODE_AUTHORIZATION_REQUIRED"
     )
     assert not (harness.root / "logs/evidence").exists()
 

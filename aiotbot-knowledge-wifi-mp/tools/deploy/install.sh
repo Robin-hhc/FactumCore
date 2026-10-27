@@ -2,7 +2,6 @@
 # Uses the existing interpreter and pip configuration; never installs Python.
 set -euo pipefail
 tool_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-root="$(cd -- "$tool_dir/../../.." && pwd)"
 python_bin=""
 args=()
 while (($#)); do
@@ -25,5 +24,4 @@ if [[ -z "$python_bin" ]]; then
     echo 'Python 3.11 was not found. Specify --python with the existing interpreter path.' >&2
     exit 3
 fi
-exec "$python_bin" -X utf8 "$tool_dir/install_environment.py" \
-    --source-root "$root" "${args[@]}"
+exec "$python_bin" -X utf8 "$tool_dir/install_environment.py" "${args[@]}"

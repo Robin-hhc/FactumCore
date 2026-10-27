@@ -8,8 +8,10 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 
 import pytest
+import yaml
 
 
 REPOSITORY = Path(__file__).resolve().parents[4]
@@ -46,6 +48,24 @@ def test_runtime_lock_is_independent_of_capabilities_and_normalizes_names(monkey
     assert environment.runtime_pins(tmp_path) == {"pyyaml": "6.0.2", "typing-extensions": "4.13.2"}
     assert not (tmp_path / "skills").exists()
     assert not (tmp_path / "workflows").exists()
+
+
+def test_nested_bootstrap_uses_own_runtime_lock_and_unique_project_config(monkeypatch, tmp_path):
+    # Outside this development repo: its own config is intentionally another
+    # ancestor candidate when pytest basetemp is inside the checkout.
+    with tempfile.TemporaryDirectory(prefix="factum-nested-bootstrap-") as temporary:
+        source = workspace(Path(temporary) / "nested project")
+        domain = source / "aiotbot/aiotbot-knowledge-wifi-mp"
+        tools = domain / "tools/deploy"
+        tools.mkdir(parents=True)
+        (tools / "requirements.runtime.lock.txt").write_text("PyYAML==6.0.3\n", encoding="utf-8")
+        runtime_lock(source, "PyYAML==6.0.2\n")
+        monkeypatch.setattr(environment, "__file__", str(tools / "install_environment.py"))
+        assert environment.runtime_pins(source) == {"pyyaml": "6.0.3"}
+        assert environment.project_source(domain) == source
+        (domain.parent / "config.yml").write_text("ambiguous bootstrap candidate\n", encoding="utf-8")
+        with pytest.raises(environment.catalog.InstallError, match="WORKSPACE_CONFIG_REQUIRED"):
+            environment.project_source(domain)
 
 
 @pytest.mark.parametrize("second", ["example_name", "example-name", "Example.Name"])
@@ -142,6 +162,38 @@ def mock_runtime_install(monkeypatch, source):
 
     monkeypatch.setattr(environment.catalog, "workspace_registration", registration)
     return calls, registry
+
+
+@pytest.mark.parametrize("matches", [False, True], ids=["wrong-sibling", "selected-tool-root"])
+def test_bootstrap_publishes_only_for_its_own_selected_knowledge_root(monkeypatch, tmp_path, matches):
+    source = workspace(tmp_path / "business workspace")
+    domain = source / "aiotbot/aiotbot-knowledge-wifi-mp"
+    tools = domain / "tools/deploy"
+    tools.mkdir(parents=True)
+    (tools / "requirements.runtime.lock.txt").write_text("PyYAML==6.0.3\n", encoding="utf-8")
+    (domain / "governance").mkdir()
+    (domain / "governance/framework.lock.yaml").write_text("schema_version: '2.0'\n", encoding="utf-8")
+    monkeypatch.setattr(environment, "__file__", str(tools / "install_environment.py"))
+    if matches:
+        config = yaml.safe_load((source / "config.yml").read_bytes())
+        config["knowledge_roots"]["wifi"] = "aiotbot/aiotbot-knowledge-wifi-mp"
+        (source / "config.yml").write_text(yaml.safe_dump(config), encoding="utf-8")
+    monkeypatch.setattr(environment, "run", lambda *args: None)
+    monkeypatch.setattr(environment, "validate_pip_destination", lambda python: None)
+    monkeypatch.setattr(environment.catalog, "validate_interpreter", lambda *args: None)
+    # Simulate the newly locked parser; no pip/venv work is needed to exercise
+    # prepare's actual no-publication boundary after runtime preparation.
+    monkeypatch.setattr(environment.catalog, "parse_yaml_data",
+                        lambda python, documents: {name: yaml.safe_load(text) for name, text in documents.items()})
+    destination = tmp_path / "new runtime"
+    if matches:
+        assert environment.prepare(source, destination)["status"] == "runtime_ready"
+    else:
+        with pytest.raises(environment.catalog.InstallError, match="WORKSPACE_KNOWLEDGE_ROOT_MISMATCH"):
+            environment.prepare(source, destination)
+        assert not (destination / "workspace-registry.json").exists()
+        assert not (destination / "installation.json").exists()
+        assert not (destination / "registration/catalog.json").exists()
 
 
 def test_prepare_runtime_without_root_skills_or_workflows(monkeypatch, tmp_path):
@@ -253,10 +305,11 @@ def test_platform_entry_forwards_external_paths_from_another_directory(tmp_path,
         "--wheelhouse": "../offline wheels",
         "--skills-root": "../agent skills",
         "--workflows-root": "../agent workflows",
+        "--workspace-config": "../business/config.yml",
     }
     if platform == "powershell":
         command = [shell, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", str(wrapper), "-Python", sys.executable]
-        names = {"--destination": "-Destination", "--wheelhouse": "-Wheelhouse", "--skills-root": "-SkillsRoot", "--workflows-root": "-WorkflowsRoot"}
+        names = {"--destination": "-Destination", "--wheelhouse": "-Wheelhouse", "--skills-root": "-SkillsRoot", "--workflows-root": "-WorkflowsRoot", "--workspace-config": "-WorkspaceConfig"}
         command += [item for key, value in arguments.items() for item in (names[key], value)]
     else:
         command = [shell, str(wrapper), "--python", sys.executable]
@@ -266,7 +319,8 @@ def test_platform_entry_forwards_external_paths_from_another_directory(tmp_path,
     data = json.loads(captured.read_text(encoding="utf-8"))
     assert Path(data["cwd"]) == invocation
     argv = data["argv"]
-    assert Path(argv[argv.index("--source-root") + 1]).resolve() == repository.resolve()
+    # The Python helper resolves the exact config rather than fixed parent depth.
+    assert "--source-root" not in argv
     assert {key: argv[argv.index(key) + 1] for key in arguments} == arguments
 
 

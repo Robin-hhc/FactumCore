@@ -4,9 +4,9 @@
 
 aiotbot-knowledge知识库仓目录结构如下所示。
 
-本节以 `repo/` 表示项目根目录，实际目录名称和存放位置不限。默认将 `aiotbot-knowledge-wifi-mp/` 放在项目根，与业务代码共同管理。开发仓保存 Skill／Workflow 分发源码；实际部署在 Agent 自己的能力目录，运行不依赖项目根保留源码副本。业务工作区可包含 Host、Device、特性和算法等多个代码模块；知识库按配置中的相对路径读取实际文件，以内容指纹核对引用。
+本节以 `repo/` 表示项目根目录，实际目录名称和存放位置不限。下树以平铺布局示意；实际知识根 K 由项目 `config.yml` 的 `knowledge_roots.wifi` 相对配置目录解析，允许安全的前置子目录，与业务代码共同管理。开发仓保存 Skill／Workflow 分发源码；实际部署在 Agent 自己的能力目录，运行不依赖项目根保留源码副本。业务工作区可包含 Host、Device、特性和算法等多个代码模块；知识库按配置中的相对路径读取实际文件，以内容指纹核对引用。
 
-当前安装和命令入口按同一业务工作区部署，从 `config.yml` 所在目录解析模块路径。知识库独立存放属于需另行实现的部署适配方案；默认入口不读取 `config.env`。路径约定与部署边界见[知识库关键点](知识库关键点.md#1-工作区路径与部署边界)。
+当前安装和命令入口按同一业务工作区部署，从 `config.yml` 所在目录解析知识根和模块路径。`config.env`／profile 仅为执行器显式读取的机器部署配置，不能替代项目映射或开启仓外知识库。知识库独立存放仍属需另行实现的部署适配方案，见[知识库关键点](知识库关键点.md#1-工作区路径与部署边界)。
 
 - AGENTS.md：本工作区的消费路由契约
 - config.yml：项目架构映射，登记代码根、模块相对路径及芯片／端／特性／用途
@@ -84,6 +84,8 @@ repo/
 节点 Skill 和 Workflow 随 WiFi 知识库维护：
 
 上树展示开发分发源码。部署后，`S` 表示 Agent 实际的 Skill 父目录，`F` 表示其 Workflow 父目录；两者可以在项目外，按最终位置生成 catalog/registry。知识库 `tools/deploy/` 独立准备运行环境和登记能力，不要求项目根保留 `skills/`、`workflows/`，节点也不从 Skill 包内运行安装器。一条 `hs-knowledge-ingest` Workflow 完成 P1—P7；`hs-knowledge-lint` 位于已安装的 Skill 目录，只执行只读检查。文档和代码均先完成独立 Agent 内容复核，文档继续 lint，代码及混合稿另完成适用代码核验。
+
+服务器项目的环境准备、登记、节点及子 CLI 统一经 SSH 在服务器原生路径执行；调用端工具、解释器、连接配置和请求／响应副本位于调用端本地磁盘，不经共享盘执行、遍历或镜像后重跑。直接位于当前机器的独立部署与服务器本机 Agent 使用当地登记能力。“本地入库”和“本机索引”均指实际执行端，不是固定指发起任务的电脑。执行器的路径检查不代替 OS 权限，也不自动识别所有 Linux 网络挂载；职责与边界见[详细设计 §6.3](知识库详细设计.md#63-命令分派与工作流续办)，操作配置见[执行说明](../tools/deploy/EXECUTION.md)。
 
 
 
@@ -175,7 +177,7 @@ flowchart TB
     E0 -->|"定位并加载后"| S1
     S1 --> S2
     S2 -->|"ingest 生产 draft"| E1
-    E1 -->|"ingest 调用 lint Skill，独立复核 / 核验后入库"| S3
+    E1 -->|"独立内容复核及适用核验 → lint → 入库"| S3
     S4 -.->|"契约约束 · 流程执行"| S3
     S5 -.->|"质量保障"| S3
 ```
@@ -207,7 +209,7 @@ flowchart LR
     E -->|"不存在或有歧义"| G["返回缺口，保留 unknown"]
 ```
 
-发现依据显式配置、有限祖先路径或受信工作区登记，不整盘猜测，不创建图谱、不伪造配置。入口线索与索引、服务实际可用性分别核实；未核实的图谱能力保留缺口。E0 发生在业务命令之前，可由独立节点在缺上下文时复用；它不是生产、治理或消费链路节点，也不是每条命令的必调步骤。用户无需先选项目、执行 `init` 或登记绑定。
+发现依据显式配置、有限祖先路径或受信工作区登记，不整盘猜测，不创建图谱、不伪造配置。入口线索与索引、服务实际可用性分别核实；未核实的图谱能力保留缺口。E0 发生在业务命令之前，可由独立节点在缺上下文时复用；它不是生产、治理或消费链路节点，也不是每条命令的必调步骤。日常命令复用已完成的部署登记，不要求每次重新选项目、执行 `init` 或绑定。
 
 #### AGENTS.md —— 消费路由契约
 
@@ -237,22 +239,22 @@ Agent 会话入口。作用是"先路由，再消费"：代码静态事实读取
 |------|------|--------|
 | `hs-workspace-explore/` | E0：缺上下文时发现知识库、代码图谱与入口规则 | 业务命令前可选调用 |
 | `hs-knowledge-source-scan/` | P1 扫描、P2 材料、P6 处理记录及进度查询 | scan / prepare / record / status |
-| `hs-knowledge-source-capture/` | 保存本次原文副本，恢复旧版阅读材料 | capture_raw |
-| `hs-knowledge-change-plan/` | 六决策计划 | plan_change |
-| `hs-knowledge-view-materialize/` | 物化最终视图 | materialize_view |
-| `hs-knowledge-governance-handoff/` | 稿件与上下文辅助，当前 ingest 不设此固定节点 | governance_handoff |
+| `hs-knowledge-source-capture/` | 保存本次原文副本，恢复旧版阅读材料 | 默认捕获；resolve-source / resolve 恢复固定来源或捕获包 |
+| `hs-knowledge-change-plan/` | 六决策计划 | plan / review 保存作者计划与独立内容复核 |
+| `hs-knowledge-view-materialize/` | 物化最终视图 | 保存完整拟写／删除字节和基线 |
+| `hs-knowledge-governance-handoff/` | 稿件与上下文辅助，当前 ingest 不设此固定节点 | 独立复用交接材料 |
 | `hs-knowledge-lint/` | L1—L5 只读确定性检查 | lint |
-| `hs-knowledge-candidate-inspect/` | 检查候选身份 | inspect_candidate |
-| `hs-knowledge-local-check/` | 代码本地核验 | local_check |
-| `hs-knowledge-candidate-revise/` | 修订或缩窄 | revise_candidate |
-| `hs-knowledge-apply/` | 精确事务落位 | apply_view |
-| `hs-knowledge-recover/` | 恢复事务 | recover_transaction |
-| `hs-knowledge-index-build/` | 构建验证和激活索引 | rebuild_index |
-| `hs-knowledge-query-regression/` | 回归候选代 | query_regression |
-| `hs-knowledge-publish-handoff/` | 外部发布材料辅助 | publish_handoff |
-| `hs-knowledge-merge-check/` | 固定代码视图复核辅助 | verify_merge |
-| `hs-knowledge-maintain/` | 维护与阻断复核 | maintain_knowledge |
-| `hs-knowledge-query/` | 消费知识 | query_knowledge |
+| `hs-knowledge-candidate-inspect/` | 检查候选身份 | 检查确切视图、证明和当前基线 |
+| `hs-knowledge-local-check/` | 代码本地核验 | local / merge 核验；verify-proof 复验既有证明 |
+| `hs-knowledge-candidate-revise/` | 修订或缩窄 | 生成新的受检视图 |
+| `hs-knowledge-apply/` | 精确事务落位 | run；verify-result 核对既有结果 |
+| `hs-knowledge-recover/` | 恢复事务 | inspect / resume / rollback |
+| `hs-knowledge-index-build/` | 构建验证和激活索引 | build / verify / activate |
+| `hs-knowledge-query-regression/` | 回归候选代 | 执行计划目标查询；verify 复验绑定报告 |
+| `hs-knowledge-publish-handoff/` | 外部发布材料辅助 | run / verify-submission；不执行 Git 提交 |
+| `hs-knowledge-merge-check/` | 固定代码视图复核辅助 | 复用 local-check 的 merge 核验 |
+| `hs-knowledge-maintain/` | 维护与阻断复核 | inspect-context 只读比较；事件登记与 advance 另行写入 |
+| `hs-knowledge-query/` | 消费知识 | search / read；延续 search 时绑定原 receipt |
 
 参与流程：ingest 编排 P1—P7，内部调用 lint Skill；query 使用知识、来源和索引能力。上表是能力清单，不表示上库必须逐个执行；固定 CI 复用 lint 的确定性检查函数。hs-workspace-explore 是命令前按需调用的 E0。
 
@@ -303,7 +305,7 @@ flowchart LR
     Q -->|"这个词什么意思？"| GL["glossaries/ 术语卡：组内黑话与缩写"]
 ```
 
-目录来源标注了蒸馏出处（dbox、storys、specs、conventions、wiki），建卡时按材料类型对号入座。`AGENTS.md` + `index.md` 是领域规则与逐层导航。
+目录按知识类型和读者问题组织，来源出处在卡内 `sources` 与来源锁登记；不能把 raw 分类或材料平台名当成卡类型。`AGENTS.md` + `index.md` 是领域规则与逐层导航。
 
 **上库管理标准**：正式卡、导航、来源锁和 `logs/ingest/` 处理记录按本批清单提交；规则、模板和测试按项目版本管理。`.build/`、派生索引、私有恢复备份及原始复核／证据日志不整体提交。文档和代码结论须有独立 Agent 内容复核，代码另按 Claim 核对源码及条件；固定 CI 仅检查确定性项，详见[保存与提交边界](知识库详细设计.md#64-哪些内容上库哪些用于本机执行)。
 
@@ -381,8 +383,8 @@ flowchart LR
 |------|-----------|--------------|
 | `.build/` | 转换、规范化、候选暂存（ignored） | 生产过程的半成品不该出现在检索结果里 |
 | `evals/` | 检索案例、回归执行与接受/拒绝测试 | 质量门禁：改索引/改契约必须先过回归 |
-| `logs/` | 按日期记录已发生的导入与维护 | 审计留痕；只追加，不代替原始 trace |
-| `artifacts/` | 本地派生索引、验证报告（Git 忽略） | 机器召回的产物，可随时从卡片全量重建 |
+| `logs/` | 按操作保存证据、复核、事务和维护记录；`logs/ingest/` 保存可共享处理事实 | 支持身份核对与恢复；历史事实不改写，不代替原始 trace |
+| `artifacts/` | 执行端派生索引、同代正文和验证报告（Git 忽略） | 根据卡、来源及有效资格重新构建；缺少必需证明时不能只凭卡正文伪造资格 |
 | `docs-llm-wiki/` | LLM WIKI 系统说明 | 讲"系统怎么用"；禁止成为第二份领域事实库 |
 
 参与链路：`.build/` 生产链路暂存；`evals/` 治理链路回归 · CI 门禁复跑；`logs/` 治理链路留痕；`artifacts/` 消费链路机器召回；`docs-llm-wiki/` 不参与链路，讲链路本身。
@@ -456,9 +458,9 @@ flowchart TB
 
     subgraph KQ["hs-knowledge-query 检索"]
         C["① SQLite 词项召回<br />按知识卡字段重合度（词面匹配）打分<br />召回匹配度高的知识卡"] --> D["② frontmatter 字段过滤<br />过滤范围不符 / 状态不符<br />"]
-        D --> E["③ 合格结论重排后精读<br />结论 / 适用条件 / 失效边界 / 验证方法"]
-        E --> F["④ 溯源 + 印证<br />卡内 sources 指针 → 原件或实际代码目录"]
-        F --> G["⑤ Search Receipt<br />检索留痕：命中 + 证据 + 范围 + 缺口"]
+        D --> E["③ 合格结论重排<br />Search Receipt 固定代次、命中与范围"]
+        E --> F["④ 沿回执同代精读并重查资格<br />溯源到确切原件或代码快照"]
+        F --> G["⑤ 保留读取回执<br />结论 + 证据 + 范围 + 缺口"]
         G --> H["返回合格 Claim、固定来源与检索记录"]
     end
 
@@ -469,6 +471,8 @@ flowchart TB
 ```
 
 图中展示证据入口，主 Agent 根据问题综合材料；代码事实以所问版本的实际源码确认。下表沿用项目根／知识根 K 的路径基准；能力位置以 Agent 的实际目录 `S`、`F` 为准。
+
+查询用途与 stable 状态分开判断：current／implementation 需要相应的当前证据与适用范围，guidance／historical 不把未知条件提升为产品当前事实。P3 预先声明目标查询及用途，P7 按原计划验证；query 的 search 回执固定频道、索引代、用途、上下文及命中 Claim，read 仍重查当前资格，不能把回执当成永久授权。同一 K 最多一个 ingest，可并发 query，但活动代切换或内容变化时允许明确拒绝，机制见[详细设计 §5.9](知识库详细设计.md#59-q1q5路由查询同代精读与回答)。
 
 #### 目录 × 链路参与矩阵
 

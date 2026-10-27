@@ -388,6 +388,57 @@ def _workspace_path(root, relative):
     return path
 
 
+def workspace_config_path(knowledge_root, registrations=None, expected_rules=None, *, config_path=None):
+    """Select one exact configuration whose safe WiFi mapping names this root.
+
+    Installed nodes supply their trusted catalog registrations. Data-only
+    historical readers without a catalog may discover an ancestor config only
+    when its explicit mapping resolves to the exact domain; ambiguity is an
+    error. No arbitrary parent is treated as the project root.
+    """
+    root = Path(knowledge_root).absolute()
+    _workspace_no_links(root)
+    root = root.resolve(strict=True)
+    if config_path is not None:
+        candidates = [(None, {"config": str(config_path)})]
+    elif registrations is not None:
+        if not isinstance(registrations, dict):
+            raise ContractError("WORKSPACE_CONFIG_UNAVAILABLE", "Installed workspace registrations must be a mapping")
+        candidates = list(registrations.items())
+    else:
+        candidates = [(None, {"config": str(parent / "config.yml")}) for parent in root.parents]
+    matches = []
+    for identity, entry in candidates:
+        if not isinstance(entry, dict) or not isinstance(entry.get("config"), str):
+            continue
+        candidate = Path(entry["config"])
+        if not candidate.is_absolute():
+            raise ContractError("WORKSPACE_CONFIG_UNAVAILABLE", "Workspace config must be absolute", candidate)
+        _workspace_no_links(candidate)
+        if not candidate.is_file():
+            continue
+        raw = candidate.read_bytes()
+        value = load_yaml(raw)
+        roots = value.get("knowledge_roots")
+        if not isinstance(roots, dict) or set(roots) != {"wifi"}:
+            continue
+        relative = roots["wifi"]
+        _workspace_relative(relative)
+        if relative == "." or _workspace_path(candidate.parent, relative).resolve() != root:
+            continue
+        if identity is not None and (value.get("workspace_id") != identity
+                or expected_rules is not None and entry.get("rules_digest") != expected_rules):
+            continue
+        if candidate.read_bytes() != raw:
+            raise ContractError("WORKSPACE_CONFIG_CHANGED", "Workspace config changed while selecting", candidate)
+        matches.append(candidate.resolve())
+    if len(matches) > 1:
+        raise ContractError("WORKSPACE_CONFIG_AMBIGUOUS", "Multiple configs map to the selected WiFi root")
+    if not matches:
+        raise ContractError("WORKSPACE_CONFIG_UNAVAILABLE", "No exact workspace config maps to the selected WiFi root")
+    return matches[0]
+
+
 def workspace_layout(config, workspace_root):
     """Resolve declared module directories without repository-manager access.
 

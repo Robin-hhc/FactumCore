@@ -79,14 +79,21 @@ def frozen_harness(tmp_path):
     return harness
 
 
-def complete_document_operation(harness, operation, decision, statement):
+def complete_document_operation(harness, operation, decision, statement, *, expected_change="unchanged"):
     scan_ref = harness.run("source-scan", {"operation_id": operation}, "scan")["data"]["scan_ref"]
     scan = harness.record(scan_ref)
     assert len(scan["units"]) == 1
     unit = scan["units"][0]
+    reason = ("Revalidate unchanged document under current rules" if expected_change == "unfinished"
+              else "Requested document wording correction")
+    maintenance = [{"unit_id": "maintenance:" + row["card_id"] + "#" + row["claim_id"],
+                    "card_id": row["card_id"], "claim_id": row["claim_id"], "outcome": "content",
+                    "reason": "Revalidate the affected Claim under the current rules"}
+                   for row in scan.get("current_context", {}).get("affected_claims", [])]
+    input_units = [unit["unit_id"]] + [row["unit_id"] for row in maintenance]
     material_request = {"operation_id": operation, "scan_ref": scan_ref}
     if decision == "update":
-        assert unit["change"] == "unchanged"
+        assert unit["change"] == expected_change
         material_request.update(unit_ids=[unit["unit_id"]], candidate_card_ids=["rule"])
     material_ref = harness.run("source-scan", material_request, "prepare")["data"]["material_ref"]
     material = harness.record(material_ref)
@@ -101,15 +108,16 @@ def complete_document_operation(harness, operation, decision, statement):
     semantic = harness.run("change-plan", {
         "operation_id": operation, "scan_ref": scan_ref, "material_ref": material_ref, "author_id": "author",
         "units": [{"unit_id": unit["unit_id"], "outcome": "content",
-                   "reason": "User requested wording correction" if decision == "update" else "New document knowledge"}],
-        "claim_changes": [{"unit_ids": [unit["unit_id"]], "card_id": "rule", "claim_id": "rule-claim",
+                   "reason": reason if decision == "update" else "New document knowledge"}],
+        "maintenance_units": maintenance,
+        "claim_changes": [{"unit_ids": input_units, "card_id": "rule", "claim_id": "rule-claim",
                            "action": decision, "before": "Synthetic fixture statement." if decision == "update" else None,
                            "after": statement, "conditions": "Synthetic design guidance only",
                            "evidence": [{"source": bundle["snapshots"][0]["snapshot_id"], "locator": "L2"}],
-                           "preserved": "Same assertion, applicability and source; wording clarified" if decision == "update" else "No old knowledge",
-                           "reason": "Clarify existing knowledge without changing its original"}],
+                           "preserved": "Same assertion, applicability and source" if decision == "update" else "No old knowledge",
+                           "reason": reason}],
         "card_actions": [{"card_id": "rule", "decision": decision, "author_id": "author",
-                          "unit_ids": [unit["unit_id"]], "reason": "Requested document wording"}],
+                          "unit_ids": input_units, "reason": reason}],
         "target_queries": [{"id": "rule-query", "query": "Synthetic", "purpose": "guidance",
                             "required": ["rule"], "expected_claim_ids": ["rule#rule-claim"]}],
     }, "plan")["data"]["semantic_plan_ref"]
@@ -119,14 +127,14 @@ def complete_document_operation(harness, operation, decision, statement):
         "operation_id": operation, "v3_required": True, "semantic_plan_ref": semantic,
         "bundle_ref": material["bundle_ref"],
         "decisions": [{"candidate_id": unit["unit_id"], "decision": decision,
-                       "reason": "Authored requested wording", "card_inputs": [candidate]}],
+                       "reason": reason, "card_inputs": [candidate]}],
     })["data"]["plan_ref"]
     view_ref = harness.run("view-materialize", {"operation_id": operation, "plan_ref": plan_ref})["data"]["view_ref"]
     review_ref = harness.run("change-plan", {
         "operation_id": operation, "semantic_plan_ref": semantic, "view_ref": view_ref,
         "reviewer_id": "independent-reviewer", "independent_context": operation + "-review-context",
-        "sampled_unit_ids": [unit["unit_id"]], "unreviewed_unit_ids": [],
-        "reason": "Read the requested change, exact candidate and unchanged original", "findings": [],
+        "sampled_unit_ids": input_units, "unreviewed_unit_ids": [],
+        "reason": "Read the exact candidate and unchanged original under current rules", "findings": [],
     }, "review")["data"]["content_review_ref"]
     lint_ref = f".build/operations/{operation}/final-lint.json"
     lint_input = harness.write(f".build/operations/{operation}/lint-input.json", canonical({"view_ref": view_ref, "inputs": check_inputs}))
@@ -138,7 +146,8 @@ def complete_document_operation(harness, operation, decision, statement):
     assert lint.returncode == 0, lint.stdout + lint.stderr
     record_ref = harness.run("source-scan", {
         "operation_id": operation, "scan_ref": scan_ref, "view_ref": view_ref, "lint_ref": lint_ref,
-        "dispositions": [{"unit_id": unit["unit_id"], "action": decision, "reason": "Requested document wording",
+        "semantic_plan_ref": semantic,
+        "dispositions": [{"unit_id": unit["unit_id"], "action": decision, "reason": reason,
                           "observed_fingerprint": unit["observed_fingerprint"], "adopted_fingerprint": unit["observed_fingerprint"],
                           "progress": "completed", "card_refs": ["rule"], "claim_refs": ["rule#rule-claim"]}],
     }, "record")["data"]["ingest_record_ref"]
@@ -161,7 +170,8 @@ def complete_document_operation(harness, operation, decision, statement):
     assert {claim["id"] for claim in read["claims"]} == {"rule-claim"}
     assert statement in read["claims"][0]["text"]
     assert read["card_digest"] == search["matches"][0]["card_digest"]
-    return {"scan": scan, "view_ref": view_ref, "review_ref": review_ref, "generation_ref": generation}
+    return {"scan": scan, "view_ref": view_ref, "review_ref": review_ref, "generation_ref": generation,
+            "apply_result_ref": applied}
 
 
 def test_user_can_correct_ingested_document_without_changing_original(tmp_path):
@@ -188,3 +198,50 @@ def test_user_can_correct_ingested_document_without_changing_original(tmp_path):
     assert not list(harness.root.rglob("confirmation-display.json"))
     assert not list(harness.root.rglob("manual-review.json"))
     assert not (harness.root / "logs/host-events").exists()
+
+
+def test_rules_upgrade_revalidates_identical_document_without_rewriting_old_acceptance(tmp_path):
+    harness = frozen_harness(tmp_path)
+    original = b"# Source\nSynthetic fixture statement for test readers.\n"
+    harness.write("docs-raw/specs/source.md", original)
+    first = complete_document_operation(harness, "old-rules", "create", "Synthetic fixture statement.")
+    old_rules = harness.rules
+    old_card = (harness.root / "knowledge/rules/rule.md").read_bytes()
+    retained = {ref: (harness.root / ref).read_bytes() for ref in (
+        "logs/operations/old-rules/journal.json", first["apply_result_ref"],
+        "logs/ingest/old-rules.yaml", first["view_ref"], first["review_ref"], first["generation_ref"],
+    )}
+
+    # Change only an infrastructure comment in this isolated governance copy.
+    contract = harness.root / "governance/contracts/indexing.py"
+    contract.write_bytes(contract.read_bytes() + b"\n# Synthetic infrastructure-only rule upgrade.\n")
+    lock_path = harness.root / "governance/framework.lock.yaml"
+    lock = yaml.safe_load(lock_path.read_bytes())
+    lock["files"]["contracts/indexing.py"]["sha256"] = hashlib.sha256(contract.read_bytes()).hexdigest()
+    lock_path.write_text(yaml.safe_dump(lock, sort_keys=False), encoding="utf-8")
+    harness.rules = hashlib.sha256(lock_path.read_bytes()).hexdigest()
+    assert harness.rules != old_rules
+
+    refused = harness.run("query", {"operation_id": "old-active-rejected", "query": "Synthetic", "purpose": "guidance"}, "search", expected=2)
+    assert refused["diagnostics"][0]["code"] == "STALE_RULES"
+    refused = harness.run("apply", {"operation_id": "old-rules", "apply_result_ref": first["apply_result_ref"]}, "verify-result", expected=2)
+    assert "rules identity mismatch" in refused["diagnostics"][0]["message"]
+    refused = harness.run("index-build", {"operation_id": "old-proof-rejected"}, "build", expected=3)
+    assert refused["diagnostics"][0]["code"] == "CARD_PROOF_MISSING"
+
+    second = complete_document_operation(
+        harness, "new-rules", "update", "Synthetic fixture statement.", expected_change="unfinished"
+    )
+    assert (harness.root / "knowledge/rules/rule.md").read_bytes() == old_card
+    assert (harness.root / "docs-raw/specs/source.md").read_bytes() == original
+    for ref, raw in retained.items():
+        assert (harness.root / ref).read_bytes() == raw
+    applied = harness.record(second["apply_result_ref"])
+    assert applied["rules_digest"] == harness.rules
+    assert applied["operation_id"] == "new-rules"
+    assert harness.record(second["review_ref"])["rules_digest"] == harness.rules
+    assert harness.record(second["generation_ref"])["rules_digest"] == harness.rules
+    active = harness.record("artifacts/indexes/local/active.json")
+    assert active["rules_digest"] == harness.rules
+    assert active["generation_ref"] == second["generation_ref"]
+    assert second["generation_ref"] != first["generation_ref"]

@@ -30,19 +30,26 @@ def pin_fixture(harness):
     harness.rules = hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-@pytest.mark.parametrize("unrelated_nav_changes", [False, True, "historical_fallback", "local_only", "uncommitted_raw"])
+@pytest.mark.parametrize("unrelated_nav_changes", [False, True, "historical_fallback", "local_only", "uncommitted_raw", "nested"])
 def test_current_ingest_review_lint_record_apply_query_without_human_confirmation(harness, unrelated_nav_changes):
+    if unrelated_nav_changes == "nested":
+        nested = harness.base / "aiotbot" / harness.root.name
+        assert nested.resolve().is_relative_to(harness.base.resolve())
+        nested.parent.mkdir()
+        harness.root.rename(nested)
+        harness.root = nested
+    domain_path = harness.root.relative_to(harness.base).as_posix()
     def git(*args):
         return subprocess.run(["git", "-C", str(harness.base), *args], capture_output=True, check=True).stdout.decode().strip()
 
     def canonical(value):
         return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
 
-    (harness.base / "config.yml").write_text(yaml.safe_dump({"knowledge_roots": {"wifi": harness.root.name}, "repos": []}), encoding="utf-8")
+    (harness.base / "config.yml").write_text(yaml.safe_dump({"knowledge_roots": {"wifi": domain_path}, "repos": []}), encoding="utf-8")
     harness.write("docs-raw/specs/source.md", b"# Source\nSynthetic fixture statement.\n")
     if unrelated_nav_changes != "uncommitted_raw":
         git("init", "-q")
-        git("add", "--", harness.root.name + "/docs-raw/specs/source.md")
+        git("add", "--", domain_path + "/docs-raw/specs/source.md")
         git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "original")
         initial_commit = git("rev-parse", "HEAD")
     scan_ref = harness.run("source-scan", {"operation_id": "op"}, "scan")["data"]["scan_ref"]
@@ -174,7 +181,7 @@ def test_current_ingest_review_lint_record_apply_query_without_human_confirmatio
     handoff = harness.record(ready["data"]["publish_handoff_ref"])
     assert {"owner": "authorized_committer", "action": "provide exact originals and portable recovery locations for CI and other clones",
             "status": "pending"} in handoff["external_obligations"]
-    git("add", "--", *[harness.root.name + "/" + ref for ref in ready["data"]["commit_files"]])
+    git("add", "--", *[domain_path + "/" + ref for ref in ready["data"]["commit_files"]])
     git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "knowledge batch")
     commit = git("rev-parse", "HEAD")
     submitted = harness.run("publish-handoff", {"operation_id": "op", "v3_required": True,

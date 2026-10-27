@@ -30,11 +30,11 @@ def _record_resolver(cards, rules, inputs, root, identity):
     history = {"loaded": False, "complete": False}
     environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_") or key == "GIT_TEST_ASSUME_DIFFERENT_OWNER"}
     environment.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull, GIT_TERMINAL_PROMPT="0", GIT_OPTIONAL_LOCKS="0", GIT_NO_LAZY_FETCH="1", GIT_PAGER="cat")
-    workspace = root.parent.resolve()
-    prefix = root.relative_to(workspace).as_posix()
+    workspace = None
 
-    def git(arguments):
-        command = ["git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + os.devnull, "-c", "core.pager=cat", "-c", "protocol.allow=never", "-c", "safe.directory=" + workspace.as_posix(), "-C", str(workspace), *arguments]
+    def git(arguments, repository=None):
+        location = workspace if repository is None else repository
+        command = ["git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + os.devnull, "-c", "core.pager=cat", "-c", "protocol.allow=never", "-c", "safe.directory=" + location.as_posix(), "-C", str(location), *arguments]
         result = subprocess.run(command, capture_output=True, timeout=30, env=environment)
         if result.returncode:
             raise v.ContractError("RECORD_HISTORY_UNAVAILABLE", "Required exact Git history is unavailable")
@@ -62,9 +62,20 @@ def _record_resolver(cards, rules, inputs, root, identity):
             yield parse(objects[expected], path, expected)
 
     def git_objects():
+        nonlocal workspace
         if not history["loaded"]:
             history["loaded"] = True
             try:
+                try:
+                    workspace = v.workspace_config_path(root).parent
+                except v.ContractError as exc:
+                    if exc.code != "WORKSPACE_CONFIG_UNAVAILABLE":
+                        raise
+                    workspace = Path(git(["rev-parse", "--show-toplevel"], root).decode("utf-8").strip()).resolve()
+                    ancestors = [parent for parent in root.parents if parent == workspace or parent.is_relative_to(workspace)]
+                    if not root.resolve().is_relative_to(workspace) or any(os.path.lexists(parent / "config.yml") for parent in ancestors):
+                        raise v.ContractError("RECORD_HISTORY_UNAVAILABLE", "An existing workspace config is invalid; Git history cannot bypass it")
+                prefix = root.relative_to(workspace).as_posix()
                 top = Path(git(["rev-parse", "--show-toplevel"]).decode("utf-8").strip()).resolve()
                 if top != workspace:
                     return

@@ -197,9 +197,21 @@ def verify_submission(ctx, request):
     commit = request.get("commit_sha")
     if not isinstance(commit, str) or not re.fullmatch(r"[0-9a-f]{40}(?:[0-9a-f]{24})?", commit):
         raise Blocked("actual exact Git commit SHA is required; batch remains pending submission")
+    registrations = ctx.catalog.get("workspaces")
+    if registrations == {}:
+        registrations = None
+    try:
+        workspace = ctx.domain.workspace_config_path(ctx.root, registrations, ctx.rules_digest).parent
+    except (ValueError, OSError):
+        if registrations is not None:
+            raise Blocked("registered workspace config could not be verified")
+        # Legacy fixture/publication calls without a project registration keep
+        # Git's own ownership check; do not invent a trusted parent directory.
+        workspace = None
 
     def git(arguments, *, optional=False):
-        done = subprocess.run(["git", "--no-optional-locks", "-c", "safe.directory=" + ctx.root.parent.resolve().as_posix(), "-C", str(ctx.root),
+        trust = ["-c", "safe.directory=" + workspace.as_posix()] if workspace is not None else []
+        done = subprocess.run(["git", "--no-optional-locks", *trust, "-C", str(ctx.root),
                                "-c", "core.hooksPath=__disabled_knowledge_hooks__", *arguments],
                               check=False, capture_output=True, timeout=60)
         if done.returncode and not optional:

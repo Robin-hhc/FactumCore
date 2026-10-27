@@ -82,17 +82,21 @@ def authorized_repo(context, repo_id, receipt=None):
         )
     catalog = read_json(context.args.catalog)
     policy = catalog.get("code_policy")
-    config_path = context.root.parent / "config.yml"
-    if config_path.is_symlink() or not config_path.is_file():
+    try:
+        config_path = context.modules["validation"].workspace_config_path(
+            context.root, catalog.get("workspaces"), context.rules["rules_digest"]
+        )
+    except (ValueError, OSError) as exc:
         raise NodeError(
             "CODE_AUTHORIZATION_REQUIRED",
-            "Workspace config is unavailable",
+            "Exact registered workspace config is unavailable",
             blocked=True,
-        )
+        ) from exc
+    workspace = config_path.parent
     config_bytes = config_path.read_bytes()
     config = load_yaml(config_bytes)
     context.modules["validation"].validate_shape("workspace", config, context.rules)
-    config = context.modules["validation"].normalize_workspace(config, context.root.parent)
+    config = context.modules["validation"].normalize_workspace(config, workspace)
     mapped = config.get("mapping_kind") == "modules"
     if mapped:
         registration = catalog.get("workspaces", {}).get(config["workspace_id"])
@@ -101,7 +105,7 @@ def authorized_repo(context, repo_id, receipt=None):
             raise NodeError("CODE_AUTHORIZATION_REQUIRED", "Catalog must register this exact workspace config", blocked=True)
         policy = config["code_policy"]
     if safe(
-        context.root.parent, config["knowledge_roots"]["wifi"]
+        workspace, config["knowledge_roots"]["wifi"]
     ).resolve() != context.root or any(
         row["knowledge_domain"] != "wifi" for row in config["architecture"]
     ):
@@ -131,7 +135,7 @@ def authorized_repo(context, repo_id, receipt=None):
         )
     registered = Path(rows[0]["root"])
     if not registered.is_absolute():
-        registered = context.root.parent / registered
+        registered = workspace / registered
     root = registered.resolve(strict=True)
     if root != Path(root_value).resolve(strict=True) or not root.is_dir():
         raise NodeError(
@@ -146,7 +150,7 @@ def authorized_repo(context, repo_id, receipt=None):
             or receipt.get("workspace_id") != config["workspace_id"]
             or receipt.get("config_digest") != sha(config_bytes)
             or Path(receipt.get("knowledge_root", "")).resolve() != context.root
-            or Path(receipt.get("workspace_root", "")).resolve() != context.root.parent
+            or Path(receipt.get("workspace_root", "")).resolve() != workspace
         ):
             raise NodeError(
                 "CODE_CONTEXT_STALE",

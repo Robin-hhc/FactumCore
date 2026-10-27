@@ -67,6 +67,24 @@ def test_plan_cannot_omit_frozen_scan_unit(harness):
     assert result["diagnostics"][0]["code"] == "PLAN_UNIT_COVERAGE"
 
 
+@pytest.mark.parametrize("purpose", ["gudiance", "", None, 17, ["guidance"]])
+def test_plan_rejects_invalid_query_purpose_before_freezing_view(harness, purpose):
+    value = request(harness)
+    value["target_queries"][0]["purpose"] = purpose
+    result = harness.run("change-plan", value, action="plan", expected=2)
+    assert result["diagnostics"][0]["code"] == "INVALID_TARGET_QUERY_PURPOSE"
+    assert not (harness.root / ".build/operations/op/semantic-plan.json").exists()
+
+
+@pytest.mark.parametrize("purpose", ["current", "implementation", "guidance", "historical"])
+def test_plan_preserves_declared_query_purpose(harness, purpose):
+    value = request(harness)
+    value["target_queries"][0]["purpose"] = purpose
+    result = harness.run("change-plan", value, action="plan")
+    plan = harness.record(result["data"]["semantic_plan_ref"])
+    assert plan["target_queries"][0]["purpose"] == purpose
+
+
 @pytest.mark.parametrize("change,error", [("duplicate", "DUPLICATE_CLAIM_PLAN"), ("skip_write", "CLAIM_SOURCE_OUTCOME"), ("unrelated_query", "TARGET_QUERY_COVERAGE")])
 def test_plan_rejects_conflicting_claims_skipped_writes_and_unrelated_queries(harness, change, error):
     value = request(harness)

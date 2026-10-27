@@ -209,7 +209,11 @@ def test_portable_current_claim_is_independent_of_an_old_historical_code_referen
     node, ctx, manifest, _ = fixture_context(tmp_path, {"a": value}, stale=["old"], code_sources=["a", "old"])
     catalog = tmp_path / "catalog.json"
     catalog.write_text("{}", encoding="utf-8")
-    ctx.args = SimpleNamespace(catalog=str(catalog))
+    ctx.args = SimpleNamespace(catalog=str(catalog), rules_digest="0" * 64)
+    def registered_config(root, registrations, expected_rules):
+        assert root == tmp_path and registrations is None and expected_rules == "0" * 64
+        return tmp_path / "config.yml"
+    ctx.modules["validation"] = SimpleNamespace(workspace_config_path=registered_config)
     ctx.modules["source_resources"].validate_current_code_identity = lambda *args: {}
     ctx.modules["source_resources"].read_source_lock = lambda root: {"resources": [{"source_id": identity, "kind": "code"} for identity in ("a", "old")]}
     ctx.modules["knowledge"].match_scope = lambda claim, context, purpose: purpose == "historical" or claim["usage"] == "current"

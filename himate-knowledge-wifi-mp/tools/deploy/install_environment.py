@@ -94,8 +94,8 @@ def validate_pip_destination(python):
 
 def prepare(source, destination, *, wheelhouse=None, index_url=None,
             skills_root=None, workflows_root=None, workspace_config=None):
-    if sys.version_info[:2] not in {(3, 11), (3, 12)}:
-        raise catalog.InstallError("PYTHON_VERSION: use existing Python 3.11 (3.12 is also supported)")
+    if sys.version_info[:2] not in {(3, 10), (3, 11), (3, 12)}:
+        raise catalog.InstallError("PYTHON_VERSION: use existing Python 3.10-3.12")
     for name in ("PIP_TARGET", "PIP_PREFIX", "PIP_ROOT", "PIP_PYTHON"):
         if os.environ.get(name):
             raise catalog.InstallError(f"PIP_DESTINATION_OVERRIDE: unset {name} before private installation")

@@ -196,7 +196,9 @@ def test_bootstrap_publishes_only_for_its_own_selected_knowledge_root(monkeypatc
         assert not (destination / "registration/catalog.json").exists()
 
 
-def test_prepare_runtime_without_root_skills_or_workflows(monkeypatch, tmp_path):
+@pytest.mark.parametrize("version", [(3, 10, 0), (3, 11, 0), (3, 12, 0)])
+def test_prepare_runtime_without_root_skills_or_workflows(monkeypatch, tmp_path, version):
+    monkeypatch.setattr(environment.sys, "version_info", version)
     source = workspace(tmp_path / "business workspace")
     calls, registry = mock_runtime_install(monkeypatch, source)
     monkeypatch.setattr(environment.catalog, "install", lambda *args, **kwargs: pytest.fail("runtime preparation must not install capabilities"))
@@ -324,8 +326,9 @@ def test_platform_entry_forwards_external_paths_from_another_directory(tmp_path,
     assert {key: argv[argv.index(key) + 1] for key in arguments} == arguments
 
 
-def test_wrong_python_fails_before_creating_destination(monkeypatch, tmp_path):
-    monkeypatch.setattr(environment.sys, "version_info", (3, 9, 0))
+@pytest.mark.parametrize("version", [(3, 9, 0), (3, 13, 0), (4, 0, 0)])
+def test_wrong_python_fails_before_creating_destination(monkeypatch, tmp_path, version):
+    monkeypatch.setattr(environment.sys, "version_info", version)
     destination = tmp_path / "uncreated"
     with pytest.raises(environment.catalog.InstallError, match="PYTHON_VERSION"):
         environment.prepare(tmp_path, destination)

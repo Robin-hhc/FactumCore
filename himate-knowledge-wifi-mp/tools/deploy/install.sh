@@ -21,7 +21,7 @@ if [[ -z "$python_bin" ]]; then
     done
 fi
 if [[ -z "$python_bin" ]]; then
-    echo 'Python 3.11 was not found. Specify --python with the existing interpreter path.' >&2
+    echo 'Python was not found. Specify --python with an existing Python 3.10-3.12 interpreter path.' >&2
     exit 3
 fi
 exec "$python_bin" -X utf8 "$tool_dir/install_environment.py" "${args[@]}"

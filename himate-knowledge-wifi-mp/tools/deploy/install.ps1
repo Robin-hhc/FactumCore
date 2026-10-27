@@ -1,5 +1,5 @@
 <#
-Prepare a private knowledge runtime using an existing Python 3.11/3.12.
+Prepare a private knowledge runtime using an existing Python 3.10-3.12.
 Run from the project root: .\himate-knowledge-wifi-mp\tools\deploy\install.ps1
 #>
 [CmdletBinding()]
@@ -25,7 +25,7 @@ if (-not $Python) {
     } elseif (Get-Command python -ErrorAction SilentlyContinue) {
         $Python = (Get-Command python).Source
     } else {
-        throw 'Python 3.11 was not found. Specify -Python with the existing interpreter path.'
+        throw 'Python was not found. Specify -Python with an existing Python 3.10-3.12 interpreter path.'
     }
 }
 $helper = Join-Path $PSScriptRoot 'install_environment.py'

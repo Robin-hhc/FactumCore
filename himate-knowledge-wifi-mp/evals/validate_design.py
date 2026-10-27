@@ -1,4 +1,4 @@
-"""Validate the approved node packages and the complete ingest Workflow.
+"""Validate node packages, the complete ingest and read-only audit Workflows.
 
 Local structural checks do not prove host triggering,
 knowledge semantics or CI permissions. Manual Skill calls do not require a
@@ -59,13 +59,19 @@ EXTRA_ARTIFACT_SCOPE = {'hs-knowledge-source-scan': {'prepare-result.yaml': (['p
                               'record-result.yaml': (['record_ingest'], ['recorded'])},
  'hs-knowledge-change-plan': {'review-result.yaml': (['review_plan', 'review_content'],
                                                      ['reviewed'])},
- 'hs-knowledge-publish-handoff': {'submission-result.yaml': ([], [])}}
+ 'hs-knowledge-publish-handoff': {'submission-result.yaml': ([], [])},
+ 'hs-knowledge-maintain': {'audit-result.yaml': (['audit_references'], ['reported'])}}
+EXTRA_ARTIFACT_IDS = {
+    ('hs-knowledge-maintain', 'audit-result.yaml'): 'hs-knowledge-code-reference-audit',
+}
 OWNERS = {'review_plan': 'reviewer',
  'review_content': 'reviewer',
  'lint_preflight': 'reviewer',
  'local_check': 'reviewer',
  'lint_view': 'reviewer',
- 'query_regression': 'reviewer'}
+ 'query_regression': 'reviewer',
+ 'check_formal': 'reviewer',
+ 'audit_references': 'reviewer'}
 NODE_SKILLS = {'scan_sources': 'hs-knowledge-source-scan',
  'prepare_material': 'hs-knowledge-source-scan',
  'plan_change': 'hs-knowledge-change-plan',
@@ -81,71 +87,50 @@ NODE_SKILLS = {'scan_sources': 'hs-knowledge-source-scan',
  'apply_view': 'hs-knowledge-apply',
  'recover_transaction': 'hs-knowledge-recover',
  'rebuild_index': 'hs-knowledge-index-build',
- 'query_regression': 'hs-knowledge-query-regression'}
-EDGES = {'hs-knowledge-ingest': {'scan_sources': {'scanned': 'prepare_material',
-                                          'unchanged': 'record_ingest',
-                                          'resume': 'inspect_candidate',
-                                          'recover': 'recover_transaction',
-                                          'blocked': '__end__'},
-                         'prepare_material': {'prepared': 'plan_change', 'blocked': '__end__'},
-                         'plan_change': {'planned': 'review_plan',
-                                         'needs_material': 'prepare_material',
-                                         'blocked': '__end__'},
-                         'review_plan': {'reviewed': 'materialize_view',
-                                         'record_only': 'record_ingest',
-                                         'needs_material': 'prepare_material',
-                                         'needs_revision': 'plan_change',
-                                         'blocked': '__end__'},
-                         'materialize_view': {'ready': 'review_content',
-                                              'stale': 'prepare_material',
-                                              'blocked': '__end__'},
-                         'review_content': {'reviewed': 'lint_preflight',
-                                            'needs_material': 'prepare_material',
-                                            'needs_plan': 'plan_change',
-                                            'needs_revision': 'revise_candidate',
-                                            'blocked': '__end__'},
-                         'lint_preflight': {'passed': 'inspect_candidate',
-                                            'needs_material': 'prepare_material',
-                                            'needs_plan': 'plan_change',
-                                            'needs_revision': 'revise_candidate',
-                                            'blocked': '__end__'},
-                         'inspect_candidate': {'manual_ready': 'lint_view',
-                                               'mixed_ready': 'local_check',
-                                               'code_ready': 'local_check',
-                                               'recovery_required': 'recover_transaction',
-                                               'needs_revision': 'revise_candidate',
-                                               'blocked': '__end__'},
-                         'local_check': {'code_passed': 'lint_view',
-                                         'needs_revision': 'revise_candidate',
-                                         'blocked': '__end__'},
-                         'revise_candidate': {'ready': 'review_content',
-                                              'needs_material': 'prepare_material',
-                                              'needs_plan': 'plan_change',
-                                              'deferred': 'record_ingest',
-                                              'blocked': '__end__'},
-                         'lint_view': {'passed': 'record_ingest',
-                                       'needs_material': 'prepare_material',
-                                       'needs_plan': 'plan_change',
-                                       'needs_revision': 'revise_candidate',
-                                       'blocked': '__end__'},
-                         'record_ingest': {'recorded': 'apply_view',
-                                           'needs_record': 'record_ingest',
-                                           'blocked': '__end__'},
-                         'apply_view': {'applied': 'rebuild_index',
-                                        'record_only': '__end__',
-                                        'recovery_required': 'recover_transaction',
-                                        'stale': 'prepare_material',
-                                        'blocked': '__end__'},
-                         'recover_transaction': {'recovered': 'rebuild_index',
-                                                 'record_only': '__end__',
-                                                 'rolled_back': 'prepare_material',
-                                                 'blocked': '__end__'},
-                         'rebuild_index': {'built': 'query_regression',
-                                           'content_error': 'plan_change',
-                                           'blocked': '__end__'},
-                         'query_regression': {'checked': '__end__',
-                                              'content_error': 'plan_change',
-                                              'blocked': '__end__'}}}
+ 'query_regression': 'hs-knowledge-query-regression',
+ 'check_formal': 'hs-knowledge-lint',
+ 'audit_references': 'hs-knowledge-maintain'}
+WORKFLOW_ENTRIES = {
+    'hs-knowledge-ingest': ('scan_sources', 'hs-knowledge-source-scan'),
+    'hs-knowledge-lint': ('check_formal', 'hs-knowledge-lint'),
+}
+# Exact contracts for the existing ingest graph and the separate read-only graph.
+# Template identity is independent of Skill identity, even when names match.
+EDGES = {
+    'hs-knowledge-ingest': {
+        'scan_sources': {'scanned': 'prepare_material', 'unchanged': '__end__',
+                         'resume': 'review_content', 'recover': 'recover_transaction',
+                         'resume_index': 'rebuild_index', 'resume_queries': 'query_regression'},
+        'prepare_material': {'prepared': 'plan_change'},
+        'plan_change': {'planned': 'review_plan', 'needs_material': 'prepare_material'},
+        'review_plan': {'reviewed': 'materialize_view', 'record_only': 'record_ingest',
+                        'needs_material': 'prepare_material', 'needs_revision': 'plan_change'},
+        'materialize_view': {'ready': 'review_content', 'stale': 'prepare_material'},
+        'review_content': {'reviewed': 'lint_preflight', 'needs_material': 'prepare_material',
+                           'needs_plan': 'plan_change', 'needs_revision': 'revise_candidate'},
+        'lint_preflight': {'passed': 'inspect_candidate', 'needs_material': 'prepare_material',
+                           'needs_plan': 'plan_change', 'needs_revision': 'revise_candidate'},
+        'inspect_candidate': {'manual_ready': 'lint_view', 'mixed_ready': 'local_check',
+                              'code_ready': 'local_check', 'recovery_required': 'recover_transaction',
+                              'needs_revision': 'revise_candidate'},
+        'local_check': {'code_passed': 'lint_view', 'needs_revision': 'revise_candidate'},
+        'revise_candidate': {'ready': 'review_content', 'needs_material': 'prepare_material',
+                             'needs_plan': 'plan_change', 'deferred': 'record_ingest'},
+        'lint_view': {'passed': 'record_ingest', 'needs_material': 'prepare_material',
+                      'needs_plan': 'plan_change', 'needs_revision': 'revise_candidate'},
+        'record_ingest': {'recorded': 'apply_view', 'needs_record': 'record_ingest'},
+        'apply_view': {'applied': 'rebuild_index', 'record_only': '__end__',
+                       'recovery_required': 'recover_transaction', 'stale': 'prepare_material'},
+        'recover_transaction': {'recovered': 'rebuild_index', 'record_only': '__end__',
+                                'rolled_back': 'prepare_material'},
+        'rebuild_index': {'built': 'query_regression', 'content_error': 'prepare_material'},
+        'query_regression': {'checked': '__end__', 'content_error': 'prepare_material'},
+    },
+    'hs-knowledge-lint': {
+        'check_formal': {'checked': 'audit_references'},
+        'audit_references': {'reported': '__end__'},
+    },
+}
 class UniqueLoader(yaml.SafeLoader):
     pass
 
@@ -305,7 +290,7 @@ def validate(root):
         for name, (expected_nodes, expected_exits) in contracts.items():
             try:
                 contract = load(package / "artifacts" / name)
-                identity = skill + "-" + name[:-5]
+                identity = EXTRA_ARTIFACT_IDS.get((skill, name), skill + "-" + name[:-5])
                 if contract.get("id") != identity or identity in artifacts:
                     errors.append(f"{skill}/{name}: duplicate or inconsistent artifact identity")
                 artifacts.add(identity)
@@ -327,13 +312,14 @@ def validate(root):
         try:
             package = root / "workflows/common/knowledge" / identity
             doc = load(package / "workflow.yaml")
+            entry_node, entry_skill = WORKFLOW_ENTRIES[identity]
             if (
                 doc.get("version"),
                 doc.get("id"),
                 doc.get("kind"),
                 doc.get("entry_node"),
-            ) != (1, identity, "custom", "scan_sources") or doc.get("entry") != {
-                "skill": "hs-knowledge-source-scan"
+            ) != (1, identity, "custom", entry_node) or doc.get("entry") != {
+                "skill": entry_skill
             }:
                 errors.append(f"{identity}: invalid template identity/entry")
             nodes = doc.get("nodes", [])
@@ -368,10 +354,14 @@ def validate(root):
                         "outputs",
                         "retry",
                         "timeout",
+                        "workflow",
+                        "workflow_id",
+                        "subworkflow",
+                        "call",
                     )
                 ):
                     errors.append(f"{identity}.{node_id}: unsupported runtime field")
-            visited, pending = set(), ["scan_sources"]
+            visited, pending = set(), [entry_node]
             while pending:
                 current = pending.pop()
                 if current in visited or current == "__end__":

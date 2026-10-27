@@ -48,7 +48,7 @@ def fixture_packages(root):
         }
         files["artifacts/result.yaml"] = yaml.safe_dump(contract)
         for name, mapping in module.EXTRA_ARTIFACT_SCOPE.get(skill, {}).items():
-            extra = {**contract, "id": skill + "-" + name[:-5],
+            extra = {**contract, "id": module.EXTRA_ARTIFACT_IDS.get((skill, name), skill + "-" + name[:-5]),
                      "applies_to": {"node_ids": mapping[0]}, "required_on": {"exit_ids": mapping[1]}}
             files["artifacts/" + name] = yaml.safe_dump(extra)
         for relative, data in files.items():
@@ -67,7 +67,7 @@ def fixture_packages(root):
     return root
 
 
-def test_ingest_is_one_complete_workflow_without_project_binding_or_lint_template():
+def test_ingest_stays_complete_beside_the_read_only_lint_template():
     ingest = yaml.safe_load(
         (
             ROOT / "workflows/common/knowledge/hs-knowledge-ingest/workflow.yaml"
@@ -76,7 +76,7 @@ def test_ingest_is_one_complete_workflow_without_project_binding_or_lint_templat
     nodes = {n["id"]: n for n in ingest["nodes"]}
     assert ingest["entry_node"] == "scan_sources"
     assert "bind_project" not in nodes and "governance_handoff" not in nodes
-    assert not (ROOT / "workflows/common/knowledge/hs-knowledge-lint/workflow.yaml").exists()
+    assert (ROOT / "workflows/common/knowledge/hs-knowledge-lint/workflow.yaml").is_file()
     assert not any(node["type"] == "gate" for node in nodes.values())
     assert not {"prepare_confirmation", "final_view_user_gate", "record_confirmation"} & nodes.keys()
     assert nodes["review_content"]["owner"] == "reviewer"
@@ -87,8 +87,28 @@ def test_ingest_is_one_complete_workflow_without_project_binding_or_lint_templat
     routes = {edge["id"]: edge["target"] for edge in nodes["inspect_candidate"]["exits"]}
     assert routes["manual_ready"] == "lint_view"
     assert routes["mixed_ready"] == routes["code_ready"] == "local_check"
-    assert "content_review_ref" in nodes["apply_view"]["prompt"]
+    assert "保留历史卡输入" in nodes["apply_view"]["prompt"]
     assert "proof_set" not in nodes["apply_view"]["prompt"]
+
+
+def test_lint_workflow_is_two_read_only_skills_with_a_report_exit():
+    workflow = yaml.safe_load(
+        (ROOT / "workflows/common/knowledge/hs-knowledge-lint/workflow.yaml").read_bytes()
+    )
+    assert workflow["entry_node"] == "check_formal"
+    assert workflow["entry"] == {"skill": "hs-knowledge-lint"}
+    nodes = workflow["nodes"]
+    assert [(node["id"], node["type"], node["owner"], node["skill"]) for node in nodes] == [
+        ("check_formal", "skill", "reviewer", "hs-knowledge-lint"),
+        ("audit_references", "skill", "reviewer", "hs-knowledge-maintain"),
+    ]
+    assert [{edge["id"]: edge["target"] for edge in node["exits"]} for node in nodes] == [
+        {"checked": "audit_references"}, {"reported": "__end__"},
+    ]
+    # A report can be complete as an artifact while retaining failed checks.
+    assert "failed" in nodes[0]["exits"][0]["condition"]
+    assert "incomplete" in nodes[0]["exits"][0]["condition"]
+    assert "audit-references" in nodes[1]["prompt"]
 
 
 def test_ingest_finishes_locally_without_repository_submission():
@@ -269,12 +289,63 @@ def test_missing_reference_or_wrong_artifact_exit_is_rejected(tmp_path):
     assert any("exit" in error.lower() for error in module.validate(source))
 
 
+@pytest.mark.parametrize("mutation, expected", [
+    ("wrong_entry", "invalid template identity/entry"),
+    ("write_skill", "wrong Skill/owner/type"),
+    ("skip_audit", "unsafe or missing transition"),
+    ("cross_template", "unsafe or missing transition"),
+    ("extra_writer", "complete node set/uniqueness mismatch"),
+    ("external_runner", "unsupported runtime field"),
+    ("child_workflow", "unsupported runtime field"),
+])
+def test_read_only_lint_workflow_rejects_writers_shortcuts_and_external_calls(tmp_path, mutation, expected):
+    module = validator_module()
+    source = fixture_packages(tmp_path / "fixture")
+    path = source / "workflows/common/knowledge/hs-knowledge-lint/workflow.yaml"
+    workflow = yaml.safe_load(path.read_bytes())
+    check, audit = workflow["nodes"]
+    if mutation == "wrong_entry":
+        workflow["entry_node"] = "audit_references"
+    elif mutation == "write_skill":
+        audit["skill"] = "hs-knowledge-apply"
+    elif mutation == "skip_audit":
+        check["exits"][0]["target"] = "__end__"
+    elif mutation == "cross_template":
+        check["exits"][0]["target"] = "hs-knowledge-ingest:scan_sources"
+    elif mutation == "extra_writer":
+        workflow["nodes"].append({"id": "apply", "type": "skill", "owner": "coder",
+                                  "skill": "hs-knowledge-apply", "prompt": "write", "exits": []})
+    elif mutation == "external_runner":
+        audit["runner"] = "python external.py"
+    elif mutation == "child_workflow":
+        audit["workflow"] = "hs-knowledge-ingest"
+    path.write_text(yaml.safe_dump(workflow), encoding="utf-8")
+    assert any(expected in error for error in module.validate(source))
+
+
+@pytest.mark.parametrize("mutation", ["wrong_id", "wrong_scope", "optional"])
+def test_audit_report_contract_keeps_its_exact_identity_scope_and_obligation(tmp_path, mutation):
+    module = validator_module()
+    source = fixture_packages(tmp_path / "fixture")
+    path = source / "skills/common/knowledge/hs-knowledge-maintain/artifacts/audit-result.yaml"
+    contract = yaml.safe_load(path.read_bytes())
+    assert contract["id"] == "hs-knowledge-code-reference-audit"
+    if mutation == "wrong_id":
+        contract["id"] = "hs-knowledge-maintain-result"
+    elif mutation == "wrong_scope":
+        contract["applies_to"]["node_ids"] = ["check_formal"]
+    elif mutation == "optional":
+        contract["required"] = False
+    path.write_text(yaml.safe_dump(contract), encoding="utf-8")
+    assert any("hs-knowledge-maintain/audit-result.yaml" in error for error in module.validate(source))
+
+
 def test_cross_template_edge_and_apply_after_index_failure_rejected(tmp_path):
     module = validator_module()
     source = fixture_packages(tmp_path / "fixture")
     path = source / "workflows/common/knowledge/hs-knowledge-ingest/workflow.yaml"
     doc = yaml.safe_load(path.read_bytes())
     node = next(n for n in doc["nodes"] if n["id"] == "query_regression")
-    next(e for e in node["exits"] if e["id"] == "blocked")["target"] = "apply_view"
+    next(e for e in node["exits"] if e["id"] == "content_error")["target"] = "apply_view"
     path.write_text(yaml.safe_dump(doc), encoding="utf-8")
     assert any("transition" in e.lower() for e in module.validate(source))

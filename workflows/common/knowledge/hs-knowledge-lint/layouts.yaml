@@ -1,0 +1,9 @@
+template_id: hs-knowledge-lint
+canvas:
+  nodes:
+    check_formal:
+      x: 0
+      y: 0
+    audit_references:
+      x: 360
+      y: 0

@@ -1,0 +1,14 @@
+id: hs-knowledge-code-reference-audit
+title: 代码引用巡检报告
+required: true
+applies_to:
+  node_ids:
+    - audit_references
+required_on:
+  exit_ids:
+    - reported
+template: templates/audit-result.md
+writing_guide: audit-writing-guide.md
+review_guide: audit-review-guide.md
+default_location:
+  kind: markdown_file

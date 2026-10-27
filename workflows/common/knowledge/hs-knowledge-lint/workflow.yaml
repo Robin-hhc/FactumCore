@@ -1,0 +1,35 @@
+version: 1
+id: hs-knowledge-lint
+name: WiFi 知识引用巡检
+description: 沿用原 lint Skill 的默认正式全库检查，再汇总来源与代码引用差异；保存报告后结束，报告完成不代表知识健康。
+kind: custom
+source: user_created
+entry:
+  skill: hs-knowledge-lint
+entry_node: check_formal
+nodes:
+  - id: check_formal
+    title: 默认正式全库检查
+    type: skill
+    owner: reviewer
+    skill: hs-knowledge-lint
+    prompt: 直接调用原 lint Skill，沿用默认 formal/full，不传 view_ref 或局部 scope。按实际 config.yml 准备输入；存在 current 代码卡时，由 Agent 提供真实 inputs.code_checkout 的配置路径、配置摘要与代码目录映射，原件使用确切源对象。为本次调用在知识根 .build 内选择全新报告路径，读取并核对实际 JSON 报告及其正式全库对象、规则和状态。完整保存的 failed/incomplete 报告也交给下一节点；规则或运行失败而未生成可用报告时保留 OpenFlow 原生等待，不交棒。记录本报告相对知识根的 lint_report_ref；摘要使用本节点独立路径，不覆盖原证据。
+    exits:
+      - id: checked
+        label: 检查报告已保存
+        condition: 本次默认正式全库检查的有效 JSON 报告已保存并读取；保留 passed、failed 或 incomplete 实际结果，不能将发现问题或未完整检查表述为健康。
+        target: audit_references
+  - id: audit_references
+    title: 来源与代码引用巡检
+    type: skill
+    owner: reviewer
+    skill: hs-knowledge-maintain
+    prompt: 显式调用 maintain 的 action audit-references，传入本次独立 operation_id 与相对知识根的 lint_report_ref，沿正式卡、Claim、来源锁和当前配置读取实际引用。保存并读取返回的 audit_ref JSON 与 report_ref Markdown，核对 phase reported、complete、status、counts 及未检查范围。原 lint 为 failed/incomplete 时仍汇总可执行项和真实缺口；完成报告不代表检查通过或已修复。只输出报告，不调用 source-scan、ingest、apply、register、advance、recover 或索引激活，不写知识、来源锁、事件或水位。规则或运行失败而无法保存有效巡检报告时保留 OpenFlow 原生等待，不交棒。按 audit-result 产物契约，用实际返回 report_ref 在执行端解析的真实路径提交产物实例 location.path，不能依赖默认模板位置，不覆盖旧报告。
+    exits:
+      - id: reported
+        label: 巡检报告已生成
+        condition: 实际 audit_ref 与 report_ref 已保存并读取，完整披露 status、complete、counts、差异及缺口；有问题或未完整也只表示报告已生成。
+        target: __end__
+artifacts:
+  primary: []
+  optional: []

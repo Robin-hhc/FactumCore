@@ -23,6 +23,8 @@
 
 独立内容复核的角色、上下文隔离与执行顺序由人工测试者或 OpenFlow 安排；Skill 只校验本次业务记录、逐 Claim 理由、引用和确切视图／源码绑定，不要求作者链、Workflow 身份或上游通过票据。apply 保留实际固定检查及安全写入，不自动生成 supported 验收摘要；索引和查询按实际来源、工作树源码、配置范围及采用的构建／运行材料核验，`code_contexts` 是生成的业务数据。显式签名发布回执仍核身份真实性，共享索引构建的 `knowledge_commit` 只核仓库快照，不代表 CI 或复核通过。用户修订以新视图记录，历史原字节保留。
 
+lint 的新增编排限定为只读巡检：`F/hs-knowledge-lint/` 只有 `check_formal`、`audit_references` 两个 `type: skill` 节点，前者沿用 `S/hs-knowledge-lint/` 默认 formal／full，后者显式调用 maintain 的只读 `audit-references`，汇总 JSON／Markdown 报告后结束。保留原 L1—L5 检查编号、lint Skill 默认行为、ingest YAML／布局与 maintain 默认 `inspect-context`；不自动修复，不嵌套 Workflow，不新增 runner。外部系统负责周期触发；巡检不写正式知识、来源锁、事件／水位或活动索引。描述新能力时区分设计、实现验证和真实宿主接入，报告完成不表示问题已修复；需要修订由人明确交 ingest。
+
 实现修改前核对共享设计、源码与现有测试；本地有对应 SDD 需求、设计、任务和测试计划时一并参考，依据实际验证更新本地记录。保留历史工件原字节，不批量替换旧记录路径或状态，不把本地开发工件重新加入 Git。普通文档整理不读受限 gold。文档独立内容复核、本地代码只读核验与固定 CI、六类原件及未知业务上下文遵循上级 AGENTS。
 
 不新增 research、experiments、agents、superpowers 或设计文档子目录。系统设计优先维护架构与详细设计两份主文档，路径与部署约定集中维护在知识库关键点；操作写使用说明，任务、测试、发布与历史记录写相应 SDD 工件。

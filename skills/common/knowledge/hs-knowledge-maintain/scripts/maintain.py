@@ -530,6 +530,9 @@ def inspect_context(context):
 
 def execute(context):
     action = context.args.action or "status"
+    if action == "audit-references":
+        from audit import audit_references
+        return audit_references(context)
     if action == "status":
         return {"state": state(context)}, "inspected"
     if action == "inspect-context":

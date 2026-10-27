@@ -12,9 +12,9 @@ flowchart LR
 | 文件 / 目录 | 阅读目的 |
 |---|---|
 | [HiMate知识库架构设计.md](HiMate知识库架构设计.md) | 目录架构、分层职责与生产、治理、消费三条链路 |
-| [知识库详细设计.md](知识库详细设计.md) | 第 1 节说明前置发现和命令；第 2.1 节画完整 ingest P1—P7，第 3.1 节展开 lint 检查，第 3.2 节说明固定 CI，第 4 节说明查询与 Q6 源码定位；第 5 节按节点解释文件设计，§5.11 说明 S0 CodeGraph 首次 setup；第 6 节集中说明共用规则与运行约束 |
+| [知识库详细设计.md](知识库详细设计.md) | 第 1 节说明前置发现和命令；第 2.1 节画完整 ingest P1—P7，第 3.1 节说明只读 lint 巡检 Workflow 与原 L1—L5 检查，第 3.2 节说明固定 CI，第 4 节说明查询与 Q6 源码定位；第 5 节按节点解释文件设计，§5.11 说明 S0 CodeGraph 首次 setup；第 6 节集中说明共用规则与运行约束 |
 | [知识库关键点.md](知识库关键点.md) | WiFi-MP 方案适配其他领域时的目录、raw／Profile、领域契约和 Skill／Workflow 配套修改，以及共用的部署与核验边界 |
-| [使用说明.md](使用说明.md) | 配置 `config.env` 连接信息 → 按需首次准备 → OpenFlow 执行 ingest → 通过 Skill 使用 lint、query |
+| [使用说明.md](使用说明.md) | 配置 `config.env` 连接信息 → 按需首次准备 → OpenFlow 执行 ingest；按需使用 lint、query Skill 或只读巡检 Workflow |
 | [AGENTS.md](AGENTS.md) | Agent 阅读入口和文档修改边界 |
 
 项目自身的 `task.md` 与 `sdd/` 仅在本地保存开发任务、需求、测试计划和验收记录，已由 Git 忽略；共享仓库和能力包不包含这些工件，使用与部署无需准备它们。
@@ -29,11 +29,13 @@ flowchart LR
 
 `config.yml` 维护代码根和模块相对路径，以及芯片、Host／Device、特性和用途；共享模块可关联多芯片、多端。无需逐项填写六 Target、三 pair 或重复代码根授权，取证按路径读取实际文件并固定内容指纹。配置文件职责与连接设置见[使用说明](使用说明.md#配置项目代码架构)，共享映射与核验逻辑见[知识库关键点](知识库关键点.md#1-工作区路径与部署边界)。
 
-能力共 19 个 Skill：18 个公开 CLI 节点及 1 个纯说明 `hs-codegraph-setup`，另有 1 条 ingest Workflow。`hs-knowledge-explore` 负责全库能力路由及按需准备、发现；`hs-codegraph-setup` 按真实模块准备图谱及官方 MCP，空模块列表不建图，日常 Q6 直接使用 MCP 或实际文件检索。卡头来源及查询结果提供模块、文件与定位，Agent 按实际 `config.yml` 匹配模块根后追查源码，不以正文可点击链接为前提；见[查询和追代码](使用说明.md#3-怎么查询和追代码)与[详细设计 §5.9](知识库详细设计.md#59-q1q6路由查询同代精读与回答)。
+能力共 19 个 Skill：18 个公开 CLI 节点及 1 个纯说明 `hs-codegraph-setup`；Workflow 设计包含 ingest 和只读 lint 巡检两条。`S/hs-knowledge-lint/` 是原检查 Skill，`F/hs-knowledge-lint/` 是同名巡检 Workflow，安装和宿主加载按实际环境核实。`hs-knowledge-explore` 负责全库能力路由及按需准备、发现；`hs-codegraph-setup` 按真实模块准备图谱及官方 MCP，空模块列表不建图，日常 Q6 直接使用 MCP 或实际文件检索。卡头来源及查询结果提供模块、文件与定位，Agent 按实际 `config.yml` 匹配模块根后追查源码，不以正文可点击链接为前提；见[查询和追代码](使用说明.md#3-怎么查询和追代码)与[详细设计 §5.9](知识库详细设计.md#59-q1q6路由查询同代精读与回答)。
 
 设计文档描述职责、流程与边界，能力安装、实际宿主、六 Target、CI 合入和权限验证以各自环境的实际记录为准。本项目历史验证工件在本地 SDD 保存原始版本身份，不据此推断当前部署状态。
 
 详设中的 `knowledge ...` 是统一入口名称。首次准备后，按[使用说明](使用说明.md)通过 OpenFlow 运行 `hs-knowledge-ingest` Workflow；独立检查和查询分别向 Agent 提出要求，并指定 `hs-knowledge-lint` 或 `hs-knowledge-query` Skill。底层接口参数见相应能力的 `SKILL.md` 与 `references/`。
+
+手动或周期巡检另行启动同名 `hs-knowledge-lint` Workflow：`check_formal` 沿用原 lint Skill 默认 formal／full，`audit_references` 显式调用 maintain 的只读 `audit-references`，汇总固定检查、逐卡／Claim 的来源、旧定位、旧／当前 hash、差异与历史用途，生成 JSON／Markdown 报告后结束。外部系统负责周期触发；巡检不改知识、来源锁、事件／水位或活动索引，也不自动修复。需要修订时，人明确把报告中的问题交给 ingest；见[详细设计 §3.1](知识库详细设计.md#31-lint-的检查流程)。
 
 `knowledge ingest` 是逻辑入口名称，默认扫描六类允许 raw 并选择新增、变化及待处理来源；限定范围时，在 source-scan 的请求中填写可选 `source`。首次导入和日常增量使用同一套能力，不要求安装同名终端命令。
 

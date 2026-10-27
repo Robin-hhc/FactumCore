@@ -49,7 +49,8 @@ repo/
 │   ├── hs-knowledge-maintain/            # 变更影响与阻断复核
 │   └── hs-knowledge-query/               # 消费知识
 ├── workflows/common/knowledge/ # 开发分发源码，部署时放入 Agent Workflows
-│   └── hs-knowledge-ingest/   # P1—P7：原件到 stable 的完整流程
+│   ├── hs-knowledge-ingest/   # P1—P7：原件到 stable 的完整流程
+│   └── hs-knowledge-lint/     # 正式全库检查 → 引用巡检报告，只读
 └── himate-knowledge-wifi-mp/       # WiFi 领域根，无嵌套 .git
     ├── AGENTS.md / README.md / CONTRIBUTING.md
     ├── check.py / check.sh         # 固定 CI 入口，复用共用检查函数
@@ -97,7 +98,7 @@ repo/
 
 知识库随代码仓一并拉取；首次运行依赖由 `hs-knowledge-explore` 准备，不需要额外业务初始化命令或常驻服务。`ingest` 默认处理六类允许 raw，从提炼 draft 连续完成检查、修订、独立内容复核和适用代码核验，最后将 stable 卡落位到 `knowledge/`；`lint` 是可单独调用的只读确定性检查入口，供手动修改和 CI 复用，不自动修稿或入库；`query` 消费知识。本地入库、索引全验、目标查询及活动代激活完成后，由人提交、触发固定 CI 并评审合入。`ingest --source` 可选限定来源；命令格式见[详细设计 §1.1](知识库详细设计.md#11-从命令进入流程)，OpenFlow 负责 Workflow 的调度和交棒校验；人工测试可逐个调用 Skill 并按实际结果继续。
 
-ingest 是原件到本地正式知识的完整流程；lint 是可被 ingest、独立命令和 CI 复用的只读检查 Skill，query 负责消费。三者不是必须由用户顺序启动的三个 Workflow。
+ingest 是原件到本地正式知识的完整流程；lint Skill 可被 ingest、独立命令和 CI 复用，query 负责消费。另有同名 lint Workflow，供手动或外部周期调度执行正式全库检查和引用巡检，出报告即结束。它直接调用两个 Skill，不嵌套 ingest，不改变原 lint Skill 默认行为或 ingest 节点。实际宿主加载、代码接入和周期触发需按部署环境验证；这些能力不要求用户顺序执行。
 
 前文"HiMate knowledge目录架构"回答的是"有哪些目录"，本章回答三个问题：**每个目录是干什么的？为什么要有这个目录？目录之间怎么协作？** 阅读顺序：11.1 建立动机认知（为什么需要知识库）→ 11.2 仓库架构（分层模型 + 目录职责）→ 11.3 知识生命周期（三条链路看目录协作）。
 
@@ -164,7 +165,7 @@ flowchart TB
         direction LR
         D1["governance/<br />templates · schemas · contracts · specs · sources.lock.yaml"]
         D2["Agent Skills · S<br />source-capture · change-plan · lint · apply · query"]
-        D3["OpenFlow · Agent Workflows · F<br />hs-knowledge-ingest：编排完整 P1—P7"]
+        D3["OpenFlow · Agent Workflows · F<br />ingest：完整 P1—P7<br />lint：正式检查与引用报告"]
     end
 
     subgraph S5["⑤ 配套支撑层"]
@@ -259,7 +260,7 @@ flowchart LR
 | `hs-knowledge-query-regression/` | 回归候选代 | 执行本次明确的查询断言；verify 重跑报告中的实际案例 |
 | `hs-knowledge-publish-handoff/` | 外部发布材料辅助 | run / verify-submission；不执行 Git 提交 |
 | `hs-knowledge-merge-check/` | 固定代码视图复核辅助 | 复用 local-check 的 merge 核验 |
-| `hs-knowledge-maintain/` | 维护与阻断复核 | inspect-context 只读比较；事件登记与 advance 另行写入 |
+| `hs-knowledge-maintain/` | 维护与阻断复核；显式只读引用巡检 | inspect-context 保持默认；audit-references 汇总引用差异报告；事件登记与 advance 另行写入 |
 | `hs-knowledge-query/` | 消费知识 | search / read；延续 search 时绑定原 receipt |
 
 参与流程：OpenFlow 的 ingest Workflow 编排 P1—P7，内部调用 lint Skill；人工测试由人按需要逐个调用，Skill 不校验前驱步骤、角色身份或上游 passed 票据。query 使用实际知识、来源和索引。上表是能力清单，不表示上库必须逐个执行；固定 CI 复用 lint 的确定性检查函数。`hs-knowledge-explore` 提供首次 setup 和后续按需项目接口。S0 仅在首次 setup 时按 `config.yml` 的真实模块准备代码图谱，消费 Q6 使用官方 MCP 定位源码，见[详细设计 §5.11](知识库详细设计.md#511-s0--q6codegraph-首次-setup-与源码定位)。
@@ -271,8 +272,9 @@ flowchart LR
 | 技能 | 职责 | 一句话 |
 |------|------|--------|
 | `hs-knowledge-ingest/` | P1 扫描或续办→P2 材料→P3 阅读计划→P4 稿件及适用复核→P5 lint→P6 处理记录→P7 入库、索引与目标查询 | 一次入口完成本地闭环 |
+| `hs-knowledge-lint/` | `check_formal` 调用原 lint 默认 formal／full → `audit_references` 显式调用 maintain 的只读 audit-references | 汇总固定检查及逐卡／Claim 的来源、代码差异，生成 JSON／Markdown 报告即结束 |
 
-ingest 不另分独立的生产和治理流程；它在 P5 调用已安装的 `hs-knowledge-lint`，由返回的问题决定补材料、重判或修稿，再继续检查。lint 不建立 Workflow。
+ingest 不另分独立的生产和治理流程；它在 P5 继续调用原 `S/hs-knowledge-lint/` Skill，由返回的问题决定补材料、重判或修稿，再继续检查。新增 `F/hs-knowledge-lint/` Workflow 与同名 Skill 分目录保存，两个节点均为 `type: skill`，不改 ingest 的 YAML／布局或 lint 包默认参数。外部调度仅负责触发，不另建 runner 或 Workflow 子调用。
 
 #### himate-knowledge-wifi-mp/ —— WiFi 领域知识库
 
@@ -443,7 +445,7 @@ P6 校验覆盖和真实引用，不要求先有 lint 通过票据或独立抽�
 
 只有同范围完整扫描成功，才能把原有路径未出现列为缺失；不可读、扫描中断或 `--source` 范围外不推断删除。缺失项读各关联卡实际引用的旧原文，不自动删知识。
 
-### 流程二：lint Skill —— 只读检查并汇总问题
+### 流程二：lint —— 只读检查与引用巡检报告
 
 `hs-knowledge-lint` 是 Agent 已安装的 Skill 包，内部调用固定脚本。ingest 的 P5、独立 lint 命令及 C1 共用确定性规则；lint 只做确定性检查，不修稿、不做内容语义复核、不 apply。C1 直接使用知识库的 `check.py`／`check.sh` 与受锁领域规则，不依赖 Agent 的能力目录。
 
@@ -456,6 +458,18 @@ flowchart LR
 ```
 
 L3 核对快照、文件指纹、路径、行页段及范围绑定，能定位不表示支持结论。文档和代码内容复核由 P4 完成，混合卡不能整体免核验。L4 检查受管导航和派生结构，必要时临时构建验证，不切换活动索引。
+
+手动或外部周期调度可启动 `F/hs-knowledge-lint/` Workflow，先运行上述默认正式全库检查，再以 maintain 的显式 `audit-references` 动作生成引用巡检报告：
+
+```mermaid
+flowchart LR
+    START["手动／外部调度"] --> CHECK["check_formal<br/>原 lint Skill 默认 formal / full"]
+    CHECK --> AUDIT["audit_references<br/>maintain 显式只读动作"]
+    AUDIT --> REPORT["JSON／Markdown 报告<br/>卡／Claim、旧定位、旧／当前 hash、差异与缺口"]
+    REPORT -. "人工明确修订要求" .-> INGEST["另行交 ingest"]
+```
+
+报告区分当前、指导性与历史用途。旧证据可恢复且定位有效时，与当前 `main/` 不同不直接等于历史引用错误；文件 hash 改变也不自动证明结论错误。覆盖以实际卡／Claim 的引用和已配置范围为准，材料缺失、读取失败和中途变化须保留缺口。巡检不修改知识、来源锁、事件／维护水位或活动索引，不自动修复或调用 ingest；原 lint 报告的失败／未完成状态继续保留。细节见[详细设计 §3.1](知识库详细设计.md#31-lint-的检查流程)。
 
 C1 位于提交之后，复用这些确定性检查及必要的 SQLite 构建验证；代码变化只核已固定文件的 hash、路径和范围。不匹配则失败返回本地修正，不自动修稿或重新组织 Agent 语义复审。
 ### 流程三：query —— 知识消费
@@ -498,7 +512,7 @@ shared 索引可在构建时按 `knowledge_commit` 核对实际 Git 快照，que
 | `AGENTS.md` / `config.yml` | 项目约定、代码根与模块归属 | 适用规则、实际代码上下文和条件缺口 | 路由与范围依据 |
 | 实际业务代码目录 | 代码取证与 P4 内容复核 | 固定引用与文件身份检查 | 源码交叉印证 |
 | Agent Skills（`S`） | 可独立调用的 P1—P7 材料、计划、内容复核、lint、核验及入库能力 | 独立 lint Skill；固定 CI 直接复用 K 内规则 | 查询、精读、来源恢复 |
-| Agent Workflows（`F`） | OpenFlow 编排 P1—P7，校验顺序、角色与交棒 | — | — |
+| Agent Workflows（`F`） | OpenFlow 编排 P1—P7，校验顺序、角色与交棒 | lint Workflow 只读巡检并出报告；固定 CI 不调用 Workflow | — |
 | `knowledge/` | 查重、关联卡和 P7 精确入库 | 正式卡格式与引用检查 | 唯一正文检索对象 |
 | `docs-raw/` | 只读原件 | 来源一致性复核 | 原件与证据溯源 |
 | `governance/` | 模板、来源和卡契约 | 共同规则、来源锁与记录约束 | 范围、来源、依赖与业务材料一致性 |

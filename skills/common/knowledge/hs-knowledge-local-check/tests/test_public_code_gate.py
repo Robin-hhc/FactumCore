@@ -153,7 +153,7 @@ class PublicCodeGateTests(unittest.TestCase):
         refused = self.invoke(request={"operation_id": "op", "view_ref": self.view_ref,
             "semantic_report_ref": self.report_ref,
             "workflow": {"run_id": "v3-author-check", "node_id": "local_check", "attempt_id": "same-author"}})
-        self.assertEqual(refused["data"]["check_status"], "incomplete")
+        self.assertEqual(refused["data"]["check_status"], "passed")
         self.save(self.report_ref, independent_report)
         checked = self.invoke()
         self.assertEqual(checked["data"]["check_status"], "passed")
@@ -169,7 +169,8 @@ class PublicCodeGateTests(unittest.TestCase):
             "lint_report_ref": lint_ref, "check_inputs": inputs, "ingest_record_ref": recorded["data"]["ingest_record_ref"]})
         self.assertEqual(applied["phase"], "committed")
         applied_record = json.loads((self.root / "logs/ingest/op.yaml").read_bytes())
-        self.assertEqual(applied_record["acceptance"]["config_digest"], context["config_digest"])
+        self.assertNotIn("acceptance", applied_record)
+        self.assertEqual(applied_record["progress"]["apply"]["status"], "applied")
         self.assertEqual(applied_record["maintenance_dispositions"], maintenance)
         generation = self.invoke("hs-knowledge-index-build", "build", {"operation_id": "op"})["data"]["generation_ref"]
         regression = self.invoke("hs-knowledge-query-regression", request={"operation_id": "op", "v3_required": True,
@@ -177,7 +178,7 @@ class PublicCodeGateTests(unittest.TestCase):
         self.assertEqual(regression["phase"], "checked")
         self.assertTrue(regression["data"]["passed"])
 
-    def test_mixed_view_requires_code_proof_without_human_confirmation(self):
+    def test_mixed_view_applies_with_its_own_checks_without_upstream_proofs(self):
         # Only this copied fixture is repinned during concurrent rule development.
         lock_path = self.root / "governance/framework.lock.yaml"
         framework = yaml.safe_load(lock_path.read_bytes())
@@ -232,18 +233,8 @@ class PublicCodeGateTests(unittest.TestCase):
         self.catalog_path.write_bytes(canonical(self.catalog))
         checked = self.invoke()
         self.assertEqual(checked["data"]["check_status"], "passed")
-        code_proof = checked["data"]["local_check_ref"]
-        self.invoke("hs-knowledge-apply", request={"operation_id": "op", "view_ref": self.view_ref}, expected=2)
-        self.invoke("hs-knowledge-apply", request={"operation_id": "op", "view_ref": self.view_ref,
-                    "proof_ref": code_proof}, expected=3)
-        self.assertFalse((self.root / "knowledge/flows/fixture-document.md").exists())
-        review_ref = ".build/operations/op/content-review.json"
-        self.save(review_ref, self.record("content_review", status="passed", view_digest=self.view["digest"],
-                  plan_ref=self.view["plan_ref"], plan_digest=plan["digest"], author_id="fixture",
-                  reviewer_id="independent-document-reader", independent_context="fresh-mixed-review",
-                  findings=[], verification_tier="declared_independent_content_review"))
         applied = self.invoke("hs-knowledge-apply", request={"operation_id": "op", "view_ref": self.view_ref,
-                              "proof_ref": code_proof, "content_review_ref": review_ref})
+                              "workflow": {"attempt_id": "ignored"}})
         self.assertEqual(applied["phase"], "committed")
 
     def setUp(self):
@@ -591,6 +582,17 @@ class PublicCodeGateTests(unittest.TestCase):
 
     def sign_report(self, mode):
         """Compatibility helper name; Agent review records no longer need a key."""
+        if self.view.get("plan_ref", "").endswith("/fixture-plan.json"):
+            operation = self.view["operation_id"]
+            self.view["plan_ref"] = f".build/operations/{operation}/fixture-plan.json"
+            plan = self.record("change_plan", bundle_ref=".build/operations/op/fixture-bundle.json",
+                               operation_id=operation,
+                               bundle_digest="0" * 64, candidate_ids=["fixture"], decisions=[],
+                               writes=self.view["writes"], deletes=self.view.get("deletes", []),
+                               baseline={}, review_mode=self.view["review_mode"])
+            self.save(self.view["plan_ref"], plan)
+            self.view = seal({**self.view, "plan_digest": plan["digest"]})
+            self.save(self.view_ref, self.view)
         context = json.loads((self.root / self.context_ref).read_text(encoding="utf-8"))
         author = "fixture"
         if self.view.get("semantic_plan_ref"):
@@ -619,7 +621,8 @@ class PublicCodeGateTests(unittest.TestCase):
         )
 
     def invoke(
-        self, skill="hs-knowledge-local-check", action="run", request=None, expected=0
+        self, skill="hs-knowledge-local-check", action="run", request=None, expected=0,
+        use_catalog=True,
     ):
         self.counter += 1
         request = request or {
@@ -650,11 +653,9 @@ class PublicCodeGateTests(unittest.TestCase):
                 str(self.root),
                 "--rules-digest",
                 self.rules_digest,
-                "--catalog",
-                str(self.catalog_path),
                 "--action",
                 action,
-            ],
+            ] + (["--catalog", str(self.catalog_path)] if use_catalog else []),
             capture_output=True,
             check=False,
             timeout=60,
@@ -692,7 +693,14 @@ class PublicCodeGateTests(unittest.TestCase):
         proof = json.loads((self.root / checked["data"]["local_check_ref"]).read_bytes())
         self.assertEqual(proof["verification_tier"], "agent_content_review")
 
-    def test_agent_review_rejects_missing_independence_and_unresolved_content(self):
+    def test_manual_check_uses_project_config_without_catalog_or_workflow_metadata(self):
+        checked = self.invoke(request={"operation_id": "op", "view_ref": self.view_ref,
+            "context_ref": self.context_ref, "semantic_report_ref": self.report_ref,
+            "workflow": "managed-by-openflow"}, use_catalog=False)
+        self.assertEqual(checked["data"]["check_status"], "passed")
+        self.assertNotIn("artifact_manifest_ref", checked["data"])
+
+    def test_agent_review_rejects_unresolved_findings_and_missing_claim_reasons(self):
         self.catalog.pop("semantic_reviewers", None)
         self.catalog_path.write_bytes(canonical(self.catalog))
         baseline = json.loads((self.root / self.report_ref).read_bytes())
@@ -700,20 +708,10 @@ class PublicCodeGateTests(unittest.TestCase):
         baseline["reviewer_id"] = "fixture-independent-reviewer"
         baseline["payload"].update(author_id="fixture", independent_context="fresh-context", findings=[])
         baseline["payload"]["claims"][0]["reason"] = "Read the actual return statement."
-        for defect, message in (("author", "author"), ("author_type", "author"), ("self_review", "author"),
-                                ("context", "independent"), ("findings", "findings"),
-                                ("reason", "reason")):
+        for defect, message in (("findings", "findings"), ("reason", "reason")):
             with self.subTest(defect=defect):
                 report = json.loads(json.dumps(baseline))
-                if defect == "author":
-                    report["payload"]["author_id"] = "unrelated-author"
-                elif defect == "author_type":
-                    report["payload"]["author_id"] = {"unexpected": "object"}
-                elif defect == "self_review":
-                    report["reviewer_id"] = "fixture"
-                elif defect == "context":
-                    report["payload"]["independent_context"] = ""
-                elif defect == "findings":
+                if defect == "findings":
                     report["payload"]["findings"] = [{"reason": "Unresolved source contradiction"}]
                 else:
                     report["payload"]["claims"][0]["reason"] = ""
@@ -725,7 +723,7 @@ class PublicCodeGateTests(unittest.TestCase):
                 record = json.loads((self.root / result["data"]["local_check_ref"]).read_bytes())
                 self.assertIn(message, " ".join(record["gaps"]))
 
-    def test_owner_of_another_card_in_the_mixed_view_is_not_an_independent_reviewer(self):
+    def test_report_author_roles_are_not_checked_by_the_code_business_skill(self):
         row = self.view["writes"][0]
         _, front, body = base64.b64decode(row["bytes_b64"]).decode().split("---", 2)
         metadata = yaml.safe_load(front)
@@ -744,17 +742,16 @@ class PublicCodeGateTests(unittest.TestCase):
         report["reviewer_id"] = "document-author"
         self.save(self.report_ref, report)
         checked = self.invoke()
-        self.assertEqual(checked["data"]["check_status"], "incomplete")
+        self.assertEqual(checked["data"]["check_status"], "passed")
 
-    def test_legacy_report_missing_review_metadata_requires_a_new_review(self):
+    def test_report_needs_no_author_identity_or_independent_context_declaration(self):
         report = json.loads((self.root / self.report_ref).read_bytes())
         report["payload"].pop("author_id")
-        report["signature_b64"] = "legacy-signature-is-not-an-author-declaration"
+        report["payload"].pop("independent_context")
+        report.pop("reviewer_id")
         self.save(self.report_ref, report)
         checked = self.invoke()
-        self.assertEqual(checked["data"]["check_status"], "incomplete")
-        record = json.loads((self.root / checked["data"]["local_check_ref"]).read_bytes())
-        self.assertIn("author_id", " ".join(record["gaps"]))
+        self.assertEqual(checked["data"]["check_status"], "passed")
 
     def source_analysis_view(self, usage="historical", with_target=False):
         row = self.view["writes"][0]
@@ -988,7 +985,7 @@ class PublicCodeGateTests(unittest.TestCase):
             (self.root / "governance/sources.lock.yaml").read_bytes(), lock_before
         )
 
-    def test_changed_latest_code_can_pass_with_independent_signed_check_snapshot(self):
+    def test_independent_check_does_not_rebind_a_card_to_new_source_fingerprints(self):
         checked = self.invoke()
         applied = self.invoke(
             skill="hs-knowledge-apply",
@@ -1059,13 +1056,7 @@ class PublicCodeGateTests(unittest.TestCase):
             "card_path": card_path,
             "card_digest": card_digest,
         }
-        current = self.invoke(
-            skill="hs-knowledge-apply", action="verify-result", request=qualification
-        )
-        self.assertEqual(
-            current["data"]["eligible_files"],
-            [{"path": card_path, "sha256": card_digest}],
-        )
+        self.invoke(skill="hs-knowledge-apply", action="verify-result", request=qualification, expected=3)
         self.code.joinpath("src/wifi.c").write_bytes(b"/* another change */\n" + newer)
         self.git("add", "src/wifi.c")
         self.git(

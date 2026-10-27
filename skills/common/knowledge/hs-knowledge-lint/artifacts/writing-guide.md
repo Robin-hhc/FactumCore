@@ -1,1 +1,3 @@
-填写本次精确检查对象、规则、范围、各项状态与问题报告路径。原生 JSON CheckReport 是门禁事实来源；Markdown 仅作阅读摘要，不可改写状态。
+# Writing guide
+
+Report the actual CLI status, phase, diagnostics and returned business file references. Use the output of this invocation; do not invent a passing result. OpenFlow owns run/node/attempt tracking and transition checks.

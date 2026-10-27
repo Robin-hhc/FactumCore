@@ -1,2 +1,3 @@
-Use public apply verify-result with a fresh child response path and trusted catalog. Bind handoff to actual transaction/view/proof digests. Preserve distinction between local completion and external publication, and between synthetic and real-host verification.
+# Writing guide
 
+Report the actual CLI status, phase, diagnostics and returned business file references. Use the output of this invocation; do not invent a passing result. OpenFlow owns run/node/attempt tracking and transition checks.

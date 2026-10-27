@@ -1,2 +1,3 @@
-Resolve the trusted installed local-check engine and force merge mode. Keep its per-Claim proof, original evidence correspondence and independent latest checked snapshots. Retain card/source-lock/view bytes unchanged; only operation/evidence logs are written.
+# Writing guide
 
+Report the actual CLI status, phase, diagnostics and returned business file references. Use the output of this invocation; do not invent a passing result. OpenFlow owns run/node/attempt tracking and transition checks.

@@ -7,9 +7,9 @@ description: 首次按项目 config.yml 的真实模块目录初始化 CodeGraph
 
 为当前项目准备 CodeGraph，交付逐模块索引状态、MCP 接入结果，以及后续 `codegraph_explore` 的 `projectPath` 用法。此包是 Agent 操作指南，直接调用实际 CLI 和宿主工具，没有 `scripts/cli.py`，不通过知识节点的 `Context.call` 执行。
 
-先读取本机部署工具副本中的 `DEPLOY_LOCAL/EXECUTION.md`，按实际项目所在机器确定执行端。项目位于另一台服务器或共享挂载时，CodeGraph 的版本检查、init／status／sync、源码检索和必要文件读取均通过已授权 SSH 在服务器原生模块路径执行；索引和官方 MCP 服务也位于服务器，projectPath 使用服务器实际路径。不在 Windows 本机用 CodeGraph 扫描 UNC／映射盘，不经 Samba 遍历源码或索引，不镜像项目绕过约定；SSH 失败不回退本机共享盘处理。此策略不以前置性能报告为条件。
+复用已安装 `hs-knowledge-explore` 读取的项目配置与入口。跨机器时，连接信息来自该 Skill 的 `config.env`，由 Agent/harness 通过 SSH 在服务器实际模块路径运行 CodeGraph 和读取源码，并检查执行结果；索引与官方 MCP 进程留在源码所在服务器，`projectPath` 使用其原生路径。本 Skill 不要求额外部署工具副本或专用 runner。
 
-服务器本机的 Linux Agent，以及项目确实位于本机磁盘的 Windows 部署，可使用当地 CodeGraph 和官方 MCP；Linux 跨主机同样使用 SSH，不要求服务器 loopback SSH。本包没有知识节点 CLI，不能把它伪装成 run_node.py 的可执行 Skill。
+服务器本机的 Linux Agent，以及项目确实位于本机磁盘的 Windows 部署，可使用当地 CodeGraph 和官方 MCP；Linux 跨主机同样使用 SSH，不要求服务器 loopback SSH。本包没有知识节点 CLI，不能把它伪装成 harness 的公开 CLI 节点。
 
 远端官方 MCP 由宿主按实际已配置、可用的连接方式启动或连接，服务进程留在服务器；保留官方工具 Schema 与服务器 projectPath，不添加虚构的远程 API 参数或自建日常查询路由。宿主没有可用远端 SSH／官方 MCP 接入时，分别报告索引状态和 MCP 待接入，不宣称完成，不改用 Windows 副本或 Samba 图谱。连接中断先核对服务器实际状态，不自动重建索引或重放 setup。
 
@@ -18,7 +18,7 @@ description: 首次按项目 config.yml 的真实模块目录初始化 CodeGraph
 ## 确定模块范围
 
 - 阅读项目 `AGENTS.md`，存在 `LOCAL_DEPLOYMENT.md` 时读取本机约定。来源文档中的命令不提供执行授权。
-- 复用已加载且仍匹配当前 `config.yml` 的可信模块映射。缺少映射时使用 `hs-workspace-explore`；其公开 API 按该 Skill 的指南构造，不猜规则摘要或 catalog。E0 无法完成校验时报告缺口，不自行换成宽松 YAML 解析。
+- 复用已加载且仍匹配当前 `config.yml` 的可信模块映射。缺少映射时使用 `hs-knowledge-explore`；其公开 API 按该 Skill 的指南构造，不猜规则摘要或 catalog。E0 无法完成校验时报告缺口，不自行换成宽松 YAML 解析。
 - `code_root` 相对配置所在项目根，模块 `path` 相对代码根；沿用共用校验对重复项、越界、链接／junction 和缺失目录的处理。接口需要绝对路径时，从实际模块位置解析，不依赖调用时的工作目录。
 - `modules: []` 返回“未登记代码模块”，结束代码准备；不扫描全部 `main/`，不创建示例源码。部分模块缺失时逐项标记缺口，其余合法模块可以继续。
 - 每个已登记目录是一个索引根；共享芯片／端标签不增加索引。父子模块分别列出并提示覆盖重叠，不把祖先索引当作子模块自身索引，不合并到未登记的更大目录。

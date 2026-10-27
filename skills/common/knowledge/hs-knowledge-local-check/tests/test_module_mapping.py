@@ -96,10 +96,9 @@ def test_current_static_code_uses_exact_files_without_git_or_manual_policy(mappe
         resources.validate_current_code_identity(identity, mapped.config_path, mapped.context["config_digest"], mapped.rules, None)
 
 
-def test_workspace_registration_is_required_for_the_local_gate(mapped):
+def test_workspace_configuration_is_found_without_install_registration(mapped):
     mapped.ctx.catalog["workspaces"] = {}
-    with pytest.raises(engine.Incomplete, match="installed workspace registration"):
-        checked(mapped)
+    assert checked(mapped)["repos"][mapped.repo["repo_id"]]["files"] == {"src/wifi.c": hashed(mapped.data)}
 
 
 @pytest.mark.parametrize("field", ["kind", "evidence_basis", "workspace_path"])

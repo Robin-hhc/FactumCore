@@ -13,7 +13,7 @@ import yaml
 
 REPOSITORY = Path(__file__).resolve().parents[4]
 SCRIPT = Path(__file__).resolve().parents[1] / "install_catalog.py"
-IDS = ["hs-workspace-explore"] + [
+IDS = ["hs-knowledge-explore"] + [
     "hs-knowledge-" + name
     for name in (
         "source-capture",
@@ -145,7 +145,7 @@ def fixture_source(tmp_path):
                             "id": "bind_project",
                             "type": "skill",
                             "owner": "coder",
-                            "skill": "hs-workspace-explore",
+                            "skill": "hs-knowledge-explore",
                             "exits": [{"id": "bound", "target": "__end__"}],
                         }
                     ],
@@ -390,7 +390,7 @@ def test_meaningful_tests_need_not_be_named_test_cli(tmp_path):
 
 def test_unicode_metadata_uses_utf8_across_isolated_python(tmp_path):
     source = fixture_source(tmp_path)
-    skill = source / "skills/common/knowledge/hs-workspace-explore/SKILL.md"
+    skill = source / "skills/common/knowledge/hs-knowledge-explore/SKILL.md"
     skill.write_text(
         skill.read_text(encoding="utf-8").replace(
             "fixture only", "从中文路径加载 WiFi 规则"
@@ -401,7 +401,7 @@ def test_unicode_metadata_uses_utf8_across_isolated_python(tmp_path):
     result = install(source, destination)
     assert result.returncode == 0, result.stderr
     assert "中文路径" in (
-        destination / "config/skills/hs-workspace-explore/SKILL.md"
+        destination / "config/skills/hs-knowledge-explore/SKILL.md"
     ).read_text(encoding="utf-8")
 
 

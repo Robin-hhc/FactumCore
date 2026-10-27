@@ -14,7 +14,6 @@ from support import (
     digest,
     fixed_bytes,
     load_yaml,
-    read_json,
     safe,
     sha,
     write_bytes,
@@ -74,22 +73,14 @@ def git_read(root, arguments, *, optional=False, authorized_root=None):
 
 
 def authorized_repo(context, repo_id, receipt=None):
-    if not context.args.catalog:
-        raise NodeError(
-            "CODE_AUTHORIZATION_REQUIRED",
-            "Installed workspace catalog is required",
-            blocked=True,
-        )
-    catalog = read_json(context.args.catalog)
-    policy = catalog.get("code_policy")
     try:
         config_path = context.modules["validation"].workspace_config_path(
-            context.root, catalog.get("workspaces"), context.rules["rules_digest"]
+            context.root
         )
     except (ValueError, OSError) as exc:
         raise NodeError(
             "CODE_AUTHORIZATION_REQUIRED",
-            "Exact registered workspace config is unavailable",
+            "Exact workspace config is unavailable",
             blocked=True,
         ) from exc
     workspace = config_path.parent
@@ -97,13 +88,7 @@ def authorized_repo(context, repo_id, receipt=None):
     config = load_yaml(config_bytes)
     context.modules["validation"].validate_shape("workspace", config, context.rules)
     config = context.modules["validation"].normalize_workspace(config, workspace)
-    mapped = config.get("mapping_kind") == "modules"
-    if mapped:
-        registration = catalog.get("workspaces", {}).get(config["workspace_id"])
-        if (not registration or Path(registration.get("config", "")).resolve() != config_path.resolve()
-                or registration.get("rules_digest") != context.rules["rules_digest"]):
-            raise NodeError("CODE_AUTHORIZATION_REQUIRED", "Catalog must register this exact workspace config", blocked=True)
-        policy = config["code_policy"]
+    policy = config.get("code_policy")
     if safe(
         workspace, config["knowledge_roots"]["wifi"]
     ).resolve() != context.root or any(
@@ -317,13 +302,7 @@ def capture_code(context):
         or any(ord(c) < 32 for c in source_id)
     ):
         raise NodeError("INVALID_SOURCE_ID", "Explicit logical source ID required")
-    if not request.get("context_ref"):
-        raise NodeError(
-            "CODE_CONTEXT_REQUIRED",
-            "Registered loaded project context is required",
-            blocked=True,
-        )
-    receipt = context.record(request["context_ref"], "project_context")
+    receipt = context.record(request["context_ref"], "project_context") if request.get("context_ref") else None
     root, registered, config, item, config_digest = authorized_repo(
         context, repo_id, receipt
     )
@@ -434,7 +413,7 @@ def capture_code(context):
             ],
             "snapshots": [snapshot],
             "extractions": extractions,
-            "context_ref": request["context_ref"],
+            "context_ref": request.get("context_ref"),
             "config_digest": config_digest,
             "limitations": limitations,
         },

@@ -10,7 +10,7 @@ When `scan.current_context.affected_claims` contains code/configuration maintena
 
 Queries use `{id,query,required:[card_id],forbidden?:[card_id],context?:{},expected_claim_ids?:["card#claim"],forbidden_claim_ids?:[...]}`. Content plans require nonempty expectations.
 
-`--action review`: `semantic_plan_ref`, a different `reviewer_id`, `independent_context`, `sampled_unit_ids`, `unreviewed_unit_ids`, risk `reason`, `findings` (explicitly empty when none). Findings name `unit_id/return_to/reason/evidence`. Add `view_ref` for P4 final-content review. Return `content_review_ref/skip_sample`, phase `reviewed` or `needs_revision`; unselected units are not reviewed-pass.
+`--action review`: `semantic_plan_ref`, `sampled_unit_ids`, `unreviewed_unit_ids`, risk `reason`, `findings` (explicitly empty when none). Findings name `unit_id/return_to/reason/evidence`. Add `view_ref` for P4 final-content review. Return `content_review_ref/skip_sample`, phase `reviewed` or `needs_revision`; unselected units are not reviewed-pass. Author/reviewer/context labels are optional descriptive data; OpenFlow owns role independence.
 
 ## P4 authored cards
 

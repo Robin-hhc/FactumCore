@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 from contextlib import closing
+from pathlib import Path
 import re
 import sqlite3
 import unicodedata
@@ -76,19 +77,9 @@ def event_state(ctx):
         ctx.modules["records"].verify(value)
         if value.get("record_kind") != "maintenance_state":
             raise NodeError("INVALID_EVENT_STATE", "Wrong validity-state identity")
-    records = []
-    directory = safe(ctx.root, "logs/ingest")
-    if directory.exists():
-        for entry in sorted(directory.iterdir()):
-            if entry.suffix not in {".yaml", ".yml", ".json"}:
-                continue
-            ref = entry.relative_to(ctx.root).as_posix()
-            records.append(ctx.modules["validation"].load_yaml(fixed_bytes(ctx.root, ref, ["logs/ingest"])))
-    shared = ctx.modules["records"].rebuild_restrictions(records, ctx.rules, cards=getattr(ctx, "processing_cards", None))
-    if not shared["complete"]:
-        raise NodeError("PROCESSING_STATE_UNAVAILABLE", str(shared["gaps"]), blocked=True)
-    return {**value, "blocked_claims": value.get("blocked_claims", []) + shared["blocked_claims"],
-            "processing_digest": digest({"records": sorted(row["digest"] for row in records), "blocks": shared["blocked_claims"]})}
+    # Ingest progress/review receipts belong to the orchestrator. Query checks
+    # live sources and explicit maintenance restrictions, not pipeline status.
+    return {**value, "processing_digest": digest(value.get("blocked_claims", []))}
 
 
 def validity_observation(state):
@@ -105,6 +96,8 @@ def blocked(
     code_sources=(),
 ):
     for entry in state.get("blocked_claims", []):
+        if entry.get("reason") == "shared_pending_review":
+            continue
         if entry.get("card_id") not in (card_id, "*") or entry.get("claim_id") not in (
             claim["id"],
             "*",
@@ -152,7 +145,7 @@ def blocked(
 
 
 def read_search_binding(ctx, request):
-    """Receipt integrity/lineage only; live application proofs remain mandatory."""
+    """Receipt integrity and same-generation query binding."""
     receipt = ctx.record(request["receipt_ref"], "search_receipt")
     binding, result = receipt.get("request_binding"), receipt.get("result")
     if (
@@ -261,6 +254,7 @@ def request_binding(request, action, generation_ref):
 
 def load_generation(ctx, request, search_receipt=None):
     channel = request.get("channel", "local")
+    ctx.generation_verification_tier = "content_index"
     if channel not in ("local", "shared"):
         raise NodeError("INVALID_CHANNEL", channel)
     explicit = request.get("generation_ref")
@@ -329,9 +323,10 @@ def load_generation(ctx, request, search_receipt=None):
         ):
             raise NodeError(
                 "PUBLICATION_NOT_VERIFIED",
-                "Shared publication was not authenticated",
+                "Shared repository snapshot could not be checked",
                 blocked=True,
             )
+        ctx.generation_verification_tier = verified.get("verification_tier", "repository_snapshot")
     db = safe(ctx.root, manifest["database_ref"], [f"artifacts/indexes/{channel}"])
     if sha(db.read_bytes()) != manifest["database_digest"]:
         raise NodeError("INDEX_CHANGED", "Frozen database differs from manifest")
@@ -346,71 +341,6 @@ def load_card(ctx, manifest, card_id, purpose="current"):
     raw = fixed_bytes(ctx.root, row["blob_ref"], ["artifacts/indexes"])
     if sha(raw) != row["sha256"]:
         raise NodeError("CARD_BLOB_CHANGED", card_id)
-    proof = manifest.get("qualifications", {}).get(card_id)
-    if not proof:
-        raise NodeError(
-            "CARD_PROOF_MISSING",
-            "Generation lacks authenticated card qualification",
-            card_id,
-            blocked=True,
-        )
-    if proof.get("kind") == "accepted_repository":
-        if manifest.get("channel") != "shared" or not manifest.get("publication"):
-            raise NodeError("ACCEPTED_REPOSITORY_REQUIRED", "Portable qualification needs authenticated shared publication")
-        # load_generation has revalidated the trusted publication signature,
-        # exact commit blobs and acceptance summaries through index-build verify.
-        card = ctx.modules["indexing"].read_document(raw, row["path"], ctx.rules, card_id=card_id, sha256=row["sha256"])
-        code_current = True
-        if card["metadata"]["review_mode"] == "code_gate" and purpose != "historical":
-            try:
-                catalog = read_json(ctx.args.catalog)
-                config = ctx.modules["validation"].workspace_config_path(
-                    ctx.root, catalog.get("workspaces"), ctx.args.rules_digest
-                )
-                ctx.modules["source_resources"].validate_current_code_identity(
-                    proof.get("code_identity"), config, proof.get("config_digest"),
-                    ctx.rules, catalog.get("code_policy"),
-                )
-            except (ValueError, OSError, KeyError) as exc:
-                code_current = False
-                card["_context_gaps"] = [{"code": "CURRENT_CODE_CONTEXT_CHANGED_OR_UNKNOWN", "card_id": card_id, "reason": str(exc)}]
-        card["_portable_context_current"] = code_current
-        card["_portable_qualification"] = True
-        card["_current_code_verified"] = code_current and card["metadata"]["review_mode"] == "code_gate"
-        return card
-    verification_purpose = "historical" if purpose == "historical" else "current"
-    response = ctx.call(
-        "hs-knowledge-apply",
-        {
-            "operation_id": proof["operation_id"],
-            "apply_result_ref": proof["apply_result_ref"],
-            "card_path": row["path"],
-            "card_digest": row["sha256"],
-            "purpose": verification_purpose,
-            **(
-                {"current_code_proof_ref": proof["current_code_proof_ref"]}
-                if verification_purpose == "current"
-                and proof.get("current_code_proof_ref")
-                else {}
-            ),
-        },
-        "verify-result",
-    )
-    if not response["data"].get("result_verified") or not any(
-        f["path"] == row["path"] and f["sha256"] == row["sha256"]
-        for f in response["data"].get(
-            "historical_files"
-            if verification_purpose == "historical"
-            else "eligible_files",
-            [],
-        )
-    ):
-        raise NodeError(
-            "CARD_PROOF_INVALID",
-            "Content is no longer qualified",
-            card_id,
-            blocked=True,
-        )
     card = ctx.modules["indexing"].read_document(
         raw, row["path"], ctx.rules, card_id=card_id, sha256=row["sha256"]
     )
@@ -420,10 +350,29 @@ def load_card(ctx, manifest, card_id, purpose="current"):
             "Generation key differs from exact card identity",
             card_id,
         )
-    card["_current_code_verified"] = (
-        verification_purpose == "current"
-        and card["metadata"]["review_mode"] == "code_gate"
-    )
+    # A card's availability does not depend on proving a prior Skill run.
+    # Current source bytes are checked by qualify_sources and refresh_sources.
+    card["_current_code_verified"] = False
+    contexts = manifest.get("code_contexts", manifest.get("code_evidence", {}))
+    if not isinstance(contexts, dict):
+        raise NodeError("INVALID_CODE_CONTEXTS", "Index code contexts must be a mapping")
+    card["_code_context"] = contexts.get(card_id)
+    provenance = manifest.get("qualifications", {}).get(card_id, {})
+    if (provenance.get("code_identity") and purpose != "historical"
+            and card["metadata"]["review_mode"] == "code_gate"):
+        try:
+            config = ctx.modules["validation"].workspace_config_path(ctx.root)
+            declaration = ctx.modules["validation"].load_yaml(config.read_bytes())
+            ctx.modules["source_resources"].validate_current_code_identity(
+                provenance["code_identity"], config, provenance.get("config_digest"),
+                ctx.rules, declaration.get("code_policy"),
+            )
+        except (ValueError, OSError, KeyError) as exc:
+            card["_portable_context_current"] = False
+            card["_context_gaps"] = [{
+                "code": "CURRENT_CODE_CONTEXT_CHANGED_OR_UNKNOWN",
+                "card_id": card_id, "reason": str(exc),
+            }]
     return card
 
 
@@ -454,12 +403,133 @@ def qualified_claims(ctx, card, request, state, code_sources=()):
     }
 
 
-def qualify_sources(ctx, card, eligible, purpose, cache, code_sources=()):
+def validate_live_code_claim(ctx, card, claim, query_context=None):
+    """Check a Claim's exact code references against the current config scope."""
+    resources = ctx.modules["source_resources"]
+    validation = ctx.modules["validation"]
+    lock = resources.read_source_lock(ctx.root)
+    kinds = {row["source_id"]: row for row in lock["resources"]}
+    refs = [source for source in claim["source_records"]
+            if kinds.get(source["source_id"], {}).get("kind") == "code"]
+    if not refs:
+        return
+    config_path = validation.workspace_config_path(ctx.root)
+    config_bytes = config_path.read_bytes()
+    config = validation.load_yaml(config_bytes)
+    validation.validate_shape("workspace", config, ctx.rules)
+    config = validation.normalize_workspace(config, config_path.parent)
+    repositories = {}
+    for ref in refs:
+        resource = kinds[ref["source_id"]]
+        repo_id = ref.get("locator", {}).get("repo_id") or resource.get("repo_id")
+        mapping = next((row for row in config["repos"] if row["repo_id"] == repo_id), None)
+        if mapping is None:
+            raise NodeError("CODE_SCOPE_CHANGED", "Claim code repository is no longer in config.yml", repo_id)
+        root = Path(mapping["root"])
+        if not root.is_absolute():
+            root = config_path.parent / root
+        snapshot = resources.validate_source_ref(ref, lock)
+        relative = ref.get("locator", {}).get("path") or resource["path"]
+        current = resources.safe_path(root.resolve(), relative).read_bytes()
+        if sha(current) != snapshot["sha256"] or len(current) != snapshot["bytes"]:
+            raise NodeError("CODE_FINGERPRINT_MISMATCH", "Current working source bytes differ from the referenced snapshot", relative)
+        commit = snapshot.get("code_identity", {}).get("revision")
+        if mapping.get("kind") == "git":
+            commit = resources._fixed_code_git(root.resolve(), ["rev-parse", "--verify", "HEAD^{commit}"]).decode("ascii").strip()
+        repositories[repo_id] = {"root": str(root.resolve()),
+                                 "commit": commit}
+    scopes = [{**claim["scope"], "contexts": [group]}
+              for group in claim["scope"].get("contexts", [])]
+    if scopes and query_context is not None:
+        scopes = [scope for scope in scopes if ctx.modules["knowledge"].match_scope(
+            {**claim, "scope": scope}, query_context, "current")]
+        if not scopes:
+            raise NodeError("CODE_SCOPE_CHANGED", "No Claim code context matches this query")
+    for scope in scopes or [claim["scope"]]:
+        scoped_card = {**card, "metadata": {**card["metadata"],
+                       "scope": scope, "sources": refs}}
+        resources.validate_code_references(scoped_card, lock, {
+            "configuration": str(config_path), "config_digest": sha(config_bytes),
+            "repos": repositories,
+        }, ctx.rules)
+    if config_path.read_bytes() != config_bytes:
+        raise NodeError("CODE_CONFIGURATION_CHANGED", "config.yml changed during the query")
+
+
+def validate_claim_materials(ctx, card, claim, query_context=None, code_sources=()):
+    """Recheck the actual build/runtime inputs adopted by this code Claim."""
+    required = set(claim.get("verification_requirements", [])) & {"build-support", "runtime-support"}
+    if claim.get("evidence_kind") == "measurement":
+        required.add("runtime-support")
+    is_code = card["metadata"].get("review_mode") == "code_gate" or any(
+        source["source_id"] in code_sources for source in claim["source_records"]
+    )
+    if not required or not is_code:
+        return
+    context = card.get("_code_context")
+    if not isinstance(context, dict) or not isinstance(context.get("code_identity"), dict):
+        raise NodeError("CODE_MATERIALS_REQUIRED", "Current build/runtime Claim needs its actual code context")
+    identity = context["code_identity"]
+    target, files = identity.get("target"), identity.get("build_files")
+    if (not isinstance(target, dict) or not target.get("target_id")
+            or not isinstance(files, dict) or not files
+            or not re.fullmatch(r"[0-9a-f]{64}", str(identity.get("macro_digest", "")))):
+        raise NodeError("CODE_MATERIALS_REQUIRED", "Build/runtime context requires actual Target, artifact and macro fingerprints")
+    configuration = ctx.modules["validation"].workspace_config_path(ctx.root)
+    declaration = ctx.modules["validation"].load_yaml(configuration.read_bytes())
+    ctx.modules["source_resources"].validate_current_code_identity(
+        identity, configuration, context.get("config_digest"), ctx.rules, declaration.get("code_policy")
+    )
+    resources = ctx.modules["source_resources"]
+    lock = resources.read_source_lock(ctx.root)
+    registered = {row["source_id"]: row for row in lock["resources"]}
+    for reference in claim["source_records"]:
+        resource = registered.get(reference["source_id"], {})
+        if resource.get("kind") != "code":
+            continue
+        repo_id = reference.get("locator", {}).get("repo_id") or resource.get("repo_id")
+        relative = reference.get("locator", {}).get("path") or resource.get("path")
+        snapshot = resources.validate_source_ref(reference, lock)
+        if identity["repos"].get(repo_id, {}).get("files", {}).get(relative) != snapshot["sha256"]:
+            raise NodeError("CODE_MATERIAL_SOURCE_MISMATCH", "Materials do not bind the Claim's exact code references", relative)
+    if not ctx.modules["knowledge"].match_scope(claim, target, "current"):
+        raise NodeError("CODE_MATERIAL_TARGET_MISMATCH", "Materials do not match the Claim's Target context")
+    if query_context and any(query_context.get(key) is not None and target.get(key) != query_context[key]
+                             for key in ("target_id", "chip", "side", "build_profile", "revision")):
+        raise NodeError("CODE_MATERIAL_TARGET_MISMATCH", "Materials belong to another queried Target")
+    claim_evidence = context.get("claim_evidence", {})
+    if not isinstance(claim_evidence, dict):
+        raise NodeError("CLAIM_MATERIALS_REQUIRED", "Claim artifact bindings must be a mapping")
+    evidence = claim_evidence.get(claim["id"], [])
+    if not isinstance(evidence, list) or any(not any(
+            isinstance(row, dict) and row.get("requirement") == requirement
+            and row.get("path") in files and row.get("sha256") == files[row["path"]]
+            for row in evidence) for requirement in required):
+        raise NodeError("CLAIM_MATERIALS_REQUIRED", "Each build/runtime assertion needs its own actual artifact fingerprint")
+
+
+def qualify_sources(ctx, card, eligible, purpose, cache, code_sources=(), query_context=None):
     accepted, resolutions, gaps = set(), {}, []
     for claim in card["claims"]:
         if claim["id"] not in eligible:
             continue
         usable = True
+        if purpose in {"current", "implementation"}:
+            try:
+                validate_claim_materials(ctx, card, claim, query_context, code_sources)
+            except (ValueError, OSError, KeyError) as exc:
+                usable = False
+                gaps.append({"code": "CURRENT_CODE_MATERIALS_CHANGED_OR_UNKNOWN",
+                             "card_id": card["metadata"]["id"], "claim_id": claim["id"], "reason": str(exc)})
+        if purpose in {"current", "implementation"} and any(
+                source["source_id"] in code_sources for source in claim["source_records"]):
+            try:
+                validate_live_code_claim(ctx, card, claim, query_context)
+            except (ValueError, OSError, KeyError) as exc:
+                usable = False
+                gaps.append({"code": "CURRENT_CODE_SCOPE_CHANGED_OR_UNKNOWN",
+                             "card_id": card["metadata"]["id"], "claim_id": claim["id"],
+                             "reason": str(exc)})
         for source in claim["source_records"]:
             key = digest(source)
             if key not in cache:
@@ -602,14 +672,9 @@ class EligibilityEvaluator:
                 self.ctx, card, self.request, self.state, self.code_sources
             )
             eligible, sources, gaps = qualify_sources(
-                self.ctx, card, eligible, self.purpose, self.sources, self.code_sources
+                self.ctx, card, eligible, self.purpose, self.sources, self.code_sources, self.context
             )
             gaps.extend(card.get("_context_gaps", []))
-            if self.purpose in {"guidance", "historical"}:
-                pending = [row for row in self.state.get("blocked_claims", []) if row.get("reason") == "shared_pending_review"]
-                for claim in card["claims"]:
-                    if claim["id"] in eligible and blocked(claim, card_id, {"blocked_claims": pending}, self.context, self.ctx.modules["knowledge"].match_scope):
-                        gaps.append({"code": "SHARED_PENDING_REVIEW", "card_id": card_id, "claim_id": claim["id"], "purpose": self.purpose})
             for relation in card["metadata"]["relations"]:
                 if relation["type"] not in {
                     "requires",
@@ -838,6 +903,7 @@ def execute(ctx):
         raise NodeError(
             "VALIDITY_CHANGED", "Validity changed before output", blocked=True
         )
+    data["verification_tier"] = ctx.generation_verification_tier
     receipt = ctx.seal(
         {
             "generation_ref": generation_ref,

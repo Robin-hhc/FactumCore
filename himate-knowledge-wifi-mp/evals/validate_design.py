@@ -19,7 +19,7 @@ import subprocess
 import yaml
 
 
-SKILLS = ('hs-workspace-explore',
+SKILLS = ('hs-knowledge-explore',
  'hs-knowledge-source-capture',
  'hs-knowledge-change-plan',
  'hs-knowledge-view-materialize',
@@ -38,7 +38,7 @@ SKILLS = ('hs-workspace-explore',
  'hs-knowledge-source-scan',
  'hs-knowledge-lint')
 INSTRUCTION_SKILLS = ('hs-codegraph-setup',)
-ARTIFACT_SCOPE = {'hs-workspace-explore': ([], []),
+ARTIFACT_SCOPE = {'hs-knowledge-explore': ([], []),
  'hs-knowledge-source-capture': ([], []),
  'hs-knowledge-change-plan': (['plan_change'], ['planned']),
  'hs-knowledge-view-materialize': (['materialize_view'], ['ready']),

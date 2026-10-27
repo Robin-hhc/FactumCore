@@ -113,16 +113,22 @@ def test_source_identity_is_rechecked_without_build_artifacts(tmp_path, monkeypa
                 "package_digest": fixture.package_digest(package),
             }
         environment.catalog_path.write_bytes(fixture.canonical(environment.catalog))
-        applied = environment.invoke("hs-knowledge-apply", request={
+        apply_request = {
             "operation_id": "op", "view_ref": environment.view_ref,
-            "proof_ref": checked["data"]["local_check_ref"],
-        })
+            "check_inputs": {},
+        }
+        if usage == "current":
+            environment.code.joinpath("src/wifi.c").write_bytes(b"changed before apply without a commit\n")
+            environment.invoke("hs-knowledge-apply", request=apply_request, expected=3)
+            assert not (environment.root / "knowledge/flows/fixture-code-flow.md").exists()
+            environment.code.joinpath("src/wifi.c").write_bytes(environment.source)
+        applied = environment.invoke("hs-knowledge-apply", request=apply_request)
         assert applied["phase"] == "committed"
         verified = environment.invoke("hs-knowledge-apply", action="verify-result", request={
             "operation_id": "op", "apply_result_ref": applied["data"]["apply_result_ref"],
         })
-        assert verified["data"]["verification_scope"] == "verified_content_eligibility"
-        assert verified["data"]["verification_tier"] == "agent_content_review"
+        assert verified["data"]["verification_scope"] == "verified_content_integrity"
+        assert verified["data"]["verification_tier"] == "fixed_business_checks"
         generation = environment.invoke("hs-knowledge-index-build", action="build", request={"operation_id": "op"})
         regression = environment.invoke("hs-knowledge-query-regression", request={
             "operation_id": "op", "generation_ref": generation["data"]["generation_ref"],
@@ -150,9 +156,17 @@ def test_source_identity_is_rechecked_without_build_artifacts(tmp_path, monkeypa
         environment.code.joinpath("src/wifi.c").write_bytes(b"changed uncommitted source\n")
         with pytest.raises(ValueError, match="CODE_BYTES_CHANGED"):
             source_resources.validate_current_code_identity(*arguments)
-        environment.invoke("hs-knowledge-apply", action="verify-result", request={
+        integrity = environment.invoke("hs-knowledge-apply", action="verify-result", request={
             "operation_id": "op", "apply_result_ref": applied["data"]["apply_result_ref"],
-        }, expected=3)
+        }, expected=3 if usage == "current" else 0)
+        if usage != "current":
+            assert integrity["data"]["verification_scope"] == "verified_content_integrity"
+        historical = environment.invoke("hs-knowledge-apply", action="verify-result", request={
+            "operation_id": "op", "apply_result_ref": applied["data"]["apply_result_ref"],
+            "purpose": "historical",
+        })
+        assert historical["data"]["eligible_files"] == []
+        assert historical["data"]["historical_files"][0]["path"] == "knowledge/flows/fixture-code-flow.md"
         if usage == "current":
             changed = environment.invoke("hs-knowledge-query", action="search", request={
                 "operation_id": "op", "query": "Fixture", "purpose": "current",
@@ -186,5 +200,24 @@ def test_unsigned_v3_review_remains_valid_for_query_and_maintenance(tmp_path, mo
         environment.code.joinpath("src/wifi.c").write_bytes(b"int fixture_wifi_ready(void) { return 99; }\n")
         changed = environment.invoke("hs-knowledge-maintain", action="inspect-context", request={"operation_id": "op"})
         assert any(row["card_id"] == "fixture-code-flow" for row in changed["data"]["affected_claims"])
+    finally:
+        environment.doCleanups()
+
+
+def test_apply_retains_actual_build_fingerprints_without_review_or_context_files(tmp_path, monkeypatch):
+    monkeypatch.setenv("HIMATE_TEST_TMP", str(tmp_path))
+    environment = fixture.PublicCodeGateTests(methodName="test_signed_positive_support_then_apply_and_verify")
+    environment.setUp()
+    try:
+        applied = environment.invoke("hs-knowledge-apply", request={
+            "operation_id": "op", "view_ref": environment.view_ref, "check_inputs": {},
+        })
+        (environment.root / environment.context_ref).unlink()
+        (environment.root / environment.report_ref).unlink()
+        request = {"operation_id": "op", "apply_result_ref": applied["data"]["apply_result_ref"]}
+        assert environment.invoke("hs-knowledge-apply", action="verify-result", request=request)["data"]["result_verified"]
+        (environment.root / "logs/evidence/build.bin").write_bytes(b"changed supplied build material\n")
+        rejected = environment.invoke("hs-knowledge-apply", action="verify-result", request=request, expected=3)
+        assert "CODE_BUILD_CHANGED" in rejected["diagnostics"][0]["message"]
     finally:
         environment.doCleanups()

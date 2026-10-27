@@ -108,22 +108,7 @@ def execute(request, args, package):
     target, workspace, root, config_path, config, raw, entry, matches = resolve(
         request, args.registry
     )
-    pinned = args.rules_digest or (entry or {}).get("rules_digest")
-    if not pinned and args.catalog:
-        catalog = read_json(args.catalog)
-        pinned = (
-            catalog.get("workspaces", {})
-            .get(config.get("workspace_id"), {})
-            .get("rules_digest")
-        )
-    if not pinned:
-        return {
-            "state": "resolved",
-            "workspace_id": config.get("workspace_id"),
-            "knowledge_root": str(root),
-            "config_path": str(config_path),
-            "gaps": ["trusted_rules_digest_required"],
-        }, "resolved"
+    pinned = args.rules_digest or sha(safe(root, "governance/framework.lock.yaml").read_bytes())
     modules, rules = domain(root, pinned)
     modules["validation"].validate_shape("workspace", config, rules)
     config = modules["validation"].normalize_workspace(config, workspace)

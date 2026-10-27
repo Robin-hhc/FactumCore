@@ -1,21 +1,13 @@
-"""Retain an inspected P4 view and continuation within the same ingest."""
+"""Describe an exact content view without deciding Workflow readiness."""
 
 from support import NodeError
 
 
 def execute(context):
     ref = context.request["view_ref"]
-    result = context.call(
-        "hs-knowledge-candidate-inspect",
-        {"operation_id": context.operation, "view_ref": ref},
-    )
-    if result["phase"] not in {"manual_ready", "code_ready", "mixed_ready"}:
-        raise NodeError(
-            "GOVERNANCE_NOT_READY",
-            "Candidate needs recovery before handoff",
-            blocked=True,
-        )
     view = context.record(ref, "final_view")
+    if view["operation_id"] != context.operation:
+        raise NodeError("OPERATION_MISMATCH", "View belongs to another operation")
     record = context.seal(
         {
             "view_ref": ref,
@@ -31,9 +23,8 @@ def execute(context):
             "target_workflow": "hs-knowledge-ingest",
             "target_phase": "P4",
             "next_action": "content_review_then_applicable_code_check_then_P5_lint",
-            "workflow": context.request.get("workflow"),
             "limitations": [
-                "P4 continuation only; independent review, final lint and local application remain required"
+                "Describes view content only; OpenFlow decides Workflow readiness"
             ],
         },
         "handoff",

@@ -9,24 +9,13 @@ FIXTURE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(FIXTURE)
 
 
-def test_document_admission_requires_independent_review_without_human_events(tmp_path):
+def test_document_apply_checks_business_data_without_requiring_upstream_review(tmp_path):
     p = FIXTURE.Pipeline(tmp_path)
     bundle_ref, bundle = p.capture("review-required", b"# Source\nIndependent review is required.\n")
     view_ref = p.view("review-required", bundle_ref, "review-rule", p.card("review-rule", bundle))
     assert "review_trust" not in p.catalog
-    p.call("knowledge-apply", {"operation_id": "review-required", "view_ref": view_ref}, expected=2)
-    assert not (p.root / "knowledge/rules/review-rule.md").exists()
-    proof_ref, review = p.review("review-required", view_ref)
-    for field, value in (("reviewer_id", review["author_id"]), ("view_digest", "0" * 64)):
-        bad = {**review, field: value}
-        bad.pop("digest")
-        bad["digest"] = FIXTURE.sha(FIXTURE.canonical(bad))
-        bad_ref = p.write(f".build/operations/review-required/bad-{field}.json", FIXTURE.canonical(bad))
-        p.call("knowledge-apply", {"operation_id": "review-required", "view_ref": view_ref,
-                                   "content_review_ref": bad_ref}, expected=3 if field == "reviewer_id" else 2)
-        assert not (p.root / "knowledge/rules/review-rule.md").exists()
-    p.call("knowledge-apply", {"operation_id": "review-required", "view_ref": view_ref,
-                               "content_review_ref": proof_ref})
+    result = p.call("knowledge-apply", {"operation_id": "review-required", "view_ref": view_ref})
+    assert "proof_ref" not in p.record(result["data"]["apply_result_ref"])
     assert (p.root / "knowledge/rules/review-rule.md").exists()
     assert not list(p.root.rglob("host-event.json"))
 
@@ -44,18 +33,12 @@ def test_raw_to_reviewed_stable_generation_and_post_ingest_correction(tmp_path):
     card_path = p.root / "knowledge/rules/capture-rule.md"
     original_card = card_path.read_bytes()
     built = p.call("knowledge-index-build", {"operation_id": "build-first"})["data"]
-    regression = {
-        "operation_id": "invalid-workflow-regression",
-        "generation_ref": built["generation_ref"],
-        "expected_active": built["expected_active"],
-        "cases": [{"id": "find-rule", "query": "capture", "required": ["capture-rule"]}],
-    }
-    p.call("knowledge-query-regression", {**regression, "workflow": {"attempt_id": "bad"}}, expected=2)
     assert not (p.root / "artifacts/indexes/local/active.json").exists()
     checked = p.call(
         "knowledge-query-regression",
         {
             "operation_id": "check-first",
+            "workflow": {"attempt_id": "host-owned-metadata"},
             "generation_ref": built["generation_ref"],
             "expected_active": built["expected_active"],
             "cases": [{"id": "find-rule", "query": "capture", "required": ["capture-rule"]}],
@@ -108,7 +91,8 @@ def test_raw_to_reviewed_stable_generation_and_post_ingest_correction(tmp_path):
         "advance",
     )["data"]
     assert advanced["cleared_claims"] and not advanced["blocked_claims"]
-    assert advanced["knowledge_apply_watermark"] == p.record(updated_apply)["digest"]
+    assert advanced["knowledge_apply_watermark"] is None
+    assert advanced["verification_tier"] == "current_source_bytes_only"
     current = p.call("knowledge-query", {**search, "operation_id": "consume-updated"}, "search")["data"]
     assert current["matches"][0]["card_id"] == "capture-rule"
     assert current["validity_epoch"] == advanced["validity_epoch"]

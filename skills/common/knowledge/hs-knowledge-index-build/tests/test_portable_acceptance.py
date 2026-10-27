@@ -55,7 +55,7 @@ def test_accepted_repository_works_without_machine_private_review_files(tmp_path
         "acceptance": {"content_view_digest": view["digest"], "rules_digest": pipeline.rules,
                        "cards": [{"path": path, "card_id": "portable-rule", "sha256": card_sha, "review_mode": "manual_document",
                                   "claim_ids": ["c1"], "review_result": "supported"}],
-                       "proof_digests": [pipeline.record("logs/operations/create/apply-result.json")["proof_digest"]]},
+                       "proof_digests": []},
     }
     record["digest"] = fixture.sha(fixture.canonical(record))
     record_ref = pipeline.write("logs/ingest/create.yaml", fixture.canonical(record))
@@ -86,19 +86,12 @@ def test_accepted_repository_works_without_machine_private_review_files(tmp_path
     pipeline.call("knowledge-index-build", {"operation_id": "portable-activate", "generation_ref": built["generation_ref"], "expected_active": None}, "activate")
     result = pipeline.call("knowledge-query", {"operation_id": "portable-search", "channel": "shared", "purpose": "current", "query": "capture"})["data"]
     assert [match["card_id"] for match in result["matches"]] == ["portable-rule"]
-    # A nonempty explicit registration is a promise and must not silently
-    # fall back to Git discovery when it belongs to another workspace.
-    registration = pipeline.catalog.get("workspaces")
+    # An obsolete machine registration is not an execution prerequisite.
     pipeline.catalog["workspaces"] = {"wrong-workspace": {"config": str(pipeline.catalog_path), "rules_digest": pipeline.rules}}
     pipeline.catalog_path.write_bytes(fixture.canonical(pipeline.catalog))
-    denied = pipeline.call("knowledge-query", {"operation_id": "wrong-registration", "channel": "shared", "purpose": "current", "query": "capture"}, expected=2)
-    assert denied["diagnostics"][0]["code"] == "WORKSPACE_CONFIG_UNAVAILABLE"
-    if registration is None:
-        pipeline.catalog.pop("workspaces")
-    else:
-        pipeline.catalog["workspaces"] = registration
-    pipeline.catalog_path.write_bytes(fixture.canonical(pipeline.catalog))
-    # A dirty local summary cannot acquire accepted-repository authority.
+    queried = pipeline.call("knowledge-query", {"operation_id": "old-registration", "channel": "shared", "purpose": "current", "query": "capture"})
+    assert [row["card_id"] for row in queried["data"]["matches"]] == ["portable-rule"]
+    # Processing history is optional metadata. Its presence is not an index/query gate.
     pipeline.write(record_ref, (pipeline.root / record_ref).read_bytes() + b"\n")
-    denied = pipeline.call("knowledge-query", {"operation_id": "dirty-summary", "channel": "shared", "purpose": "current", "query": "capture"}, expected=2)
-    assert denied["status"] == "error"
+    queried = pipeline.call("knowledge-query", {"operation_id": "dirty-summary", "channel": "shared", "purpose": "current", "query": "capture"})
+    assert [row["card_id"] for row in queried["data"]["matches"]] == ["portable-rule"]

@@ -1,4 +1,4 @@
-"""Check an Agent's independent review record against exact code and view inputs."""
+"""Check a content review report against exact code and view inputs."""
 
 import base64
 import importlib
@@ -83,33 +83,21 @@ def git_read(root, arguments):
 
 def read_configuration(ctx, context):
     if ctx.domain is None:
-        raise Incomplete("registered workspace configuration unavailable")
+        raise Incomplete("workspace configuration unavailable")
     try:
-        path = ctx.domain.workspace_config_path(ctx.root, ctx.catalog.get("workspaces"), ctx.rules_digest)
+        path = ctx.domain.workspace_config_path(ctx.root)
     except (ValueError, OSError) as exc:
-        raise Incomplete("registered workspace configuration unavailable; installed workspace registration required") from exc
+        raise Incomplete("workspace configuration unavailable") from exc
     raw = path.read_bytes()
     if context.get("config_digest") != digest(raw):
         raise Incomplete("code context does not fix current workspace configuration")
     config = ctx.domain.load_yaml(raw)
     ctx.domain.validate_shape("workspace", config, ctx.rules)
     config = ctx.domain.normalize_workspace(config, path.parent)
-    if config.get("mapping_kind") == "modules":
-        registration = ctx.catalog.get("workspaces", {}).get(config["workspace_id"], {})
-        if (
-            not registration.get("config")
-            or pathlib.Path(registration["config"]).resolve() != path.resolve()
-            or registration.get("rules_digest") != ctx.rules_digest
-        ):
-            raise Incomplete("module mapping requires the installed workspace registration")
-        return config, config["code_policy"], raw
     declared = config.get("code_policy")
-    trusted = ctx.catalog.get("code_policy")
-    if not declared or not trusted or declared != trusted:
-        raise Incomplete(
-            "protected code authorization and domain declaration are missing or differ"
-        )
-    return config, trusted, raw
+    if not declared:
+        raise Incomplete("workspace code policy is missing")
+    return config, declared, raw
 
 
 def mapped_code_identity(ctx, context, config, mode, source_only=False, require_build=True):
@@ -291,7 +279,7 @@ def code_identity(ctx, context, config, policy, mode, source_only=False, require
             raise Incomplete("repository root/identity is not authorized")
         root = pathlib.Path(registered_repo["root"])
         root = (
-            (ctx.domain.workspace_config_path(ctx.root, ctx.catalog.get("workspaces"), ctx.rules_digest).parent / root).resolve()
+            (ctx.domain.workspace_config_path(ctx.root).parent / root).resolve()
             if not root.is_absolute()
             else root.resolve()
         )
@@ -383,7 +371,6 @@ def claims_and_sources(ctx, view):
             ctx.domain.validate_shape("sources", source_lock, ctx.rules)
     rules = {**ctx.rules, "source_lock": source_lock}
     claims = {}
-    authors = set()
     for row in view["writes"]:
         if not row["path"].startswith("knowledge/") or pathlib.PurePosixPath(
             row["path"]
@@ -392,7 +379,6 @@ def claims_and_sources(ctx, view):
         card = knowledge.parse_card(
             base64.b64decode(row["bytes_b64"], validate=True), row["path"], rules
         )
-        authors.add(card["metadata"]["owner"])
         if card["metadata"]["review_mode"] != "code_gate":
             if view.get("review_mode") == "mixed":
                 continue
@@ -411,33 +397,11 @@ def claims_and_sources(ctx, view):
             }
     if not claims:
         raise Incomplete("code view contains no verifiable Claims")
-    return claims, source_lock, resources, authors
+    return claims, source_lock, resources
 
 
-def review_authors(ctx, view, authors):
-    """Read actual authorship declarations, without authenticating an identity."""
-    authors = set(authors)
-    plan_ref = view.get("semantic_plan_ref")
-    if plan_ref:
-        ctx.path(plan_ref, (f".build/operations/{view['operation_id']}",))
-        plan = ctx.read(plan_ref)
-        if (
-            plan.get("record_kind") != "semantic_plan"
-            or plan.get("operation_id") != view["operation_id"]
-            or plan.get("digest") != view.get("semantic_plan_digest")
-        ):
-            raise Incomplete("review authors are not bound to the actual authored plan")
-        authors.add(plan.get("author_id"))
-        authors.update(row.get("author_id") for row in plan.get("card_actions", []))
-    elif view.get("v3_required"):
-        raise Incomplete("review author plan is missing")
-    if any(not isinstance(author, str) or not author.strip() for author in authors):
-        raise Incomplete("review author identity declaration is missing")
-    return authors
-
-
-def verify_report(ctx, report, view, context, mode, authors):
-    """Validate declared independence and bindings; do not certify semantics."""
+def verify_report(ctx, report, view, context, mode):
+    """Validate content findings and exact input bindings."""
     try:
         ctx.domain.validate_shape("semantic_review", report, ctx.rules)
     except ctx.domain.ContractError as exc:
@@ -451,15 +415,6 @@ def verify_report(ctx, report, view, context, mode, authors):
         or not isinstance(payload, dict)
     ):
         raise Failed("invalid Agent review record")
-    authors = review_authors(ctx, view, authors)
-    reviewer = report.get("reviewer_id")
-    author = payload.get("author_id")
-    if not isinstance(author, str) or not author.strip() or author not in authors:
-        raise Incomplete("review author does not match the actual plan or card author")
-    if not isinstance(reviewer, str) or not reviewer.strip() or reviewer in authors:
-        raise Incomplete("independent reviewer must differ from every declared author")
-    if not isinstance(payload.get("independent_context"), str) or not payload["independent_context"].strip():
-        raise Incomplete("independent review context declaration is missing")
     if payload.get("findings") != []:
         raise Incomplete("review findings are missing or unresolved")
     if (
@@ -577,7 +532,7 @@ def evaluate(
         )
     ):
         raise Incomplete("code context is not a project context")
-    claims, source_lock, resources, authors = claims_and_sources(ctx, view)
+    claims, source_lock, resources = claims_and_sources(ctx, view)
     source_only = all(source_analysis_claim(claim) for claim in claims.values())
     require_build = any(artifact_requirements(claim) for claim in claims.values())
     if historical:
@@ -592,7 +547,7 @@ def evaluate(
         raise Invalid("requested card is not in the reviewed code view")
     report_ref = request.get("semantic_report_ref")
     if report_override is None and not report_ref:
-        raise Incomplete("independent Agent review record is missing")
+        raise Incomplete("Agent content review report is missing")
     report = (
         report_override
         if report_override is not None
@@ -603,7 +558,7 @@ def evaluate(
             ).read_text(encoding="utf-8")
         )
     )
-    payload, tier = verify_report(ctx, report, view, context, mode, authors)
+    payload, tier = verify_report(ctx, report, view, context, mode)
     rows = payload.get("claims")
     if not isinstance(rows, list) or len(rows) != len(claims):
         raise Incomplete("semantic evidence does not cover every Claim exactly once")
@@ -638,7 +593,7 @@ def evaluate(
                     "retired Claim requires exact reason and replacement mapping"
                 )
         elif row.get("status") != "supported":
-            raise Failed("semantic reviewer did not support every Claim")
+            raise Failed("semantic report did not support every Claim")
         if not retired:
             for requirement in artifact_requirements(claims[key]):
                 matching_artifacts = [
@@ -692,7 +647,7 @@ def evaluate(
                         )
                         if actual != snapshot["sha256"]:
                             raise Incomplete(
-                                "latest code changed; independent checked_snapshot evidence is required"
+                                "latest code changed; exact checked_snapshot evidence is required"
                             )
                         continue
                     repo_id, relative = checked.get("repo_id"), checked.get("path")
@@ -770,7 +725,7 @@ def evaluate(
         before != after
         or (
             not historical
-            and ctx.domain.workspace_config_path(ctx.root, ctx.catalog.get("workspaces"), ctx.rules_digest).read_bytes() != config_raw
+            and ctx.domain.workspace_config_path(ctx.root).read_bytes() != config_raw
         )
         or ctx.read(context_ref)["digest"] != context["digest"]
         or checked_view(ctx, request)["digest"] != view["digest"]
@@ -869,14 +824,7 @@ def local_check(ctx, request, action="run"):
         gaps=gaps,
         **details,
     )
-    attempt = request.get("workflow", {}).get("attempt_id")
-    if attempt is not None and (
-        not isinstance(attempt, str)
-        or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}", attempt)
-    ):
-        raise Invalid("invalid workflow attempt_id")
-    suffix = "-" + attempt if attempt else ""
-    ref = f"logs/operations/{op}/{mode}-check{suffix}.json"
+    ref = f"logs/operations/{op}/{mode}-check-{record['digest'][:24]}.json"
     ctx.save(ref, record)
     return {
         "merge_check_ref" if mode == "merge" else "local_check_ref": ref,

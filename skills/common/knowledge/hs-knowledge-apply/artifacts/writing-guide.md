@@ -1,2 +1,3 @@
-Before writing, validate the complete final card map, reviewed bytes, proof and all expected-old digests. Persist fsynced content-addressed old bytes and a prepared journal. Atomic per-file replacements are reconciled from old/final digests after interruptions. Seal all journal states; verify against authenticated exact view before recovery so resealing cannot authorize new writes.
+# Writing guide
 
+Report the actual CLI status, phase, diagnostics and returned business file references. Use the output of this invocation; do not invent a passing result. OpenFlow owns run/node/attempt tracking and transition checks.

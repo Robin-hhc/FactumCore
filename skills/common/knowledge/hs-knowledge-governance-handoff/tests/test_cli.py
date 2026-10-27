@@ -44,3 +44,25 @@ def test_handoff_freezes_exact_view_and_stops_before_governance(harness):
     assert handoff["target_phase"] == "P4"
     assert result["phase"] == "handed_off"
     assert not (harness.root / "knowledge").exists()
+
+
+def test_handoff_describes_view_without_checking_another_operations_stage(harness):
+    import hashlib
+
+    ref, _ = harness.view()
+    view = harness.record(ref)
+    journal = {
+        "schema_version": "2.0", "record_kind": "transaction_journal",
+        "operation_id": "another", "rules_digest": view["rules_digest"],
+        "tool_identity": view["tool_identity"], "status": "prepared",
+        "view_ref": ".build/operations/another/final-view.json",
+        "view_digest": "0" * 64, "entries": [],
+    }
+    raw = json.dumps(journal, sort_keys=True, separators=(",", ":")).encode()
+    journal["digest"] = hashlib.sha256(raw).hexdigest()
+    harness.write("logs/operations/another/journal.json", json.dumps(journal).encode())
+    result = harness.run("governance-handoff", {"operation_id": "op", "view_ref": ref})
+    assert result["phase"] == "handed_off"
+    assert harness.record(result["data"]["handoff_ref"])["view_digest"] == view["digest"]
+    rejected = harness.run("governance-handoff", {"operation_id": "different", "view_ref": ref}, expected=2)
+    assert rejected["diagnostics"][0]["code"] == "OPERATION_MISMATCH"

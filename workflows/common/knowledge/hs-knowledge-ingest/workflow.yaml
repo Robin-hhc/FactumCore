@@ -13,22 +13,15 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-source-scan
-  prompt: 'Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
-    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
-    For a project stored on another server or reached through a remote share, run this entire node through
-    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
-    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
-    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
-    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
-    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
-    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
-    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
-    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
-    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
-    After SSH failure inspect the original remote process, records, journal and active index before any retry;
-    never fall back to Samba, switch endpoints or repeat an applied write automatically.
-    Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+  prompt: 'OpenFlow owns workflow run/node/attempt tracking, role assignment and transition legality. Call the installed public Skill CLI with its operation_id and business inputs; do not require workflow identities or workflow manifests from the Skill.
+    Use the installed hs-knowledge-explore setup entry and reuse the project config.yml context.
+    Use the execution host global Python; initial setup checks dependencies and installs only missing or mismatched locked packages.
+    SSH connection hints belong to that Skill config.env; the Agent/harness establishes SSH, runs the node on the server and checks the result.
+    Do not require a copied deployment tool directory, a new runner, or user-created catalog/registry/binding configuration.
+    Keep requests, drafts, results, logs and indexes in the execution knowledge root existing .build/logs/artifacts locations.
+    Preserve one ingest writer and distinct query identities; inspect actual operation state before retrying interrupted writes.
+    Read the actual result status/phase and business input/output files; OpenFlow checks the selected transition, and exit 0 alone is insufficient.
+    Keep workflow execution identities in OpenFlow. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
@@ -71,22 +64,15 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-source-scan
-  prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
-    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
-    For a project stored on another server or reached through a remote share, run this entire node through
-    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
-    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
-    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
-    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
-    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
-    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
-    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
-    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
-    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
-    After SSH failure inspect the original remote process, records, journal and active index before any retry;
-    never fall back to Samba, switch endpoints or repeat an applied write automatically.
-    Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+  prompt: OpenFlow owns workflow run/node/attempt tracking, role assignment and transition legality. Call the installed public Skill CLI with its operation_id and business inputs; do not require workflow identities or workflow manifests from the Skill.
+    Use the installed hs-knowledge-explore setup entry and reuse the project config.yml context.
+    Use the execution host global Python; initial setup checks dependencies and installs only missing or mismatched locked packages.
+    SSH connection hints belong to that Skill config.env; the Agent/harness establishes SSH, runs the node on the server and checks the result.
+    Do not require a copied deployment tool directory, a new runner, or user-created catalog/registry/binding configuration.
+    Keep requests, drafts, results, logs and indexes in the execution knowledge root existing .build/logs/artifacts locations.
+    Preserve one ingest writer and distinct query identities; inspect actual operation state before retrying interrupted writes.
+    Read the actual result status/phase and business input/output files; OpenFlow checks the selected transition, and exit 0 alone is insufficient.
+    Keep workflow execution identities in OpenFlow. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
@@ -117,22 +103,15 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-change-plan
-  prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
-    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
-    For a project stored on another server or reached through a remote share, run this entire node through
-    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
-    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
-    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
-    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
-    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
-    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
-    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
-    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
-    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
-    After SSH failure inspect the original remote process, records, journal and active index before any retry;
-    never fall back to Samba, switch endpoints or repeat an applied write automatically.
-    Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+  prompt: OpenFlow owns workflow run/node/attempt tracking, role assignment and transition legality. Call the installed public Skill CLI with its operation_id and business inputs; do not require workflow identities or workflow manifests from the Skill.
+    Use the installed hs-knowledge-explore setup entry and reuse the project config.yml context.
+    Use the execution host global Python; initial setup checks dependencies and installs only missing or mismatched locked packages.
+    SSH connection hints belong to that Skill config.env; the Agent/harness establishes SSH, runs the node on the server and checks the result.
+    Do not require a copied deployment tool directory, a new runner, or user-created catalog/registry/binding configuration.
+    Keep requests, drafts, results, logs and indexes in the execution knowledge root existing .build/logs/artifacts locations.
+    Preserve one ingest writer and distinct query identities; inspect actual operation state before retrying interrupted writes.
+    Read the actual result status/phase and business input/output files; OpenFlow checks the selected transition, and exit 0 alone is insufficient.
+    Keep workflow execution identities in OpenFlow. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
@@ -166,22 +145,15 @@ nodes:
   type: skill
   owner: reviewer
   skill: hs-knowledge-change-plan
-  prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
-    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
-    For a project stored on another server or reached through a remote share, run this entire node through
-    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
-    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
-    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
-    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
-    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
-    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
-    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
-    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
-    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
-    After SSH failure inspect the original remote process, records, journal and active index before any retry;
-    never fall back to Samba, switch endpoints or repeat an applied write automatically.
-    Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+  prompt: OpenFlow owns workflow run/node/attempt tracking, role assignment and transition legality. Call the installed public Skill CLI with its operation_id and business inputs; do not require workflow identities or workflow manifests from the Skill.
+    Use the installed hs-knowledge-explore setup entry and reuse the project config.yml context.
+    Use the execution host global Python; initial setup checks dependencies and installs only missing or mismatched locked packages.
+    SSH connection hints belong to that Skill config.env; the Agent/harness establishes SSH, runs the node on the server and checks the result.
+    Do not require a copied deployment tool directory, a new runner, or user-created catalog/registry/binding configuration.
+    Keep requests, drafts, results, logs and indexes in the execution knowledge root existing .build/logs/artifacts locations.
+    Preserve one ingest writer and distinct query identities; inspect actual operation state before retrying interrupted writes.
+    Read the actual result status/phase and business input/output files; OpenFlow checks the selected transition, and exit 0 alone is insufficient.
+    Keep workflow execution identities in OpenFlow. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
@@ -216,22 +188,15 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-view-materialize
-  prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
-    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
-    For a project stored on another server or reached through a remote share, run this entire node through
-    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
-    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
-    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
-    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
-    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
-    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
-    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
-    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
-    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
-    After SSH failure inspect the original remote process, records, journal and active index before any retry;
-    never fall back to Samba, switch endpoints or repeat an applied write automatically.
-    Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+  prompt: OpenFlow owns workflow run/node/attempt tracking, role assignment and transition legality. Call the installed public Skill CLI with its operation_id and business inputs; do not require workflow identities or workflow manifests from the Skill.
+    Use the installed hs-knowledge-explore setup entry and reuse the project config.yml context.
+    Use the execution host global Python; initial setup checks dependencies and installs only missing or mismatched locked packages.
+    SSH connection hints belong to that Skill config.env; the Agent/harness establishes SSH, runs the node on the server and checks the result.
+    Do not require a copied deployment tool directory, a new runner, or user-created catalog/registry/binding configuration.
+    Keep requests, drafts, results, logs and indexes in the execution knowledge root existing .build/logs/artifacts locations.
+    Preserve one ingest writer and distinct query identities; inspect actual operation state before retrying interrupted writes.
+    Read the actual result status/phase and business input/output files; OpenFlow checks the selected transition, and exit 0 alone is insufficient.
+    Keep workflow execution identities in OpenFlow. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
@@ -258,22 +223,15 @@ nodes:
   type: skill
   owner: reviewer
   skill: hs-knowledge-change-plan
-  prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
-    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
-    For a project stored on another server or reached through a remote share, run this entire node through
-    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
-    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
-    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
-    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
-    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
-    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
-    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
-    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
-    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
-    After SSH failure inspect the original remote process, records, journal and active index before any retry;
-    never fall back to Samba, switch endpoints or repeat an applied write automatically.
-    Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+  prompt: OpenFlow owns workflow run/node/attempt tracking, role assignment and transition legality. Call the installed public Skill CLI with its operation_id and business inputs; do not require workflow identities or workflow manifests from the Skill.
+    Use the installed hs-knowledge-explore setup entry and reuse the project config.yml context.
+    Use the execution host global Python; initial setup checks dependencies and installs only missing or mismatched locked packages.
+    SSH connection hints belong to that Skill config.env; the Agent/harness establishes SSH, runs the node on the server and checks the result.
+    Do not require a copied deployment tool directory, a new runner, or user-created catalog/registry/binding configuration.
+    Keep requests, drafts, results, logs and indexes in the execution knowledge root existing .build/logs/artifacts locations.
+    Preserve one ingest writer and distinct query identities; inspect actual operation state before retrying interrupted writes.
+    Read the actual result status/phase and business input/output files; OpenFlow checks the selected transition, and exit 0 alone is insufficient.
+    Keep workflow execution identities in OpenFlow. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
@@ -307,22 +265,15 @@ nodes:
   type: skill
   owner: reviewer
   skill: hs-knowledge-lint
-  prompt: 'Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
-    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
-    For a project stored on another server or reached through a remote share, run this entire node through
-    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
-    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
-    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
-    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
-    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
-    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
-    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
-    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
-    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
-    After SSH failure inspect the original remote process, records, journal and active index before any retry;
-    never fall back to Samba, switch endpoints or repeat an applied write automatically.
-    Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+  prompt: 'OpenFlow owns workflow run/node/attempt tracking, role assignment and transition legality. Call the installed public Skill CLI with its operation_id and business inputs; do not require workflow identities or workflow manifests from the Skill.
+    Use the installed hs-knowledge-explore setup entry and reuse the project config.yml context.
+    Use the execution host global Python; initial setup checks dependencies and installs only missing or mismatched locked packages.
+    SSH connection hints belong to that Skill config.env; the Agent/harness establishes SSH, runs the node on the server and checks the result.
+    Do not require a copied deployment tool directory, a new runner, or user-created catalog/registry/binding configuration.
+    Keep requests, drafts, results, logs and indexes in the execution knowledge root existing .build/logs/artifacts locations.
+    Preserve one ingest writer and distinct query identities; inspect actual operation state before retrying interrupted writes.
+    Read the actual result status/phase and business input/output files; OpenFlow checks the selected transition, and exit 0 alone is insufficient.
+    Keep workflow execution identities in OpenFlow. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
@@ -357,22 +308,15 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-candidate-inspect
-  prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
-    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
-    For a project stored on another server or reached through a remote share, run this entire node through
-    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
-    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
-    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
-    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
-    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
-    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
-    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
-    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
-    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
-    After SSH failure inspect the original remote process, records, journal and active index before any retry;
-    never fall back to Samba, switch endpoints or repeat an applied write automatically.
-    Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+  prompt: OpenFlow owns workflow run/node/attempt tracking, role assignment and transition legality. Call the installed public Skill CLI with its operation_id and business inputs; do not require workflow identities or workflow manifests from the Skill.
+    Use the installed hs-knowledge-explore setup entry and reuse the project config.yml context.
+    Use the execution host global Python; initial setup checks dependencies and installs only missing or mismatched locked packages.
+    SSH connection hints belong to that Skill config.env; the Agent/harness establishes SSH, runs the node on the server and checks the result.
+    Do not require a copied deployment tool directory, a new runner, or user-created catalog/registry/binding configuration.
+    Keep requests, drafts, results, logs and indexes in the execution knowledge root existing .build/logs/artifacts locations.
+    Preserve one ingest writer and distinct query identities; inspect actual operation state before retrying interrupted writes.
+    Read the actual result status/phase and business input/output files; OpenFlow checks the selected transition, and exit 0 alone is insufficient.
+    Keep workflow execution identities in OpenFlow. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
@@ -411,22 +355,15 @@ nodes:
   type: skill
   owner: reviewer
   skill: hs-knowledge-local-check
-  prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
-    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
-    For a project stored on another server or reached through a remote share, run this entire node through
-    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
-    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
-    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
-    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
-    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
-    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
-    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
-    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
-    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
-    After SSH failure inspect the original remote process, records, journal and active index before any retry;
-    never fall back to Samba, switch endpoints or repeat an applied write automatically.
-    Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+  prompt: OpenFlow owns workflow run/node/attempt tracking, role assignment and transition legality. Call the installed public Skill CLI with its operation_id and business inputs; do not require workflow identities or workflow manifests from the Skill.
+    Use the installed hs-knowledge-explore setup entry and reuse the project config.yml context.
+    Use the execution host global Python; initial setup checks dependencies and installs only missing or mismatched locked packages.
+    SSH connection hints belong to that Skill config.env; the Agent/harness establishes SSH, runs the node on the server and checks the result.
+    Do not require a copied deployment tool directory, a new runner, or user-created catalog/registry/binding configuration.
+    Keep requests, drafts, results, logs and indexes in the execution knowledge root existing .build/logs/artifacts locations.
+    Preserve one ingest writer and distinct query identities; inspect actual operation state before retrying interrupted writes.
+    Read the actual result status/phase and business input/output files; OpenFlow checks the selected transition, and exit 0 alone is insufficient.
+    Keep workflow execution identities in OpenFlow. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
@@ -465,22 +402,15 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-candidate-revise
-  prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
-    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
-    For a project stored on another server or reached through a remote share, run this entire node through
-    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
-    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
-    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
-    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
-    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
-    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
-    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
-    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
-    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
-    After SSH failure inspect the original remote process, records, journal and active index before any retry;
-    never fall back to Samba, switch endpoints or repeat an applied write automatically.
-    Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+  prompt: OpenFlow owns workflow run/node/attempt tracking, role assignment and transition legality. Call the installed public Skill CLI with its operation_id and business inputs; do not require workflow identities or workflow manifests from the Skill.
+    Use the installed hs-knowledge-explore setup entry and reuse the project config.yml context.
+    Use the execution host global Python; initial setup checks dependencies and installs only missing or mismatched locked packages.
+    SSH connection hints belong to that Skill config.env; the Agent/harness establishes SSH, runs the node on the server and checks the result.
+    Do not require a copied deployment tool directory, a new runner, or user-created catalog/registry/binding configuration.
+    Keep requests, drafts, results, logs and indexes in the execution knowledge root existing .build/logs/artifacts locations.
+    Preserve one ingest writer and distinct query identities; inspect actual operation state before retrying interrupted writes.
+    Read the actual result status/phase and business input/output files; OpenFlow checks the selected transition, and exit 0 alone is insufficient.
+    Keep workflow execution identities in OpenFlow. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
@@ -514,22 +444,15 @@ nodes:
   type: skill
   owner: reviewer
   skill: hs-knowledge-lint
-  prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
-    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
-    For a project stored on another server or reached through a remote share, run this entire node through
-    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
-    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
-    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
-    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
-    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
-    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
-    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
-    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
-    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
-    After SSH failure inspect the original remote process, records, journal and active index before any retry;
-    never fall back to Samba, switch endpoints or repeat an applied write automatically.
-    Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+  prompt: OpenFlow owns workflow run/node/attempt tracking, role assignment and transition legality. Call the installed public Skill CLI with its operation_id and business inputs; do not require workflow identities or workflow manifests from the Skill.
+    Use the installed hs-knowledge-explore setup entry and reuse the project config.yml context.
+    Use the execution host global Python; initial setup checks dependencies and installs only missing or mismatched locked packages.
+    SSH connection hints belong to that Skill config.env; the Agent/harness establishes SSH, runs the node on the server and checks the result.
+    Do not require a copied deployment tool directory, a new runner, or user-created catalog/registry/binding configuration.
+    Keep requests, drafts, results, logs and indexes in the execution knowledge root existing .build/logs/artifacts locations.
+    Preserve one ingest writer and distinct query identities; inspect actual operation state before retrying interrupted writes.
+    Read the actual result status/phase and business input/output files; OpenFlow checks the selected transition, and exit 0 alone is insufficient.
+    Keep workflow execution identities in OpenFlow. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
@@ -566,22 +489,15 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-source-scan
-  prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
-    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
-    For a project stored on another server or reached through a remote share, run this entire node through
-    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
-    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
-    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
-    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
-    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
-    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
-    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
-    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
-    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
-    After SSH failure inspect the original remote process, records, journal and active index before any retry;
-    never fall back to Samba, switch endpoints or repeat an applied write automatically.
-    Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+  prompt: OpenFlow owns workflow run/node/attempt tracking, role assignment and transition legality. Call the installed public Skill CLI with its operation_id and business inputs; do not require workflow identities or workflow manifests from the Skill.
+    Use the installed hs-knowledge-explore setup entry and reuse the project config.yml context.
+    Use the execution host global Python; initial setup checks dependencies and installs only missing or mismatched locked packages.
+    SSH connection hints belong to that Skill config.env; the Agent/harness establishes SSH, runs the node on the server and checks the result.
+    Do not require a copied deployment tool directory, a new runner, or user-created catalog/registry/binding configuration.
+    Keep requests, drafts, results, logs and indexes in the execution knowledge root existing .build/logs/artifacts locations.
+    Preserve one ingest writer and distinct query identities; inspect actual operation state before retrying interrupted writes.
+    Read the actual result status/phase and business input/output files; OpenFlow checks the selected transition, and exit 0 alone is insufficient.
+    Keep workflow execution identities in OpenFlow. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
@@ -611,22 +527,15 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-apply
-  prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
-    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
-    For a project stored on another server or reached through a remote share, run this entire node through
-    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
-    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
-    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
-    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
-    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
-    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
-    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
-    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
-    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
-    After SSH failure inspect the original remote process, records, journal and active index before any retry;
-    never fall back to Samba, switch endpoints or repeat an applied write automatically.
-    Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+  prompt: OpenFlow owns workflow run/node/attempt tracking, role assignment and transition legality. Call the installed public Skill CLI with its operation_id and business inputs; do not require workflow identities or workflow manifests from the Skill.
+    Use the installed hs-knowledge-explore setup entry and reuse the project config.yml context.
+    Use the execution host global Python; initial setup checks dependencies and installs only missing or mismatched locked packages.
+    SSH connection hints belong to that Skill config.env; the Agent/harness establishes SSH, runs the node on the server and checks the result.
+    Do not require a copied deployment tool directory, a new runner, or user-created catalog/registry/binding configuration.
+    Keep requests, drafts, results, logs and indexes in the execution knowledge root existing .build/logs/artifacts locations.
+    Preserve one ingest writer and distinct query identities; inspect actual operation state before retrying interrupted writes.
+    Read the actual result status/phase and business input/output files; OpenFlow checks the selected transition, and exit 0 alone is insufficient.
+    Keep workflow execution identities in OpenFlow. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
@@ -667,22 +576,15 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-recover
-  prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
-    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
-    For a project stored on another server or reached through a remote share, run this entire node through
-    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
-    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
-    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
-    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
-    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
-    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
-    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
-    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
-    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
-    After SSH failure inspect the original remote process, records, journal and active index before any retry;
-    never fall back to Samba, switch endpoints or repeat an applied write automatically.
-    Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+  prompt: OpenFlow owns workflow run/node/attempt tracking, role assignment and transition legality. Call the installed public Skill CLI with its operation_id and business inputs; do not require workflow identities or workflow manifests from the Skill.
+    Use the installed hs-knowledge-explore setup entry and reuse the project config.yml context.
+    Use the execution host global Python; initial setup checks dependencies and installs only missing or mismatched locked packages.
+    SSH connection hints belong to that Skill config.env; the Agent/harness establishes SSH, runs the node on the server and checks the result.
+    Do not require a copied deployment tool directory, a new runner, or user-created catalog/registry/binding configuration.
+    Keep requests, drafts, results, logs and indexes in the execution knowledge root existing .build/logs/artifacts locations.
+    Preserve one ingest writer and distinct query identities; inspect actual operation state before retrying interrupted writes.
+    Read the actual result status/phase and business input/output files; OpenFlow checks the selected transition, and exit 0 alone is insufficient.
+    Keep workflow execution identities in OpenFlow. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
@@ -712,22 +614,15 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-index-build
-  prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
-    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
-    For a project stored on another server or reached through a remote share, run this entire node through
-    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
-    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
-    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
-    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
-    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
-    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
-    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
-    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
-    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
-    After SSH failure inspect the original remote process, records, journal and active index before any retry;
-    never fall back to Samba, switch endpoints or repeat an applied write automatically.
-    Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+  prompt: OpenFlow owns workflow run/node/attempt tracking, role assignment and transition legality. Call the installed public Skill CLI with its operation_id and business inputs; do not require workflow identities or workflow manifests from the Skill.
+    Use the installed hs-knowledge-explore setup entry and reuse the project config.yml context.
+    Use the execution host global Python; initial setup checks dependencies and installs only missing or mismatched locked packages.
+    SSH connection hints belong to that Skill config.env; the Agent/harness establishes SSH, runs the node on the server and checks the result.
+    Do not require a copied deployment tool directory, a new runner, or user-created catalog/registry/binding configuration.
+    Keep requests, drafts, results, logs and indexes in the execution knowledge root existing .build/logs/artifacts locations.
+    Preserve one ingest writer and distinct query identities; inspect actual operation state before retrying interrupted writes.
+    Read the actual result status/phase and business input/output files; OpenFlow checks the selected transition, and exit 0 alone is insufficient.
+    Keep workflow execution identities in OpenFlow. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,
@@ -753,22 +648,15 @@ nodes:
   type: skill
   owner: reviewer
   skill: hs-knowledge-query-regression
-  prompt: Use the installed trusted public CLI with explicit operation_id and fresh workflow run_id/node_id/attempt_id.
-    First read DEPLOY_LOCAL/EXECUTION.md from the caller local-disk deployment tools copy.
-    For a project stored on another server or reached through a remote share, run this entire node through
-    local-disk DEPLOY_LOCAL/run_node.py --config-env ABS_PRIVATE_CONFIG_ENV with EXECUTION_MODE=ssh and
-    the logical Skill ID. Keep all child CLIs on that server with its registered Python, catalog, rules and native paths.
-    Never start Python, the runner or project commands from UNC/mapped storage, never traverse originals,
-    cards, indexes or source code through Samba, and never mirror K locally to bypass server execution.
-    Obtain remote evidence or necessary source files through authorized SSH. This policy has no benchmark gate.
-    Linux agents already on the project server and genuinely local-disk Windows projects may use their own
-    registered native CLI; Linux access to another host also uses SSH, without requiring server loopback SSH.
-    Pin one endpoint for the whole ingest, allow at most one ingest writer, and keep concurrent query identities distinct.
-    Remote artifact references belong to the remote knowledge root; caller-side response copies do not replace them.
-    After SSH failure inspect the original remote process, records, journal and active index before any retry;
-    never fall back to Samba, switch endpoints or repeat an applied write automatically.
-    Read actual immutable result manifests, status/phase and bound input/output identities; exit 0 alone is insufficient.
-    Do not forward workflow identities to helpers. Preserve stop state and never convert missing material
+  prompt: OpenFlow owns workflow run/node/attempt tracking, role assignment and transition legality. Call the installed public Skill CLI with its operation_id and business inputs; do not require workflow identities or workflow manifests from the Skill.
+    Use the installed hs-knowledge-explore setup entry and reuse the project config.yml context.
+    Use the execution host global Python; initial setup checks dependencies and installs only missing or mismatched locked packages.
+    SSH connection hints belong to that Skill config.env; the Agent/harness establishes SSH, runs the node on the server and checks the result.
+    Do not require a copied deployment tool directory, a new runner, or user-created catalog/registry/binding configuration.
+    Keep requests, drafts, results, logs and indexes in the execution knowledge root existing .build/logs/artifacts locations.
+    Preserve one ingest writer and distinct query identities; inspect actual operation state before retrying interrupted writes.
+    Read the actual result status/phase and business input/output files; OpenFlow checks the selected transition, and exit 0 alone is insufficient.
+    Keep workflow execution identities in OpenFlow. Preserve stop state and never convert missing material
     or runtime failure to a passing result. Before a retry inspect actual operation/source/rules/code/baseline state.
     Already applied content is never applied again; retry only unfinished local indexing/query. A revised input
     needs a new operation/view and renewed applicable review. Honor user interruption or return requests; after admission,

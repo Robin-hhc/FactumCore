@@ -1,194 +1,67 @@
-"""Describe verified local state and explicit external publishing obligations."""
+"""Describe exact local files and verify actual Git objects on explicit request."""
 
 import pathlib
-import secrets
 import subprocess
 import re
 
-from support import Blocked, Invalid, atomic_bytes, canonical, package_digest, digest
-
-
-def verify_query_gate(ctx, op, report_ref):
-    spec = ctx.catalog.get("skills", {}).get("hs-knowledge-query-regression")
-    if not spec or not ctx.catalog_path:
-        raise Blocked("installed public batch query verifier is required")
-    package = pathlib.Path(spec["root"]).resolve()
-    entry = (package / spec.get("entry", "scripts/cli.py")).resolve()
-    if entry != package / "scripts/cli.py" or package_digest(package) != spec.get("package_digest"):
-        raise Invalid("batch query verifier package identity mismatch")
-    nonce = secrets.token_hex(12)
-    incoming = f".build/operations/{op}/query-gate-{nonce}-input.json"
-    outgoing = f".build/operations/{op}/query-gate-{nonce}-output.json"
-    atomic_bytes(ctx.path(incoming), canonical({"operation_id": op, "report_ref": report_ref}))
-    done = subprocess.run([spec["python"], str(entry), "--input", str(ctx.path(incoming)),
-                           "--output", str(ctx.path(outgoing)), "--knowledge-root", str(ctx.root),
-                           "--rules-digest", ctx.rules_digest, "--catalog", ctx.catalog_path,
-                           "--action", "verify"], check=False, capture_output=True, timeout=120)
-    if done.returncode != 0 or not ctx.path(outgoing).is_file():
-        raise Blocked("batch index and target query gate has not passed")
-    result = ctx.read(outgoing)
-    if (result.get("status") != "ok" or result.get("phase") != "verified"
-            or result.get("tool_identity", {}).get("package_digest") != spec["package_digest"]
-            or result.get("data", {}).get("gate_verified") is not True):
-        raise Blocked("batch query gate did not return verified evidence")
-    return result["data"]
+from support import Blocked, Invalid, checked_view, digest, native_path
 
 
 def publish_handoff(ctx, request):
     op = ctx.operation(request)
     apply_ref = request.get("apply_result_ref")
-    ctx.path(apply_ref, (f"logs/operations/{op}",))
-    applied = ctx.read(apply_ref)
-    spec = ctx.catalog.get("skills", {}).get("hs-knowledge-apply")
-    if not spec or not ctx.catalog_path:
-        raise Blocked("installed public apply verifier is required")
-    package = pathlib.Path(spec["root"]).resolve()
-    entry = (package / spec.get("entry", "scripts/cli.py")).resolve()
-    if entry != package / "scripts/cli.py" or package_digest(package) != spec.get(
-        "package_digest"
-    ):
-        raise Invalid("apply verifier package identity mismatch")
-    nonce = secrets.token_hex(12)
-    req_ref = f".build/operations/{op}/publish-verify-{nonce}-request.json"
-    response_ref = f".build/operations/{op}/publish-verify-{nonce}-response.json"
-    atomic_bytes(
-        ctx.path(req_ref),
-        canonical({"operation_id": op, "apply_result_ref": apply_ref}),
-    )
-    completed = subprocess.run(
-        [
-            spec["python"],
-            str(entry),
-            "--input",
-            str(ctx.path(req_ref)),
-            "--output",
-            str(ctx.path(response_ref)),
-            "--knowledge-root",
-            str(ctx.root),
-            "--rules-digest",
-            ctx.rules_digest,
-            "--catalog",
-            ctx.catalog_path,
-            "--action",
-            "verify-result",
-        ],
-        check=False,
-        capture_output=True,
-        timeout=120,
-    )
-    if completed.returncode != 0 or not ctx.path(response_ref).is_file():
-        raise Blocked("local transaction authenticity could not be verified")
-    response = ctx.read(response_ref)
-    verified = response.get("data", {})
-    if (
-        response.get("status") != "ok"
-        or verified.get("result_verified") is not True
-        or response.get("tool_identity", {}).get("package_digest")
-        != spec["package_digest"]
-        or verified.get("view_digest") != applied.get("view_digest")
-    ):
-        raise Blocked("local transaction is not verified")
-    view = ctx.read(verified["view_ref"])
-    if request.get("v3_required") or view.get("v3_required") or applied.get("batch_kind") == "record_only":
-        kind = applied.get("batch_kind", "content")
-        if kind != "record_only":
-            if not request.get("query_report_ref"):
-                raise Blocked("passing batch target query report is required before submit")
-            gate = verify_query_gate(ctx, op, request["query_report_ref"])
-            if gate.get("apply_result_digest") != applied["digest"] or gate.get("view_digest") != view["digest"]:
-                raise Invalid("query gate belongs to another applied batch")
-        if not applied.get("ingest_record_path"):
-            raise Blocked("shared processing record must be applied before submit")
-        for row in verified.get("write_manifest", []):
-            path = ctx.path(row["path"], ("knowledge", "governance/sources.lock.yaml", "index.md", "logs/ingest"))
-            if not path.is_file() or digest(path.read_bytes()) != row["sha256"]:
-                raise Blocked("batch changed after apply; inspect before submit: " + row["path"])
-        for ref in verified.get("delete_manifest", []):
-            if ctx.path(ref).exists():
-                raise Blocked("batch deletion changed after apply")
-        phase = "record_only_ready" if kind == "record_only" else "ready_to_submit"
-        files = [row["path"] for row in verified["write_manifest"]] + verified["delete_manifest"]
-        obligations = [{"owner": "authorized_committer", "action": "commit exactly commit_files", "status": "pending"},
-                       {"owner": "fixed_ci", "action": "reuse lint deterministic checks on submitted content", "status": "pending"}]
-        if kind != "record_only":
-            obligations.append({"owner": "authorized_committer",
-                                "action": "provide exact originals and portable recovery locations for CI and other clones",
-                                "status": "pending"})
-        record = ctx.record("publish_handoff", op, status=phase, apply_result_ref=apply_ref,
-                            apply_result_digest=applied["digest"], view_ref=verified["view_ref"],
-                            view_digest=view["digest"], proof_ref=verified["proof_ref"],
-                            verification_tier=verified["verification_tier"], batch_kind=kind,
-                            query_report_ref=request.get("query_report_ref"), commit_files=files,
-                            write_manifest=verified["write_manifest"], delete_manifest=verified["delete_manifest"],
-                            git_merge_verified=False, remote_push_verified=False,
-                            external_obligations=obligations)
-        reference = f"logs/operations/{op}/submit-ready.json"
-        ctx.save(reference, record)
-        return {"publish_handoff_ref": reference, "publication_status": phase,
-                "commit_files": files, "batch_kind": kind, "phase": phase}
+    applied = None
+    if apply_ref:
+        ctx.path(apply_ref, (f"logs/operations/{op}",))
+        applied = ctx.read(apply_ref)
+        if applied.get("record_kind") != "apply_result":
+            raise Invalid("apply_result_ref must name an apply result")
+    view_ref = request.get("view_ref") or (applied or {}).get("view_ref")
+    if not view_ref:
+        raise Blocked("final view bytes are required to describe the local change set")
+    view = checked_view(ctx, {"operation_id": op, "view_ref": view_ref})
+    if applied and applied.get("view_digest") != view["digest"]:
+        raise Invalid("apply result and selected view describe different bytes")
+    writes = []
+    deletes = [row["path"] for row in view.get("deletes", [])]
+    for row in view.get("writes", []):
+        path = ctx.path(row["path"], ("knowledge", "governance/sources.lock.yaml", "index.md"))
+        if not path.is_file() or digest(pathlib.Path(native_path(path)).read_bytes()) != row["final_digest"]:
+            raise Blocked("local file differs from the selected final bytes: " + row["path"])
+        writes.append({"path": row["path"], "sha256": row["final_digest"]})
+    for ref in deletes:
+        if ctx.path(ref).exists():
+            raise Blocked("selected deletion is still present: " + ref)
+    ingest = (applied or {}).get("ingest_record_path")
+    if ingest:
+        path = ctx.path(ingest, ("logs/ingest",))
+        if not path.is_file():
+            raise Blocked("declared processing record is unavailable: " + ingest)
+        writes.append({"path": ingest, "sha256": digest(pathlib.Path(native_path(path)).read_bytes())})
+    kind = (applied or {}).get("batch_kind", view.get("batch_kind", "content"))
+    batch = request.get("v3_required") or view.get("v3_required") or kind == "record_only"
+    phase = ("record_only_ready" if kind == "record_only" else "ready_to_submit") if batch else "awaiting_external_publish"
+    files = [row["path"] for row in writes] + deletes
     obligations = [
-        {
-            "owner": "authorized_committer",
-            "action": "review scoped diff and create commit",
-            "status": "pending",
-        },
-        {
-            "owner": "authorized_committer",
-            "action": "push and verify remote commit identity",
-            "status": "pending",
-        },
-        {
-            "owner": "index_and_regression_workflow",
-            "action": "verify and activate the corresponding immutable index generation",
-            "status": "pending",
-        },
+        {"owner": "authorized_committer", "action": "review scoped diff and create commit", "status": "pending"},
+        {"owner": "fixed_ci", "action": "reuse lint deterministic checks on submitted content", "status": "pending"},
+        {"owner": "authorized_committer", "action": "push and verify remote commit identity", "status": "pending"},
     ]
-    if view.get("review_mode") == "code_gate":
-        obligations.append(
-            {
-                "owner": "external_ci",
-                "action": "run fixed deterministic format/index/source/code-reference checks on the submitted commit",
-                "status": "pending",
-            }
-        )
     record = ctx.record(
-        "publish_handoff",
-        op,
-        status="awaiting_external_publish",
-        apply_result_ref=apply_ref,
-        apply_result_digest=applied["digest"],
-        view_ref=verified["view_ref"],
-        view_digest=view["digest"],
-        proof_ref=verified["proof_ref"],
-        verification_tier=verified["verification_tier"],
-        local_verification_ref=response_ref,
-        local_verification_digest=response["digest"],
-        external_obligations=obligations,
-        git_merge_verified=False,
-        remote_push_verified=False,
+        "publish_handoff", op, status=phase, view_ref=view_ref, view_digest=view["digest"],
+        **({"apply_result_ref": apply_ref, "apply_result_digest": applied["digest"]} if applied else {}),
+        batch_kind=kind, commit_files=files, write_manifest=writes, delete_manifest=deletes,
+        external_obligations=obligations, git_merge_verified=False, remote_push_verified=False,
     )
-    reference = f"logs/operations/{op}/publish-handoff.json"
-    # Child verifier response references vary per invocation. A repeat returns
-    # the prior immutable handoff only after freshly verifying the same apply.
+    reference = f"logs/operations/{op}/" + ("submit-ready.json" if batch else "publish-handoff.json")
     if ctx.path(reference).exists():
         prior = ctx.read(reference)
-        if (
-            prior.get("apply_result_digest") != applied["digest"]
-            or prior.get("view_digest") != view["digest"]
-        ):
-            raise Invalid("operation already handed off another result")
-        return {
-            "publish_handoff_ref": reference,
-            "publication_status": prior["status"],
-            "phase": "awaiting_external_publish",
-        }
-    ctx.save(reference, record)
-    return {
-        "publish_handoff_ref": reference,
-        "publication_status": record["status"],
-        "phase": "awaiting_external_publish",
-    }
-
+        if prior.get("view_digest") != view["digest"] or prior.get("write_manifest") != writes or prior.get("delete_manifest") != deletes:
+            raise Invalid("operation already describes a different local change set")
+    else:
+        ctx.save(reference, record)
+    return {"publish_handoff_ref": reference, "publication_status": phase,
+            "commit_files": files, "batch_kind": kind, "phase": phase}
 
 def verify_submission(ctx, request):
     """Read actual Git objects; a claimed SHA or ready receipt is insufficient."""
@@ -197,14 +70,9 @@ def verify_submission(ctx, request):
     commit = request.get("commit_sha")
     if not isinstance(commit, str) or not re.fullmatch(r"[0-9a-f]{40}(?:[0-9a-f]{24})?", commit):
         raise Blocked("actual exact Git commit SHA is required; batch remains pending submission")
-    registrations = ctx.catalog.get("workspaces")
-    if registrations == {}:
-        registrations = None
     try:
-        workspace = ctx.domain.workspace_config_path(ctx.root, registrations, ctx.rules_digest).parent
+        workspace = ctx.domain.workspace_config_path(ctx.root).parent
     except (ValueError, OSError):
-        if registrations is not None:
-            raise Blocked("registered workspace config could not be verified")
         # Legacy fixture/publication calls without a project registration keep
         # Git's own ownership check; do not invent a trusted parent directory.
         workspace = None

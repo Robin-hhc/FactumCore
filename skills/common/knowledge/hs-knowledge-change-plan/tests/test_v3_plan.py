@@ -110,7 +110,34 @@ def test_substantive_skip_review_records_unselected_scope(harness):
     review = harness.record(result["data"]["content_review_ref"])
     assert review["sampled_unit_ids"] == ["u1"]
     assert review["status"] == "passed"
-    assert review["verification_tier"] == "declared_independent_content_review"
+    assert review["verification_tier"] == "declared_content_review"
+
+
+@pytest.mark.parametrize("identities", [{}, {"reviewer_id": "author", "independent_context": ""}])
+def test_review_checks_content_without_role_separation_gate(harness, identities):
+    value = request(harness)
+    plan = harness.run("change-plan", value, action="plan")["data"]["semantic_plan_ref"]
+    result = harness.run("change-plan", {"operation_id": "op", "semantic_plan_ref": plan,
+        "sampled_unit_ids": ["u1"], "unreviewed_unit_ids": [], "reason": "Read the exact changed scope",
+        "findings": [], **identities}, action="review")
+    review = harness.record(result["data"]["content_review_ref"])
+    assert review["status"] == "passed"
+    assert review["plan_digest"] == harness.record(plan)["digest"]
+    assert "independent" not in result["data"]["skip_sample"]
+    for key, expected in identities.items():
+        assert review[key] == expected
+    if not identities:
+        assert "reviewer_id" not in review and "independent_context" not in review
+
+
+def test_review_still_rejects_missing_business_scope_and_findings(harness):
+    value = request(harness)
+    plan = harness.run("change-plan", value, action="plan")["data"]["semantic_plan_ref"]
+    base = {"operation_id": "op", "semantic_plan_ref": plan, "reason": "Read the exact changed scope"}
+    scope = harness.run("change-plan", {**base, "findings": []}, action="review", expected=2)
+    assert scope["diagnostics"][0]["code"] == "REVIEW_SCOPE_INVALID"
+    findings = harness.run("change-plan", {**base, "sampled_unit_ids": ["u1"]}, action="review", expected=2)
+    assert findings["diagnostics"][0]["code"] == "REVIEW_FINDINGS_REQUIRED"
 
 
 def test_same_snapshot_can_gain_verified_git_recovery_without_semantic_version_change(harness):

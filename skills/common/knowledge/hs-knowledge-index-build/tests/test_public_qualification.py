@@ -153,6 +153,13 @@ def test_shared_receipt_binds_actual_git_blobs_and_is_rechecked_by_query(tmp_pat
     }
     found = p.call("knowledge-query", request)["data"]
     assert [row["card_id"] for row in found["matches"]] == ["shared-rule"]
+    assert found["verification_tier"] == "synthetic_publication_identity"
+    for changed, expected_code in (({**receipt, "signature_b64": base64.b64encode(b"bad signature").decode()}, "PUBLICATION_SIGNATURE_INVALID"),
+                                   ({**receipt, "adapter_id": "unknown"}, "UNTRUSTED_PUBLICATION")):
+        p.write(ref, FIXTURE.canonical(changed))
+        denied = p.call("knowledge-query", {**request, "operation_id": expected_code}, expected=2)
+        assert denied["diagnostics"][0]["code"] == expected_code
+    p.write(ref, FIXTURE.canonical(receipt))
     _, unrelated = p.capture(
         "unrelated-source",
         b"# Unrelated\nNot used by the published card.\n",

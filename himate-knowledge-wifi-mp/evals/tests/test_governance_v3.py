@@ -272,7 +272,7 @@ def test_document_admission_summary_uses_agent_support_instead_of_human_approval
         records.validate_ingest_record(records.seal(reviewed))
 
 
-def test_only_final_same_claim_descendant_review_clears_shared_pending():
+def test_same_claim_disposition_clears_recorded_pending_without_process_credentials():
     pending = maintenance_record("pending")
     unrelated = maintenance_record("other", claim="c2", outcome="content", parent=pending)
     assert records.rebuild_restrictions([pending, unrelated])["blocked_claims"][0]["claim_id"] == "c1"
@@ -280,7 +280,10 @@ def test_only_final_same_claim_descendant_review_clears_shared_pending():
     assert records.rebuild_restrictions([pending, resolved])["blocked_claims"] == []
     skip = maintenance_record("skip", outcome="skip", parent=pending)
     unverified = records.rebuild_restrictions([pending, skip])
-    assert not unverified["complete"] and unverified["blocked_claims"]
+    assert unverified["complete"] and not unverified["blocked_claims"]
+    resolved.pop("acceptance")
+    resolved = records.seal(resolved)
+    assert records.rebuild_restrictions([pending, resolved])["blocked_claims"] == []
     reviewed = maintenance_record("skip-reviewed", outcome="skip", parent=pending, sample={"independent": True, "reviewer": "independent", "report_digest": "f" * 64, "reason": "Exact independent review"})
     assert records.rebuild_restrictions([pending, reviewed])["blocked_claims"] == []
 

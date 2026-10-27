@@ -387,6 +387,7 @@ class Context:
     def __init__(self, args, request, package):
         self.args, self.request, self.package = args, request, package
         self.root = Path(args.knowledge_root).resolve(strict=True)
+        args.rules_digest = args.rules_digest or sha(safe(self.root, "governance/framework.lock.yaml").read_bytes())
         self.modules, self.rules = domain(self.root, args.rules_digest)
         validate_runtime(package)
         self.tool = tool_identity(package)
@@ -443,44 +444,23 @@ class Context:
         return value
 
     def call(self, name, request, action=None):
-        if not self.args.catalog:
-            raise NodeError(
-                "MISSING_CATALOG",
-                "Installed catalog required for sibling capability",
-                name,
-                blocked=True,
-            )
-        catalog = read_json(self.args.catalog)
-        entry = catalog.get("skills", {}).get(name)
-        if catalog.get("schema_version") != "2.0" or not entry:
-            raise NodeError(
-                "MISSING_CAPABILITY",
-                "Skill missing from installed catalog",
-                name,
-                blocked=True,
-            )
-        package = Path(entry["root"]).resolve(strict=True)
-        if entry.get("entry") != "scripts/cli.py":
-            raise NodeError(
-                "INVALID_CATALOG_ENTRY",
-                "Catalog must name the fixed public scripts/cli.py entry",
-                name,
-            )
-        if package_digest(package) != entry.get("package_digest"):
-            raise NodeError(
-                "PACKAGE_DIGEST_MISMATCH", "Installed Skill differs from catalog", name
-            )
-        cli = safe(package, entry["entry"])
-        interpreter = Path(entry["python"])
-        if not interpreter.is_absolute() or not interpreter.is_file():
-            raise NodeError(
-                "MISSING_RUNTIME", "Catalog interpreter unavailable", name, blocked=True
-            )
+        identifier(name)
+        package = self.package.parent / name
+        if not (package / "scripts/cli.py").is_file() and self.args.catalog:
+            try:
+                entry = read_json(self.args.catalog).get("skills", {}).get(name, {})
+                package = Path(entry.get("root", package))
+            except (OSError, ValueError, TypeError, NodeError):
+                pass
+        if not (package / "scripts/cli.py").is_file():
+            raise NodeError("MISSING_CAPABILITY", "Installed sibling Skill is unavailable", name, blocked=True)
+        package = package.resolve(strict=True)
+        cli = safe(package, "scripts/cli.py")
         call = self.base + "/calls/" + uuid.uuid4().hex
         incoming, outgoing = call + "/request.json", call + "/response.json"
         write_bytes(self.root, incoming, canonical(request))
         argv = [
-            str(interpreter),
+            sys.executable,
             str(cli),
             "--input",
             str(safe(self.root, incoming)),
@@ -490,9 +470,9 @@ class Context:
             str(self.root),
             "--rules-digest",
             self.args.rules_digest,
-            "--catalog",
-            self.args.catalog,
         ]
+        if self.args.catalog:
+            argv += ["--catalog", self.args.catalog]
         if action:
             argv += ["--action", action]
         result = subprocess.run(argv, capture_output=True, timeout=120, check=False)
@@ -505,27 +485,13 @@ class Context:
                 "Response envelope digest is missing or invalid",
                 name,
             )
-        if (
-            response.get("schema_version") != "2.0"
-            or response.get("record_kind") != "result"
-            or response.get("rules_digest") != self.args.rules_digest
-            or response.get("tool_identity", {}).get("package_digest")
-            != entry["package_digest"]
-        ):
-            raise NodeError(
-                "SIBLING_IDENTITY_MISMATCH",
-                "Response does not bind the pinned public Skill",
-                name,
-            )
-        if package_digest(package) != entry["package_digest"]:
-            raise NodeError(
-                "PACKAGE_CHANGED", "Sibling package changed during invocation", name
-            )
+        if response.get("schema_version") != "2.0" or response.get("record_kind") != "result":
+            raise NodeError("INVALID_SIBLING_RESULT", "Public Skill returned an invalid result", name)
         if result.returncode or response.get("status") != "ok":
             issue = next(iter(response.get("diagnostics", [])), {})
             raise NodeError(
                 issue.get("code", "SIBLING_BLOCKED"),
-                issue.get("message", "Sibling prerequisite blocked"),
+                issue.get("message", "Skill operation failed"),
                 name,
                 blocked=response.get("status") == "blocked",
             )
@@ -537,7 +503,7 @@ def run(handler, package):
     parser.add_argument("--input", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--knowledge-root", required=True)
-    parser.add_argument("--rules-digest", required=True)
+    parser.add_argument("--rules-digest")
     parser.add_argument("--catalog")
     parser.add_argument("--action")
     args = parser.parse_args()
@@ -555,78 +521,9 @@ def run(handler, package):
     code = 2
     try:
         request = read_json(args.input)
-        workflow = request.get("workflow")
-        if "workflow" in request:
-            if not isinstance(workflow, dict) or any(
-                key not in workflow for key in ("run_id", "node_id", "attempt_id")
-            ):
-                raise NodeError(
-                    "INVALID_WORKFLOW",
-                    "Explicit workflow needs run, node and attempt IDs",
-                )
-            pieces = [
-                identifier(workflow[key]) for key in ("run_id", "node_id", "attempt_id")
-            ]
         context = Context(args, request, package)
         data, phase = handler(context)
         envelope.update(status="ok", phase=phase, data=data)
-        workflow = request.get("workflow")
-        if workflow:
-            pieces = [
-                identifier(workflow[k]) for k in ("run_id", "node_id", "attempt_id")
-            ]
-            ref = (
-                "logs/workflows/"
-                + pieces[0]
-                + "/nodes/"
-                + "/".join(pieces[1:])
-                + "/result.json"
-            )
-            references = set()
-            for key, value in data.items():
-                if key.endswith("_ref") and isinstance(value, str):
-                    references.add(value)
-                elif key.endswith("_refs") and isinstance(value, list):
-                    references.update(item for item in value if isinstance(item, str))
-            artifact_digests = {
-                item: sha(
-                    fixed_bytes(
-                        context.root, item, [".build", "logs", "artifacts/indexes"]
-                    )
-                )
-                for item in sorted(references)
-            }
-            manifest = context.seal(
-                {
-                    "workflow": workflow,
-                    "artifact_digests": artifact_digests,
-                    "phase": phase,
-                    "result": data,
-                    "request_digest": digest(request),
-                    "result_digest": digest(data),
-                },
-                "workflow_manifest",
-            )
-            context.save(ref, manifest)
-            markdown = (
-                "# Node result\n\n```json\n" + canonical(manifest).decode() + "\n```\n"
-            )
-            write_bytes(context.root, ref[:-5] + ".md", markdown.encode())
-            for item, expected in artifact_digests.items():
-                if (
-                    sha(
-                        fixed_bytes(
-                            context.root, item, [".build", "logs", "artifacts/indexes"]
-                        )
-                    )
-                    != expected
-                ):
-                    raise NodeError(
-                        "ARTIFACT_CHANGED",
-                        "Returned file changed during workflow manifest publication",
-                        item,
-                    )
-            envelope["data"]["artifact_manifest_ref"] = ref[:-5] + ".md"
         code = 0
     except Exception as exc:
         blocked = getattr(exc, "blocked", False)
@@ -642,6 +539,7 @@ def run(handler, package):
             ],
         )
         code = 3 if blocked else 2
+    envelope["rules_digest"] = args.rules_digest
     output = Path(args.output).absolute()
     root = Path(args.knowledge_root).resolve()
     if root.exists() and output.is_relative_to(root):

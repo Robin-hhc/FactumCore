@@ -1,11 +1,11 @@
-"""Recovery orchestration over the catalog-pinned public apply CLI."""
+"""Delegate transaction recovery to the installed public apply CLI."""
 
 import pathlib
-import re
 import secrets
 import subprocess
+import sys
 
-from support import Blocked, Invalid, atomic_bytes, canonical, native_path, package_digest
+from support import Blocked, Invalid, atomic_bytes, canonical, native_path
 
 
 def recover(ctx, request, action):
@@ -13,23 +13,14 @@ def recover(ctx, request, action):
     if mode not in ("inspect", "resume", "rollback"):
         raise Invalid("recovery action must be inspect, resume or rollback")
     op = ctx.operation(request)
-    spec = ctx.catalog.get("skills", {}).get("hs-knowledge-apply")
-    if not spec:
-        raise Blocked("catalog-pinned apply engine is not installed")
-    package = pathlib.Path(spec["root"]).resolve()
-    entry = (package / spec.get("entry", "scripts/cli.py")).resolve()
-    if entry != package / "scripts/cli.py" or package_digest(package) != spec.get(
-        "package_digest"
-    ):
-        raise Invalid("installed apply package identity mismatch")
-    if not ctx.catalog_path:
-        raise Blocked("trusted installed catalog path is required")
-    attempt = request.get("workflow", {}).get("attempt_id", "standalone")
-    if not isinstance(attempt, str) or not re.fullmatch(
-        r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}", attempt
-    ):
-        raise Invalid("invalid workflow attempt_id")
-    stem = f".build/operations/{op}/recover-{mode}-{attempt}"
+    package = pathlib.Path(__file__).resolve().parents[2] / "hs-knowledge-apply"
+    if not (package / "scripts/cli.py").is_file():
+        spec = ctx.catalog.get("skills", {}).get("hs-knowledge-apply", {})
+        package = pathlib.Path(spec.get("root", package))
+    entry = package / "scripts/cli.py"
+    if not entry.is_file():
+        raise Blocked("installed apply Skill is unavailable")
+    stem = f".build/operations/{op}/recover-{mode}-{secrets.token_hex(8)}"
     request_ref, response_ref = (
         stem + "-request.json",
         stem + "-response-" + secrets.token_hex(12) + ".json",
@@ -47,7 +38,7 @@ def recover(ctx, request, action):
     native_response = pathlib.Path(native_path(response_path))
     if not native_response.exists():
         command = [
-            spec["python"],
+            sys.executable,
             str(entry),
             "--input",
             str(ctx.path(request_ref)),
@@ -57,11 +48,11 @@ def recover(ctx, request, action):
             str(ctx.root),
             "--rules-digest",
             ctx.rules_digest,
-            "--catalog",
-            ctx.catalog_path,
             "--action",
             mode,
         ]
+        if ctx.catalog_path:
+            command += ["--catalog", ctx.catalog_path]
         try:
             completed = subprocess.run(
                 command, check=False, capture_output=True, timeout=120
@@ -74,7 +65,6 @@ def recover(ctx, request, action):
     if (
         response.get("record_kind") != "result"
         or response.get("tool_identity", {}).get("skill") != "hs-knowledge-apply"
-        or response["tool_identity"].get("package_digest") != spec["package_digest"]
     ):
         raise Invalid("public apply result identity mismatch")
     record = ctx.record(

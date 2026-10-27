@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import base64
 import copy
 from contextlib import contextmanager
 import os
@@ -13,7 +12,6 @@ from support import (
     digest,
     fixed_bytes,
     load_yaml,
-    read_json,
     safe,
     sha,
     write_bytes,
@@ -397,209 +395,83 @@ def register(context, *, code=False):
     }, "registered"
 
 
-def validate_generation_baseline(context, generation):
-    paths = [
-        path for path in (context.root / "knowledge").rglob("*.md") if path.is_file()
-    ]
-    paths.append(context.root / "governance/sources.lock.yaml")
-    files = {
-        path.relative_to(context.root).as_posix(): sha(
-            fixed_bytes(context.root, path.relative_to(context.root).as_posix())
-        )
-        for path in sorted(paths)
-    }
-    if generation.get("knowledge_baseline") != digest(files):
-        raise NodeError(
-            "STALE_GENERATION",
-            "Active generation does not represent current exact knowledge and source-lock bytes",
-            blocked=True,
-        )
-
-
 def advance(context):
-    request = context.request
-    if not request.get("apply_result_ref") or not request.get("generation_ref"):
-        raise NodeError(
-            "VERIFIED_REVIEW_REQUIRED",
-            "Applied review and actual activated generation are required",
-            blocked=True,
-        )
+    """Recheck stale-source restrictions from current cards and actual sources."""
     with writer_lock(context):
         previous = state(context)
         if previous.get("pending_event_ids"):
             raise NodeError(
                 "EVENT_RECOVERY_REQUIRED",
-                "Source event publication must finish before clearing blocks",
+                "Source event publication must finish before updating restrictions",
                 blocked=True,
             )
-        applied = context.record(request["apply_result_ref"], "apply_result")
-        verification = context.call(
-            "hs-knowledge-apply",
-            {
-                "operation_id": applied["operation_id"],
-                "apply_result_ref": request["apply_result_ref"],
-                "purpose": "current",
-                **(
-                    {"current_code_proof_ref": request["current_code_proof_ref"]}
-                    if request.get("current_code_proof_ref")
-                    else {}
-                ),
-            },
-            "verify-result",
-        )
-        if not verification["data"].get("result_verified"):
-            raise NodeError(
-                "VERIFIED_REVIEW_REQUIRED",
-                "Apply authority could not be verified",
-                blocked=True,
-            )
-        generation = context.call(
-            "hs-knowledge-index-build",
-            {
-                "operation_id": context.operation,
-                "generation_ref": request["generation_ref"],
-            },
-            "verify",
-        )["data"]
-        if (
-            not generation.get("verified")
-            or generation.get("validity_epoch") != previous["validity_epoch"]
-        ):
-            raise NodeError(
-                "STALE_GENERATION",
-                "Reviewed generation does not bind the current validity epoch",
-                blocked=True,
-            )
-        active_ref = "artifacts/indexes/" + generation["channel"] + "/active.json"
-        active = read_json(safe(context.root, active_ref))
-        if (
-            active.get("generation_ref") != request["generation_ref"]
-            or active.get("generation_id") != generation["generation_id"]
-        ):
-            raise NodeError(
-                "GENERATION_NOT_ACTIVE",
-                "Review generation is not actually active",
-                blocked=True,
-            )
-        validate_generation_baseline(context, generation)
-        view = context.record(applied["view_ref"], "final_view")
-        if view["digest"] != applied["view_digest"]:
-            raise NodeError("APPLIED_VIEW_CHANGED", "Apply proof and exact view differ")
-        reviewed_cards = {}
-        reviewed_paths = {}
-        for write in view["writes"]:
-            path = write["path"]
-            if not path.startswith("knowledge/") or path.endswith("/index.md"):
-                continue
-            raw = base64.b64decode(write["bytes_b64"], validate=True)
-            if (
-                sha(raw) != write["final_digest"]
-                or fixed_bytes(context.root, path) != raw
-            ):
-                raise NodeError(
-                    "APPLIED_CARD_CHANGED",
-                    "Reviewed Card bytes differ from current knowledge",
-                    path,
-                )
-            card = context.modules["knowledge"].parse_card(raw, path, context.rules)
-            reviewed_cards[card["metadata"]["id"]] = card
-            reviewed_paths[card["metadata"]["id"]] = path
+        cards = {card["metadata"]["id"]: card for card in domain_cards(context)}
+        source_lock = context.modules["source_resources"].read_source_lock(context.root)
+        rules = {**context.rules, "source_lock": source_lock}
+        for card in cards.values():
+            context.modules["knowledge"].validate_card(card, cards, rules)
+        context.modules["knowledge"].validate_relations(cards)
+        before = {card["path"]: card["sha256"] for card in cards.values()}
         remaining, cleared = [], []
+        freshness_reasons = {"source_changed", "code_changed", "code_source_changed"}
         for block in previous["blocked_claims"]:
-            card = reviewed_cards.get(block["card_id"])
-            if card is None:
+            # Source-byte checks cannot clear semantic/applicability restrictions.
+            if block.get("reason") not in freshness_reasons or block["card_id"] == "*":
                 remaining.append(block)
                 continue
-            metadata = card["metadata"]
-            if metadata["lifecycle"] == "deprecated":
+            card = cards.get(block["card_id"])
+            if card is None or card["metadata"]["lifecycle"] == "deprecated":
                 cleared.append(block)
                 continue
-            claim = next(
-                (c for c in metadata["claims"] if c["id"] == block["claim_id"]), None
-            )
-            if claim is None:
-                cleared.append(
-                    block
-                )  # exact accepted write explicitly removed this old Claim.
-                continue
-            if block.get("reason") == "code_changed":
-                current_proof = request.get("current_code_proof_ref")
-                path = reviewed_paths[block["card_id"]]
-                eligible = verification["data"].get("eligible_files", [])
-                if (
-                    view["review_mode"] != "code_gate"
-                    or not current_proof
-                    or verification["data"].get("current_code_proof_ref")
-                    != current_proof
-                    or not any(
-                        row.get("path") == path
-                        and row.get("sha256") == sha(card["raw"])
-                        for row in eligible
-                    )
-                ):
-                    remaining.append(block)
-                    continue
-                # A fresh bound Agent review records the current applicability
-                # judgment; historical code evidence stays immutable.
+            claim = next((row for row in card["claims"] if row["id"] == block["claim_id"]), None)
+            if claim is None and block["claim_id"] != "*":
                 cleared.append(block)
                 continue
-            sources = {s["evidence_ref"]: s for s in metadata["sources"]}
-            refs = [
-                sources[r]
-                for r in claim["source_refs"]
-                if sources[r]["source_id"] == block["source_id"]
-            ]
-            latest = (
-                previous.get("observed_sources", {})
-                .get(block["source_id"], {})
-                .get("snapshot_id", block["new_snapshot_id"])
-            )
-            if not refs or any(r["snapshot_id"] != latest for r in refs):
+            claims = [claim] if claim is not None else card["claims"]
+            refs = [source for row in claims for source in row["source_records"]
+                    if not block.get("source_id") or source["source_id"] == block["source_id"]]
+            latest = previous.get("observed_sources", {}).get(block.get("source_id"), {}).get("snapshot_id")
+            if not refs or (latest and any(source["snapshot_id"] != latest for source in refs)):
                 remaining.append(block)
                 continue
-            for ref in refs:
-                resolved = context.call(
-                    "hs-knowledge-source-capture",
-                    {"operation_id": context.operation, "source_ref": ref},
-                    "resolve-source",
-                )["data"]
-                if resolved.get("current_source_matches") is not True:
-                    raise NodeError(
-                        "SOURCE_CHANGED_AGAIN",
-                        "Reviewed source changed again; keep current block",
-                        blocked=True,
-                    )
-            cleared.append(block)
+            current = True
+            for source in refs:
+                try:
+                    resolved = context.call(
+                        "hs-knowledge-source-capture",
+                        {"operation_id": context.operation, "source_ref": source},
+                        "resolve-source",
+                    )["data"]
+                    current = current and resolved.get("current_source_matches") is True
+                except (ValueError, OSError, KeyError):
+                    current = False
+            (cleared if current else remaining).append(block)
+        for path, expected in before.items():
+            if sha(fixed_bytes(context.root, path)) != expected:
+                raise NodeError("KNOWLEDGE_CHANGED", "Cards changed while checking restrictions", path, blocked=True)
         updated = copy.deepcopy(previous)
         updated["blocked_claims"] = remaining
-        updated["knowledge_apply_watermark"] = applied["digest"]
         if cleared:
             updated["validity_epoch"] += 1
-        validate_generation_baseline(context, generation)
         result = save_state(context, previous, updated)
     return {
         "cleared_claims": cleared,
         "blocked_claims": remaining,
         "validity_epoch": result["validity_epoch"],
         "knowledge_apply_watermark": result["knowledge_apply_watermark"],
+        "verification_tier": "current_source_bytes_only",
     }, "advanced"
 
 
 def inspect_context(context):
     """Reconstruct current restrictions; no event registration or knowledge writes."""
     cards = domain_cards(context)
-    lock = context.modules["source_resources"].read_source_lock(context.root)
-    resources = {row["source_id"]: row for row in lock["resources"]}
     try:
-        catalog = read_json(context.args.catalog) if context.args.catalog else {}
-        config_path = context.modules["validation"].workspace_config_path(
-            context.root, catalog.get("workspaces"), context.args.rules_digest
-        )
+        config_path = context.modules["validation"].workspace_config_path(context.root)
         config_digest = sha(config_path.read_bytes())
     except (ValueError, OSError):
         config_digest = None
-    cached, affected, gaps, processing_records = {}, [], [], []
-    summaries = {}
+    cached, affected, gaps = {}, [], []
     record_root = context.root / "logs/ingest"
     if record_root.exists():
         for path in sorted(record_root.iterdir()):
@@ -609,39 +481,13 @@ def inspect_context(context):
             try:
                 record = load_yaml(fixed_bytes(context.root, ref, ["logs/ingest"]))
                 context.modules["records"].validate_ingest_record(record, rules=context.rules)
-                processing_records.append(record)
-                acceptance = record.get("acceptance", {})
-                for row in acceptance.get("cards", []):
-                    summaries.setdefault((row.get("path"), row.get("sha256")), []).append(acceptance)
             except (ValueError, OSError, KeyError) as exc:
                 gaps.append({"code": "PROCESSING_RECORD_UNAVAILABLE", "path": ref, "reason": str(exc)})
     persisted = state(context)
-    shared = context.modules["records"].rebuild_restrictions(processing_records, context.rules, cards=cards)
-    gaps.extend(shared["gaps"])
-    affected.extend(shared["blocked_claims"])
     for card in cards:
         card_id = card["metadata"]["id"]
-        accepted = summaries.get((card["path"], card["sha256"]), [])
-        code_context_problem = None
-        if card["metadata"]["review_mode"] == "code_gate":
-            verified_context = False
-            for acceptance in accepted:
-                try:
-                    context.modules["source_resources"].validate_current_code_identity(
-                        acceptance.get("code_identity"), config_path, acceptance.get("config_digest"),
-                        context.rules, read_json(context.args.catalog).get("code_policy"),
-                    )
-                    verified_context = True
-                except (ValueError, OSError, KeyError) as exc:
-                    code_context_problem = str(exc)
-            if not verified_context:
-                code_context_problem = code_context_problem or "No exact current code identity in processing records"
-            else:
-                code_context_problem = None
         for claim in card["claims"]:
             reasons = []
-            if code_context_problem:
-                reasons.append({"reason": "code_context_unknown_or_changed", "details": code_context_problem})
             for source in claim["source_records"]:
                 key = digest(source)
                 if key not in cached:
@@ -657,12 +503,6 @@ def inspect_context(context):
                 reason, details = cached[key]
                 if reason:
                     reasons.append({"reason": reason, "source_id": source["source_id"], "details": details})
-                if resources.get(source["source_id"], {}).get("kind") == "code":
-                    identities = {row.get("config_digest") for row in accepted}
-                    if not config_digest or config_digest not in identities:
-                        reasons.append({"reason": "code_context_unknown_or_changed", "source_id": source["source_id"]})
-            if accepted and not any(row.get("rules_digest") == context.args.rules_digest for row in accepted):
-                reasons.append({"reason": "rules_changed"})
             for block in persisted.get("blocked_claims", []):
                 if block.get("card_id") in {card_id, "*"} and block.get("claim_id") in {claim["id"], "*"}:
                     reasons.append({"reason": block.get("reason", "pending_review")})

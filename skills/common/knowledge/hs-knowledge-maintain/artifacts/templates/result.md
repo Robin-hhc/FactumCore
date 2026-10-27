@@ -1,3 +1,8 @@
 # Node result
 
-Use the CLI-generated immutable manifest location. Record run, operation, node, attempt, exact input/output digests, actual phase and unresolved limitations.
+- Operation and requested action:
+- Actual status / phase:
+- Business output file references:
+- Diagnostics and remaining gaps:
+
+Use the actual CLI response. OpenFlow records its own execution identities.

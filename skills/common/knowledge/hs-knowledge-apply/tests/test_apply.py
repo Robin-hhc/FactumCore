@@ -1,4 +1,4 @@
-"""Transactions use independent content review without human confirmation."""
+"""Transactions check their own bytes and write safely without workflow gates."""
 
 import base64
 import pathlib
@@ -136,34 +136,38 @@ class ApplyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             ctx, request = self.fixture(pathlib.Path(tmp))
             request.pop("proof_ref")
+            request.pop("content_review_ref")
             result = execute(ctx, request)
             self.assertEqual(result["transaction_status"], "committed")
             self.assertNotIn("review_trust", ctx.catalog)
             self.assertFalse(ctx.path("logs/host-events").exists())
+            journal = ctx.read("logs/operations/op/journal.json")
+            self.assertNotIn("proof_ref", journal)
+            self.assertNotIn("content_review_ref", journal)
 
-    def test_document_self_review_cannot_authorize_writes(self):
+    def test_optional_review_identity_is_not_an_apply_gate(self):
         from transaction import execute
-        from support import Blocked, canonical, seal
+        from support import canonical, seal
         with tempfile.TemporaryDirectory() as tmp:
             ctx, request = self.fixture(pathlib.Path(tmp))
             proof = ctx.read(request["proof_ref"])
             proof["reviewer_id"] = proof["author_id"]
             ctx.path(request["proof_ref"]).write_bytes(canonical(seal(proof)))
-            with self.assertRaises(Blocked):
-                execute(ctx, request)
-            self.assertFalse(ctx.path("knowledge/create.md").exists())
+            self.assertEqual(execute(ctx, request)["transaction_status"], "committed")
+            result = ctx.read("logs/operations/op/apply-result.json")
+            self.assertEqual(result["verification_tier"], "transaction_bytes_only")
 
-    def test_legacy_human_approval_cannot_replace_independent_review(self):
+    def test_optional_review_status_does_not_certify_apply(self):
         from transaction import execute
-        from support import Blocked, canonical, seal
+        from support import canonical, seal
         with tempfile.TemporaryDirectory() as tmp:
             ctx, request = self.fixture(pathlib.Path(tmp))
             proof = ctx.read(request["proof_ref"])
             proof.update(record_kind="manual_review", status="approved")
             ctx.path(request["proof_ref"]).write_bytes(canonical(seal(proof)))
-            with self.assertRaises(Blocked):
-                execute(ctx, request)
-            self.assertFalse(ctx.path("knowledge/create.md").exists())
+            self.assertEqual(execute(ctx, request)["transaction_status"], "committed")
+            result = ctx.read("logs/operations/op/apply-result.json")
+            self.assertEqual(result["verification_tier"], "transaction_bytes_only")
 
     def test_changed_document_view_invalidates_review(self):
         from transaction import execute
@@ -177,18 +181,15 @@ class ApplyTests(unittest.TestCase):
                 execute(ctx, request)
             self.assertFalse(ctx.path("knowledge/create.md").exists())
 
-    def test_removed_proof_set_is_rejected_even_when_empty(self):
+    def test_unused_workflow_proof_set_is_not_an_apply_gate(self):
         from transaction import execute
-        from support import Invalid
         with tempfile.TemporaryDirectory() as tmp:
             ctx, request = self.fixture(pathlib.Path(tmp))
-            with self.assertRaises(Invalid):
-                execute(ctx, {**request, "proof_set": {}})
-            self.assertFalse(ctx.path("knowledge/create.md").exists())
+            self.assertEqual(execute(ctx, {**request, "proof_set": {}})["transaction_status"], "committed")
 
-    def test_authored_plan_binding_cannot_be_disabled_by_omitting_v3_flag(self):
+    def test_optional_review_does_not_require_plan_author_chain(self):
         from transaction_v3 import validate_content_review
-        from support import Blocked, seal
+        from support import seal
         with tempfile.TemporaryDirectory() as tmp:
             ctx, request = self.fixture(pathlib.Path(tmp))
             view = ctx.read(request["view_ref"])
@@ -201,8 +202,7 @@ class ApplyTests(unittest.TestCase):
                                 author_id="fixture-author", reviewer_id="second-author",
                                 independent_context="separate", findings=[], plan_digest=plan["digest"],
                                 semantic_plan_ref=view["semantic_plan_ref"], scan_digest=plan["scan_digest"])
-            with self.assertRaises(Blocked):
-                validate_content_review(ctx, view, review)
+            self.assertEqual(validate_content_review(ctx, view, review), review)
 
     def mixed_fixture(self, root):
         from support import canonical, seal
@@ -216,35 +216,31 @@ class ApplyTests(unittest.TestCase):
         ctx.save("logs/operations/op/code-proof.json", proof)
         return ctx, {**request, "proof_ref": "logs/operations/op/code-proof.json"}
 
-    def test_mixed_code_proof_cannot_replace_full_view_content_review_without_v3(self):
+    def test_mixed_view_does_not_require_a_separate_full_view_review_gate(self):
         from transaction import execute
-        from support import Blocked
-        from unittest.mock import patch
         with tempfile.TemporaryDirectory() as tmp:
             ctx, request = self.mixed_fixture(pathlib.Path(tmp))
             request.pop("content_review_ref")
-            with patch("transaction.invoke_checker", return_value={}), self.assertRaises(Blocked):
-                execute(ctx, request)
-            self.assertFalse(ctx.path("knowledge/create.md").exists())
+            self.assertEqual(execute(ctx, request)["transaction_status"], "committed")
 
-    def test_mixed_review_digest_is_persisted_and_rechecked_during_recovery(self):
+    def test_safe_recovery_does_not_depend_on_optional_upstream_reports(self):
         from transaction import execute
-        from support import Blocked, Invalid, canonical, seal
-        from unittest.mock import patch
-        with tempfile.TemporaryDirectory() as tmp:
-            ctx, request = self.mixed_fixture(pathlib.Path(tmp))
-            with patch("transaction.invoke_checker", return_value={}):
+        from support import Blocked
+        for action in ("resume", "rollback"):
+            with self.subTest(action=action), tempfile.TemporaryDirectory() as tmp:
+                ctx, request = self.mixed_fixture(pathlib.Path(tmp))
                 with self.assertRaises(Blocked):
                     execute(ctx, {**request, "fault_after": 1})
                 journal = ctx.read("logs/operations/op/journal.json")
+                captured = (journal["proof_digest"], journal["content_review_digest"])
                 self.assertEqual(journal["content_review_ref"], request["content_review_ref"])
-                review = ctx.read(request["content_review_ref"])
-                self.assertEqual(journal["content_review_digest"], review["digest"])
-                review["reason"] = "changed after interruption"
-                ctx.path(request["content_review_ref"]).write_bytes(canonical(seal(review)))
-                with self.assertRaises(Invalid):
-                    execute(ctx, {"operation_id": "op"}, "resume")
-                self.assertEqual(ctx.path("knowledge/update.md").read_bytes(), b"old")
+                ctx.path(request["content_review_ref"]).write_bytes(b"corrupt optional review")
+                ctx.path(request["proof_ref"]).unlink()
+                result = execute(ctx, {"operation_id": "op"}, action)
+                self.assertEqual(result["transaction_status"], "committed" if action == "resume" else "rolled_back")
+                saved = ctx.read("logs/operations/op/journal.json")
+                self.assertEqual((saved["proof_digest"], saved["content_review_digest"]), captured)
+                self.assertEqual(ctx.path("knowledge/update.md").read_bytes(), b"updated" if action == "resume" else b"old")
 
     def test_resealed_journal_cannot_authorize_raw_writes(self):
         from transaction import execute

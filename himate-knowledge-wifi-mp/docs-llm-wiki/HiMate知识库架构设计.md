@@ -1,12 +1,14 @@
 # HiMate知识库架构设计
 
+Skill 可人工逐个调用，只校验本职业务数据和固定检查；OpenFlow 负责流程顺序、角色隔离及交棒合法性。节点不要求 Workflow 身份、catalog 登记或上游通过凭证。
+
 ## 5.3 HiMate knowledge目录架构
 
 himate-knowledge知识库仓目录结构如下所示。
 
 本节以 `repo/` 表示项目根目录，实际目录名称和存放位置不限。下树以平铺布局示意；实际知识根 K 由项目 `config.yml` 的 `knowledge_roots.wifi` 相对配置目录解析，允许安全的前置子目录，与业务代码共同管理。开发仓保存 Skill／Workflow 分发源码；实际部署在 Agent 自己的能力目录，运行不依赖项目根保留源码副本。业务工作区可包含 Host、Device、特性和算法等多个代码模块；知识库按配置中的相对路径读取实际文件，以内容指纹核对引用。
 
-当前安装和命令入口按同一业务工作区部署，从 `config.yml` 所在目录解析知识根和模块路径。`config.env`／profile 仅为执行器显式读取的机器部署配置，不能替代项目映射或开启仓外知识库。知识库独立存放仍属需另行实现的部署适配方案，见[知识库关键点](知识库关键点.md#1-工作区路径与部署边界)。
+当前入口按同一业务工作区读取根 `config.yml`，项目配置全部由用户在这份文件维护。已安装 `hs-knowledge-explore` 是知识库的项目接口：首次用 setup 复用全局 Python、补齐实际缺依赖并读取入口，后续按需定位代码仓、知识根并加载上下文。跨机器 SSH 信息放该 Skill 的 `config.env`，连接与实际执行检查交给 harness。正常流程不增加私有环境或登记步骤。仓外知识库仍需另行适配，见[知识库关键点](知识库关键点.md#1-工作区路径与部署边界)。
 
 - AGENTS.md：本工作区的消费路由契约
 - config.yml：项目架构映射，登记代码根、模块相对路径及芯片／端／特性／用途
@@ -17,7 +19,7 @@ himate-knowledge知识库仓目录结构如下所示。
   - knowledge/：知识卡，唯一检索对象，处理后知识的仓库
   - docs-raw/：源文档，原始证据层（LLM 只读）
   - governance/：治理文件夹，存放契约，模板，规范等
-  - tools/deploy/：环境准备、能力分发及 Agent 最终目录登记，不属于 Skill
+  - tools/deploy/：已有部署兼容工具、执行说明和回归
   - .build/ · logs/ · evals/ · artifacts/ · docs-llm-wiki/：配套支撑层
 
 ```text
@@ -26,14 +28,15 @@ repo/
 ├── config.yml                     # 代码根、模块相对路径与归属
 ├── main/                          # 业务代码工作区，可包含多个模块
 ├── skills/common/knowledge/   # 开发分发源码，部署时放入 Agent Skills
-│   ├── hs-workspace-explore/             # E0：缺上下文时前置发现
+│   ├── hs-knowledge-explore/             # 项目接口：首次 setup，后续按需定位和读取上下文
+│   ├── hs-codegraph-setup/               # 按真实模块首次准备 CodeGraph；日常使用官方 MCP
 │   ├── hs-knowledge-source-scan/         # 增量扫描、材料与处理记录
 │   ├── hs-knowledge-source-capture/      # 保存本次原文副本与定位
 │   ├── hs-knowledge-change-plan/         # 六决策计划
 │   ├── hs-knowledge-view-materialize/    # 物化最终视图
-│   ├── hs-knowledge-governance-handoff/  # 登记稿件与检查上下文
+│   ├── hs-knowledge-governance-handoff/  # 只读描述确切视图与上下文
 │   ├── hs-knowledge-lint/                # 只读确定性检查 Skill
-│   ├── hs-knowledge-candidate-inspect/   # 检查候选身份
+│   ├── hs-knowledge-candidate-inspect/   # 检查候选视图、来源与基线
 │   ├── hs-knowledge-local-check/         # 代码本地核验
 │   ├── hs-knowledge-candidate-revise/    # 修订或缩窄
 │   ├── hs-knowledge-apply/               # 精确事务落位
@@ -75,7 +78,7 @@ repo/
     │   └── glossaries/           # 术语
     ├── .build/                   # 候选暂存，Git 忽略
     ├── logs/                     # 来源、复核、操作和恢复留痕
-    ├── tools/deploy/             # 独立安装工具、运行锁及能力目录登记
+    ├── tools/deploy/             # 已有部署兼容、执行说明及回归
     ├── evals/                    # 检索案例和回归门禁
     ├── artifacts/                # 可重建索引和报告，Git 忽略
     └── docs-llm-wiki/             # 系统设计与使用说明；自身 SDD 仅本地维护
@@ -83,15 +86,15 @@ repo/
 
 节点 Skill 和 Workflow 随 WiFi 知识库维护：
 
-上树展示开发分发源码。部署后，`S` 表示 Agent 实际的 Skill 父目录，`F` 表示其 Workflow 父目录；两者可以在项目外，按最终位置生成 catalog/registry。知识库 `tools/deploy/` 独立准备运行环境和登记能力，不要求项目根保留 `skills/`、`workflows/`，节点也不从 Skill 包内运行安装器。一条 `hs-knowledge-ingest` Workflow 完成 P1—P7；`hs-knowledge-lint` 位于已安装的 Skill 目录，只执行只读检查。文档和代码均先完成独立 Agent 内容复核，文档继续 lint，代码及混合稿另完成适用代码核验。
+上树展示开发分发源码。实际能力已经安装在 Agent 自己的 `S`、`F` 目录，由 harness 使用；不要求业务仓根保留能力源码。首次运行 `S/hs-knowledge-explore/scripts/setup.py` 检查当前全局 Python 和依赖、读取项目入口；需要跨机时从同 Skill 的 `config.env` 提示 harness 通过 SSH 执行，不另复制部署工具或建立机器绑定。业务产物仍在 K 已有 `.build/`、`logs/`、`artifacts/`。ingest 完成 P1—P7，lint 保持确定性检查；文档和代码均独立内容复核，代码及混合稿另做适用代码核验。
 
-服务器项目的环境准备、登记、节点及子 CLI 统一经 SSH 在服务器原生路径执行；调用端工具、解释器、连接配置和请求／响应副本位于调用端本地磁盘，不经共享盘执行、遍历或镜像后重跑。直接位于当前机器的独立部署与服务器本机 Agent 使用当地登记能力。“本地入库”和“本机索引”均指实际执行端，不是固定指发起任务的电脑。执行器的路径检查不代替 OS 权限，也不自动识别所有 Linux 网络挂载；职责与边界见[详细设计 §6.3](知识库详细设计.md#63-命令分派与工作流续办)，操作配置见[执行说明](../tools/deploy/EXECUTION.md)。
+服务器项目由 Agent/harness 按 `hs-knowledge-explore/config.env` 的 SSH 提示在服务器原生路径执行，使用当地现有全局 Python。harness 须确认实际执行端能调用对应 Skill 脚本；调用端的安装路径不能当作远端脚本路径。setup 只返回连接提示，不上传能力；执行端能力缺失时报告缺口，特殊处理先与用户讨论，不另建目录或工具副本。连接、权限与命令结果由 harness 判断，不另外建立 runner 硬校验层。“本地入库”和“本机索引”指实际执行端；生成物留在 K 原有目录。行为与恢复见[详细设计 §6.3](知识库详细设计.md#63-命令分派与工作流续办)，入口说明见[执行说明](../tools/deploy/EXECUTION.md)。
 
 
 
 # 11 HiMate知识库架构
 
-知识库随代码仓一并拉取，无需独立初始化命令或常驻服务。`ingest` 默认处理五类允许 raw，从提炼 draft 连续完成检查、修订、独立内容复核和适用代码核验，最后将 stable 卡落位到 `knowledge/`；`lint` 是可单独调用的只读确定性检查入口，供手动修改和 CI 复用，不自动修稿或入库；`query` 消费知识。本地入库、索引全验、目标查询及活动代激活完成后，由人提交、触发固定 CI 并评审合入。`ingest --source` 可选限定来源；命令格式见[详细设计 §1.1](知识库详细设计.md#11-从命令进入流程)，实际注册和续办由宿主适配层负责。
+知识库随代码仓一并拉取；首次运行依赖由 `hs-knowledge-explore` 准备，不需要额外业务初始化命令或常驻服务。`ingest` 默认处理五类允许 raw，从提炼 draft 连续完成检查、修订、独立内容复核和适用代码核验，最后将 stable 卡落位到 `knowledge/`；`lint` 是可单独调用的只读确定性检查入口，供手动修改和 CI 复用，不自动修稿或入库；`query` 消费知识。本地入库、索引全验、目标查询及活动代激活完成后，由人提交、触发固定 CI 并评审合入。`ingest --source` 可选限定来源；命令格式见[详细设计 §1.1](知识库详细设计.md#11-从命令进入流程)，OpenFlow 负责 Workflow 的调度和交棒校验；人工测试可逐个调用 Skill 并按实际结果继续。
 
 ingest 是原件到本地正式知识的完整流程；lint 是可被 ingest、独立命令和 CI 复用的只读检查 Skill，query 负责消费。三者不是必须由用户顺序启动的三个 Workflow。
 
@@ -128,7 +131,7 @@ AIoT 业务横跨 WiFi、BGLE、定位、雷达、SLP、NFC、NPU、MCU 等十�
 flowchart TB
     U["用户 / AI Agent 任务"]
     C0{"已有适用项目上下文？"}
-    E0["E0 hs-workspace-explore<br />发现知识库、代码图谱入口和规则"]
+    E0["E0 hs-knowledge-explore<br />首次 setup · 后续项目定位与上下文读取"]
 
     subgraph S1["① 入口路由层 · 知识库前台"]
         direction LR
@@ -159,7 +162,7 @@ flowchart TB
         direction LR
         D1["governance/<br />templates · schemas · contracts · specs · sources.lock.yaml"]
         D2["Agent Skills · S<br />source-capture · change-plan · lint · apply · query"]
-        D3["Agent Workflows · F<br />hs-knowledge-ingest：完整 P1—P7"]
+        D3["OpenFlow · Agent Workflows · F<br />hs-knowledge-ingest：编排完整 P1—P7"]
     end
 
     subgraph S5["⑤ 配套支撑层"]
@@ -178,7 +181,7 @@ flowchart TB
     S1 --> S2
     S2 -->|"ingest 生产 draft"| E1
     E1 -->|"独立内容复核及适用核验 → lint → 入库"| S3
-    S4 -.->|"契约约束 · 流程执行"| S3
+    S4 -.->|"Skill 核业务数据 · OpenFlow 管流程交接"| S3
     S5 -.->|"质量保障"| S3
 ```
 
@@ -186,30 +189,30 @@ flowchart TB
 
 | 层 | 一句话职责 | 承载目录/文件 |
 |---|---|---|
-| ① 入口路由层 | 已知上下文直接路由；缺失时先发现 | `AGENTS.md` · `config.yml` · 领域仓根四件套；`hs-workspace-explore` 作为可选前置 E0 |
+| ① 入口路由层 | 已知上下文直接路由；缺失时先发现 | `AGENTS.md` · `config.yml` · 领域仓根四件套；`hs-knowledge-explore` 作为可选前置 E0 |
 | ② 源事实层 | 证据底座：代码事实 + 原始材料，喂知识层 | `main/` · `docs-raw/` |
 | ③ 知识资产层 | 唯一检索对象：治理后的知识卡 | `knowledge/` |
-| ④ 治理与工具层 | 契约约束、独立部署工具与节点执行体 | `governance/` · `tools/deploy/` · Agent 的 `S`／`F` |
+| ④ 治理与工具层 | Skill 执行业务检查，OpenFlow 编排顺序、角色与交棒；harness 执行命令 | `governance/` · Agent 的 `S`／`F` · 既有兼容工具 |
 | ⑤ 配套支撑层 | 候选暂存 · 回归门禁 · 留痕 · 派生索引 | `.build/` · `evals/` · `logs/` · `artifacts/` · `docs-llm-wiki/` |
 
 递进一句话：证据层喂知识层，契约层束知识层，技能层跑知识层，配套层验知识层，入口层路由知识层。
 
 ### 11.2.1 根目录架构
 
-#### hs-workspace-explore —— 会话前置发现 E0
+#### hs-knowledge-explore —— 首次准备与会话前置发现 E0
 
-Agent 已加载项目入口、知道知识库和代码图谱入口时，直接复用上下文执行 `ingest`、`lint` 或 `query`。会话尚未加载项目约定、未知这些能力位置，或独立 Workflow 节点只收到代码仓信息时，才先用 E0 补齐上下文；触发取决于信息是否缺失，不取决于当前目录是否在仓内。
+该 Skill 是知识库的项目接口。首次使用运行 `hs-knowledge-explore/scripts/setup.py`，检查现有全局依赖并读取根 `config.yml`；有 SSH 提示时由 harness 连接服务器实际执行。后续调用通过只读 E0 定位代码仓、知识根并读取 `AGENTS.md` 与配置；已有有效项目上下文就直接使用相应业务能力，无需重复 setup 或登记。
 
 ```mermaid
 flowchart LR
     A["会话 / 独立节点<br/>已知代码路径或工作区"] --> B{"适用上下文已加载？"}
     B -->|"是"| C["直接执行业务命令"]
-    B -->|"否"| E["E0 前置发现<br/>知识库 · 代码图谱入口<br/>AGENTS / config 路径与规则"]
+    B -->|"否"| E["E0 项目接口<br/>代码仓 · 知识根 · 图谱线索<br/>读取 AGENTS / config 与实际规则"]
     E -->|"发现并加载"| C
     E -->|"不存在或有歧义"| G["返回缺口，保留 unknown"]
 ```
 
-发现依据显式配置、有限祖先路径或受信工作区登记，不整盘猜测，不创建图谱、不伪造配置。入口线索与索引、服务实际可用性分别核实；未核实的图谱能力保留缺口。E0 发生在业务命令之前，可由独立节点在缺上下文时复用；它不是生产、治理或消费链路节点，也不是每条命令的必调步骤。日常命令复用已完成的部署登记，不要求每次重新选项目、执行 `init` 或绑定。
+只读发现依据显式配置、有限祖先路径或 harness 提供的既有上下文，不整盘猜测、不创建图谱或伪造配置。首次 setup 只准备全局依赖和入口，E0 继续处理会话信息缺口；它们位于业务命令之前，不属于 ingest，也不是每条命令的必调步骤。图谱线索和服务真实可用性分别核实，缺项保留 unknown。
 
 #### AGENTS.md —— 消费路由契约
 
@@ -233,45 +236,45 @@ Agent 会话入口。作用是"先路由，再消费"：代码静态事实读取
 
 #### `skills/common/knowledge/` —— 项目入口与节点级能力
 
-该路径是开发分发源码；实际能力放在 Agent 的 `S` 目录，由 catalog 按逻辑 Skill ID 定位，不依赖项目根同名目录。Skill 是知识库的"操作说明书"，不装领域事实或安装工具：
+该路径是开发分发源码；实际能力位于 Agent 的 `S` 目录，由 harness 使用，不依赖项目根同名目录。Skill 保存操作指引与所需脚本；`hs-knowledge-explore` 同时提供首次 setup 和后续项目定位接口，领域事实仍只放知识库：
 
 | 技能 | 职责 | 一句话 |
 |------|------|--------|
-| `hs-workspace-explore/` | E0：缺上下文时发现知识库、代码图谱与入口规则 | 业务命令前可选调用 |
+| `hs-knowledge-explore/` | 知识库项目接口：首次 setup，后续定位代码仓、知识根与上下文 | 已知上下文直接复用，缺入口信息时调用 |
 | `hs-codegraph-setup/` | S0：按模块首次准备 CodeGraph 索引与 MCP 接入 | 纯说明 Skill；日常 Q6 直接用官方 MCP |
 | `hs-knowledge-source-scan/` | P1 扫描、P2 材料、P6 处理记录及进度查询 | scan / prepare / record / status |
 | `hs-knowledge-source-capture/` | 保存本次原文副本，恢复旧版阅读材料 | 默认捕获；resolve-source / resolve 恢复固定来源或捕获包 |
 | `hs-knowledge-change-plan/` | 六决策计划 | plan / review 保存作者计划与独立内容复核 |
 | `hs-knowledge-view-materialize/` | 物化最终视图 | 保存完整拟写／删除字节和基线 |
-| `hs-knowledge-governance-handoff/` | 稿件与上下文辅助，当前 ingest 不设此固定节点 | 独立复用交接材料 |
+| `hs-knowledge-governance-handoff/` | 只读描述确切视图及来源／基线，不判交棒合法性 | 当前 ingest 不设此固定节点 |
 | `hs-knowledge-lint/` | L1—L5 只读确定性检查 | lint |
-| `hs-knowledge-candidate-inspect/` | 检查候选身份 | 检查确切视图、证明和当前基线 |
-| `hs-knowledge-local-check/` | 代码本地核验 | local / merge 核验；verify-proof 复验既有证明 |
+| `hs-knowledge-candidate-inspect/` | 检查候选业务数据 | 核对确切视图、来源、拟写字节和当前基线 |
+| `hs-knowledge-local-check/` | 检查逐 Claim 依据与实际代码／配置材料 | local / merge 核验；verify-proof 复查结果中的业务绑定 |
 | `hs-knowledge-candidate-revise/` | 修订或缩窄 | 生成新的受检视图 |
-| `hs-knowledge-apply/` | 精确事务落位 | run；verify-result 核对既有结果 |
+| `hs-knowledge-apply/` | 实际固定检查与精确事务落位 | run；verify-result 核对事务内容，不颁发流程通过资格 |
 | `hs-knowledge-recover/` | 恢复事务 | inspect / resume / rollback |
-| `hs-knowledge-index-build/` | 构建验证和激活索引 | build / verify / activate |
-| `hs-knowledge-query-regression/` | 回归候选代 | 执行计划目标查询；verify 复验绑定报告 |
+| `hs-knowledge-index-build/` | 按实际卡／来源和可选代码材料构建、验证及激活 | build / verify / activate；不追查上游通过票据 |
+| `hs-knowledge-query-regression/` | 回归候选代 | 执行本次明确的查询断言；verify 重跑报告中的实际案例 |
 | `hs-knowledge-publish-handoff/` | 外部发布材料辅助 | run / verify-submission；不执行 Git 提交 |
 | `hs-knowledge-merge-check/` | 固定代码视图复核辅助 | 复用 local-check 的 merge 核验 |
 | `hs-knowledge-maintain/` | 维护与阻断复核 | inspect-context 只读比较；事件登记与 advance 另行写入 |
 | `hs-knowledge-query/` | 消费知识 | search / read；延续 search 时绑定原 receipt |
 
-参与流程：ingest 编排 P1—P7，内部调用 lint Skill；query 使用知识、来源和索引能力。上表是能力清单，不表示上库必须逐个执行；固定 CI 复用 lint 的确定性检查函数。hs-workspace-explore 是命令前按需调用的 E0。S0 仅在首次 setup 时按 `config.yml` 的真实模块准备代码图谱，消费 Q6 使用官方 MCP 定位源码，见[详细设计 §5.11](知识库详细设计.md#511-s0--q6codegraph-首次-setup-与源码定位)。
+参与流程：OpenFlow 的 ingest Workflow 编排 P1—P7，内部调用 lint Skill；人工测试由人按需要逐个调用，Skill 不校验前驱步骤、角色身份或上游 passed 票据。query 使用实际知识、来源和索引。上表是能力清单，不表示上库必须逐个执行；固定 CI 复用 lint 的确定性检查函数。`hs-knowledge-explore` 提供首次 setup 和后续按需项目接口。S0 仅在首次 setup 时按 `config.yml` 的真实模块准备代码图谱，消费 Q6 使用官方 MCP 定位源码，见[详细设计 §5.11](知识库详细设计.md#511-s0--q6codegraph-首次-setup-与源码定位)。
 
 #### `workflows/common/knowledge/` —— 增量更新与治理工作流
 
-该路径是开发分发源码；实际 Workflow 放在 Agent 的 `F` 目录，按 Skill ID 编排，不以项目根目录拼接运行脚本。不装领域事实：
+该路径是开发分发源码；实际 Workflow 放在 Agent 的 `F` 目录，由 OpenFlow 按 Skill ID 编排并校验流程顺序、角色隔离和交棒合法性。Skill 自身只处理本次业务输入与输出，不要求 Workflow run／node／attempt 身份或生成流程 manifest。运行脚本从已安装能力定位，不以项目根目录拼接；Workflow 不装领域事实：
 
 | 技能 | 职责 | 一句话 |
 |------|------|--------|
 | `hs-knowledge-ingest/` | P1 扫描或续办→P2 材料→P3 阅读计划→P4 稿件及适用复核→P5 lint→P6 处理记录→P7 入库、索引与目标查询 | 一次入口完成本地闭环 |
 
-ingest 不另分独立的生产和治理流程；它在 P5 调用已登记的 `hs-knowledge-lint`，由返回的问题决定补材料、重判或修稿，再继续检查。lint 不建立 Workflow。
+ingest 不另分独立的生产和治理流程；它在 P5 调用已安装的 `hs-knowledge-lint`，由返回的问题决定补材料、重判或修稿，再继续检查。lint 不建立 Workflow。
 
 #### himate-knowledge-wifi-mp/ —— WiFi 领域知识库
 
-WiFi 原件、知识、治理与独立部署工具集中放在 `himate-knowledge-wifi-mp/`，业务代码工作区通过项目根 `config.yml` 关联。节点 Skill／Workflow 放在 Agent 的最终目录，工具生成 catalog/registry 连接已安装能力与项目；部署不要求项目根保留分发源码。知识库与业务工作区分离的方案仍需另行实现[知识库关键点 §1.3](知识库关键点.md#13-例外知识库位于业务仓外)的宿主适配。目录和忽略规则不构成 ACL，资料与能力分发按实际授权处理。
+WiFi 原件、知识和治理集中在 `himate-knowledge-wifi-mp/`，项目配置由根 `config.yml` 提供；Skill／Workflow 安装在 Agent 自己的目录，由 harness 调用。首次准备复用现有全局 Python，不要求额外私有部署目录或用户填写能力登记。产物使用既有 K 目录。仓外知识库仍需另行实现[知识库关键点 §1.3](知识库关键点.md#13-例外知识库位于业务仓外)的宿主适配；目录不构成 ACL。
 
 参与流程：ingest 负责原件到本地知识，lint 检查固定资产，query 消费合格结论。
 
@@ -332,7 +335,7 @@ flowchart LR
         A1["conventions/ 规范类<br />clean code · 命名规范"]
         A2["chips/ 芯片类<br />配置约束 · 表单"]
         A3["storys/ 迭代文档<br />2/3设计文档 · 测试用例"]
-        A4["specs/ SDD 工件<br />design · specs · task"]
+        A4["specs/ 业务规格与设计原件<br />需求 · 接口 · 状态与约束"]
         A5["protocols/ 协议类<br />wifi 80211协议"]
     end
 
@@ -355,12 +358,12 @@ flowchart LR
     A3 -.->|"测试用例"| K5
     A4 -->|"specs 规格"| K1
     A4 -.->|"design 流程"| K3
-    A4 -.->|"task 清单"| K6
+    A4 -.->|"实际命令与操作约束"| K6
     A5 -->|"协议机制"| K4
     A5 -.->|"帧格式字段"| K2
 ```
 
-实线是默认提炼方向，虚线是兼路由。一类材料可产生多类卡，最终按具体结论的性质选择 Profile；目录分类不能替代对正文、来源和适用范围的判断。
+实线是默认提炼方向，虚线是兼路由。图中的 specs 是已放入原件目录的业务规格与设计，不包含本项目本地 `docs-llm-wiki/sdd/`、`task.md`。一类材料可产生多类卡，最终按具体结论的性质选择 Profile；目录分类不能替代对正文、来源和适用范围的判断。
 
 | 影响点 | 链路环节 | 分类错位后果 |
 |--------|----------|--------------|
@@ -384,15 +387,15 @@ flowchart LR
 |------|-----------|--------------|
 | `.build/` | 转换、规范化、候选暂存（ignored） | 生产过程的半成品不该出现在检索结果里 |
 | `evals/` | 检索案例、回归执行与接受/拒绝测试 | 质量门禁：改索引/改契约必须先过回归 |
-| `logs/` | 按操作保存证据、复核、事务和维护记录；`logs/ingest/` 保存可共享处理事实 | 支持身份核对与恢复；历史事实不改写，不代替原始 trace |
-| `artifacts/` | 执行端派生索引、同代正文和验证报告（Git 忽略） | 根据卡、来源及有效资格重新构建；缺少必需证明时不能只凭卡正文伪造资格 |
+| `logs/` | 按操作保存来源、内容复核、事务和维护记录；`logs/ingest/` 保存可共享处理事实 | 支持内容追溯与安全恢复；不把日志存在或上游状态当作交棒资格 |
+| `artifacts/` | 执行端派生索引、同代正文和验证报告（Git 忽略） | 按实际卡、来源和业务材料重建；完整核对集合、内容与指纹，不依赖上游通过证明链 |
 | `docs-llm-wiki/` | LLM WIKI 系统说明 | 讲"系统怎么用"；禁止成为第二份领域事实库 |
 
 参与链路：`.build/` 生产链路暂存；`evals/` 治理链路回归 · CI 门禁复跑；`logs/` 治理链路留痕；`artifacts/` 消费链路机器召回；`docs-llm-wiki/` 不参与链路，讲链路本身。
 
 ## 11.3 知识库使用链路
 
-目录共同支撑完整 ingest、只读 lint 和 query。先看各自的输入、动作与输出，再对应资产位置；提交后的固定 CI 是独立作业。
+目录共同支撑完整 ingest、只读 lint 和 query。下述先后关系由 OpenFlow 的 Workflow 编排和校验，人工测试时由人掌握；独立 Skill 仍核对本次所需业务文件和内容一致性。先看各自的输入、动作与输出，再对应资产位置；提交后的固定 CI 是独立作业。
 
 ### 流程一：ingest —— 从原件到本地正式知识
 
@@ -401,7 +404,7 @@ Agent 已在命令前读取项目 `AGENTS.md`、获知代码仓与知识库入�
 ```mermaid
 flowchart TD
     CMD["执行 knowledge ingest<br/>项目入口已在命令前读取"] --> P1
-    subgraph INGEST["hs-knowledge-ingest：本地流程"]
+    subgraph INGEST["OpenFlow 编排 hs-knowledge-ingest：本地流程"]
         P1["P1 扫描 / 续办"] -->|"新变化、输入失效或用户要求修卡"| P2["P2 准备本次原文、旧版与关联卡"]
         P2 --> P3["P3 Agent 阅读与计划"]
         P3 --> P4["P4 生成 draft 与完整视图<br/>完成独立内容复核和适用代码核验"]
@@ -412,7 +415,7 @@ flowchart TD
         P5 -->|"格式、导航或视图问题"| P4
         P4 -->|"结论需修订"| P3
         P4 -->|"缺代码或配置证据"| P2
-        P6 --> P7["P7 本地入库 / 恢复<br/>内容批：索引全验、目标查询及激活"]
+        P6 --> P7["P7 实际固定检查、CAS 写入 / 恢复<br/>内容批：索引全验、目标查询及激活"]
         P1 -->|"有效稿件及复核／检查停点"| P4
         P1 -->|"未完成事务或收尾"| P7
         P7 --> DONE["本地检查通过且该代已激活<br/>ingest 结束"]
@@ -425,9 +428,11 @@ flowchart TD
     C1 -. "失败：人工安排本地修正" .-> CMD
 ```
 
-P1 对照原件处理记录发现新增、修改、缺失与未完成事项，并接收用户明确的修卡请求；即使原件未变，该请求仍进入 P2 阅读原件和旧卡，不按无变化跳过。扫描只提供观察事实；P3 读取新旧原文和关联卡，再选择 create、update、merge、split、deprecate 或 defer。原件处理记录分别保留本次看到的版本、正式卡采用的版本及实际停点；保存副本、某卡引用原件均不表示整份原件已全部提炼。仅记录批在 P6 对账并由 P7 保存记录后结束，不写卡或重建索引。记录和阅读材料见[详细设计](知识库详细设计.md)。
+P1 对照原件处理记录发现新增、修改、缺失与未完成事项，并接收用户明确的修卡请求；即使原件未变，该请求仍进入 P2 阅读原件和旧卡，不按无变化跳过。扫描只提供观察事实；P3 读取新旧原文和关联卡，再选择 create、update、merge、split、deprecate 或 defer。原件处理记录分别保留本次看到的版本、正式卡采用的版本及实际停点；
 
-续办先核对原件、规则、代码和相关基线，稿件及依据未变时复用原操作与视图。退回改稿或输入变化后建立新操作与新视图，重新完成独立内容复核、适用代码核验和 P5；纯文档通过后继续入库，不等待真人回复。P6 准备并校验待入库记录，P7 随本批事务正式落位；未完成写入优先恢复原事务，已入库只补未完成的索引／查询／激活，不重复写入。用户要求修改已入库卡时，另建更新操作。
+P6 校验覆盖和真实引用，不要求先有 lint 通过票据或独立抽样身份证明。apply 自身运行完整固定业务检查，保存实际写入结果，不自动生成 supported 或独立复核验收摘要。保存副本、某卡引用原件均不表示整份原件已全部提炼。仅记录批在 P6 对账并由 P7 保存记录后结束，不写卡或重建索引。记录和阅读材料见[详细设计](知识库详细设计.md)。
+
+续办先核对原件、规则、代码和相关基线，稿件及依据未变时复用原操作与视图。退回改稿或输入变化后建立新操作与新视图，重新完成独立内容复核、适用代码核验和 P5；纯文档通过后继续入库，不等待真人回复。P6 准备并校验待入库记录，P7 随本批事务正式落位；apply 核对实际视图、来源恢复、当前代码／配置材料和旧基线，不检查前驱 Skill 是否通过。恢复依赖原视图、事务、CAS 和备份，可选复核文件后来删除不阻断安全恢复。未完成写入优先恢复原事务，已入库只补未完成的索引／查询／激活，不重复写入。用户要求修改已入库卡时，另建更新操作。
 
 只有同范围完整扫描成功，才能把原有路径未出现列为缺失；不可读、扫描中断或 `--source` 范围外不推断删除。缺失项读各关联卡实际引用的旧原文，不自动删知识。
 
@@ -460,7 +465,7 @@ flowchart TB
     subgraph KQ["hs-knowledge-query 检索"]
         C["① SQLite 词项召回<br />按知识卡字段重合度（词面匹配）打分<br />召回匹配度高的知识卡"] --> D["② frontmatter 字段过滤<br />过滤范围不符 / 状态不符<br />"]
         D --> E["③ 合格结论重排<br />Search Receipt 固定代次、命中与范围"]
-        E --> F["④ 沿回执同代精读并重查资格<br />溯源到确切原件或代码快照"]
+        E --> F["④ 沿回执同代精读并核实际依据<br />来源、代码范围与采用材料指纹"]
         F --> G["⑤ 保留读取回执<br />结论 + 证据 + 范围 + 缺口"]
         G --> H["返回合格 Claim、固定来源与检索记录"]
     end
@@ -473,7 +478,11 @@ flowchart TB
 
 图中展示证据入口，主 Agent 根据问题综合材料；代码事实以所问版本的实际源码确认。下表沿用项目根／知识根 K 的路径基准；能力位置以 Agent 的实际目录 `S`、`F` 为准。
 
-查询用途与 stable 状态分开判断：current／implementation 需要相应的当前证据与适用范围，guidance／historical 不把未知条件提升为产品当前事实。P3 预先声明目标查询及用途，P7 按原计划验证；query 的 search 回执固定频道、索引代、用途、上下文及命中 Claim，read 仍重查当前资格，不能把回执当成永久授权。同一 K 最多一个 ingest，可并发 query，但活动代切换或内容变化时允许明确拒绝，机制见[详细设计 §5.9](知识库详细设计.md#59-q1q6路由查询同代精读与回答)。
+查询用途与 stable 状态分开判断：current／implementation 直接核对实际来源、当前模块／Target 范围和工作树源码字节；涉及构建／运行断言时，还复查索引中 `code_contexts` 固定的实际材料和逐 Claim 引用指纹，不要求 apply／merge-check 已通过的票据。静态源码结论和纯文档不增加构建材料要求，guidance／historical 不把未知条件提升为产品当前事实。
+
+OpenFlow 在 P3 预先声明目标查询及用途，P7 沿用计划；独立回归 Skill 直接执行本次明确输入的查询断言。query 的 search 回执固定频道、索引代、用途、上下文及命中 Claim，read 仍核实际依据，不能把回执当成永久授权。
+
+shared 索引可在构建时按 `knowledge_commit` 核对实际 Git 快照，query 复验所用代次的快照，结果只声明 `repository_snapshot`；显式提交签名发布回执时另核受信发布身份，不由此证明上游流程或 CI 已通过。OpenFlow 按同一 K 单个 ingest 编排；query 可并发，写入仍由事务锁和 CAS 保护，活动代切换或内容变化时可明确拒绝，机制见[详细设计 §5.9](知识库详细设计.md#59-q1q6路由查询同代精读与回答)。
 
 #### 目录 × 链路参与矩阵
 
@@ -481,13 +490,13 @@ flowchart TB
 |---|---|---|---|
 | `AGENTS.md` / `config.yml` | 项目约定、代码根与模块归属 | 适用规则、实际代码上下文和条件缺口 | 路由与范围依据 |
 | 实际业务代码目录 | 代码取证与 P4 内容复核 | 固定引用与文件身份检查 | 源码交叉印证 |
-| Agent Skills（`S`） | P2—P7 的材料、计划、内容复核、lint、核验及入库能力 | 独立 lint Skill；固定 CI 直接复用 K 内规则 | 查询、精读、来源恢复 |
-| Agent Workflows（`F`） | 一条 ingest 编排 P1—P7 | — | — |
+| Agent Skills（`S`） | 可独立调用的 P1—P7 材料、计划、内容复核、lint、核验及入库能力 | 独立 lint Skill；固定 CI 直接复用 K 内规则 | 查询、精读、来源恢复 |
+| Agent Workflows（`F`） | OpenFlow 编排 P1—P7，校验顺序、角色与交棒 | — | — |
 | `knowledge/` | 查重、关联卡和 P7 精确入库 | 正式卡格式与引用检查 | 唯一正文检索对象 |
 | `docs-raw/` | 只读原件 | 来源一致性复核 | 原件与证据溯源 |
-| `governance/` | 模板、来源和卡契约 | 共同规则、来源锁与记录约束 | 范围、来源、依赖及证明规则 |
+| `governance/` | 模板、来源和卡契约 | 共同规则、来源锁与记录约束 | 范围、来源、依赖与业务材料一致性 |
 | `.build/` | draft、计划和完整视图 | 只读检查视图 | 检索操作暂存 |
 | `evals/` | — | 索引和检索回归 | 回归用例 |
-| `logs/` | 原文、内容复核、核验、事务与续办记录 | 只读核对固定记录 | 资格证明及证据恢复 |
+| `logs/` | 原文、内容复核、核验、事务与续办记录 | 只读核对记录结构和实际引用 | 来源恢复与实际变更事实，不作为上游放行票据 |
 | `artifacts/` | 查重时使用已有索引 | CI 内部构建、验证的派生索引 | 机器召回与同代正文 |
 | `docs-llm-wiki/` | 系统设计与操作说明 | 系统设计与操作说明 | 系统使用说明 |

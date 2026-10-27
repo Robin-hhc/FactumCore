@@ -1,6 +1,7 @@
 """Public empty-library build/activate; old journals never provide card proof."""
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -94,7 +95,7 @@ def test_public_index_writer_barrier_rejects_unverified_or_own_old_journals(tmp_
         assert old.read_bytes() == before
 
 
-def test_old_terminal_journal_never_qualifies_an_unaccepted_current_card(tmp_path):
+def test_manual_card_build_and_query_need_no_admission_history(tmp_path):
     trial = EmptyIndex(tmp_path)
     source = trial.root / "docs-raw/specs/fixture.txt"
     source.parent.mkdir(parents=True)
@@ -112,11 +113,39 @@ def test_old_terminal_journal_never_qualifies_an_unaccepted_current_card(tmp_pat
         template = template.replace("{{" + key + "}}", value)
     target = trial.root / "knowledge/rules/unaccepted.md"
     target.parent.mkdir()
-    target.write_text(template.replace("lifecycle: draft", "lifecycle: stable"), encoding="utf-8")
+    target.write_text(template.replace("lifecycle: draft", "lifecycle: stable").replace("applicability: unknown", "applicability: universal").replace("usage: guidance", "usage: current"), encoding="utf-8")
     (target.parent / "index.md").write_text("# Rules\n[Unaccepted](unaccepted.md)\n", encoding="utf-8")
     old = trial.journal()
     before = old.read_bytes()
-    result = trial.call("build", {"operation_id": "unaccepted-index"}, expected=3)
-    assert result["diagnostics"][0]["code"] == "CARD_PROOF_MISSING"
-    assert not list((trial.root / "artifacts").rglob("index.sqlite"))
+    result = trial.call("build", {"operation_id": "manual-index"})
+    generation_ref = result["data"]["generation_ref"]
+    manifest = json.loads((trial.root / generation_ref).read_bytes())
+    assert manifest["qualifications"] == {}
+    assert set(manifest["documents"]) == {"unaccepted"}
+    trial.call("activate", {"operation_id": "manual-activate", "generation_ref": generation_ref, "expected_active": None})
+    queried = trial.call("search", {"operation_id": "manual-query", "query": "design"}, skill="hs-knowledge-query")
+    assert [row["card_id"] for row in queried["data"]["matches"]] == ["unaccepted"]
+    read = trial.call("read", {"operation_id": "manual-read", "card_id": "unaccepted"}, skill="hs-knowledge-query")
+    assert [row["id"] for row in read["data"]["claims"]] == ["c1"]
+    assert not list((trial.root / "logs/operations").glob("*/apply-result.json"))
+    # The shared channel checks a real snapshot; no CI receipt, adapter or key
+    # registration is needed to exercise this Skill independently.
+    def git(*arguments):
+        return subprocess.run(["git", "-c", "core.hooksPath=" + os.devnull,
+                               "-C", str(trial.base), *arguments], capture_output=True, check=True).stdout.decode().strip()
+    git("init", "-q")
+    git("config", "core.autocrlf", "false")
+    git("add", *(trial.root.name + "/" + path for path in ("knowledge", "governance", "docs-raw", "logs/evidence")))
+    git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false",
+        "commit", "-qm", "actual isolated snapshot")
+    shared = trial.call("build", {"operation_id": "shared-manual", "channel": "shared", "knowledge_commit": git("rev-parse", "HEAD")})
+    shared_ref = shared["data"]["generation_ref"]
+    shared_manifest = json.loads((trial.root / shared_ref).read_bytes())
+    assert shared_manifest["publication"]["verification_tier"] == "repository_snapshot"
+    trial.call("activate", {"operation_id": "shared-activate", "generation_ref": shared_ref, "expected_active": None})
+    shared_query = trial.call("search", {"operation_id": "shared-query", "channel": "shared", "query": "design"}, skill="hs-knowledge-query")
+    assert [row["card_id"] for row in shared_query["data"]["matches"]] == ["unaccepted"]
+    source.write_bytes(b"A changed actual original.\n")
+    stale = trial.call("search", {"operation_id": "stale-query", "query": "design"}, skill="hs-knowledge-query")
+    assert stale["data"]["matches"] == []
     assert old.read_bytes() == before

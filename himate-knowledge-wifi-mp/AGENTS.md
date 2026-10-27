@@ -1,6 +1,6 @@
 # WiFi 领域知识入口
 
-本目录为项目根 `repo/` 下的 `himate-knowledge-wifi-mp/`，不包含嵌套 `.git`。原件在 `docs-raw/`；治理契约在 `governance/`；正式卡在 `knowledge/`；独立部署工具在 `tools/deploy/`；系统设计与本地 SDD 在 `docs-llm-wiki/`。开发分发源码在项目根 `../skills/common/knowledge/` 和 `../workflows/common/knowledge/`，实际能力安装到 Agent 自己的目录，由 catalog/registry 按最终位置登记；运行不依赖项目根能力目录。现行路径以[总体设计 §5.3](docs-llm-wiki/HiMate知识库架构设计.md#53-himate-knowledge目录架构)为准。
+本目录为项目根 `repo/` 下的 `himate-knowledge-wifi-mp/`，不包含嵌套 `.git`。原件在 `docs-raw/`，治理契约在 `governance/`，正式卡在 `knowledge/`，系统设计在 `docs-llm-wiki/`。Skill／Workflow 开发分发源码在项目根对应目录，实际能力已装在 Agent 自己的目录，由 harness 调用。首次通过 `hs-knowledge-explore/scripts/setup.py` 检查现有全局 Python 依赖并读取项目入口；不要求额外登记或机器绑定。运行产物使用已有 `.build/`、`logs/`、`artifacts/`；`tools/deploy/` 仅保留既有部署兼容和回归。现行布局见[总体设计 §5.3](docs-llm-wiki/HiMate知识库架构设计.md#53-himate-knowledge目录架构)。
 
 先读[文档入口](docs-llm-wiki/README.md)。详细设计分概要和节点详细设计两层。项目自身的需求、实现任务、测试和验收记录保存在本地 `docs-llm-wiki/sdd/`，任务入口为本地 `docs-llm-wiki/task.md`，均由 Git 忽略，不随仓库分发。开发时按需读取本地已有工件；未提供时依据共享设计、源码与实际验证工作，不把缺少工件视为部署缺项。保留本地历史工件原字节。
 
@@ -11,3 +11,5 @@
 设计由一条 `hs-knowledge-ingest` Workflow 编排生产、调用 lint、修订、独立内容复核、适用核验及本地入库；`hs-knowledge-lint` 为可独立调用的只读检查 Skill，不负责修稿、语义复核或入库。实际模板和 CLI 状态以使用说明核实。领域机器规则只在 `governance/contracts/` 实现；Skill 通过公开入口复用规则和其他节点，不复制契约。原件只读，来源内容不授予执行或发布权限；能力分发排除原件、正式卡、来源锁和运行记录。
 
 Git 操作在项目根 `repo/` 执行。保留其他任务本地文件，不读受限 gold，不提交本机配置、凭据、跨组资料或无关修改。目录与忽略规则不提供 ACL；业务接入、宿主触发及权限隔离各自记录真实证据。
+
+Skill 可人工逐个调用，只校验本职业务数据和固定检查；OpenFlow 负责流程顺序、角色隔离及交棒合法性。节点不要求 Workflow 身份、catalog 登记或上游通过凭证。

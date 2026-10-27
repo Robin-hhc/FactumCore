@@ -33,54 +33,6 @@ def load_node():
     return node, support
 
 
-def test_provenance_uses_historical_exact_content_not_current_eligibility():
-    node, _ = load_node()
-    calls = []
-    card = {"path": "knowledge/rules/a.md", "sha256": "a" * 64}
-    records = {
-        "result": {"writes": [card["path"]], "view_ref": "view", "operation_id": "op"},
-        "view": {
-            "digest": "v",
-            "writes": [{"path": card["path"], "final_digest": card["sha256"]}],
-        },
-    }
-
-    def call(skill, request, action):
-        calls.append((skill, request, action))
-        return {
-            "data": {
-                "result_verified": True,
-                "historical_files": [{"path": card["path"], "sha256": card["sha256"]}],
-            }
-        }
-
-    ctx = SimpleNamespace(record=lambda ref, kind: records[ref], call=call)
-    assert node.qualify(ctx, card, ["result"])["apply_result_ref"] == "result"
-    assert calls[0][1]["purpose"] == "historical"
-
-
-def test_provenance_rejects_verified_result_without_exact_historical_sha():
-    node, _ = load_node()
-    path = "knowledge/rules/a.md"
-    ctx = SimpleNamespace(
-        record=lambda ref, kind: {
-            "writes": [path],
-            "view_ref": "view",
-            "operation_id": "op",
-        }
-        if ref == "result"
-        else {"digest": "v", "writes": [{"path": path, "final_digest": "a" * 64}]},
-        call=lambda *args: {
-            "data": {
-                "result_verified": True,
-                "historical_files": [{"path": path, "sha256": "b" * 64}],
-            }
-        },
-    )
-    with pytest.raises(ValueError, match="proof|content|Stable"):
-        node.qualify(ctx, {"path": path, "sha256": "a" * 64}, ["result"])
-
-
 def test_nonterminal_journal_is_a_snapshot_barrier(tmp_path):
     node, _ = load_node()
     journal = tmp_path / "logs/operations/other-op/journal.json"
@@ -175,7 +127,7 @@ def signed_publication(tmp_path, card_digest="a" * 64):
     return node, support, ctx, card, payload, save_receipt
 
 
-def test_valid_signature_cannot_substitute_for_a_real_git_commit(tmp_path):
+def test_receipt_metadata_cannot_substitute_for_a_real_git_commit(tmp_path):
     node, _, ctx, card, _, _ = signed_publication(tmp_path)
     with pytest.raises(ValueError, match="Git|commit|publication"):
         node.validate_publication(
@@ -183,7 +135,26 @@ def test_valid_signature_cannot_substitute_for_a_real_git_commit(tmp_path):
         )
 
 
-def test_signed_receipt_must_match_actual_committed_card_bytes(tmp_path):
+@pytest.mark.parametrize("change", ["bad-signature", "unknown-adapter", "missing-trust"])
+def test_explicit_publication_receipt_requires_authentic_identity(tmp_path, change):
+    node, _, ctx, card, _, _ = signed_publication(tmp_path)
+    receipt = ctx.root / "logs/publication.json"
+    value = json.loads(receipt.read_bytes())
+    if change == "bad-signature":
+        value["signature_b64"] = base64.b64encode(b"invalid").decode()
+    elif change == "unknown-adapter":
+        value["adapter_id"] = "unknown"
+    else:
+        ctx.args.catalog = None
+    receipt.write_text(json.dumps(value), encoding="utf-8")
+    with pytest.raises(ValueError) as error:
+        node.validate_publication(ctx, {"publication_receipt_ref": "logs/publication.json"}, [card])
+    assert getattr(error.value, "code", None) == (
+        "PUBLICATION_SIGNATURE_INVALID" if change == "bad-signature" else "UNTRUSTED_PUBLICATION"
+    )
+
+
+def test_repository_snapshot_must_match_actual_committed_card_bytes(tmp_path):
     node, support, ctx, card, payload, save_receipt = signed_publication(tmp_path)
 
     def git(*args):
@@ -240,45 +211,15 @@ def test_signed_receipt_must_match_actual_committed_card_bytes(tmp_path):
         ctx, {"publication_receipt_ref": "logs/publication.json"}, [card]
     )
     assert result["payload"]["knowledge_commit"] == payload["knowledge_commit"]
+    assert result["verification_tier"] == "synthetic_publication_identity" and result["adapter_id"] == "fixture"
+    # Index publication checks actual signed content, not previous Skill runs.
     card["metadata"]["review_mode"] = "code_gate"
-    payload["merge_check_refs"] = {"a": "logs/operations/op/fake-merge.json"}
-    save_receipt()
-    qualification = {
-        "a": {
-            "view_digest": "view",
-            "operation_id": "op",
-            "apply_result_ref": "logs/operations/op/apply-result.json",
-        }
-    }
-    ctx.record = lambda ref, kind: {
-        "mode": "merge",
-        "status": "passed",
-        "view_digest": "view",
-    }
-    ctx.call = lambda *args: {"data": {"result_verified": False, "eligible_files": []}}
-    with pytest.raises(ValueError, match="proof|authenticate"):
-        node.validate_publication(
-            ctx,
-            {"publication_receipt_ref": "logs/publication.json"},
-            [card],
-            qualification,
-        )
-    card["metadata"]["lifecycle"] = "deprecated"
-    calls = []
-
-    def authenticated_retirement(skill, request, action):
-        calls.append(request)
-        return {
-            "data": {
-                "result_verified": True,
-                "current_code_proof_ref": payload["merge_check_refs"]["a"],
-                "eligible_files": [],
-                "historical_files": [{"path": card["path"], "sha256": card["sha256"]}],
-            }
-        }
-
-    ctx.call = authenticated_retirement
+    ctx.call = lambda *args: (_ for _ in ()).throw(AssertionError("No workflow verifier"))
     node.validate_publication(
-        ctx, {"publication_receipt_ref": "logs/publication.json"}, [card], qualification
+        ctx, {"publication_receipt_ref": "logs/publication.json"}, [card], {}
     )
-    assert calls[-1]["purpose"] == "current" and "card_path" not in calls[-1]
+
+    ctx.args.catalog = None
+    unsigned = node.validate_publication(ctx, {"knowledge_commit": payload["knowledge_commit"]}, [card])
+    assert unsigned["verification_tier"] == "repository_snapshot"
+    assert unsigned["payload"]["card_digests"] == {card["path"]: card["sha256"]}

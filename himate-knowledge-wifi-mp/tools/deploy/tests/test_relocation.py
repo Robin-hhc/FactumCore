@@ -140,7 +140,7 @@ def test_nested_domain_uses_registered_workspace_for_capture_and_scan(deployed):
     registered = register(layout, destination)
     assert registered.returncode == 0, registered.stderr.decode(errors="replace")
     catalog_path = destination / "catalog.json"
-    process, result = call(layout, catalog_path, "hs-workspace-explore", "nested-e0",
+    process, result = call(layout, catalog_path, "hs-knowledge-explore", "nested-e0",
                            request={"target_path": str(source)})
     assert process.returncode == 0, result
     context_ref = result["data"]["context_ref"]
@@ -177,7 +177,7 @@ def test_existing_agent_packages_work_without_project_capability_folders(deploye
                for identity, entry in catalog["skills"].items())
     assert not (destination / "config/skills").exists()
 
-    process, result = call(layout, catalog_path, "hs-workspace-explore", "external-e0",
+    process, result = call(layout, catalog_path, "hs-knowledge-explore", "external-e0",
                            request={"target_path": str(layout["project"] / "main")})
     assert process.returncode == 0, result
     assert result["status"] == "ok" and result["phase"] == "context_loaded", result
@@ -213,7 +213,7 @@ def test_instruction_skill_registers_final_paths_and_binds_reference_changes(dep
 
 
 def test_instruction_skill_is_not_callable_as_a_workflow_cli(deployed):
-    """The existing dispatch gate rejects instruction entries before execution."""
+    """An instruction-only Skill has no executable business CLI."""
     import importlib.util
     from types import SimpleNamespace
 
@@ -221,18 +221,20 @@ def test_instruction_skill_is_not_callable_as_a_workflow_cli(deployed):
     destination = layout["base"] / "instruction-dispatch-registration"
     result = register(layout, destination)
     assert result.returncode == 0, result.stderr.decode(errors="replace")
-    support = layout["skills"] / "hs-workspace-explore/scripts/support.py"
+    support = layout["skills"] / "hs-knowledge-explore/scripts/support.py"
     spec = importlib.util.spec_from_file_location("instruction_dispatch_support", support)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     context = object.__new__(module.Context)
     context.args = SimpleNamespace(catalog=destination / "catalog.json")
-    with pytest.raises(module.NodeError, match="fixed public scripts/cli.py"):
+    context.package = layout["skills"] / "hs-knowledge-explore"
+    with pytest.raises(module.NodeError, match="Installed sibling Skill is unavailable") as failure:
         context.call("hs-codegraph-setup", {})
+    assert failure.value.code == "MISSING_CAPABILITY"
 
 
 @pytest.mark.parametrize("filename", ["requirements.txt", "requirements-extra.txt"])
-def test_existing_package_additional_requirement_files_bind_actual_runtime_identity(deployed, filename):
+def test_existing_package_metadata_changes_do_not_require_catalog_refresh(deployed, filename):
     layout = deployed
     extra = layout["skills"] / "hs-knowledge-maintain" / filename
     extra.write_text("# Agent-owned metadata; no dependency installation.\n", encoding="utf-8")
@@ -244,19 +246,9 @@ def test_existing_package_additional_requirement_files_bind_actual_runtime_ident
     assert_scan_succeeded(layout, first_catalog, "extra-initial")
     assert fingerprint(layout["skills"]) == before
 
-    extra.write_text("# Agent changed this identity-bound file.\n", encoding="utf-8")
-    failed, response = call(layout, first_catalog, "hs-knowledge-source-scan", "extra-stale")
-    assert failed.returncode != 0
-    assert any(item["code"] == "PACKAGE_DIGEST_MISMATCH" for item in response.get("diagnostics", [])), response
+    extra.write_text("# Agent changed optional package metadata.\n", encoding="utf-8")
     changed = fingerprint(layout["skills"])
-    second = layout["base"] / "extra-file-new-registration"
-    registered = register(layout, second)
-    assert registered.returncode == 0, registered.stderr.decode(errors="replace")
-    second_catalog = second / "catalog.json"
-    first_entry = json.loads(first_catalog.read_bytes())["skills"]["hs-knowledge-maintain"]
-    second_entry = json.loads(second_catalog.read_bytes())["skills"]["hs-knowledge-maintain"]
-    assert first_entry["package_digest"] != second_entry["package_digest"]
-    assert_scan_succeeded(layout, second_catalog, "extra-refreshed", expected_change="unfinished")
+    assert_scan_succeeded(layout, first_catalog, "extra-changed", expected_change="unfinished")
     assert fingerprint(layout["skills"]) == changed
 
 
@@ -295,7 +287,7 @@ def test_existing_registration_rejects_overlapping_catalog_output(deployed, root
     assert not destination.exists()
 
 
-def test_moved_agent_packages_need_new_catalog(deployed):
+def test_moved_agent_packages_work_with_existing_catalog(deployed):
     layout = deployed
     first = layout["base"] / "old-package-registration"
     result = register(layout, first)
@@ -307,17 +299,14 @@ def test_moved_agent_packages_need_new_catalog(deployed):
     old_root.rename(new_root)
     layout["skills"] = new_root
 
-    failed, envelope = call(layout, first / "catalog.json", "hs-knowledge-source-scan", "stale-package",
-                            python=sys.executable, skill_root=new_root / "hs-knowledge-source-scan")
-    assert failed.returncode != 0 and envelope.get("phase") != "scanned"
-    second = layout["base"] / "new-package-registration"
-    result = register(layout, second)
-    assert result.returncode == 0, result.stderr.decode(errors="replace")
-    assert_scan_succeeded(layout, second / "catalog.json", "new-package")
+    assert_scan_succeeded(layout, first / "catalog.json", "moved-package",
+                          python=sys.executable, skill_root=new_root / "hs-knowledge-source-scan")
+    assert not old_root.exists()
+    assert not (layout["base"] / "new-package-registration").exists()
     assert fingerprint(new_root) == before
 
 
-def test_moved_interpreter_needs_new_catalog(deployed):
+def test_moved_interpreter_works_with_existing_catalog(deployed):
     layout = deployed
     old_runtime = layout["base"] / "runtime-old"
     built = subprocess.run([sys.executable, "-m", "venv", "--copies", "--without-pip", str(old_runtime)],
@@ -337,11 +326,40 @@ def test_moved_interpreter_needs_new_catalog(deployed):
     assert old_runtime.parent == new_runtime.parent == layout["base"]
     old_runtime.rename(new_runtime)
     new_python = new_runtime / relative_python
-    failed, envelope = call(layout, first / "catalog.json", "hs-knowledge-source-scan", "stale-runtime",
-                            python=new_python)
-    assert failed.returncode != 0 and envelope.get("phase") != "scanned"
-    assert any(item["code"] == "MISSING_RUNTIME" for item in envelope.get("diagnostics", [])), envelope
-    second = layout["base"] / "new-runtime-registration"
-    result = register(layout, second, python=new_python)
+    assert_scan_succeeded(layout, first / "catalog.json", "moved-runtime", python=new_python)
+    assert not old_runtime.exists()
+    assert not (layout["base"] / "new-runtime-registration").exists()
+
+
+def test_missing_actual_sibling_cli_remains_a_business_error(deployed):
+    layout = deployed
+    destination = layout["base"] / "missing-cli-registration"
+    result = register(layout, destination)
     assert result.returncode == 0, result.stderr.decode(errors="replace")
-    assert_scan_succeeded(layout, second / "catalog.json", "new-runtime")
+    (layout["skills"] / "hs-knowledge-maintain/scripts/cli.py").unlink()
+    failed, response = call(layout, destination / "catalog.json", "hs-knowledge-source-scan", "missing-cli")
+    assert failed.returncode == 3, response
+    assert response["diagnostics"][0]["code"] == "MISSING_CAPABILITY"
+
+
+def test_missing_actual_runtime_package_remains_a_business_error(deployed):
+    layout = deployed
+    destination = layout["base"] / "missing-runtime-registration"
+    result = register(layout, destination)
+    assert result.returncode == 0, result.stderr.decode(errors="replace")
+    lock = layout["skills"] / "hs-knowledge-maintain/requirements.lock.txt"
+    lock.write_bytes(lock.read_bytes() + b"\nhimate-nonexistent-runtime-fixture==0.0.0\n")
+    failed, response = call(layout, destination / "catalog.json", "hs-knowledge-source-scan", "missing-runtime")
+    assert failed.returncode == 3, response
+    assert response["diagnostics"][0]["code"] == "MISSING_RUNTIME"
+
+
+def test_invalid_actual_source_scope_remains_a_business_error(deployed):
+    layout = deployed
+    destination = layout["base"] / "invalid-scope-registration"
+    result = register(layout, destination)
+    assert result.returncode == 0, result.stderr.decode(errors="replace")
+    failed, response = call(layout, destination / "catalog.json", "hs-knowledge-source-scan", "invalid-scope",
+                            request={"source": "../outside.md"})
+    assert failed.returncode == 2, response
+    assert response["diagnostics"][0]["code"] == "RAW_SCOPE_REQUIRED"

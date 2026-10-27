@@ -106,7 +106,7 @@ class PublicGovernanceTests(unittest.TestCase):
                 self.assertEqual(old.read_bytes(), before)
         self.assertFalse((self.root / "logs/ingest/legacy.yaml").exists())
 
-    def test_old_terminal_journal_does_not_approve_a_forged_new_content_proof(self):
+    def test_apply_does_not_certify_optional_review_authorship(self):
         request = self.prepare_reviewed("new-forged-proof")
         old = self.save_foreign_journal()
         frozen = old.read_bytes()
@@ -114,10 +114,11 @@ class PublicGovernanceTests(unittest.TestCase):
         proof = json.loads(proof_path.read_bytes())
         proof["reviewer_id"] = proof["author_id"]
         proof_path.write_bytes(canonical(seal(proof)))
-        result = self.invoke("hs-knowledge-apply", request, expected=3)
-        self.assertIn("independent content review", result["diagnostics"][0]["message"])
+        result = self.invoke("hs-knowledge-apply", request)
+        applied = json.loads((self.root / result["data"]["apply_result_ref"]).read_bytes())
+        self.assertEqual(applied["verification_tier"], "fixed_business_checks")
         self.assertEqual(old.read_bytes(), frozen)
-        self.assertEqual((self.root / "knowledge/index.md").read_bytes(), b"old navigation")
+        self.assertEqual((self.root / "knowledge/index.md").read_bytes(), b"new navigation")
 
     def test_old_terminal_journal_does_not_accept_an_old_rules_current_proof(self):
         request = self.prepare_reviewed("new-old-proof")
@@ -145,7 +146,7 @@ class PublicGovernanceTests(unittest.TestCase):
         self.assertEqual(old.read_bytes(), frozen)
         self.assertEqual((self.root / "knowledge/index.md").read_bytes(), b"old navigation")
 
-    def test_v3_handoff_requires_batch_target_query_evidence(self):
+    def test_handoff_describes_files_without_a_target_query_pass_gate(self):
         import yaml
 
         path = self.root / "governance/framework.lock.yaml"
@@ -157,8 +158,11 @@ class PublicGovernanceTests(unittest.TestCase):
         request = self.prepare_reviewed("gate")
         applied = self.invoke("hs-knowledge-apply", request)
         result = self.invoke("hs-knowledge-publish-handoff", {"operation_id": "gate", "v3_required": True,
-                             "apply_result_ref": applied["data"]["apply_result_ref"]}, expected=3)
-        self.assertIn("query", result["diagnostics"][0]["message"])
+                             "apply_result_ref": applied["data"]["apply_result_ref"]})
+        self.assertEqual(result["phase"], "ready_to_submit")
+        handoff = json.loads((self.root / result["data"]["publish_handoff_ref"]).read_bytes())
+        self.assertEqual(handoff["commit_files"], ["knowledge/index.md"])
+        self.assertNotIn("verification_tier", handoff)
 
     def test_record_only_batch_applies_shared_failure_fact_without_card_writes(self):
         import yaml
@@ -427,15 +431,14 @@ class PublicGovernanceTests(unittest.TestCase):
         return {"operation_id": op, "view_ref": ref, "proof_ref": review_ref,
                 "content_review_ref": review_ref}
 
-    def test_non_v3_document_review_requires_the_exact_existing_change_plan(self):
+    def test_optional_review_does_not_require_an_upstream_plan_chain(self):
         request = self.prepare_reviewed("missing-plan-binding")
         path = self.root / request["content_review_ref"]
         review = json.loads(path.read_bytes())
         review.pop("plan_ref")
         path.write_bytes(canonical(seal(review)))
-        result = self.invoke("hs-knowledge-apply", request, expected=3)
-        self.assertIn("exact change plan", result["diagnostics"][0]["message"])
-        self.assertEqual((self.root / "knowledge/index.md").read_bytes(), b"old navigation")
+        self.invoke("hs-knowledge-apply", request)
+        self.assertEqual((self.root / "knowledge/index.md").read_bytes(), b"new navigation")
 
     def test_non_v3_document_runs_full_checks_before_admission(self):
         request = self.prepare_reviewed("invalid-full-view")
@@ -455,6 +458,8 @@ class PublicGovernanceTests(unittest.TestCase):
         review = json.loads(review_path.read_bytes())
         review.update(view_digest=view["digest"], plan_digest=plan["digest"])
         review_path.write_bytes(canonical(seal(review)))
+        request.pop("proof_ref")
+        request.pop("content_review_ref")
         result = self.invoke("hs-knowledge-apply", request, expected=3)
         self.assertIn("full-view checks", result["diagnostics"][0]["message"])
         self.assertEqual((self.root / "knowledge/index.md").read_bytes(), b"old navigation")
@@ -467,18 +472,15 @@ class PublicGovernanceTests(unittest.TestCase):
         self.assertEqual((self.root / "knowledge/index.md").read_bytes(), b"old navigation")
         self.assertFalse((self.root / "knowledge/flows/fixture-flow.md").exists())
 
-    def test_workflow_artifact_binds_actual_apply_result_without_human_gate(self):
+    def test_workflow_metadata_does_not_create_skill_handoff_manifests(self):
         workflow = {"run_id": "fixture-run", "node_id": "apply_view", "attempt_id": "first"}
         request = self.prepare_reviewed("workflow")
         applied = self.invoke("hs-knowledge-apply", {**request, "workflow": workflow})
         manifest_path = self.root / "logs/workflows/fixture-run/nodes/apply_view/first/result.json"
-        self.assertTrue(manifest_path.is_file())
-        record = json.loads(manifest_path.read_text(encoding="utf-8"))
-        self.assertEqual(record["phase"], "committed")
+        self.assertFalse(manifest_path.exists())
+        self.assertNotIn("artifact_manifest_ref", applied["data"])
         result_ref = applied["data"]["apply_result_ref"]
-        self.assertEqual(record["artifact_digests"][result_ref], digest((self.root / result_ref).read_bytes()))
-        self.assertTrue(manifest_path.with_suffix(".md").is_file())
-        self.assertNotIn("review_trust", self.catalog)
+        self.assertEqual(json.loads((self.root / result_ref).read_bytes())["status"], "committed")
 
     def test_public_review_apply_verify_publish(self):
         request = self.prepare_reviewed("public")
@@ -486,6 +488,9 @@ class PublicGovernanceTests(unittest.TestCase):
         self.assertEqual(
             self.root.joinpath("knowledge/index.md").read_bytes(), b"new navigation"
         )
+        # A committed transaction remains verifiable from its own exact bytes
+        # even after optional upstream review material has disappeared.
+        (self.root / request["proof_ref"]).unlink()
         verify_request = {
             "operation_id": "public",
             "apply_result_ref": applied["data"]["apply_result_ref"],
@@ -502,7 +507,8 @@ class PublicGovernanceTests(unittest.TestCase):
         )
         self.assertFalse(record["git_merge_verified"])
         self.assertFalse(record["remote_push_verified"])
-        self.assertEqual(record["verification_tier"], "declared_independent_content_review")
+        self.assertNotIn("verification_tier", record)
+        self.assertEqual(record["write_manifest"], [{"path": "knowledge/index.md", "sha256": digest(b"new navigation")}])
 
     def test_public_recover_delegates_to_single_apply_engine(self):
         request = self.prepare_reviewed("recover")
@@ -534,20 +540,41 @@ class PublicGovernanceTests(unittest.TestCase):
         )
         self.assertEqual(resumed["data"]["transaction_status"], "committed")
 
-    def test_invalid_workflow_is_rejected_before_apply_mutates_files(self):
-        request = self.prepare_reviewed("invalid-workflow")
+    def test_workflow_metadata_is_ignored_by_apply(self):
+        request = self.prepare_reviewed("workflow-metadata")
+        request.pop("proof_ref")
+        request.pop("content_review_ref")
         for workflow in ({"attempt_id": "partial"}, {}, None, []):
-            self.invoke(
-                "hs-knowledge-apply",
-                {**request, "workflow": workflow},
-                expected=2,
-            )
-        self.assertEqual(
-            (self.root / "knowledge/index.md").read_bytes(), b"old navigation"
-        )
-        self.assertFalse(
-            (self.root / "logs/operations/invalid-workflow/journal.json").exists()
-        )
+            result = self.invoke("hs-knowledge-apply", {**request, "workflow": workflow})
+            self.assertEqual(result["data"]["transaction_status"], "committed")
+        self.assertEqual((self.root / "knowledge/index.md").read_bytes(), b"new navigation")
+
+    def test_manual_card_apply_needs_no_upstream_proofs(self):
+        request = self.prepare_reviewed("manual-card", include_card=True)
+        request.pop("proof_ref")
+        request.pop("content_review_ref")
+        result = self.invoke("hs-knowledge-apply", request)
+        applied = json.loads((self.root / result["data"]["apply_result_ref"]).read_bytes())
+        self.assertEqual(applied["verification_tier"], "fixed_business_checks")
+        self.assertNotIn("proof_ref", applied)
+        self.assertNotIn("proof_digest", applied)
+        self.assertTrue((self.root / "knowledge/flows/fixture-flow.md").is_file())
+
+    def test_manual_apply_still_rejects_malformed_card_before_writing(self):
+        request = self.prepare_reviewed("manual-bad-card", include_card=True)
+        request.pop("proof_ref")
+        request.pop("content_review_ref")
+        path = self.root / request["view_ref"]
+        view = json.loads(path.read_bytes())
+        for row in view["writes"]:
+            if row["path"] == "knowledge/flows/fixture-flow.md":
+                raw = b"# Missing required card frontmatter\n"
+                row.update(bytes_b64=base64.b64encode(raw).decode(), final_digest=digest(raw))
+        path.write_bytes(canonical(seal(view)))
+        self.invoke("hs-knowledge-apply", request, expected=2)
+        self.assertEqual((self.root / "knowledge/index.md").read_bytes(), b"old navigation")
+        self.assertFalse((self.root / "knowledge/flows/fixture-flow.md").exists())
+        self.assertFalse((self.root / "logs/operations/manual-bad-card/journal.json").exists())
 
     def test_card_eligibility_ignores_unrelated_navigation_and_source_append(self):
         request = self.prepare_reviewed("card", include_card=True)

@@ -1,3 +1,3 @@
 # Writing guide
 
-Submit the actual CLI-returned Markdown manifest reference. Do not transcribe a success assertion or copy a prior attempt.
+Report the actual CLI status, phase, diagnostics and returned business file references. Use the output of this invocation; do not invent a passing result. OpenFlow owns run/node/attempt tracking and transition checks.

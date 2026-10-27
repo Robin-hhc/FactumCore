@@ -1,2 +1,3 @@
-Exercise missing/malformed review records, author conflicts, absent independent-context declarations, unresolved findings, missing reasons, changed exact-view/context bindings, source-byte/locator mismatch, document exemption, local/merge separation, complete Claim coverage and no source mutation. A complete independent Agent record works without a key or signature. Do not treat regex anchors, matching hashes or empty finding arrays as proof of semantic correctness; script results only establish the listed fixed checks.
+# Review guide
 
+Check the actual result and relevant card/source/view/index bytes. State unresolved gaps. Workflow order, role assignment and handoff validation belong to OpenFlow. A successful business check does not prove semantic correctness, deployment or Git merge.

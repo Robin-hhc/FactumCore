@@ -1,4 +1,4 @@
-"""Immutable SQLite generations, proof qualification and writer-lock/CAS activation."""
+"""Immutable SQLite generations with content checks and writer-lock/CAS activation."""
 
 from __future__ import annotations
 import base64
@@ -115,51 +115,6 @@ def check_transactions(ctx):
             )
 
 
-def qualify(ctx, card, results, current_code_proof_ref=None):
-    path, card_sha = card["path"], card["sha256"]
-    for result_ref in results:
-        try:
-            result = ctx.record(result_ref, "apply_result")
-            if path not in result.get("writes", []):
-                continue
-            view = ctx.record(result["view_ref"], "final_view")
-            if not any(
-                row["path"] == path and row["final_digest"] == card_sha
-                for row in view["writes"]
-            ):
-                continue
-            response = ctx.call(
-                "hs-knowledge-apply",
-                {
-                    "operation_id": result["operation_id"],
-                    "apply_result_ref": result_ref,
-                    "card_path": path,
-                    "card_digest": card_sha,
-                    "purpose": "historical",
-                },
-                "verify-result",
-            )
-            if response["data"].get("result_verified") is True and any(
-                row.get("path") == path and row.get("sha256") == card_sha
-                for row in response["data"].get("historical_files", [])
-            ):
-                return {
-                    "apply_result_ref": result_ref,
-                    "operation_id": result["operation_id"],
-                    "view_digest": view["digest"],
-                    "verification_tier": response["data"].get("verification_tier"),
-                    "current_code_proof_ref": current_code_proof_ref,
-                }
-        except (ValueError, OSError, KeyError):
-            continue
-    raise NodeError(
-        "CARD_PROOF_MISSING",
-        "Stable content has no matching verified admission record",
-        path,
-        blocked=True,
-    )
-
-
 def git_read(workspace, args):
     if args[0] not in {"rev-parse", "cat-file"}:
         raise NodeError(
@@ -203,86 +158,57 @@ def git_read(workspace, args):
     if process.returncode:
         raise NodeError(
             "PUBLICATION_GIT_UNAVAILABLE",
-            "The signed publication commit is not available in the workspace Git repository",
+            "The requested snapshot commit is not available in the workspace Git repository",
             blocked=True,
         )
     return process.stdout
 
 
 def publication_workspace(ctx, catalog=None):
-    """Use exact installed mapping, or the actual Git root for portable readers.
-
-    A pure-document shared consumer needs no machine-private workspace registry.
-    Git discovery is read-only and its exact commit/blobs are still verified by
-    the caller. An invalid explicit registration never falls back to discovery.
-    """
-    catalog = catalog if catalog is not None else read_json(ctx.args.catalog)
-    registrations = catalog.get("workspaces")
-    if registrations is not None and registrations != {}:
-        workspace = ctx.modules["validation"].workspace_config_path(
-            ctx.root, registrations, ctx.args.rules_digest
-        ).parent
-    else:
-        workspace = Path(git_read(ctx.root, ["rev-parse", "--show-toplevel"]).decode("utf-8").strip()).resolve()
+    """Locate the actual enclosing Git repository without machine registration."""
+    workspace = Path(git_read(ctx.root, ["rev-parse", "--show-toplevel"]).decode("utf-8").strip()).resolve()
     if not ctx.root.resolve().is_relative_to(workspace):
-        raise NodeError("PUBLICATION_REPOSITORY_MISMATCH", "Knowledge root escapes the actual publication repository")
+        raise NodeError("PUBLICATION_REPOSITORY_MISMATCH", "Knowledge root escapes the actual snapshot repository")
     return workspace
 
 
 def validate_publication(ctx, request, cards, qualifications=None, purpose="current"):
-    ref = request.get("publication_receipt_ref")
-    if not ref or not ctx.args.catalog:
-        raise NodeError(
-            "SHARED_MERGE_PROOF_REQUIRED",
-            "Shared generation needs trusted actual publication proof",
-            blocked=True,
+    receipt_ref = request.get("publication_receipt_ref")
+    receipt = read_json(safe(ctx.root, receipt_ref, ["logs"])) if receipt_ref else {}
+    payload = receipt.get("payload", {})
+    if not isinstance(payload, dict):
+        raise NodeError("INVALID_REPOSITORY_SNAPSHOT", "Snapshot payload must be an object")
+    if receipt_ref:
+        catalog_path = getattr(ctx.args, "catalog", None)
+        catalog = read_json(catalog_path) if catalog_path else {}
+        trust = catalog.get("publication_trust", {}).get(receipt.get("adapter_id"))
+        fixture = safe(ctx.root, ".isolated-knowledge-fixture")
+        synthetic_allowed = bool(
+            trust and trust.get("synthetic") and trust.get("fixture_root")
+            and Path(trust["fixture_root"]).resolve() == ctx.root
+            and fixture.is_file()
+            and fixture.read_text(encoding="utf-8").strip() == "HIMATE_SYNTHETIC_FIXTURE_V2"
         )
-    receipt = read_json(safe(ctx.root, ref, ["logs"]))
-    catalog = read_json(ctx.args.catalog)
-    trust = catalog.get("publication_trust", {}).get(receipt.get("adapter_id"))
-    fixture = safe(ctx.root, ".isolated-knowledge-fixture")
-    synthetic_allowed = bool(
-        trust
-        and trust.get("synthetic")
-        and trust.get("fixture_root")
-        and Path(trust["fixture_root"]).resolve() == ctx.root
-        and fixture.is_file()
-        and fixture.read_text(encoding="utf-8").strip()
-        == "HIMATE_SYNTHETIC_FIXTURE_V2"
-    )
-    if not trust or (trust.get("synthetic") and not synthetic_allowed):
-        raise NodeError(
-            "UNTRUSTED_PUBLICATION",
-            "A trusted committer/CI adapter is required; synthetic adapters are fixture-only",
-            blocked=True,
-        )
-    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+        if not trust or (trust.get("synthetic") and not synthetic_allowed):
+            raise NodeError("UNTRUSTED_PUBLICATION", "Explicit publication receipt has no trusted adapter identity")
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
-    payload = receipt["payload"]
-    try:
-        Ed25519PublicKey.from_public_bytes(
-            base64.b64decode(trust["public_key_b64"], validate=True)
-        ).verify(
-            base64.b64decode(receipt["signature_b64"], validate=True),
-            canonical(payload),
-        )
-    except Exception as exc:
-        raise NodeError(
-            "PUBLICATION_SIGNATURE_INVALID", "Publication signature is invalid"
-        ) from exc
-    required = {c["path"]: c["sha256"] for c in cards}
+        try:
+            Ed25519PublicKey.from_public_bytes(base64.b64decode(trust["public_key_b64"], validate=True)).verify(
+                base64.b64decode(receipt["signature_b64"], validate=True), canonical(payload)
+            )
+        except Exception as exc:
+            raise NodeError("PUBLICATION_SIGNATURE_INVALID", "Explicit publication receipt signature is invalid") from exc
+    commit = request.get("knowledge_commit") or payload.get("knowledge_commit")
+    required = {card["path"]: card["sha256"] for card in cards}
     if (
-        payload.get("card_digests") != required
-        or payload.get("rules_digest") != ctx.args.rules_digest
-        or not re.fullmatch(
-            r"[0-9a-f]{40}(?:[0-9a-f]{24})?", str(payload.get("knowledge_commit", ""))
-        )
+        not re.fullmatch(r"[0-9a-f]{40}(?:[0-9a-f]{24})?", str(commit or ""))
+        or (payload.get("knowledge_commit") and payload["knowledge_commit"] != commit)
+        or ("card_digests" in payload and payload["card_digests"] != required)
+        or ("rules_digest" in payload and payload["rules_digest"] != ctx.args.rules_digest)
     ):
-        raise NodeError(
-            "PUBLICATION_CONTENT_MISMATCH", "Merged content identity differs"
-        )
-    workspace = publication_workspace(ctx, catalog)
-    commit = payload["knowledge_commit"]
+        raise NodeError("PUBLICATION_CONTENT_MISMATCH", "Exact repository snapshot identity differs or is missing")
+    workspace = publication_workspace(ctx)
     top = Path(
         git_read(workspace, ["rev-parse", "--show-toplevel"]).decode().strip()
     ).resolve()
@@ -295,7 +221,7 @@ def validate_publication(ctx, request, cards, qualifications=None, purpose="curr
     ):
         raise NodeError(
             "PUBLICATION_REPOSITORY_MISMATCH",
-            "Publication must name an exact commit in this workspace repository",
+            "Snapshot must name an exact commit in this workspace repository",
         )
     prefix = ctx.root.relative_to(workspace).as_posix()
     expected_files = {
@@ -310,7 +236,7 @@ def validate_publication(ctx, request, cards, qualifications=None, purpose="curr
         if sha(raw) != expected:
             raise NodeError(
                 "PUBLICATION_CONTENT_MISMATCH",
-                "Actual Git commit content differs from the signed publication digest",
+                "Actual Git snapshot differs from the indexed card or rules digest",
                 ref,
             )
     published_sources = load_yaml(
@@ -334,154 +260,46 @@ def validate_publication(ctx, request, cards, qualifications=None, purpose="curr
             published_resource = next(row for row in published_sources["resources"] if row["source_id"] == source["source_id"])
             current_resource = next(row for row in current_sources["resources"] if row["source_id"] == source["source_id"])
             if canonical((published_resource, published_snapshot)) != canonical((current_resource, current_snapshot)):
-                raise NodeError("SOURCE_LINEAGE_MISMATCH", "Referenced source identity differs from the accepted Git source lock", source["source_id"])
-    if "acceptance_records" in payload:
-        portable = repository_acceptance(ctx, receipt, cards)
-        if qualifications:
-            if canonical(portable) != canonical(qualifications):
-                raise NodeError("ACCEPTANCE_CHANGED", "Published qualification differs from exact accepted records")
-        elif qualifications is not None:
-            qualifications.update(portable)
-        return receipt
-    # Legacy signed publications retain their original authenticated local proof
-    # requirements. New portable records use the fixed-CI acceptance path above.
-    if qualifications is not None and not qualifications and cards:
-        results = [path.relative_to(ctx.root).as_posix() for path in sorted((ctx.root / "logs/operations").glob("*/apply-result.json"))]
-        qualifications.update({card["metadata"]["id"]: qualify(ctx, card, results) for card in cards})
-    code_cards = {
-        card["metadata"]["id"]: card
-        for card in cards
-        if card["metadata"]["review_mode"] == "code_gate"
+                raise NodeError("SOURCE_LINEAGE_MISMATCH", "Referenced source identity differs from the exact Git source lock", source["source_id"])
+    return {
+        "verification_tier": ("synthetic_publication_identity" if synthetic_allowed else "trusted_publication_identity") if receipt_ref else "repository_snapshot",
+        **({"adapter_id": receipt["adapter_id"]} if receipt_ref else {}),
+        "payload": {"knowledge_commit": commit, "rules_digest": ctx.args.rules_digest,
+                    "card_digests": required},
     }
-    merge_refs = payload.get("merge_check_refs", {})
-    if not isinstance(merge_refs, dict) or set(merge_refs) != set(code_cards):
-        raise NodeError(
-            "MERGE_GATE_PROOF_REQUIRED",
-            "Every code card needs its exact authenticated current merge proof",
-            blocked=True,
+
+
+def code_contexts(ctx, cards, request):
+    """Validate direct code/build materials; no workflow result is required."""
+    contexts = request.get("code_contexts", request.get("code_evidence", {}))
+    if ("code_contexts" in request and "code_evidence" in request
+            and request["code_contexts"] != request["code_evidence"]):
+        raise NodeError("CODE_CONTEXT_CONFLICT", "Code material aliases differ")
+    known = {card["metadata"]["id"]: card for card in cards}
+    if not isinstance(contexts, dict) or not set(contexts) <= set(known):
+        raise NodeError("INVALID_CODE_CONTEXTS", "Code contexts must name cards in this generation")
+    if not contexts:
+        return contexts
+    configuration = ctx.modules["validation"].workspace_config_path(ctx.root)
+    declaration = ctx.modules["validation"].load_yaml(configuration.read_bytes())
+    for card_id, context in contexts.items():
+        if not isinstance(context, dict):
+            raise NodeError("INVALID_CODE_CONTEXT", "Each code context must be an object", card_id)
+        identity = context.get("code_identity")
+        ctx.modules["source_resources"].validate_current_code_identity(
+            identity, configuration, context.get("config_digest"), ctx.rules, declaration.get("code_policy")
         )
-    for card_id, card in code_cards.items():
-        qualification = (qualifications or {}).get(card_id)
-        if not qualification:
-            raise NodeError(
-                "CARD_PROOF_MISSING",
-                "Shared code card has no authenticated application provenance",
-                card_id,
-                blocked=True,
-            )
-        proof_ref = merge_refs[card_id]
-        retired = card["metadata"].get("lifecycle") == "deprecated"
-        proof = ctx.record(proof_ref, "merge_check")
-        if (
-            proof.get("mode") != "merge"
-            or proof.get("status") != "passed"
-            or proof.get("view_digest") != qualification["view_digest"]
-        ):
-            raise NodeError(
-                "MERGE_GATE_PROOF_REQUIRED",
-                "Publication proof is not a passing merge check for the same exact view",
-                card_id,
-                blocked=True,
-            )
-        verified = ctx.call(
-            "hs-knowledge-apply",
-            {
-                "operation_id": qualification["operation_id"],
-                "apply_result_ref": qualification["apply_result_ref"],
-                "purpose": purpose,
-                **(
-                    {"current_code_proof_ref": proof_ref}
-                    if purpose == "current"
-                    else {}
-                ),
-                **(
-                    {}
-                    if retired and purpose == "current"
-                    else {"card_path": card["path"]}
-                ),
-                "card_digest": card["sha256"],
-            },
-            "verify-result",
-        )["data"]
-        if (
-            verified.get("result_verified") is not True
-            or (
-                purpose == "current"
-                and verified.get("current_code_proof_ref") != proof_ref
-            )
-            or not any(
-                item.get("path") == card["path"]
-                and item.get("sha256") == card["sha256"]
-                for item in verified.get(
-                    "historical_files"
-                    if purpose == "historical" or retired
-                    else "eligible_files",
-                    [],
-                )
-            )
-        ):
-            raise NodeError(
-                "MERGE_GATE_PROOF_REQUIRED",
-                "Current merge proof did not authenticate exact published content",
-                card_id,
-                blocked=True,
-            )
-        qualification["current_code_proof_ref"] = proof_ref
-    return receipt
-
-
-def repository_acceptance(ctx, receipt, cards):
-    """Called only after trusted signature and exact Git card/rule validation."""
-    payload = receipt["payload"]
-    declared = payload.get("acceptance_records")
-    if not isinstance(declared, dict) or not declared:
-        raise NodeError("ACCEPTANCE_RECORD_REQUIRED", "Accepted repository summaries are required")
-    workspace = publication_workspace(ctx)
-    commit = payload["knowledge_commit"]
-    prefix = ctx.root.relative_to(workspace).as_posix()
-    available = {}
-    for ref, expected in sorted(declared.items()):
-        safe(ctx.root, ref, ["logs/ingest"])
-        raw = git_read(workspace, ["cat-file", "blob", commit + ":" + prefix + "/" + ref])
-        if sha(raw) != expected or fixed_bytes(ctx.root, ref, ["logs/ingest"]) != raw:
-            raise NodeError("ACCEPTANCE_CHANGED", "Record must be the exact accepted Git blob", ref)
-        record = load_yaml(raw)
-        ctx.modules["records"].validate_ingest_record(record, rules=ctx.rules)
-        acceptance = record.get("acceptance", {})
-        applied = record.get("progress", {}).get("apply", {})
-        if (acceptance.get("rules_digest") != ctx.args.rules_digest
-                or applied.get("status") != "applied"
-                or applied.get("view_digest") != acceptance.get("content_view_digest")
-                or not acceptance.get("proof_digests")):
-            raise NodeError("ACCEPTANCE_INCOMPLETE", "Summary lacks completed exact-view acceptance", ref)
-        for row in acceptance.get("cards", []):
-            available.setdefault((row.get("path"), row.get("sha256")), []).append((ref, expected, acceptance, row))
-    qualifications = {}
-    source_lock = ctx.modules["source_resources"].read_source_lock(ctx.root)
-    for card in cards:
-        matches = available.get((card["path"], card["sha256"]), [])
-        if not matches:
-            raise NodeError("ACCEPTANCE_RECORD_REQUIRED", "Card has no exact accepted summary", card["path"])
-        ref, record_sha, acceptance, row = sorted(matches, key=lambda item: item[0])[-1]
-        mode = card["metadata"]["review_mode"]
-        expected_result = "retired" if card["metadata"].get("lifecycle") == "deprecated" else "supported"
-        claim_ids = sorted(claim["id"] for claim in card["claims"])
-        if (row.get("card_id") != card["metadata"]["id"] or row.get("review_mode") != mode
-                or sorted(row.get("claim_ids", [])) != claim_ids or row.get("review_result") != expected_result):
-            raise NodeError("ACCEPTANCE_CONTENT_MISMATCH", "Accepted card/Claim scope differs", card["path"])
-        qualifications[card["metadata"]["id"]] = {
-            "kind": "accepted_repository", "record_ref": ref, "record_sha256": record_sha,
-            "knowledge_commit": commit, "view_digest": acceptance["content_view_digest"],
-            "rules_digest": acceptance["rules_digest"], "config_digest": acceptance.get("config_digest"),
-            "code_identity": acceptance.get("code_identity"),
-            "review_mode": mode, "claim_ids": claim_ids, "review_result": expected_result,
-            "source_bindings": [{
-                "reference": source,
-                "resource": next(item for item in source_lock["resources"] if item["source_id"] == source["source_id"]),
-                "snapshot": ctx.modules["source_resources"].validate_source_ref(source, source_lock),
-            } for source in card["metadata"]["sources"]],
-        }
-    return qualifications
+        evidence = context.get("claim_evidence", {})
+        claims = {claim["id"] for claim in known[card_id]["claims"]}
+        if not isinstance(evidence, dict) or not set(evidence) <= claims:
+            raise NodeError("INVALID_CLAIM_EVIDENCE", "Material evidence must name this card's Claims", card_id)
+        for rows in evidence.values():
+            if not isinstance(rows, list) or any(
+                    not isinstance(row, dict) or row.get("requirement") not in {"build-support", "runtime-support"}
+                    or identity["build_files"].get(row.get("path")) != row.get("sha256")
+                    or row.get("sha256") is None for row in rows):
+                raise NodeError("INVALID_CLAIM_EVIDENCE", "Claim materials must bind actual code-context artifact hashes", card_id)
+    return contexts
 
 
 def verify(ctx, ref, purpose="current"):
@@ -509,16 +327,23 @@ def verify(ctx, ref, purpose="current"):
     if manifest["channel"] == "shared":
         publication = validate_publication(
             ctx,
-            {"publication_receipt_ref": manifest.get("publication_receipt_ref")},
+            {"publication_receipt_ref": manifest.get("publication_receipt_ref"),
+             "knowledge_commit": manifest.get("publication", {}).get("payload", {}).get("knowledge_commit")},
             cards,
             manifest.get("qualifications", {}),
             "historical" if purpose == "historical" else "current",
         )
-        if canonical(publication) != canonical(manifest.get("publication")):
+        ctx.publication_verification_tier = publication["verification_tier"]
+        stored_payload = (manifest.get("publication") or {}).get("payload", {})
+        if any(stored_payload.get(key) != value for key, value in publication["payload"].items()):
             raise NodeError(
                 "PUBLICATION_CHANGED",
-                "Generation publication receipt differs from its authenticated source",
+                "Generation repository snapshot differs from its declared input",
             )
+        if (manifest.get("publication_receipt_ref")
+                and manifest.get("publication", {}).get("adapter_id") is not None
+                and manifest.get("publication", {}).get("adapter_id") != publication.get("adapter_id")):
+            raise NodeError("PUBLICATION_CHANGED", "Publication adapter identity changed")
     return manifest
 
 
@@ -580,6 +405,7 @@ def execute(ctx):
             "knowledge_baseline": manifest["knowledge_baseline"],
             "complete": True,
             "index_verification": manifest["index_verification"],
+            "verification_tier": ctx.publication_verification_tier if manifest["channel"] == "shared" else "content_index",
         }, "activated" if action == "activate" else "verified"
     if action != "build":
         raise NodeError("INVALID_ACTION", action)
@@ -608,24 +434,10 @@ def execute(ctx):
         ctx.modules["knowledge"].validate_relations(
             {c["metadata"]["id"]: c for c in cards}
         )
-        result_paths = sorted(
-            (ctx.root / "logs/operations").glob("*/apply-result.json")
-        )
-        results = [p.relative_to(ctx.root).as_posix() for p in result_paths]
-        current_refs = request.get("current_code_proof_refs", {})
-        if not isinstance(current_refs, dict) or not set(current_refs).issubset(
-            c["metadata"]["id"] for c in cards
-        ):
-            raise NodeError(
-                "INVALID_CURRENT_PROOF_MAP",
-                "Current proof map must name cards in this exact generation",
-            )
-        qualifications = {} if channel == "shared" else {
-            c["metadata"]["id"]: qualify(
-                ctx, c, results, current_refs.get(c["metadata"]["id"])
-            )
-            for c in cards
-        }
+        # Qualifications in older manifests are provenance metadata. Building an
+        # index checks the current cards and source lock, not prior workflow runs.
+        qualifications = {}
+        contexts = code_contexts(ctx, cards, request)
         publication = (
             validate_publication(ctx, request, cards, qualifications)
             if channel == "shared"
@@ -644,6 +456,8 @@ def execute(ctx):
                 "channel": channel,
                 "operation": ctx.operation,
                 "tool": ctx.tool,
+                "code_contexts": contexts,
+                "publication": publication,
             }
         )[:24]
     )
@@ -674,6 +488,7 @@ def execute(ctx):
         write_bytes(ctx.root, database_ref, database)
     finally:
         Path(db_name).unlink(missing_ok=True)
+    code_contexts(ctx, cards, {"code_contexts": contexts})
     manifest = ctx.seal(
         {
             "generation_id": generation,
@@ -682,6 +497,7 @@ def execute(ctx):
             "database_digest": sha(database),
             "documents": documents,
             "qualifications": qualifications,
+            "code_contexts": contexts,
             "knowledge_baseline": digest(files),
             "file_baseline": files,
             "validity_epoch": epoch,

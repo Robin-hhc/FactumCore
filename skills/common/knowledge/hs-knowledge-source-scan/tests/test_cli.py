@@ -378,18 +378,18 @@ def test_limited_scan_never_infers_deletion_outside_selected_scope(harness):
     assert [u["path"] for u in scan["units"]] == ["docs-raw/specs/a.md"]
 
 
-def test_record_rejects_omitted_unit_and_unreviewed_substantive_skip(harness):
+def test_record_requires_unit_coverage_but_not_prior_sampling_step(harness):
     harness.write("docs-raw/specs/a.md", b"A\n")
     response = harness.run("source-scan", {"operation_id": "batch"}, "scan")
     scan = harness.record(response["data"]["scan_ref"])
     bad = harness.run("source-scan", {"operation_id": "batch", "scan_ref": response["data"]["scan_ref"], "dispositions": []}, "record", expected=2)
     assert bad["diagnostics"][0]["code"] == "UNIT_COVERAGE_INVALID"
     unit = scan["units"][0]
-    bad = harness.run("source-scan", {"operation_id": "batch", "scan_ref": response["data"]["scan_ref"],
+    result = harness.run("source-scan", {"operation_id": "batch", "scan_ref": response["data"]["scan_ref"],
         "dispositions": [{"unit_id": unit["unit_id"], "action": "skip", "reason": "No new knowledge",
                           "observed_fingerprint": unit["observed_fingerprint"], "adopted_fingerprint": None,
-                          "progress": "skipped", "card_refs": [], "claim_refs": []}]}, "record", expected=2)
-    assert bad["diagnostics"][0]["code"] == "SKIP_SAMPLE_REQUIRED"
+                          "progress": "skipped", "card_refs": [], "claim_refs": []}]}, "record")
+    assert result["status"] == "ok"
 
 
 def test_prepare_expands_explicit_dependencies_but_not_related_links(harness):

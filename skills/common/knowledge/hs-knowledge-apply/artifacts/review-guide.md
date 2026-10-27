@@ -1,2 +1,3 @@
-Exercise multi-file writes/deletes, complete CAS, cooperative locking, idempotence, interruption, resume and rollback. Recovery must reject external edits and altered backup/journal bytes. Confirm raw originals are outside the write set. Document admission requires an independent content_review bound to the final view; code records require independent Agent review and positive per-Claim evidence through the fixed public checker, without reviewer keys or signatures. Structure, binding and reference checks do not certify semantic correctness. Real-host and real-code acceptance remain pending when unavailable.
+# Review guide
 
+Check the actual result and relevant card/source/view/index bytes. State unresolved gaps. Workflow order, role assignment and handoff validation belong to OpenFlow. A successful business check does not prove semantic correctness, deployment or Git merge.

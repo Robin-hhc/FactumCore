@@ -52,11 +52,11 @@ def call(tmp_path, pin=None, workflow=None):
     return result, json.loads(response.read_bytes())
 
 
-def test_path_only_resolves_but_does_not_self_trust(tmp_path):
+def test_path_only_loads_current_rules_without_registration(tmp_path):
     fixture(tmp_path)
     result, response = call(tmp_path)
-    assert result.returncode == 0 and response["data"]["state"] == "resolved"
-    assert "context_ref" not in response["data"]
+    assert result.returncode == 0 and response["data"]["state"] == "context_loaded"
+    assert response["data"]["context_ref"]
 
 
 def test_pinned_rules_load_actual_entries_from_other_cwd(tmp_path):
@@ -82,7 +82,7 @@ def test_missing_agent_entry_never_claims_loaded(tmp_path):
     assert result.returncode == 3 and response["status"] == "blocked"
 
 
-def test_actual_workflow_artifact_hashes_the_loaded_context(tmp_path):
+def test_workflow_metadata_does_not_publish_skill_handoff_manifest(tmp_path):
     pin = fixture(tmp_path)
     process, response = call(
         tmp_path,
@@ -91,20 +91,20 @@ def test_actual_workflow_artifact_hashes_the_loaded_context(tmp_path):
     )
     assert process.returncode == 0, response
     root = tmp_path / "himate-knowledge-wifi-mp"
-    manifest = json.loads(
-        (root / response["data"]["artifact_manifest_ref"])
-        .with_suffix(".json")
-        .read_bytes()
-    )
-    ref = response["data"]["context_ref"]
-    assert (
-        manifest["artifact_digests"][ref]
-        == hashlib.sha256((root / ref).read_bytes()).hexdigest()
-    )
+    assert (root / response["data"]["context_ref"]).is_file()
+    assert "artifact_manifest_ref" not in response["data"]
+    assert not (root / "logs/workflows").exists()
 
 
-def test_incomplete_workflow_never_creates_context(tmp_path):
+def test_incomplete_workflow_does_not_block_manual_context(tmp_path):
     pin = fixture(tmp_path)
     result, response = call(tmp_path, pin, {"attempt_id": "first"})
+    assert result.returncode == 0, response
+    assert response["data"]["state"] == "context_loaded"
+
+
+def test_explicit_wrong_rules_digest_is_still_rejected(tmp_path):
+    fixture(tmp_path)
+    result, response = call(tmp_path, "0" * 64)
     assert result.returncode == 2, response
-    assert not (tmp_path / "himate-knowledge-wifi-mp/.build").exists()
+    assert response["diagnostics"][0]["code"] == "RULES_DIGEST_MISMATCH"

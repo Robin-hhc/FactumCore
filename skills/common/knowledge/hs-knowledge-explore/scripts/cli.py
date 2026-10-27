@@ -9,16 +9,13 @@ sys.pycache_prefix = str(
     Path(tempfile.gettempdir()) / ("hs-no-cache-" + secrets.token_hex(16))
 )
 from support import (  # noqa: E402 - bootstrap must precede package imports
-    Context,
     canonical,
     digest,
     identifier,
     read_json,
     safe,
-    sha,
     tool_identity,
     validate_runtime,
-    write_bytes,
 )
 from node import execute  # noqa: E402 - reject cached bytecode before imports
 
@@ -45,11 +42,6 @@ if __name__ == "__main__":
         validate_runtime(package)
         request = read_json(args.input)
         identifier(request.get("operation_id", "binding"))
-        if "workflow" in request:
-            if not isinstance(request["workflow"], dict):
-                raise ValueError("Workflow metadata must be an explicit mapping")
-            for key in ("run_id", "node_id", "attempt_id"):
-                identifier(request["workflow"][key])
         data, phase = execute(request, args, package)
         result.update(status="ok", data=data, phase=phase)
         if phase == "context_loaded":
@@ -59,49 +51,6 @@ if __name__ == "__main__":
             )
             args.rules_digest = context_record["rules_digest"]
             result["rules_digest"] = args.rules_digest
-            if request.get("workflow"):
-                context = Context(args, request, package)
-                workflow = request["workflow"]
-                run_id, node_id, attempt_id = [
-                    identifier(workflow[key])
-                    for key in ("run_id", "node_id", "attempt_id")
-                ]
-                ref = (
-                    f"logs/workflows/{run_id}/nodes/{node_id}/{attempt_id}/result.json"
-                )
-                manifest = context.seal(
-                    {
-                        "workflow": workflow,
-                        "artifact_digests": {
-                            data["context_ref"]: sha(
-                                safe(context.root, data["context_ref"]).read_bytes()
-                            )
-                        },
-                        "phase": phase,
-                        "result": data,
-                        "request_digest": digest(request),
-                        "result_digest": digest(data),
-                    },
-                    "workflow_manifest",
-                )
-                context.save(ref, manifest)
-                write_bytes(
-                    context.root,
-                    ref[:-5] + ".md",
-                    (
-                        "# Project context\n\n```json\n"
-                        + canonical(manifest).decode()
-                        + "\n```\n"
-                    ).encode(),
-                )
-                if (
-                    sha(safe(context.root, data["context_ref"]).read_bytes())
-                    != manifest["artifact_digests"][data["context_ref"]]
-                ):
-                    raise ValueError(
-                        "Loaded project context changed during artifact publication"
-                    )
-                result["data"]["artifact_manifest_ref"] = ref[:-5] + ".md"
         code = 0
     except Exception as exc:
         blocked = getattr(exc, "blocked", False)

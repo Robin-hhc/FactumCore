@@ -1,4 +1,8 @@
-# Apply result
+# Node result
 
-Report committed, recovery_required or rolled_back with exact view/proof identities and durable result/journal references. Identify fixture-only verification separately.
+- Operation and requested action:
+- Actual status / phase:
+- Business output file references:
+- Diagnostics and remaining gaps:
 
+Use the actual CLI response. OpenFlow records its own execution identities.

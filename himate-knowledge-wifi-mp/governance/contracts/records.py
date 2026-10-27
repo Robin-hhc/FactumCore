@@ -24,7 +24,8 @@ def rebuild_restrictions(records, rules=None, *, cards=None):
     """Reconstruct unresolved shared facts; input authenticity belongs to caller.
 
     No timestamps, names, raw text or local events choose a winner. A restriction
-    is cleared only by a same-Claim, finalized descendant's explicit review.
+    is cleared only by a same-Claim descendant's explicit disposition. Workflow
+    review/approval credentials do not determine record validity.
     """
     import re
     unresolved = {"defer", "failed", "uncovered", "pending", "blocked", "partial"}
@@ -38,18 +39,6 @@ def rebuild_restrictions(records, rules=None, *, cards=None):
 
     def gap(code, reason, record=None):
         gaps.append({"code": code, "reason": str(reason), "record_digest": (record or {}).get("digest")})
-
-    def final(record):
-        expected = "recorded" if record.get("batch_kind") == "record_only" else "applied"
-        progress = record.get("progress", {})
-        if not isinstance(progress, dict):
-            return False
-        stage = progress.get("apply", {})
-        if not isinstance(stage, dict):
-            return False
-        if record.get("batch_kind") == "content" and (not record.get("content_view_digest") or stage.get("view_digest") != record["content_view_digest"]):
-            return False
-        return record.get("status") == expected and stage.get("status") == expected and stage.get("operation_id") == record.get("operation_id")
 
     def add(record, card_id, claim_id, row):
         if not isinstance(card_id, str) or not card_id or not isinstance(claim_id, str) or not claim_id:
@@ -80,10 +69,6 @@ def rebuild_restrictions(records, rules=None, *, cards=None):
         if not isinstance(pending, list) or not isinstance(maintenance, list):
             gap("PROCESSING_FACTS_INVALID", "Pending and maintenance facts must be lists", record)
             continue
-        relevant = bool(pending or maintenance or any(item["action"] in {"defer", "failed", "uncovered"} and (item["progress"].get("status") if isinstance(item["progress"], dict) else item["progress"]) in {"pending", "blocked", "partial"} and item.get("claim_refs") for item in record["dispositions"]))
-        if relevant and not final(record):
-            gap("PROCESSING_APPLICATION_UNAVAILABLE", "Shared restrictions need a final P7 processing fact", record)
-            continue
         for row in pending:
             # Machine target fields only: never infer an identity from prose.
             if not isinstance(row, dict):
@@ -101,16 +86,9 @@ def rebuild_restrictions(records, rules=None, *, cards=None):
             if row["outcome"] in unresolved:
                 add(record, *target, row)
             elif row["outcome"] in {"content", "skip"}:
-                accepted = record.get("acceptance", {})
-                content = (row["outcome"] == "content" and record.get("batch_kind") == "content" and final(record)
-                           and any(item.get("card_id") == target[0] and target[1] in item.get("claim_ids", []) for item in accepted.get("cards", [])))
-                sample = record.get("skip_sample") or {}
-                skip = (row["outcome"] == "skip" and final(record) and sample.get("independent") is True and bool(sample.get("reviewer"))
-                        and re.fullmatch(r"[0-9a-f]{64}", str(sample.get("report_digest", ""))))
-                if content or skip:
-                    resolutions.append((record["digest"], target))
-                else:
-                    gap("PROCESSING_REVIEW_UNAVAILABLE", "A clearing review needs actual application/acceptance or an independent review summary", record)
+                # The disposition is business data, not proof that a predecessor
+                # passed. Exact card/Claim bindings are checked independently.
+                resolutions.append((record["digest"], target))
         for row in record["dispositions"]:
             status = row["progress"].get("status") if isinstance(row["progress"], dict) else row["progress"]
             if status not in {"pending", "blocked", "partial"} or row["action"] not in {"defer", "failed", "uncovered"}:
@@ -192,6 +170,9 @@ def validate_ingest_record(record, scan=None, view=None, rules=None, *, version_
         if "card_id" in item or "claim_id" in item:
             if not all(isinstance(item.get(key), str) and item[key] for key in ("card_id", "claim_id")) or item.get("outcome", item.get("status")) not in {"defer", "failed", "uncovered", "pending", "blocked", "partial"}:
                 raise ContractError("INVALID_PENDING", "Pending Card/Claim targets must be paired with an unresolved outcome")
+    stage = record.get("progress", {}).get("apply", {}) if isinstance(record.get("progress"), dict) else {}
+    if isinstance(stage, dict) and stage.get("view_digest") is not None and record.get("content_view_digest") is not None and stage["view_digest"] != record["content_view_digest"]:
+        raise ContractError("RECORD_VIEW_MISMATCH", "Recorded application and content view fingerprints differ")
     if require_final:
         expected = "recorded" if record.get("batch_kind") == "record_only" else "applied"
         stage = record.get("progress", {}).get("apply", {}) if isinstance(record.get("progress"), dict) else {}
@@ -291,10 +272,6 @@ def validate_ingest_record(record, scan=None, view=None, rules=None, *, version_
                 raise ContractError("ADOPTION_REQUIRED", "Completed adoption needs associated cards or explicit reviewed document scope")
         if item["action"] in {"failed", "defer", "uncovered"} and progress == "completed":
             raise ContractError("ADOPTION_REQUIRED", "Unresolved work cannot be adopted")
-        if item["action"] == "skip" and item.get("kind", "substantive") != "scan_unchanged":
-            sample = item.get("skip_sample") or record.get("skip_sample")
-            if not isinstance(sample, dict) or not sample.get("independent") or not sample.get("reviewer") or not sample.get("reason"):
-                raise ContractError("SKIP_SAMPLE_REQUIRED", "Substantive skips require an independent recorded sample")
         if item.get("kind") == "scan_unchanged" and unit and unit.get("change") != "unchanged":
             raise ContractError("SKIP_SAMPLE_REQUIRED", "Only an unchanged observation can be a scan-only skip")
         resolved_cards = []
@@ -349,8 +326,9 @@ def validate_ingest_record(record, scan=None, view=None, rules=None, *, version_
         digest_pattern = r"[0-9a-f]{64}"
         if not isinstance(acceptance, dict) or acceptance.get("content_view_digest") != record.get("content_view_digest") or acceptance.get("rules_digest") != record.get("rules_digest"):
             raise ContractError("ACCEPTANCE_BINDING_MISMATCH", "Acceptance summary differs from its record")
-        if not isinstance(acceptance.get("cards"), list) or not isinstance(acceptance.get("proof_digests"), list) or not acceptance["proof_digests"] or any(not re.fullmatch(digest_pattern, value) for value in acceptance["proof_digests"]):
-            raise ContractError("INVALID_ACCEPTANCE", "Acceptance requires exact cards and proof fingerprints")
+        proofs = acceptance.get("proof_digests", [])
+        if not isinstance(acceptance.get("cards"), list) or not isinstance(proofs, list) or any(not isinstance(value, str) or not re.fullmatch(digest_pattern, value) for value in proofs):
+            raise ContractError("INVALID_ACCEPTANCE", "Acceptance requires exact cards and valid optional proof fingerprints")
         seen = set()
         for summary in acceptance["cards"]:
             required_summary = ("path", "card_id", "sha256", "review_mode", "claim_ids", "review_result")

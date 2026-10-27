@@ -1,7 +1,7 @@
 # Search and same-generation read
 
-Use this package's public `scripts/cli.py` with explicit input/output, K, pinned
-rules and the trusted installed catalog. Actions are `search`, `read`, `receipt`.
+Use this package's public `scripts/cli.py` with input/output and the actual K.
+Rules default to the actual framework lock; no catalog is required. Actions are `search`, `read`, `receipt`.
 
 A formal `search` chooses the actual active generation. Its immutable
 `search_receipt` stores effective `request_binding` (action, query, budgets,
@@ -26,23 +26,20 @@ retains the original generation even after a new generation activates.
 
 Receipt hashes and active-pointer observations provide integrity and lineage
 under the existing local artifact trust model. They are not origin signatures,
-ACLs or independent content/code review. They cannot replace any application
-provenance, code proof, publication verification, source or dependency check.
-Current reads recheck live blockers/revocation and current exact-content proof;
-historical reads use authenticated historical application content. If no
+ACLs or independent content/code review. They retain data integrity, source and dependency checks. Skill calls do not
+require an apply/merge-check qualification chain. Current reads check actual
+source/configuration bytes; historical reads keep the exact retained source. If no
 original record or eligible claim remains, the read is refused.
 
 Without `receipt_ref`, `read` keeps the existing behavior of using the current
 active generation. A `read` receipt links back to its source search for audit;
 use the original search receipt for subsequent reads.
 
-Shared repository acceptance can instead bind an exact accepted Git commit,
-card hashes and `logs/ingest` acceptance summaries through a trusted signed
-publication receipt. The consumer verifies actual Git blobs, current record
+Shared repository snapshots bind an explicit Git commit and card hashes. The consumer verifies actual Git blobs, current record
 bytes, rules, source references and Claim scope; another machine's private
 operation log or `.build` directory is not required. A digest alone or an
-uncommitted local record grants no shared authority. Code/current use also
-requires the accepted configuration fingerprint and actual referenced code
+uncommitted local record does not establish a repository snapshot. Code/current use also
+requires the current configuration fingerprint and actual referenced code
 bytes to match; unknown or changed context restricts those Claims.
 
 P2 maintenance candidate discovery is exposed by `source-scan prepare` and

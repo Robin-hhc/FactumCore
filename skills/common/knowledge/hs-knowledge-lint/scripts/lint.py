@@ -7,10 +7,10 @@ import sys
 
 
 def main():
-    from support import domain
+    from support import domain, sha
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--knowledge-root", required=True)
-    parser.add_argument("--rules-digest", required=True)
+    parser.add_argument("--rules-digest")
     parser.add_argument("--input")
     parser.add_argument("--output", required=True)
     parser.add_argument("--catalog")  # transport compatibility; intentionally unused
@@ -19,6 +19,8 @@ def main():
     report = None
     try:
         root = Path(args.knowledge_root).resolve(strict=True)
+        if args.rules_digest is None:
+            args.rules_digest = sha((root / "governance/framework.lock.yaml").read_bytes())
         output = Path(args.output).resolve()
         if output.exists():
             raise ValueError("A fresh report path is required")

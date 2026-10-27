@@ -40,7 +40,7 @@ def mapped_workspace(harness, monkeypatch, *, nested=False):
     monkeypatch.setenv("PATH", str(no_commands))
     request, response = workspace / "explore-request.json", workspace / "explore-response.json"
     request.write_text(json.dumps({"operation_id": "explore-files", "target_path": str(workspace / "main")}), encoding="utf-8")
-    package = harness.packages / "hs-workspace-explore"
+    package = harness.packages / "hs-knowledge-explore"
     process = subprocess.run([sys.executable, str(package / "scripts/cli.py"), "--input", str(request),
                               "--output", str(response), "--rules-digest", harness.rules,
                               "--catalog", str(harness.catalog)], capture_output=True, check=False)
@@ -117,20 +117,35 @@ def test_changed_mapping_requires_fresh_context(harness, monkeypatch):
     assert denied["diagnostics"][0]["code"] == "CODE_CONTEXT_STALE"
 
 
-def test_module_capture_does_not_need_repeated_catalog_code_policy(harness, monkeypatch):
+def test_module_capture_does_not_need_catalog_registration(harness, monkeypatch):
     context, repos, _ = mapped_workspace(harness, monkeypatch)
     catalog = json.loads(harness.catalog.read_bytes())
     assert "code_policy" not in catalog
     catalog.pop("workspaces")
     harness.catalog.write_text(json.dumps(catalog), encoding="utf-8")
-    denied = capture(harness, context, repos["main/host"], "unregistered", expected=3)
-    assert denied["diagnostics"][0]["code"] == "CODE_AUTHORIZATION_REQUIRED"
+    result = capture(harness, context, repos["main/host"], "unregistered")
+    assert result["phase"] == "captured"
 
 
 def test_raw_capture_in_module_workspace_never_uses_git_recovery(harness, monkeypatch):
     mapped_workspace(harness, monkeypatch)
     _, bundle = harness.capture("raw-no-manager")
     assert bundle["snapshots"][0]["recovery"]["method"] != "git"
+
+
+def test_manual_code_capture_needs_config_and_file_but_no_context_or_catalog(harness, monkeypatch):
+    _, repos, _ = mapped_workspace(harness, monkeypatch)
+    incoming, outgoing = harness.base / "manual-code-in.json", harness.base / "manual-code-out.json"
+    incoming.write_text(json.dumps({"operation_id": "manual-code", "kind": "code", "repo_id": repos["main/host"],
+                                   "relative_path": "src/logic.c", "source_id": "manual-code"}), encoding="utf-8")
+    process = subprocess.run([sys.executable, str(harness.packages / "hs-knowledge-source-capture/scripts/cli.py"),
+                              "--input", str(incoming), "--output", str(outgoing), "--knowledge-root", str(harness.root)],
+                             capture_output=True, check=False)
+    response = json.loads(outgoing.read_bytes())
+    assert process.returncode == 0, response
+    bundle = harness.record(response["data"]["bundle_ref"])
+    assert bundle["context_ref"] is None
+    assert bundle["snapshots"][0]["sha256"] == hashlib.sha256((harness.root.parent / "main/host/src/logic.c").read_bytes()).hexdigest()
 
 
 def test_agent_observed_version_label_is_retained_without_parsing_or_commands(harness, monkeypatch):

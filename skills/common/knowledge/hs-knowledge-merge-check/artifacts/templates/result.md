@@ -1,4 +1,8 @@
-# Merge code recheck
+# Node result
 
-Report passed, failed or incomplete, the latest authorized code identity, exact candidate view and delegated proof. Identify remaining external CI/merge acceptance separately.
+- Operation and requested action:
+- Actual status / phase:
+- Business output file references:
+- Diagnostics and remaining gaps:
 
+Use the actual CLI response. OpenFlow records its own execution identities.

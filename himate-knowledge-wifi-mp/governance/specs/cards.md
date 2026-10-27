@@ -52,6 +52,6 @@ Claim.context_ids 和关系的 context_ids 只能引用本卡 scope.contexts 中
 
 模板默认 draft/manual_document、未知范围，作者应按证据补齐内容。生产只写 candidates、ChangeSet、final-view 和 review-package；final-view 含拟落位 stable 的确切字节，正式卡、导航和来源锁在 apply 前不变。
 
-`manual_document` 保留为文档类的协议取值，不再表示真人确认。独立内容复核绑定最终卡、来源集合、范围、计划和全部拟写文件，并检查作者回避、独立上下文及未解决问题。文档类不要求 LocalCheckRecord/MergeGateRecord；代码卡仍须额外核对源码、配置条件与逐 Claim 依据。用户可在入库前要求退回或缩小范围，修订后生成新操作并重新复核；入库后再修订时也走新操作，不覆盖旧事务。
+`manual_document` 保留为文档类的协议取值，不再表示真人确认。内容复核核对最终卡、来源集合、范围、计划、拟写文件和未解决问题；作者回避及上下文隔离由 OpenFlow 管理，不用作者名字或上游通过票据在 Skill 内放行。文档类不需要代码材料；代码结论核对实际源码、配置条件与逐 Claim 依据，构建／运行断言须有对应实际材料。用户可在入库前要求退回或缩小范围；入库后修订走新操作，不覆盖旧事务。
 
 本地 stable、已合入/未合入、当前有效性是不同状态。落位不等于已建立索引、已共享发布、最新代码已核验或已部署访问控制。未完成能力以 SDD 及实际验收记录为准。

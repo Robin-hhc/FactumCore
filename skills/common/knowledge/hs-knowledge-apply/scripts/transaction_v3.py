@@ -2,10 +2,10 @@
 
 import base64
 import importlib
-import pathlib
+from pathlib import Path
 import re
 
-from support import Blocked, Invalid, canonical, digest, seal, strict_json
+from support import Blocked, Invalid, canonical, digest, seal
 
 
 def contracts(ctx, name):
@@ -51,8 +51,8 @@ def record_input(ctx, request, view=None, proof=None):
         "operation_id": record["operation_id"], "view_digest": view["digest"] if view else None,
     }}
     final["status"] = "recorded" if record["batch_kind"] == "record_only" else "applied"
-    if record["batch_kind"] == "content" and proof is not None:
-        final["acceptance"] = acceptance(ctx, view, proof, request.get("content_review_ref"))
+    # Applying bytes does not certify a separate Agent review.
+    final.pop("acceptance", None)
     final = seal(final)
     records.validate_ingest_record(final, view=view, rules=ctx.rules)
     raw = canonical(final) + b"\n"
@@ -63,106 +63,26 @@ def record_input(ctx, request, view=None, proof=None):
                     "final_digest": digest(raw), "bytes_b64": base64.b64encode(raw).decode()}
 
 
-def acceptance(ctx, view, proof, content_review_ref=None):
-    knowledge = contracts(ctx, "knowledge")
-    cards = []
-    for row in view["writes"]:
-        path = row["path"]
-        if not path.startswith("knowledge/") or pathlib.PurePosixPath(path).name in {"AGENTS.md", "index.md", "README.md"}:
-            continue
-        card = knowledge.parse_card(base64.b64decode(row["bytes_b64"], validate=True), path, ctx.rules)
-        cards.append({"path": path, "card_id": card["metadata"]["id"], "sha256": row["final_digest"],
-                      "review_mode": card["metadata"]["review_mode"], "claim_ids": [c["id"] for c in card["claims"]],
-                      "review_result": "retired" if card["metadata"]["lifecycle"] == "deprecated" else
-                      "supported"})
-    proofs = [proof]
-    if content_review_ref:
-        review = ctx.read(content_review_ref)
-        validate_content_review(ctx, view, review)
-        if review["digest"] != proof["digest"]:
-            proofs.insert(0, review)
-    result = {"content_view_digest": view["digest"], "rules_digest": ctx.rules_digest,
-              "cards": cards, "proof_digests": [p["digest"] for p in proofs],
-              "verification_tiers": [p.get("verification_tier") for p in proofs]}
-    code = next((p for p in proofs if p.get("record_kind") == "local_check"), None)
-    if code:
-        context = ctx.read(code["context_ref"])
-        result.update(context_digest=code["context_digest"], code_identity=code["code_identity"])
-        result["config_digest"] = context.get("configuration_digest") or context.get("config_digest")
-        # code proof was already verified against current configuration bytes.
-        if not result["config_digest"]:
-            raise Blocked("verified code context has no configuration fingerprint")
-    return result
-
-
 def validate_content_review(ctx, view, review):
-    """Validate independent review of the exact authored view, without human consent."""
-    author, reviewer = review.get("author_id"), review.get("reviewer_id")
-    if (review.get("record_kind") != "content_review" or review.get("status") != "passed"
-            or review.get("operation_id") != view["operation_id"]
-            or review.get("view_digest") != view["digest"]
-            or not isinstance(author, str) or not author.strip()
-            or not isinstance(reviewer, str) or not reviewer.strip()
-            or reviewer == author or not review.get("independent_context")
-            or review.get("findings") != []):
-        raise Blocked("independent content review must pass for this exact view with different authors and reviewers")
-    if view.get("v3_required") or view.get("semantic_plan_ref") or view.get("semantic_plan_digest"):
-        if not view.get("semantic_plan_ref") or not view.get("semantic_plan_digest"):
-            raise Blocked("independent content review requires the exact authored plan")
-        plan = ctx.read(view["semantic_plan_ref"])
-        authors = {plan["author_id"], *(row["author_id"] for row in plan["card_actions"])}
-        if (plan.get("record_kind") != "semantic_plan"
-                or plan.get("operation_id") != view["operation_id"]
-                or plan.get("digest") != view["semantic_plan_digest"]
-                or review.get("plan_digest") != plan["digest"]
-                or review.get("semantic_plan_ref") != view["semantic_plan_ref"]
-                or author != plan["author_id"] or reviewer in authors
-                or review.get("scan_digest") != plan.get("scan_digest")):
-            raise Blocked("independent content review has a stale plan, author conflict or changed scan")
-    elif ctx.domain is not None:
-        plan_ref = view.get("plan_ref")
-        if not plan_ref or review.get("plan_ref") != plan_ref or review.get("plan_digest") != view.get("plan_digest"):
-            raise Blocked("independent content review must bind the exact change plan")
-        plan = ctx.read(plan_ref)
-        if (plan.get("record_kind") != "change_plan" or plan.get("operation_id") != view["operation_id"]
-                or plan.get("digest") != view.get("plan_digest")):
-            raise Blocked("independent content review has a changed or foreign change plan")
-        declared = {plan.get("author_id")}
-        declared.update(row.get("author_id") for row in plan.get("decisions", []) if isinstance(row, dict))
-        if reviewer in declared or (plan.get("author_id") and author != plan["author_id"]):
-            raise Blocked("independent content review has a change-plan author conflict")
+    """Check only the integrity binding of optional review material."""
+    if (review.get("operation_id") != view["operation_id"]
+            or review.get("view_digest") != view["digest"]):
+        raise Invalid("review material is not bound to this exact final view")
     return review
 
 
 def check_admission(ctx, request, view):
-    versioned = any((view.get("v3_required"), request.get("v3_required"), request.get("ingest_record_ref"),
-                     view.get("semantic_plan_ref"), view.get("semantic_plan_digest")))
-    # Legacy code-only admission already verifies the fixed local-check proof.
-    # Keep its checked-snapshot semantics; only documents/mixed batches gain
-    # the document replacement checks, while versioned code keeps its full gate.
-    if view.get("review_mode") == "code_gate" and not versioned:
-        return
     if ctx.domain is None:
-        if versioned:
-            raise Blocked("versioned domain contracts are required for admission")
         return
     checks = contracts(ctx, "checks")
-    if versioned:
-        path = ctx.path(request.get("lint_report_ref"), (f".build/operations/{view['operation_id']}",))
-        report = strict_json(path.read_text(encoding="utf-8"))
-        checks.validate_report(report, expected_rules=ctx.rules_digest, required_scope="full")
-        if report.get("status") != "passed" or report.get("object", {}).get("view_digest") != view["digest"]:
-            raise Blocked("a complete passing lint report for the exact view is required")
     actual = checks.run(checks.prepare_view(ctx.root, view, mode="candidate", identity={"view_digest": view["digest"], "operation_id": view["operation_id"]}),
                         ctx.rules, request.get("check_inputs"), scope="full")
     checks.validate_report(actual, expected_rules=ctx.rules_digest, required_scope="full")
     if actual["exit_code"] != 0:
-        raise Blocked("actual fixed full-view checks must pass immediately before admission")
-    if versioned or view.get("review_mode") in {"manual_document", "mixed"} or request.get("content_review_ref"):
-        if not request.get("content_review_ref"):
-            raise Blocked("the complete view requires independent content review")
-        review = ctx.read(request["content_review_ref"])
-        validate_content_review(ctx, view, review)
+        findings = [finding for check in actual["checks"] for finding in check.get("findings", [])]
+        details = "; ".join(str(item.get("code", "check")) + ": " + str(item.get("reason", ""))
+                            for item in findings[:3])
+        raise Blocked("actual fixed full-view checks must pass immediately before admission" + (": " + details if details else ""))
     for snapshot in view.get("source_refs", []):
         recovery = snapshot.get("recovery", {})
         if recovery.get("kind") != "git" and recovery.get("method") != "git":
@@ -178,6 +98,93 @@ def check_admission(ctx, request, view):
             raise Blocked("exact source recovery is unavailable for local admission") from exc
 
 
+def check_current_code(ctx, view, inputs):
+    """Recheck current code references during resume without an upstream proof."""
+    if ctx.domain is None:
+        return inputs
+    knowledge, sources = contracts(ctx, "knowledge"), contracts(ctx, "source_resources")
+    lock = sources.read_source_lock(ctx.root)
+    for row in view["writes"]:
+        if row["path"] == "governance/sources.lock.yaml":
+            lock = ctx.domain.load_yaml(base64.b64decode(row["bytes_b64"], validate=True))
+    rules = {**ctx.rules, "source_lock": lock}
+    resolved = dict(inputs or {})
+    checkout = resolved.get("code_checkout")
+    for row in view["writes"]:
+        path = row["path"]
+        if not path.startswith("knowledge/") or path.rsplit("/", 1)[-1] in {"AGENTS.md", "README.md", "index.md"}:
+            continue
+        card = knowledge.parse_card(base64.b64decode(row["bytes_b64"], validate=True), path, rules)
+        meta = card["metadata"]
+        current = [claim for claim in meta["claims"] if claim["usage"] == "current"]
+        if meta["review_mode"] != "code_gate" or meta["lifecycle"] == "deprecated" or not current:
+            continue
+        context = None
+        if not checkout or not resolved.get("code_context"):
+            context_ref = view.get("context_ref")
+            if context_ref:
+                context = ctx.read(context_ref)
+        if not checkout:
+            configuration = ctx.domain.workspace_config_path(ctx.root)
+            config_bytes = configuration.read_bytes()
+            config = ctx.domain.normalize_workspace(ctx.domain.load_yaml(config_bytes), configuration.parent)
+            repos = {}
+            for mapping in config["repos"]:
+                root = Path(mapping["root"])
+                root = root if root.is_absolute() else configuration.parent / root
+                fixed = (context or {}).get("repos", {}).get(mapping["repo_id"], {})
+                commit = fixed.get("head")
+                repos[mapping["repo_id"]] = {"root": str(root.resolve()), "commit": commit}
+            checkout = {"configuration": str(configuration),
+                        "config_digest": (context or {}).get("config_digest") or digest(config_bytes), "repos": repos}
+            resolved["code_checkout"] = checkout
+        if not resolved.get("code_context") and context:
+            build = context.get("build_evidence") or {}
+            resolved["code_context"] = {"basis": "source", "repos": {
+                repo_id: {**repo, "checked_files_dirty": repo.get("dirty")}
+                for repo_id, repo in context.get("repos", {}).items()},
+                "target": context.get("target"),
+                "build_files": {artifact["path"]: artifact["sha256"] for artifact in build.get("artifacts", [])},
+                "macro_digest": build.get("macro_digest")}
+        evidence = {ref for claim in current for ref in claim["source_refs"]}
+        contexts = {ref for claim in current for ref in claim["context_ids"]}
+        selected = {**card, "metadata": {**meta, "claims": current,
+            "sources": [source for source in meta["sources"] if source["evidence_ref"] in evidence],
+            "scope": {**meta["scope"], "contexts": [context for context in meta["scope"]["contexts"]
+                                                    if context["context_id"] in contexts]}}}
+        try:
+            configuration = Path(checkout["configuration"])
+            config = ctx.domain.normalize_workspace(ctx.domain.load_yaml(configuration.read_bytes()), configuration.parent)
+            mappings = {mapping["repo_id"]: mapping for mapping in config["repos"]}
+            resources = {resource["source_id"]: resource for resource in lock["resources"]}
+            for reference in selected["metadata"]["sources"]:
+                resource = resources[reference["source_id"]]
+                if resource["kind"] != "code":
+                    continue
+                repo_id = reference["locator"].get("repo_id") or resource["repo_id"]
+                repo = checkout["repos"].get(repo_id)
+                if repo and mappings.get(repo_id, {}).get("kind") == "git" and repo.get("commit") in (None, "unknown", "unavailable"):
+                    repo["commit"] = sources._fixed_code_git(Path(repo["root"]), ["rev-parse", "--verify", "HEAD^{commit}"]).decode("ascii").strip()
+            sources.validate_code_references(selected, lock, checkout, rules)
+            for reference in selected["metadata"]["sources"]:
+                resource = resources[reference["source_id"]]
+                if resource["kind"] != "code":
+                    continue
+                locator = reference["locator"]
+                repo = checkout["repos"][locator.get("repo_id") or resource["repo_id"]]
+                relative = locator.get("path") or resource["path"]
+                raw = ctx.domain.safe_path(Path(repo["root"]), relative).read_bytes()
+                snapshot = sources.validate_source_ref(reference, lock)
+                if digest(raw) != snapshot["sha256"] or len(raw) != snapshot["bytes"]:
+                    raise Invalid("current worktree source bytes differ from the card snapshot")
+            if resolved.get("code_context"):
+                sources.validate_current_code_identity(resolved["code_context"], configuration,
+                    checkout["config_digest"], rules, config.get("code_policy"))
+        except (ValueError, OSError) as exc:
+            raise Blocked("current code references changed: " + str(exc)) from exc
+    return resolved
+
+
 def record_only_view(ctx, request):
     record, _ = record_input(ctx, request)
     if record["batch_kind"] != "record_only":
@@ -188,9 +195,4 @@ def record_only_view(ctx, request):
                       batch_kind="record_only", ingest_record_ref=request["ingest_record_ref"])
     view_ref = f".build/operations/{op}/record-only-view.json"
     ctx.save(view_ref, view)
-    proof = ctx.record("admission_record", op, status="passed", view_digest=view["digest"],
-                       batch_kind="record_only", ingest_record_ref=request["ingest_record_ref"],
-                       ingest_record_digest=record["digest"], verification_tier="record_only_fixed_validation")
-    proof_ref = f".build/operations/{op}/record-only-proof.json"
-    ctx.save(proof_ref, proof)
-    return {**request, "view_ref": view_ref, "proof_ref": proof_ref}
+    return {**request, "view_ref": view_ref}

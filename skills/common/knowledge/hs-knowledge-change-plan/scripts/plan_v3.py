@@ -108,10 +108,10 @@ def author_plan(ctx, request):
 
 def content_review(ctx, request):
     plan = ctx.record(request.get("semantic_plan_ref"), "semantic_plan")
-    reviewer = request.get("reviewer_id")
-    require(plan["operation_id"] == ctx.operation and text(reviewer)
-            and reviewer not in {plan["author_id"], *(r["author_id"] for r in plan["card_actions"])}
-            and text(request.get("independent_context")), "INDEPENDENT_REVIEW_REQUIRED", "Review needs a different author and fresh context identity")
+    require(plan["operation_id"] == ctx.operation, "PLAN_OPERATION_MISMATCH", "Review must describe this operation's plan")
+    identities = {key: request[key] for key in ("reviewer_id", "independent_context") if key in request}
+    if plan.get("author_id") is not None:
+        identities["author_id"] = plan["author_id"]
     scan = ctx.record(plan["scan_ref"], "source_inventory")
     applicable = {u["unit_id"] for u in plan["units"] + plan.get("maintenance_units", []) if u["outcome"] in {"skip", "content"}}
     planned_skips = {u["unit_id"] for u in plan["units"] if u["outcome"] == "skip"}
@@ -135,14 +135,14 @@ def content_review(ctx, request):
         require(view.get("semantic_plan_digest") == plan["digest"], "REVIEW_VIEW_MISMATCH", "Review view differs from plan")
         view_digest = view["digest"]
     record = ctx.seal({"semantic_plan_ref": request["semantic_plan_ref"], "plan_digest": plan["digest"],
-                       "scan_digest": scan["digest"], "author_id": plan["author_id"], "reviewer_id": reviewer,
-                       "independent_context": request["independent_context"], "sampled_unit_ids": sampled,
+                       "scan_digest": scan["digest"], **identities, "sampled_unit_ids": sampled,
                        "unreviewed_unit_ids": unreviewed, "reason": request["reason"], "findings": findings,
                        "view_digest": view_digest, "status": "failed" if findings else "passed",
-                       "verification_tier": "declared_independent_content_review"}, "content_review")
+                       "verification_tier": "declared_content_review"}, "content_review")
     ref = ctx.save(ctx.base + "/content-review/" + record["digest"] + ".json", record)
     return {"content_review_ref": ref, "review_status": record["status"],
-            "skip_sample": {"independent": True, "reviewer": reviewer, "reason": request["reason"],
+            "skip_sample": {**({"reviewer": identities["reviewer_id"]} if "reviewer_id" in identities else {}),
+                            "reason": request["reason"],
                             "sampled_unit_ids": sampled, "unreviewed_unit_ids": unreviewed,
                             "report_ref": ref, "report_digest": record["digest"]}}, ("needs_revision" if findings else "reviewed")
 

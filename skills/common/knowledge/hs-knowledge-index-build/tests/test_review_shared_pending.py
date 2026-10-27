@@ -1,4 +1,4 @@
-"""Shared pending facts must survive loss of machine-local maintenance events."""
+"""Workflow progress metadata does not gate queries of unchanged source bytes."""
 import base64
 import importlib.util
 import os
@@ -17,7 +17,7 @@ spec.loader.exec_module(fixture)
 
 
 @pytest.mark.parametrize("include_raw_refs", [False, True])
-def test_committed_record_only_pending_blocks_current_without_private_events(tmp_path, include_raw_refs):
+def test_processing_status_does_not_gate_query_of_unchanged_actual_sources(tmp_path, include_raw_refs):
     # This isolated test key signs publication receipts only.
     publication_key = Ed25519PrivateKey.generate()
     p = fixture.Pipeline(tmp_path)
@@ -60,7 +60,7 @@ def test_committed_record_only_pending_blocks_current_without_private_events(tmp
         "scan_ref": ".build/operations/create/inventory.json", "scan_digest": inventory["digest"], "inventory": inventory, "content_view_digest": view["digest"],
         "dispositions": [{"unit_id": "u1", "action": "create", "reason": "Exact reviewed source", "observed_fingerprint": fixture.sha(original), "adopted_fingerprint": fixture.sha(original), "progress": "completed", "card_refs": ["pending-rule"], "claim_refs": [{"card_id": "pending-rule", "claim_id": "c1"}]}],
         "progress": {"apply": {"status": "applied", "operation_id": "create", "view_digest": view["digest"]}},
-        "acceptance": {"content_view_digest": view["digest"], "rules_digest": p.rules, "proof_digests": [p.record(applied_ref)["proof_digest"]], "cards": [{"path": path, "card_id": "pending-rule", "sha256": card_sha, "review_mode": "manual_document", "claim_ids": ["c1"], "review_result": "supported"}]}}
+        "acceptance": {"content_view_digest": view["digest"], "rules_digest": p.rules, "proof_digests": [], "cards": [{"path": path, "card_id": "pending-rule", "sha256": card_sha, "review_mode": "manual_document", "claim_ids": ["c1"], "review_result": "supported"}]}}
     accepted["digest"] = fixture.sha(fixture.canonical(accepted))
     accepted_ref = p.write("logs/ingest/accepted.yaml", fixture.canonical(accepted))
     p.catalog["publication_trust"] = {"fixture": {"synthetic": True, "fixture_root": str(p.root), "public_key_b64": base64.b64encode(publication_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)).decode()}}
@@ -100,4 +100,4 @@ def test_committed_record_only_pending_blocks_current_without_private_events(tmp
     assert (p.root / "docs-raw/specs/raw-source.md").read_bytes() == original
     publish("pending")
     result = p.call("knowledge-query", {"operation_id": "new-machine-query", "channel": "shared", "purpose": "current", "query": "capture"})["data"]
-    assert not result["matches"], "Committed unresolved Card/Claim facts must restrict current use even with unchanged source and no local events"
+    assert [row["card_id"] for row in result["matches"]] == ["pending-rule"], "Query checks actual source bytes rather than workflow progress"

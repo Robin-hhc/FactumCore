@@ -370,7 +370,7 @@ def test_record_reference_cannot_read_restricted_gold(harness):
         {"run_id": "run", "node_id": "capture_raw"},
     ],
 )
-def test_invalid_workflow_context_has_no_capture_side_effects(harness, workflow):
+def test_workflow_metadata_does_not_gate_source_capture(harness, workflow):
     harness.write("docs-raw/specs/source.md", b"Synthetic evidence.\n")
     response = harness.run(
         "source-capture",
@@ -380,16 +380,13 @@ def test_invalid_workflow_context_has_no_capture_side_effects(harness, workflow)
             "source_path": "docs-raw/specs/source.md",
             "workflow": workflow,
         },
-        expected=2,
     )
-    assert response["status"] == "error"
-    assert not (harness.root / "logs/evidence").exists()
-    assert not (harness.root / ".build/operations/op").exists()
+    assert response["status"] == "ok"
+    assert (harness.root / response["data"]["bundle_ref"]).is_file()
+    assert not (harness.root / "logs/workflows").exists()
 
 
-def test_workflow_manifest_binds_actual_capture_bundle_bytes(harness):
-    import hashlib
-
+def test_source_capture_returns_business_artifact_without_handoff_manifest(harness):
     harness.write("docs-raw/specs/source.md", b"Synthetic evidence.\n")
     response = harness.run(
         "source-capture",
@@ -405,18 +402,10 @@ def test_workflow_manifest_binds_actual_capture_bundle_bytes(harness):
         },
     )
     reference = response["data"]["bundle_ref"]
-    manifest = harness.record(
-        "logs/workflows/run/nodes/capture_raw/attempt1/result.json"
-    )
-    assert manifest["workflow"] == {
-        "run_id": "run",
-        "node_id": "capture_raw",
-        "attempt_id": "attempt1",
-    }
-    assert (
-        manifest["artifact_digests"][reference]
-        == hashlib.sha256((harness.root / reference).read_bytes()).hexdigest()
-    )
+    bundle = harness.record(reference)
+    assert bundle["digest"] == response["data"]["bundle_digest"]
+    assert "artifact_manifest_ref" not in response["data"]
+    assert not (harness.root / "logs/workflows").exists()
 
 
 @pytest.mark.parametrize("module", ["support", "capture"])

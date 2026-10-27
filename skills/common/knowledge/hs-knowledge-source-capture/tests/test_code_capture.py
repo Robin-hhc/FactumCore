@@ -96,7 +96,7 @@ def setup_code(harness, *, git=False):
         "operation_id": "context",
         "rules_digest": harness.rules,
         "tool_identity": {
-            "skill": "hs-workspace-explore",
+            "skill": "hs-knowledge-explore",
             "package_digest": "0" * 64,
             "runtime": "synthetic-test",
             "requirements_digest": "0" * 64,
@@ -309,7 +309,7 @@ def test_code_selection_cannot_escape_authorized_repository(harness):
     assert result["diagnostics"][0]["code"] == "UNSAFE_PATH"
 
 
-def test_code_resolver_replays_frozen_bytes_after_change_or_removed_authorization(
+def test_code_resolver_uses_config_without_catalog_and_preserves_frozen_bytes(
     harness,
 ):
     repo, context = setup_code(harness)
@@ -346,7 +346,12 @@ def test_code_resolver_replays_frozen_bytes_after_change_or_removed_authorizatio
     catalog = json.loads(harness.catalog.read_text())
     catalog.pop("code_policy")
     harness.catalog.write_bytes(canonical(catalog))
-    request["operation_id"] = "resolve-without-root"
+    request["operation_id"] = "resolve-without-catalog-policy"
+    without_catalog = harness.run("source-capture", request, "resolve-source")["data"]
+    assert without_catalog["text"] == original.decode()
+    assert without_catalog["current_source_matches"] is False
+    (harness.root.parent / "config.yml").unlink()
+    request["operation_id"] = "resolve-without-config"
     historical = harness.run("source-capture", request, "resolve-source")["data"]
     assert historical["text"] == original.decode()
     assert historical["current_source_matches"] is None

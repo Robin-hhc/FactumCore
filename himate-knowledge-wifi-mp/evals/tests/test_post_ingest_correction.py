@@ -226,8 +226,8 @@ def test_rules_upgrade_revalidates_identical_document_without_rewriting_old_acce
     assert refused["diagnostics"][0]["code"] == "STALE_RULES"
     refused = harness.run("apply", {"operation_id": "old-rules", "apply_result_ref": first["apply_result_ref"]}, "verify-result", expected=2)
     assert "rules identity mismatch" in refused["diagnostics"][0]["message"]
-    refused = harness.run("index-build", {"operation_id": "old-proof-rejected"}, "build", expected=3)
-    assert refused["diagnostics"][0]["code"] == "CARD_PROOF_MISSING"
+    rebuilt = harness.run("index-build", {"operation_id": "new-rules-index"}, "build")
+    assert harness.record(rebuilt["data"]["generation_ref"])["rules_digest"] == harness.rules
 
     second = complete_document_operation(
         harness, "new-rules", "update", "Synthetic fixture statement.", expected_change="unfinished"

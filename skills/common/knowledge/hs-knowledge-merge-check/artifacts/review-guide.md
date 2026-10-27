@@ -1,2 +1,3 @@
-A local review is insufficient for the latest-code recheck node. Validate the authorized latest ref, exact merge-mode review binding and complete positive Claim evidence. A stale context remains incomplete; a fresh independent review with a checked_snapshot can cover a harmless latest-code change without repairing links. Reviewer keys and signatures are not prerequisites. Verify document exemption and no CI-policy or semantic-certification claim.
+# Review guide
 
+Check the actual result and relevant card/source/view/index bytes. State unresolved gaps. Workflow order, role assignment and handoff validation belong to OpenFlow. A successful business check does not prove semantic correctness, deployment or Git merge.

@@ -138,22 +138,28 @@ def test_current_ingest_review_lint_record_apply_query_without_human_confirmatio
         assert "fixed" in blocked["diagnostics"][0]["message"]
         assert not (harness.root / "knowledge/rules/new.md").exists()
         (harness.root / extra).unlink()
-        for defect in ("author", "findings"):
-            forged = harness.record(review)
-            forged.pop("digest")
-            if defect == "author":
-                forged["reviewer_id"] = "author"
-            else:
-                forged["findings"] = [{"unit_id": unit["unit_id"], "return_to": "P3", "reason": "Unresolved contradiction", "evidence": ["L2"]}]
-            forged["digest"] = hashlib.sha256(canonical(forged)).hexdigest()
-            ref = harness.write(".build/operations/op/forged-review-" + defect + ".json", canonical(forged))
-            blocked = harness.run("apply", {**apply_request, "content_review_ref": ref}, expected=3)
-            assert blocked["status"] == "blocked"
-            assert not (harness.root / "knowledge/rules/new.md").exists()
+        changed = harness.record(review)
+        changed.pop("digest")
+        changed["view_digest"] = "0" * 64
+        changed["digest"] = hashlib.sha256(canonical(changed)).hexdigest()
+        ref = harness.write(".build/operations/op/foreign-view-review.json", canonical(changed))
+        rejected = harness.run("apply", {**apply_request, "content_review_ref": ref}, expected=2)
+        assert "exact final view" in rejected["diagnostics"][0]["message"]
+        assert not (harness.root / "knowledge/rules/new.md").exists()
+        # Role declarations and unresolved review findings are information for
+        # the caller's workflow; apply neither certifies nor gates on them.
+        material = harness.record(review)
+        material.pop("digest")
+        material["reviewer_id"] = "author"
+        material["findings"] = [{"unit_id": unit["unit_id"], "return_to": "P3",
+                                 "reason": "Caller must resolve this review finding", "evidence": ["L2"]}]
+        material["digest"] = hashlib.sha256(canonical(material)).hexdigest()
+        apply_request["content_review_ref"] = harness.write(".build/operations/op/review-material.json", canonical(material))
     applied = harness.run("apply", apply_request)["data"]["apply_result_ref"]
     saved = harness.record("logs/ingest/op.yaml")
-    assert saved["acceptance"]["cards"][0]["card_id"] == "new"
-    assert saved["acceptance"]["cards"][0]["review_result"] == "supported"
+    assert "acceptance" not in saved
+    assert saved["progress"]["apply"]["status"] == "applied"
+    assert saved["content_view_digest"] == harness.record(view_ref)["digest"]
     generation = harness.run("index-build", {"operation_id": "op"}, "build")["data"]["generation_ref"]
     queries = harness.run("query-regression", {"operation_id": "op", "v3_required": True,
         "apply_result_ref": applied, "generation_ref": generation})["data"]["report_ref"]
@@ -179,8 +185,9 @@ def test_current_ingest_review_lint_record_apply_query_without_human_confirmatio
         "apply_result_ref": applied, "query_report_ref": queries})
     assert ready["phase"] == "ready_to_submit"
     handoff = harness.record(ready["data"]["publish_handoff_ref"])
-    assert {"owner": "authorized_committer", "action": "provide exact originals and portable recovery locations for CI and other clones",
+    assert {"owner": "fixed_ci", "action": "reuse lint deterministic checks on submitted content",
             "status": "pending"} in handoff["external_obligations"]
+    assert "verification_tier" not in handoff
     git("add", "--", *[domain_path + "/" + ref for ref in ready["data"]["commit_files"]])
     git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "knowledge batch")
     commit = git("rev-parse", "HEAD")

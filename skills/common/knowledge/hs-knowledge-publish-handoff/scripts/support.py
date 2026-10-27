@@ -287,7 +287,7 @@ class Context:
                 os.fsync(stream.fileno())
             self.path(relative, (".build/operations", "logs"))
             try:
-                os.link(temporary, path)
+                os.link(temporary, native_path(path))
                 sync_directory(path.parent)
             except FileExistsError:
                 if pathlib.Path(native_path(path)).read_bytes() != content:
@@ -393,6 +393,7 @@ def load_context(args, package_root):
             raise Blocked("runtime dependency differs from pinned lock: " + match[1])
     root = pathlib.Path(args.knowledge_root).resolve()
     lock = safe_path(root, "governance/framework.lock.yaml")
+    args.rules_digest = args.rules_digest or digest(pathlib.Path(native_path(lock)).read_bytes())
     if digest(pathlib.Path(native_path(lock)).read_bytes()) != args.rules_digest:
         raise Invalid("framework lock digest mismatch")
     import yaml
@@ -480,13 +481,14 @@ def load_context(args, package_root):
     for reference, raw in verified.items():
         if pathlib.Path(native_path(safe_path(root, reference))).read_bytes() != raw:
             raise Invalid("rules changed while loading")
-    catalog = (
-        strict_json(pathlib.Path(args.catalog).read_text(encoding="utf-8"))
-        if args.catalog
-        else {}
-    )
-    if catalog and catalog.get("schema_version") != "2.0":
-        raise Invalid("invalid installed catalog version")
+    catalog = {}
+    if args.catalog:
+        try:
+            catalog = strict_json(pathlib.Path(args.catalog).read_text(encoding="utf-8"))
+            if not isinstance(catalog, dict):
+                catalog = {}
+        except (OSError, ValueError):
+            pass
     context = Context(
         root, args.rules_digest, identity(package_root), catalog, domain, rules
     )
@@ -496,59 +498,13 @@ def load_context(args, package_root):
     return context
 
 
-def validate_workflow(request):
-    if "workflow" not in request:
-        return None
-    workflow = request.get("workflow")
-    if not isinstance(workflow, dict):
-        raise Invalid("workflow must be an object")
-    pieces = [workflow.get(key) for key in ("run_id", "node_id", "attempt_id")]
-    if any(
-        not isinstance(value, str)
-        or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}", value)
-        for value in pieces
-    ):
-        raise Invalid("workflow requires safe run/node/attempt identities")
-    return pieces
-
-
-def workflow_artifact(ctx, request, result):
-    pieces = validate_workflow(request)
-    if pieces is None:
-        return None
-    workflow = request["workflow"]
-    prefix = "logs/workflows/" + pieces[0] + "/nodes/" + pieces[1] + "/" + pieces[2]
-    data = dict(result["data"])
-    references = {}
-    for key, value in data.items():
-        if key.endswith("_ref") and isinstance(value, str):
-            path = ctx.path(value, (".build/operations", "logs"))
-            if path.is_file():
-                references[value] = digest(pathlib.Path(native_path(path)).read_bytes())
-    manifest = ctx.record(
-        "workflow_manifest",
-        ctx.operation(request),
-        workflow=workflow,
-        phase=result["phase"],
-        result=data,
-        request_digest=digest(request),
-        result_digest=digest(data),
-        artifact_digests=references,
-    )
-    ctx.save(prefix + "/result.json", manifest)
-    ctx.publish(
-        prefix + "/result.md",
-        b"# Node result\n\n```json\n" + canonical(manifest) + b"\n```\n",
-    )
-    return prefix + "/result.md"
-
 
 def run_cli(handler, package_root):
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--knowledge-root", required=True)
-    parser.add_argument("--rules-digest", required=True)
+    parser.add_argument("--rules-digest")
     parser.add_argument("--catalog")
     parser.add_argument("--action", default="run")
     args = parser.parse_args()
@@ -556,7 +512,6 @@ def run_cli(handler, package_root):
     try:
         ctx = load_context(args, package_root)
         request = strict_json(pathlib.Path(native_path(args.input)).read_text(encoding="utf-8"))
-        validate_workflow(request)
         data = handler(ctx, request, args.action)
         result = {
             "status": "ok",
@@ -564,9 +519,6 @@ def run_cli(handler, package_root):
             "data": data,
             "diagnostics": [],
         }
-        artifact = workflow_artifact(ctx, request, result)
-        if artifact:
-            result["data"]["artifact_manifest_ref"] = artifact
         code = 0
     except Blocked as exc:
         result = {
@@ -602,7 +554,7 @@ def run_cli(handler, package_root):
             rel = output.relative_to(root).as_posix()
             safe_path(root, rel, (".build", "logs"))
         if output.exists() and pathlib.Path(native_path(output)).read_bytes() != canonical(result) + b"\n":
-            raise Invalid("response path already exists; use a new attempt output")
+            raise Invalid("response path already exists; use a new output path")
         atomic_bytes(output, canonical(result) + b"\n")
     except Exception as exc:
         sys.stderr.write(str(exc) + "\n")

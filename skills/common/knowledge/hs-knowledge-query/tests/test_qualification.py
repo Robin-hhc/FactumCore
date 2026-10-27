@@ -68,6 +68,9 @@ def card(identity, dependency=None, *, review_mode="manual_document"):
 def fixture_context(tmp_path, cards, *, stale=None, code_sources=()):
     node, support = load_node()
     stale = set(stale or [])
+    # These unit tests isolate eligibility/source decisions. The real module/Target
+    # mapping check is covered through actual contracts in test_live_code_scope.
+    node.validate_live_code_claim = lambda *args: None
     documents, qualifications, calls = {}, {}, []
     for identity, value in cards.items():
         ref = f"artifacts/indexes/local/g/cards/{identity}.md"
@@ -160,15 +163,38 @@ def fixture_context(tmp_path, cards, *, stale=None, code_sources=()):
     return node, ctx, manifest, calls
 
 
-def test_historical_load_uses_exact_historical_content_and_current_forwards_fresh_proof(
+def test_card_load_uses_exact_content_without_replaying_prior_skills(
     tmp_path,
 ):
     value = card("a", review_mode="code_gate")
     node, ctx, manifest, calls = fixture_context(tmp_path, {"a": value})
     node.load_card(ctx, manifest, "a", "historical")
-    assert calls[-1][1]["purpose"] == "historical"
     node.load_card(ctx, manifest, "a", "current")
-    assert calls[-1][1]["current_code_proof_ref"].endswith("fresh-check.json")
+    assert calls == []
+    manifest["qualifications"] = {}
+    assert node.load_card(ctx, manifest, "a", "current")["metadata"]["id"] == "a"
+
+
+def test_optional_code_fingerprint_is_checked_from_root_config_without_catalog(tmp_path):
+    value = card("a", review_mode="code_gate")
+    node, ctx, manifest, calls = fixture_context(tmp_path, {"a": value})
+    config = tmp_path / "config.yml"
+    config.write_text("{}", encoding="utf-8")
+    ctx.args = SimpleNamespace(catalog=None)
+    observed = []
+    ctx.modules["validation"] = SimpleNamespace(workspace_config_path=lambda root: config, load_yaml=lambda raw: {})
+    ctx.modules["source_resources"].validate_current_code_identity = lambda *args: observed.append(args)
+    identity = {"basis": "source", "repos": {"module": {"files": {"file.c": "a" * 64}}}}
+    manifest["qualifications"]["a"].update(code_identity=identity, config_digest="b" * 64)
+    node.load_card(ctx, manifest, "a")
+    assert observed[0][:3] == (identity, config, "b" * 64)
+    assert calls == []
+    def changed(*args):
+        raise ValueError("Actual code bytes changed")
+    ctx.modules["source_resources"].validate_current_code_identity = changed
+    stale = node.load_card(ctx, manifest, "a")
+    assert stale["_portable_context_current"] is False
+    assert stale["_context_gaps"][0]["code"] == "CURRENT_CODE_CONTEXT_CHANGED_OR_UNKNOWN"
 
 
 @pytest.mark.parametrize("relation", ["requires", "derived_from"])
@@ -192,12 +218,22 @@ def test_related_to_does_not_propagate_staleness(tmp_path):
     assert evaluated.evaluate("a")[1] == {"c1"}
 
 
-def test_guidance_keeps_historical_material_but_reports_shared_pending_review(tmp_path):
+def test_processing_review_status_does_not_gate_business_query(tmp_path):
     node, ctx, manifest, _ = fixture_context(tmp_path, {"a": card("a")})
     state = {"blocked_claims": [{"card_id": "a", "claim_id": "c1", "reason": "shared_pending_review", "conditions": {}}]}
     evaluated = node.EligibilityEvaluator(ctx, manifest, {"purpose": "guidance", "context": {}}, state).evaluate("a")
     assert evaluated[1] == {"c1"}
-    assert any(gap["code"] == "SHARED_PENDING_REVIEW" for gap in evaluated[3])
+    assert evaluated[3] == []
+
+
+def test_document_measurement_does_not_require_code_or_build_context(tmp_path):
+    value = card("a")
+    value["claims"][0].update(evidence_kind="measurement", verification_requirements=["runtime-support"])
+    node, ctx, manifest, _ = fixture_context(tmp_path, {"a": value})
+    evaluated = node.EligibilityEvaluator(
+        ctx, manifest, {"purpose": "current", "context": {}}, {"blocked_claims": []}
+    ).evaluate("a")
+    assert evaluated[1] == {"c1"} and evaluated[3] == []
 
 
 def test_portable_current_claim_is_independent_of_an_old_historical_code_reference(tmp_path):
@@ -244,7 +280,7 @@ def test_transitive_dependencies_do_not_need_query_term_hits(tmp_path):
     assert evaluated.evaluate("a")[1] == set()
 
 
-def test_code_snapshot_mismatch_requires_current_authenticated_code_proof_but_raw_never_waives(
+def test_changed_code_and_raw_snapshots_are_not_waived_by_workflow_proofs(
     tmp_path,
 ):
     values = {"a": card("a", review_mode="code_gate"), "b": card("b")}
@@ -254,11 +290,11 @@ def test_code_snapshot_mismatch_requires_current_authenticated_code_proof_but_ra
     evaluated = node.EligibilityEvaluator(
         ctx, manifest, {"purpose": "current", "context": {}}, {"blocked_claims": []}
     )
-    assert evaluated.evaluate("a")[1] == {"c1"}
+    assert evaluated.evaluate("a")[1] == set()
     assert evaluated.evaluate("b")[1] == set()
 
 
-def test_fresh_code_proof_supersedes_only_code_source_blocks(tmp_path):
+def test_old_workflow_proofs_do_not_override_explicit_source_restrictions(tmp_path):
     values = {"a": card("a", review_mode="code_gate"), "b": card("b")}
     node, ctx, manifest, _ = fixture_context(tmp_path, values, code_sources=["a"])
     blocks = [
@@ -274,7 +310,7 @@ def test_fresh_code_proof_supersedes_only_code_source_blocks(tmp_path):
     evaluator = node.EligibilityEvaluator(
         ctx, manifest, {"purpose": "current", "context": {}}, {"blocked_claims": blocks}
     )
-    assert evaluator.evaluate("a")[1] == {"c1"}
+    assert evaluator.evaluate("a")[1] == set()
     assert evaluator.evaluate("b")[1] == set()
     blocks[0]["reason"] = "semantic_rejected"
     evaluator = node.EligibilityEvaluator(

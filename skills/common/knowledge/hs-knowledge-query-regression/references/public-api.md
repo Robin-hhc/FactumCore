@@ -1,6 +1,6 @@
 # Candidate-generation regression 2.0
 
-Use the public `scripts/cli.py` with trusted `--knowledge-root`, `--rules-digest` and `--catalog`. Request:
+Use the public `scripts/cli.py` with the actual `--knowledge-root`. Rules default to the current framework lock; no catalog or upstream apply result is required. Request:
 
 ```json
 {"operation_id":"check-generation","generation_ref":"artifacts/indexes/local/gen-<id>/manifest.json","expected_active":null,"cases":[{"id":"rule-can-be-found","query":"capture","purpose":"current","context":{},"required":["rule-id"],"forbidden":["wrong-id"]}]}

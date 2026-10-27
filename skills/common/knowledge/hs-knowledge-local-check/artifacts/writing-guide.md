@@ -1,4 +1,3 @@
-Bind an independent Agent review record to the exact view, context and mode. Declare the actual author, a different reviewer and independent context; list no unresolved findings and give a positive reason and immutable source snapshot/locator/hash evidence for every code Claim. No reviewer key or signature is required. The script checks record structure and consistency, not reviewer authenticity or semantic correctness. In mixed views, document and code requirements remain separate and both apply. Recheck actual code/configuration and provided build evidence before and after. Persist incomplete status for missing inputs. This record does not claim CI, a Git commit, real host or six-Target acceptance; submitted CI uses fixed deterministic rules.
+# Writing guide
 
-For a final deprecated card, `retired` Claims must carry its exact reason and replacement mapping. Preserve and validate historical source bytes; do not promote retired content to current eligibility. For a stable card, retirement status is invalid and positive current support is mandatory.
-
+Report the actual CLI status, phase, diagnostics and returned business file references. Use the output of this invocation; do not invent a passing result. OpenFlow owns run/node/attempt tracking and transition checks.

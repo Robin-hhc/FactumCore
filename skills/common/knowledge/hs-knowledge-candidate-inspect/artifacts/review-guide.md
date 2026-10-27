@@ -1,3 +1,3 @@
 # Review guide
 
-Check run/operation/node/attempt and source/view/rules/package digests against actual files. Artifacts do not prove human approval, semantics, deployment or a Git merge.
+Check the actual result and relevant card/source/view/index bytes. State unresolved gaps. Workflow order, role assignment and handoff validation belong to OpenFlow. A successful business check does not prove semantic correctness, deployment or Git merge.

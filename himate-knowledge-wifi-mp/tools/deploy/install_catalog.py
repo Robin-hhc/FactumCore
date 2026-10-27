@@ -19,7 +19,7 @@ import sys
 import tempfile
 
 
-SKILLS = ("hs-workspace-explore",) + tuple(
+SKILLS = ("hs-knowledge-explore",) + tuple(
     "hs-knowledge-" + name
     for name in (
         "source-capture",

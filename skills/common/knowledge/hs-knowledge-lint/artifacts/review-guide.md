@@ -1,1 +1,3 @@
-仅完整全库 passed/complete 且 exit 0 的有效原生报告可进入 P6。确认对象和规则摘要一致；未完成项、空报告和状态矛盾不通过。摘要不替代真人确认或代码语义核验。
+# Review guide
+
+Check the actual result and relevant card/source/view/index bytes. State unresolved gaps. Workflow order, role assignment and handoff validation belong to OpenFlow. A successful business check does not prove semantic correctness, deployment or Git merge.

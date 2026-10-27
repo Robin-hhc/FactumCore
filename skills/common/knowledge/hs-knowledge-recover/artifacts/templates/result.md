@@ -1,4 +1,8 @@
-# Recovery result
+# Node result
 
-Report the requested action, delegated apply result reference, transaction status and any conflict. Do not report recovery complete when the public engine is blocked.
+- Operation and requested action:
+- Actual status / phase:
+- Business output file references:
+- Diagnostics and remaining gaps:
 
+Use the actual CLI response. OpenFlow records its own execution identities.

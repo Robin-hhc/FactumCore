@@ -1,4 +1,8 @@
-# Local code gate result
+# Node result
 
-Report passed, failed or incomplete with exact view/context/code identities, per-Claim positive evidence and gaps. Identify synthetic mechanism verification separately from real code/Target acceptance.
+- Operation and requested action:
+- Actual status / phase:
+- Business output file references:
+- Diagnostics and remaining gaps:
 
+Use the actual CLI response. OpenFlow records its own execution identities.

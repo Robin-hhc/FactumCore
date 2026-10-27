@@ -1,3 +1,3 @@
-# 生成要求
+# Writing guide
 
-由本节点真实 CLI 输出派生；manifest 与机器记录绑定，不覆盖旧 attempt。缺口和等待不能写成完成。
+Report the actual CLI status, phase, diagnostics and returned business file references. Use the output of this invocation; do not invent a passing result. OpenFlow owns run/node/attempt tracking and transition checks.

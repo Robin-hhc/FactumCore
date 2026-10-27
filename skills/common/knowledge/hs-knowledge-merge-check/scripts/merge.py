@@ -1,9 +1,9 @@
-"""Latest-authorized-code check through the same pinned public evidence engine."""
+"""Check current code against the exact view through the installed business checker."""
 
 import pathlib
-import re
 import secrets
 import subprocess
+import sys
 
 from support import (
     Blocked,
@@ -11,7 +11,6 @@ from support import (
     atomic_bytes,
     canonical,
     checked_view,
-    package_digest,
 )
 
 
@@ -20,15 +19,13 @@ def merge_check(ctx, request):
     view = checked_view(ctx, request)
     if view.get("review_mode") != "code_gate":
         raise Invalid("pure-document views are exempt from merge code checks")
-    spec = ctx.catalog.get("skills", {}).get("hs-knowledge-local-check")
-    if not spec or not ctx.catalog_path:
-        raise Blocked("installed trusted code evidence engine is unavailable")
-    package = pathlib.Path(spec["root"]).resolve()
-    entry = (package / spec.get("entry", "scripts/cli.py")).resolve()
-    if entry != package / "scripts/cli.py" or package_digest(package) != spec.get(
-        "package_digest"
-    ):
-        raise Invalid("code evidence engine package identity mismatch")
+    package = pathlib.Path(__file__).resolve().parents[2] / "hs-knowledge-local-check"
+    if not (package / "scripts/cli.py").is_file():
+        spec = ctx.catalog.get("skills", {}).get("hs-knowledge-local-check", {})
+        package = pathlib.Path(spec.get("root", package))
+    entry = package / "scripts/cli.py"
+    if not entry.is_file():
+        raise Blocked("installed code evidence Skill is unavailable")
     nonce = secrets.token_hex(12)
     request_ref = f".build/operations/{op}/merge-engine-{nonce}-request.json"
     response_ref = f".build/operations/{op}/merge-engine-{nonce}-response.json"
@@ -39,7 +36,7 @@ def merge_check(ctx, request):
     before_lock = source_lock.read_bytes()
     completed = subprocess.run(
         [
-            spec["python"],
+            sys.executable,
             str(entry),
             "--input",
             str(ctx.path(request_ref)),
@@ -49,8 +46,6 @@ def merge_check(ctx, request):
             str(ctx.root),
             "--rules-digest",
             ctx.rules_digest,
-            "--catalog",
-            ctx.catalog_path,
             "--action",
             "merge",
         ],
@@ -63,8 +58,6 @@ def merge_check(ctx, request):
     response = ctx.read(response_ref)
     if (
         response.get("status") != "ok"
-        or response.get("tool_identity", {}).get("package_digest")
-        != spec["package_digest"]
         or response.get("data", {}).get("mode") != "merge"
     ):
         raise Invalid("public merge evidence result binding mismatch")
@@ -80,14 +73,7 @@ def merge_check(ctx, request):
         or source_lock.read_bytes() != before_lock
     ):
         raise Blocked("merge check inputs changed; no repair is attempted")
-    attempt = request.get("workflow", {}).get("attempt_id")
-    if attempt is not None and (
-        not isinstance(attempt, str)
-        or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}", attempt)
-    ):
-        raise Invalid("invalid workflow attempt_id")
-    suffix = "-" + attempt if attempt else ""
-    ref = f"logs/operations/{op}/merge-check-handoff{suffix}.json"
+    ref = f"logs/operations/{op}/merge-check-{nonce}.json"
     record = ctx.record(
         "merge_check",
         op,

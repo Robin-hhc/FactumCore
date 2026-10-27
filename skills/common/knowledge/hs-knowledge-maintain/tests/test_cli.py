@@ -36,52 +36,37 @@ def test_changed_raw_blocks_affected_claim_once_without_editing_official_card(ha
     )
 
 
-def test_manual_clear_without_applied_and_activated_proof_is_blocked(harness):
+def test_manual_advance_never_claims_missing_semantic_review(harness):
     response = harness.run(
         "maintain",
-        {"operation_id": "untrusted", "clear_claims": ["claim"]},
+        {"operation_id": "manual", "clear_claims": ["claim"]},
         "advance",
-        expected=3,
     )
-    assert response["diagnostics"][0]["code"] == "VERIFIED_REVIEW_REQUIRED"
-    assert not (harness.root / "logs/events/state.json").exists()
+    assert response["data"]["cleared_claims"] == []
+    assert response["data"]["verification_tier"] == "current_source_bytes_only"
+    assert response["data"]["knowledge_apply_watermark"] is None
 
 
-def test_active_generation_baseline_cannot_clear_after_official_bytes_change(harness):
-    import hashlib
-    import json
-    import subprocess
-    import sys
+def test_source_repair_can_clear_stale_bytes_without_apply_or_index_history(harness):
+    import yaml
 
-    harness.write("knowledge/rules/existing.md", b"Synthetic official bytes.\n")
-    files = {
-        path.relative_to(harness.root).as_posix(): hashlib.sha256(
-            path.read_bytes()
-        ).hexdigest()
-        for path in [
-            harness.root / "knowledge/rules/existing.md",
-            harness.root / "governance/sources.lock.yaml",
-        ]
-    }
-    baseline = hashlib.sha256(
-        json.dumps(files, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()
-    script = harness.packages / "hs-knowledge-maintain/scripts"
-    code = (
-        "import sys; from pathlib import Path; from types import SimpleNamespace; "
-        "sys.path.insert(0,sys.argv[1]); import maintain\n"
-        "try:\n"
-        " maintain.validate_generation_baseline(SimpleNamespace(root=Path(sys.argv[2])), {'knowledge_baseline':sys.argv[3]})\n"
-        "except Exception as exc:\n"
-        " print(getattr(exc,'code','INVALID')); raise SystemExit(3)\n"
-    )
-    command = [sys.executable, "-c", code, str(script), str(harness.root), baseline]
-    matching = subprocess.run(command, capture_output=True, text=True, check=False)
-    assert matching.returncode == 0, matching.stderr
-    harness.write("knowledge/rules/existing.md", b"Changed official bytes.\n")
-    stale = subprocess.run(command, capture_output=True, text=True, check=False)
-    assert stale.returncode != 0
-    assert "STALE_GENERATION" in stale.stdout
+    _, old = harness.capture("old")
+    harness.write("knowledge/rules/existing.md", harness.card("existing", old, lifecycle="stable"))
+    harness.write("governance/sources.lock.yaml", yaml.safe_dump({
+        "schema_version": "2.0", "resources": old["resources"], "snapshots": old["snapshots"],
+    }).encode())
+    new_ref, new = harness.capture("changed", b"# Source\nChanged authorized synthetic evidence.\n")
+    harness.run("maintain", {"operation_id": "changed", "bundle_ref": new_ref}, "register-source-change")
+    stale = harness.run("maintain", {"operation_id": "still-stale"}, "advance")
+    assert stale["data"]["blocked_claims"] and not stale["data"]["cleared_claims"]
+    harness.write("knowledge/rules/existing.md", harness.card("existing", new, lifecycle="stable"))
+    harness.write("governance/sources.lock.yaml", yaml.safe_dump({
+        "schema_version": "2.0", "resources": new["resources"], "snapshots": new["snapshots"],
+    }).encode())
+    current = harness.run("maintain", {"operation_id": "current"}, "advance")
+    assert not current["data"]["blocked_claims"] and current["data"]["cleared_claims"]
+    assert current["data"]["knowledge_apply_watermark"] is None
+    assert not list((harness.root / "logs/operations").glob("*/apply-result.json"))
 
 
 def test_interrupted_event_publish_keeps_blocks_and_resumes_without_epoch_duplication(

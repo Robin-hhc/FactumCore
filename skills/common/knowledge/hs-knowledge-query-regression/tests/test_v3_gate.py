@@ -1,3 +1,4 @@
+"""Manual query regression checks actual behavior without an apply proof chain."""
 from pathlib import Path
 import subprocess
 import sys
@@ -9,36 +10,47 @@ class PublicFixture:
     base = ".build/operations/op"
     args = SimpleNamespace(action="run")
 
-    def __init__(self):
-        self.request = {"operation_id": "op", "v3_required": True, "apply_result_ref": "applied",
-                        "generation_ref": "generation", "cases": [{"id": "forged", "query": "anything", "required": ["wrong"]}]}
-        self.values = {"applied": {"record_kind": "apply_result", "digest": "apply", "view_ref": "view", "view_digest": "view-digest"},
-                       "view": {"record_kind": "final_view", "digest": "view-digest", "target_queries": [
-                           {"id": "actual", "query": "timeout", "required": ["timeout"]}]}}
-
-    def record(self, ref, kind=None):
-        return self.values[ref]
+    def __init__(self, expected="actual"):
+        self.request = {"operation_id": "op", "generation_ref": "generation", "expected_active": None,
+                        "cases": [{"id": "manual", "query": "timeout", "required": [expected]}]}
+        self.calls = []
 
     def call(self, name, request, action=None):
-        if name == "hs-knowledge-apply":
-            return {"data": {"result_verified": True, "view_ref": "view", "view_digest": "view-digest"}}
-        raise AssertionError("Rejected before query or activation")
+        self.calls.append((name, action))
+        if name == "hs-knowledge-index-build":
+            return {"data": {"channel": "local", "activated": action == "activate"}}
+        if name == "hs-knowledge-query":
+            if action == "search":
+                return {"data": {"candidate_scan_truncated": False,
+                                 "matches": [{"card_id": "actual", "card_digest": "card", "claim_ids": ["c1"]}],
+                                 "receipt_ref": "search-receipt"}}
+            return {"data": {"generation_ref": "generation", "card_digest": "card",
+                             "claims": [{"id": "c1"}], "receipt_ref": "read-receipt"}}
+        raise AssertionError("No upstream workflow verifier may be called")
+
+    def seal(self, value, kind):
+        return {**value, "digest": "report", "record_kind": kind}
+
+    def save(self, ref, report):
+        self.report = report
 
 
-def test_v3_cases_cannot_replace_authored_batch_queries():
+def test_manual_queries_do_not_need_an_authored_batch_or_apply_proof():
     result = subprocess.run([sys.executable, str(Path(__file__).resolve())], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
 
 
 if __name__ == "__main__":
-    # A separate interpreter prevents the repository's intentionally isolated
-    # Skill support modules from sharing a global import cache in pytest.
+    # Skill support modules intentionally run in separate interpreter contexts.
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
     from node import execute
 
-    try:
-        execute(PublicFixture())
-    except Exception as error:
-        assert getattr(error, "code", None) == "BATCH_QUERY_PLAN_MISMATCH", error
-    else:
-        raise AssertionError("Caller queries replaced the authored batch plan")
+    fixture = PublicFixture()
+    result, phase = execute(fixture)
+    assert phase == "checked" and result["passed"] and result["activated"]
+    assert fixture.report["cases"] == fixture.request["cases"]
+    assert ("hs-knowledge-query", "read") in fixture.calls
+    failed = PublicFixture("absent")
+    result, phase = execute(failed)
+    assert phase == "needs_revision" and not result["passed"] and not result["activated"]
+    assert ("hs-knowledge-index-build", "activate") not in failed.calls

@@ -1,4 +1,8 @@
-# Publishing handoff
+# Node result
 
-State the actual local apply, processing-record and index/query gate identities and verification tier. List exact `commit_files` and whether the authorized Git action is pending or verified by `verify-submission`. Keep deferred/failed units unfinished. Report CI, push and merge independently from local application and a scoped commit.
+- Operation and requested action:
+- Actual status / phase:
+- Business output file references:
+- Diagnostics and remaining gaps:
 
+Use the actual CLI response. OpenFlow records its own execution identities.

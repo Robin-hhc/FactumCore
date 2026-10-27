@@ -1,2 +1,3 @@
-An Agent-written resealed apply or query JSON alone must not pass. Recheck the exact transaction through the public verifier; v3 content batches must also reverify the full index and plan-bound target searches and same-generation reads. Record-only batches must contain no knowledge writes. `ready_to_submit` describes a pending human Git action; it does not prevent local ingest from completing. `verify-submission` reads actual HEAD objects and the exact batch scope. Do not invent remote push, CI or merge results; fixed CI reuses lint checks and remains separate from the local independent content review.
+# Review guide
 
+Check the actual result and relevant card/source/view/index bytes. State unresolved gaps. Workflow order, role assignment and handoff validation belong to OpenFlow. A successful business check does not prove semantic correctness, deployment or Git merge.

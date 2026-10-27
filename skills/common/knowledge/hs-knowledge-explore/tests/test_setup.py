@@ -99,7 +99,8 @@ def test_missing_packages_are_installed_into_the_same_python(deployment, monkeyp
     report = json.loads(capsys.readouterr().out)
     assert code == 0 and report["dependencies"] == "installed"
     assert commands[0][:3] == [sys.executable, "-m", "pip"]
-    assert "--no-cache-dir" in commands[0] and "--no-user" in commands[0]
+    assert "--no-cache-dir" in commands[0] and "--user" in commands[0]
+    assert "--no-user" not in commands[0]
     assert not any(flag in commands[0] for flag in ("--prefix", "--target", "venv"))
     assert snapshot(project.parent) == before
 

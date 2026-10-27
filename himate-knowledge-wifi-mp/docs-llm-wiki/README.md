@@ -13,7 +13,7 @@ flowchart LR
 |---|---|
 | [HiMate知识库架构设计.md](HiMate知识库架构设计.md) | 目录架构、分层职责与生产、治理、消费三条链路 |
 | [知识库详细设计.md](知识库详细设计.md) | 第 1 节说明前置发现和命令；第 2.1 节画完整 ingest P1—P7，第 3.1 节展开 lint 检查，第 3.2 节说明固定 CI，第 4 节说明查询与 Q6 源码定位；第 5 节按节点解释文件设计，§5.11 说明 S0 CodeGraph 首次 setup；第 6 节集中说明共用规则与运行约束 |
-| [知识库关键点.md](知识库关键点.md) | 工作区路径基准、默认与仓外部署边界，以及项目视图和文件核验约定 |
+| [知识库关键点.md](知识库关键点.md) | WiFi-MP 方案适配其他领域时的目录、raw／Profile、领域契约和 Skill／Workflow 配套修改，以及共用的部署与核验边界 |
 | [使用说明.md](使用说明.md) | 配置 `config.env` 连接信息 → 按需首次准备 → OpenFlow 执行 ingest → 通过 Skill 使用 lint、query |
 | [AGENTS.md](AGENTS.md) | Agent 阅读入口和文档修改边界 |
 

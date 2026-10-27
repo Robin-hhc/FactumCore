@@ -57,6 +57,7 @@ repo/
     │   ├── storys/               # 迭代设计和测试材料
     │   ├── specs/                # 项目需求与设计原件
     │   ├── protocols/            # 内部协议
+    │   ├── troubleshooting/      # 问题定位与排查经验
     │   └── sources/              # dbox、3ms、wiki 登记，暂不接入
     ├── governance/
     │   ├── AGENTS.md / index.md
@@ -92,7 +93,7 @@ repo/
 
 # 11 HiMate知识库架构
 
-知识库随代码仓一并拉取；首次运行依赖由 `hs-knowledge-explore` 准备，不需要额外业务初始化命令或常驻服务。`ingest` 默认处理五类允许 raw，从提炼 draft 连续完成检查、修订、独立内容复核和适用代码核验，最后将 stable 卡落位到 `knowledge/`；`lint` 是可单独调用的只读确定性检查入口，供手动修改和 CI 复用，不自动修稿或入库；`query` 消费知识。本地入库、索引全验、目标查询及活动代激活完成后，由人提交、触发固定 CI 并评审合入。`ingest --source` 可选限定来源；命令格式见[详细设计 §1.1](知识库详细设计.md#11-从命令进入流程)，OpenFlow 负责 Workflow 的调度和交棒校验；人工测试可逐个调用 Skill 并按实际结果继续。
+知识库随代码仓一并拉取；首次运行依赖由 `hs-knowledge-explore` 准备，不需要额外业务初始化命令或常驻服务。`ingest` 默认处理六类允许 raw，从提炼 draft 连续完成检查、修订、独立内容复核和适用代码核验，最后将 stable 卡落位到 `knowledge/`；`lint` 是可单独调用的只读确定性检查入口，供手动修改和 CI 复用，不自动修稿或入库；`query` 消费知识。本地入库、索引全验、目标查询及活动代激活完成后，由人提交、触发固定 CI 并评审合入。`ingest --source` 可选限定来源；命令格式见[详细设计 §1.1](知识库详细设计.md#11-从命令进入流程)，OpenFlow 负责 Workflow 的调度和交棒校验；人工测试可逐个调用 Skill 并按实际结果继续。
 
 ingest 是原件到本地正式知识的完整流程；lint 是可被 ingest、独立命令和 CI 复用的只读检查 Skill，query 负责消费。三者不是必须由用户顺序启动的三个 Workflow。
 
@@ -142,7 +143,7 @@ flowchart TB
         direction LR
         B1["实际业务代码目录<br />按 config.yml 映射<br />.codegraph/ 可用时提供定位"]
         B2["docs-raw/sources/<br />来源登记预留，暂不接入"]
-        B3["docs-raw/ 落库制五类<br />conventions · chips · storys · specs · protocols"]
+        B3["docs-raw/ 落库制六类<br />conventions · chips · storys · specs · protocols · troubleshooting"]
     end
 
     subgraph S3["③ 知识资产层 · 检索对象"]
@@ -320,7 +321,7 @@ flowchart LR
 两套存放形态：
 
 - **登记制（`sources/`）**：不好落到本地的文件（dbox、3ms、wiki），按公司三个文档管理工具分类登记"链接 + 版本 + hash + 密级"，原件仍由源系统持有，与薪火平台共管理；`governance/sources.lock.yaml` 锁声明版本与恢复说明。（首发版本暂不支持）
-- **落库制（conventions / chips / storys / specs / protocols）**：内部公开、上库 Git 仓的文件，按 WiFi 组可能用到的材料类型分五类。
+- **落库制（conventions / chips / storys / specs / protocols / troubleshooting）**：内部公开、上库 Git 仓的文件，按 WiFi 组可能用到的材料类型分六类。
 
 ##### 分类对知识卡生成的影响
 
@@ -328,13 +329,14 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    subgraph M["docs-raw/ 五类材料"]
+    subgraph M["docs-raw/ 六类材料"]
         direction LR
         A1["conventions/ 规范类<br />clean code · 命名规范"]
         A2["chips/ 芯片类<br />配置约束 · 表单"]
         A3["storys/ 迭代文档<br />2/3设计文档 · 测试用例"]
         A4["specs/ 业务规格与设计原件<br />需求 · 接口 · 状态与约束"]
         A5["protocols/ 协议类<br />wifi 80211协议"]
+        A6["troubleshooting/ 问题定位与排查经验<br />现象 · 排查 · 根因 · 措施与验证"]
     end
 
     subgraph K["knowledge/ 可能蒸成的卡"]
@@ -359,6 +361,8 @@ flowchart LR
     A4 -.->|"实际命令与操作约束"| K6
     A5 -->|"协议机制"| K4
     A5 -.->|"帧格式字段"| K2
+    A6 -->|"排查步骤与解决经验"| K5
+    A6 -.->|"定位链路"| K3
 ```
 
 实线是默认提炼方向，虚线是兼路由。图中的 specs 是已放入原件目录的业务规格与设计，不包含本项目本地 `docs-llm-wiki/sdd/`、`task.md`。一类材料可产生多类卡，最终按具体结论的性质选择 Profile；目录分类不能替代对正文、来源和适用范围的判断。

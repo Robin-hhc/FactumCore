@@ -1,6 +1,6 @@
 ---
 name: hs-knowledge-source-scan
-description: Discover incremental changes in the five landed raw directories, prepare related-card reading material and reconcile a portable ingest record.
+description: Discover incremental changes in the six landed raw directories, prepare related-card reading material and reconcile a portable ingest record.
 ---
 
 首次使用或缺项目入口信息时，先用已安装的 `hs-knowledge-explore` 运行 setup 并读取项目 `config.yml`；已具备上下文就直接复用。默认使用实际执行机器已有的全局 Python，缺依赖时再由 setup 补齐。
@@ -11,7 +11,7 @@ description: Discover incremental changes in the five landed raw directories, pr
 
 Use `scripts/cli.py --action scan|prepare|record --input REQUEST.json --output RESPONSE.json --knowledge-root K` after the Agent has read the project entry. This Skill does not locate, bind or initialize the project.
 
-`scan` defaults to the five supported raw directories; optional `source` narrows that scope. It fixes the batch inventory and scan completeness, compares portable ingest records, and preserves unfinished work. It detects file changes, never decides which knowledge statement is true.
+`scan` defaults to the six supported raw directories; optional `source` narrows that scope. It fixes the batch inventory and scan completeness, compares portable ingest records, and preserves unfinished work. It detects file changes, never decides which knowledge statement is true.
 
 `prepare` retains current originals through source-capture, reconstructs source/Claim references and explicit `requires`/`derived_from` downstream dependencies across all card states, and prepares each card's adopted old version. Each old original has an immutable batch copy, its exact recovery descriptor and locator. Use `topics` or explicit `candidate_card_ids` to include authoring candidates discovered by the Agent; read complete originals and old cards before deciding. Ordinary related links do not imply a dependency. Query answer qualification is separate from authoring search.
 

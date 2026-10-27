@@ -62,19 +62,43 @@ else:
         link.rmdir()
 
 
-def test_default_scan_discovers_five_raw_classes_without_source_argument(harness):
-    harness.write("docs-raw/specs/new.md", b"# Synthetic source\n")
-    harness.write("docs-raw/chips/chip.md", b"# Synthetic chip\n")
+def test_default_scan_discovers_all_six_raw_classes_without_source_argument(harness):
+    paths = [
+        "docs-raw/chips/chip.md",
+        "docs-raw/conventions/convention.md",
+        "docs-raw/protocols/protocol.md",
+        "docs-raw/specs/new.md",
+        "docs-raw/storys/story.md",
+        "docs-raw/troubleshooting/wifi/case.md",
+    ]
+    for path in paths:
+        harness.write(path, b"# Synthetic source\n")
+    harness.write("docs-raw/troubleshooting/.gitkeep", b"")
     harness.write("sources/outside.md", b"Not an accepted raw source")
+    harness.write("docs-raw/sources/link.md", b"Not an accepted raw class")
     result = harness.run("source-scan", {"operation_id": "scan-one"}, "scan")
     scan = harness.record(result["data"]["scan_ref"])
     assert result["phase"] == "scanned"
     assert scan["full_scan"] is True and scan["complete"] is True
-    assert [(u["path"], u["change"]) for u in scan["units"]] == [
-        ("docs-raw/chips/chip.md", "new"), ("docs-raw/specs/new.md", "new")
-    ]
+    assert [(u["path"], u["change"]) for u in scan["units"]] == [(path, "new") for path in paths]
     assert all(u["progress"] is None for u in scan["units"])
     assert not (harness.root / "logs/ingest").exists()
+
+
+@pytest.mark.parametrize("source", [
+    "docs-raw/troubleshooting",
+    "docs-raw/troubleshooting/wifi",
+    "docs-raw/troubleshooting/wifi/case.md",
+])
+def test_troubleshooting_source_scope_selects_only_requested_originals(harness, source):
+    path = "docs-raw/troubleshooting/wifi/case.md"
+    harness.write(path, b"# Case\nSynthetic diagnostic experience.\n")
+    harness.write("docs-raw/specs/unrelated.md", b"# Unrelated source\n")
+    result = harness.run("source-scan", {"operation_id": "case-scope", "source": source}, "scan")
+    scan = harness.record(result["data"]["scan_ref"])
+    assert scan["full_scan"] is False and scan["complete"] is True
+    assert scan["scope"] == [source]
+    assert [(unit["path"], unit["change"]) for unit in scan["units"]] == [(path, "new")]
 
 
 def test_prepare_reads_all_card_states_and_each_adopted_version(harness):
@@ -412,9 +436,15 @@ def test_prepare_expands_explicit_dependencies_but_not_related_links(harness):
     assert all("recovery" in source for candidate in material["candidates"] for source in candidate["adopted_sources"])
 
 
-def test_scan_rejects_external_source_scope(harness):
+@pytest.mark.parametrize("source", [
+    "sources/outside.md",
+    "docs-raw/sources/link.md",
+    "docs-raw/troubleshooting-extra/case.md",
+    "docs-raw/troubleshooting/../specs/source.md",
+])
+def test_scan_rejects_external_source_scope(harness, source):
     harness.write("sources/outside.md", b"Outside allowed raw roots")
-    response = harness.run("source-scan", {"operation_id": "invalid", "source": "sources/outside.md"}, "scan", expected=2)
+    response = harness.run("source-scan", {"operation_id": "invalid", "source": source}, "scan", expected=2)
     assert response["diagnostics"][0]["code"] == "RAW_SCOPE_REQUIRED"
     assert not (harness.root / ".build/operations/invalid").exists()
 

@@ -4,7 +4,7 @@
 
 WiFi 原件、知识和治理位于 `himate-knowledge-wifi-mp/`。Skill／Workflow 的开发分发源码在项目根对应目录，实际能力安装在 Agent 自己的目录，由 harness 使用。首次运行已安装 `hs-knowledge-explore` 内的 setup 检查现有全局 Python 依赖、读取根 `config.yml`；不另建私有运行环境或要求用户登记能力。跨机器 SSH 信息在该 Skill 的 `config.env`，由 harness 处理连接和执行。ingest 完成生产与本地入库，lint 保持只读检查；不建立额外领域目录或嵌套 `.git`。Git 在项目根 `repo/` 执行。
 
-原始文档放 `docs-raw/{conventions,chips,storys,specs,protocols}/`，保留原件及必要附件；`sources/` 的 URL 更新暂不接入。知识卡经候选和确切最终视图治理后进入 `knowledge/`。纯文档经独立 Agent 内容复核和完整固定检查后 stable，免代码实现核验。用户可在执行中退回或入库后要求修订。代码卡本地只读检查通过后 stable，上库固定 CI 校验格式、索引及来源／代码引用一致性；检查不修卡、锁、链接或源码。
+原始文档放 `docs-raw/{conventions,chips,storys,specs,protocols,troubleshooting}/`，保留原件及必要附件；`sources/` 的 URL 更新暂不接入。知识卡经候选和确切最终视图治理后进入 `knowledge/`。纯文档经独立 Agent 内容复核和完整固定检查后 stable，免代码实现核验。用户可在执行中退回或入库后要求修订。代码卡本地只读检查通过后 stable，上库固定 CI 校验格式、索引及来源／代码引用一致性；检查不修卡、锁、链接或源码。
 
 系统设计放 `docs-llm-wiki/`；项目自身的 SDD 工件也在该目录内本地维护，不作为领域知识正文或共享部署内容。候选暂存放 `.build/`；复核、来源和恢复证据放 `logs/`；回归用例放 `evals/`；可重建索引与报告放 `artifacts/`。不在项目根 `repo/` 另建工具、测试、研究或第二份文档目录。
 

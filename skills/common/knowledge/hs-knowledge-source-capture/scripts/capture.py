@@ -19,7 +19,7 @@ from support import (
     write_bytes,
 )
 
-RAW_CLASSES = {"conventions", "chips", "storys", "specs", "protocols"}
+RAW_CLASSES = {"conventions", "chips", "storys", "specs", "protocols", "troubleshooting"}
 
 
 def extract(data, suffix, *, primary=True):
@@ -117,7 +117,7 @@ def raw_member(context, ref):
     parts = PurePosixPath(ref).parts if isinstance(ref, str) else ()
     if len(parts) < 3 or parts[0] != "docs-raw" or parts[1] not in RAW_CLASSES:
         raise NodeError(
-            "RAW_SCOPE_REQUIRED", "Only five landed docs-raw classes are supported", ref
+            "RAW_SCOPE_REQUIRED", "Expected a file in a supported landed docs-raw class", ref
         )
     path = safe(context.root, ref)
     if not path.is_file():

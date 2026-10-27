@@ -6,7 +6,10 @@ from pathlib import PurePosixPath
 
 from support import NodeError, fixed_bytes, load_yaml, safe, sha
 
-RAW_DIRS = tuple("docs-raw/" + name for name in ("conventions", "chips", "storys", "specs", "protocols"))
+RAW_DIRS = tuple(
+    "docs-raw/" + name
+    for name in ("conventions", "chips", "storys", "specs", "protocols", "troubleshooting")
+)
 IGNORED = {"AGENTS.md", ".gitkeep"}
 FINISHED = {"completed", "skipped", "withdrawn"}
 
@@ -35,7 +38,7 @@ def scopes(request):
         raise NodeError("RAW_SCOPE_REQUIRED", "Expected a relative supported raw path", source)
     ref = "/".join(parts)
     if not any(ref == raw or ref.startswith(raw + "/") for raw in RAW_DIRS):
-        raise NodeError("RAW_SCOPE_REQUIRED", "Only five landed raw classes are supported", source)
+        raise NodeError("RAW_SCOPE_REQUIRED", "Expected a supported landed raw directory or file", source)
     return [ref], False
 
 

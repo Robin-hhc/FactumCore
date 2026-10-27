@@ -35,7 +35,7 @@ flowchart LR
 
 详设中的 `knowledge ...` 是统一入口名称。首次准备后，按[使用说明](使用说明.md)中的 Prompt 向 Agent 发起 `query`、`ingest`、`lint`；当前由 Agent 调用已安装 Skill，底层接口参数见相应能力的 `SKILL.md` 与 `references/`。
 
-`knowledge ingest` 是逻辑入口名称，默认扫描五类允许 raw 并选择新增、变化及待处理来源；限定范围时，在 source-scan 的请求中填写可选 `source`。首次导入和日常增量使用同一套能力，不要求安装同名终端命令。
+`knowledge ingest` 是逻辑入口名称，默认扫描六类允许 raw 并选择新增、变化及待处理来源；限定范围时，在 source-scan 的请求中填写可选 `source`。首次导入和日常增量使用同一套能力，不要求安装同名终端命令。
 
 当前测试由人工点名逐个调用 Skill，按实际业务文件传递输入输出；后续由 OpenFlow 的 ingest Workflow 编排扫描、写稿、独立内容复核、适用代码核验、lint、记录及本地入库，并检查流程顺序和交棒。Skill 自身只检查本职数据，不要求前驱通过凭证。`query` 消费正式知识，`hs-knowledge-lint` 独立只读检查，发现问题交回相应生产步骤修订。
 

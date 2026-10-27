@@ -22,6 +22,7 @@ allowed_raw_roots:
 - docs-raw/storys
 - docs-raw/specs
 - docs-raw/protocols
+- docs-raw/troubleshooting
 allowed_knowledge_roots:
 - knowledge
 locator_kinds:

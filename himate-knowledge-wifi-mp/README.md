@@ -12,7 +12,7 @@ flowchart LR
 
 | 目录 | 存放内容 |
 |---|---|
-| `docs-raw/` | conventions、chips、storys、specs、protocols 五类原件；`sources/` 留作后续接入 |
+| `docs-raw/` | conventions、chips、storys、specs、protocols、troubleshooting 六类原件；`sources/` 留作后续接入 |
 | `knowledge/` | 七类正式知识卡及逐层导航，唯一知识正文根 |
 | `governance/` | Schema、契约、受控枚举、卡模板、规范及来源锁 |
 | `../skills/common/knowledge/` | 节点 Skill 的开发分发源码；实际由 harness 调用 Agent 已安装能力 |

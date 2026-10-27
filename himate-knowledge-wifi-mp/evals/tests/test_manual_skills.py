@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import sys
 
+import pytest
 import yaml
 
 
@@ -38,16 +39,18 @@ class ManualPipeline(FIXTURE.Pipeline):
         return response
 
 
-def test_manual_document_scan_record_apply_index_query_keeps_business_checks(tmp_path):
+@pytest.mark.parametrize("raw_class", ["specs", "troubleshooting"])
+def test_manual_document_scan_record_apply_index_query_keeps_business_checks(tmp_path, raw_class):
     p = ManualPipeline(tmp_path)
     p.catalog_path.unlink()
     (p.root / ".isolated-knowledge-fixture").unlink()
     original = b"# Source\nCapture marker is a documented rule.\n"
-    p.write("docs-raw/specs/raw-source.md", original)
+    source_path = "docs-raw/" + raw_class + "/wifi/raw-source.md"
+    p.write(source_path, original)
     scan_ref = p.call("knowledge-source-scan", {"operation_id": "manual"}, "scan")["data"]["scan_ref"]
     scan = p.record(scan_ref)
     bundle_ref = p.call("knowledge-source-capture", {
-        "operation_id": "manual", "source_path": "docs-raw/specs/raw-source.md",
+        "operation_id": "manual", "source_path": source_path,
         "source_id": scan["units"][0]["source_id"],
     })["data"]["bundle_ref"]
     bundle = p.record(bundle_ref)
@@ -83,7 +86,7 @@ def test_manual_document_scan_record_apply_index_query_keeps_business_checks(tmp
         "operation_id": "read-manual", "receipt_ref": result["receipt_ref"], "card_id": "manual-rule",
     }, "read")["data"]
     assert read["card_digest"] == result["matches"][0]["card_digest"]
-    assert (p.root / "docs-raw/specs/raw-source.md").read_bytes() == original
+    assert (p.root / source_path).read_bytes() == original
     assert not (p.root / "logs/workflows").exists()
     assert p.call("knowledge-lint", {})["status"] == "passed"
     status = p.call("knowledge-source-scan", {
@@ -129,7 +132,7 @@ def test_manual_document_scan_record_apply_index_query_keeps_business_checks(tmp
     }, "search")["data"]["matches"][0]
     assert corrected_match["card_digest"] != read["card_digest"]
     assert (p.root / "logs/ingest/manual.yaml").read_bytes() == original_record
-    assert (p.root / "docs-raw/specs/raw-source.md").read_bytes() == original
+    assert (p.root / source_path).read_bytes() == original
     # Format/reference lint remains independently callable and rejects bad content.
     card = p.root / "knowledge/rules/manual-rule.md"
     card.write_bytes(card.read_bytes().replace(b"lifecycle: stable", b"lifecycle: invalid-state"))

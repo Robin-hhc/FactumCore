@@ -13,7 +13,7 @@ nodes:
     type: skill
     owner: coder
     skill: hs-knowledge-source-scan
-    prompt: 扫描五类原件及实际停点，区分新处理、未入库复核和已入库收尾；无变化不写记录。先核宿主产物根，摘要用独立显式路径；不兼容或阻断时保存停点，不交棒。
+    prompt: 扫描六类原件及实际停点，区分新处理、未入库复核和已入库收尾；无变化不写记录。先核宿主产物根，摘要用独立显式路径；不兼容或阻断时保存停点，不交棒。
     exits:
       - id: scanned
         label: 准备材料

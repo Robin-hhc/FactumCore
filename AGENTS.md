@@ -22,13 +22,13 @@
 
 先阅读 WiFi [AGENTS.md](himate-knowledge-wifi-mp/AGENTS.md) 与[文档入口](himate-knowledge-wifi-mp/docs-llm-wiki/README.md)。架构设计说明目录和三条链路；详细设计先讲流程与判断，再按节点解释文件分工。修改实现前按共享设计和适用测试核实；本地存在对应 SDD 需求、设计和任务时一并读取。本项目开发工件位于 `himate-knowledge-wifi-mp/docs-llm-wiki/sdd/` 和同级 `task.md`，由 Git 忽略，不随部署分发；缺少它们不影响安装、运行或共享文档阅读。保留本地历史工件原字节，不把历史路径或成绩当作当前部署证明。
 
-只接受 `docs-raw/{conventions,chips,storys,specs,protocols}/` 内已落地原件；`sources/` 链接、网页及仓外映射暂不接入。纯文档经独立 Agent 内容复核和完整固定检查后 stable，免代码实现核验。用户可在执行中退回或入库后要求修订。代码卡本地通过后 stable，上库固定 CI 检查格式、索引及来源／代码引用的一致性，不修卡、锁、链接或源码。
+只接受 `docs-raw/{conventions,chips,storys,specs,protocols,troubleshooting}/` 内已落地原件；`sources/` 链接、网页及仓外映射暂不接入。纯文档经独立 Agent 内容复核和完整固定检查后 stable，免代码实现核验。用户可在执行中退回或入库后要求修订。代码卡本地通过后 stable，上库固定 CI 检查格式、索引及来源／代码引用的一致性，不修卡、锁、链接或源码。
 
 日常任务按需使用以下能力：
 
 | 任务 | 能力与结果 |
 |---|---|
-| 入库、增量更新、续办 | `hs-knowledge-ingest`；默认扫描五类原件，完成本地生产、检查、记录、入库和索引／目标查询 |
+| 入库、增量更新、续办 | `hs-knowledge-ingest`；默认扫描六类原件，完成本地生产、检查、记录、入库和索引／目标查询 |
 | 查询背景与定位 | `hs-knowledge-query`；卡片提供背景、条件与索引，具体代码问题继续读取所问版本的实际源码，追查调用、宏条件和早退 |
 | 独立检查 | `hs-knowledge-lint`；只检查并报告，修订交回 ingest |
 | 查看进度 | `hs-knowledge-source-scan` 的 `status`；读取实际停点、待修订及材料缺口 |

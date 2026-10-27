@@ -9,7 +9,7 @@ description: Freeze landed raw documents or explicitly registered code bytes wit
 
 本 Skill 可由人工单独调用。只校验本次业务输入、实际文件及输出，不检查 Workflow 顺序或上游通过凭证。流程顺序、角色分工与交棒合法性由 OpenFlow 的 Workflow 管理；人工测试时由人选择顺序。
 
-Capture landed five-class raw originals and explicit attachments, or selected files in configured modules. In a `code_root` / `modules` workspace, the fixed script reads ordinary files and retains exact snapshots, hashes and locators without relying on repository-manager integration. A version is recorded only from explicit supplied material; unknown version does not block current-file static verification. Chip, side and feature labels express module ownership, not enabled macros or build/runtime facts. Retain exact-byte recovery without network acquisition or execution of repository programs.
+Capture landed six-class raw originals and explicit attachments, or selected files in configured modules. In a `code_root` / `modules` workspace, the fixed script reads ordinary files and retains exact snapshots, hashes and locators without relying on repository-manager integration. A version is recorded only from explicit supplied material; unknown version does not block current-file static verification. Chip, side and feature labels express module ownership, not enabled macros or build/runtime facts. Retain exact-byte recovery without network acquisition or execution of repository programs.
 
 Optional `version` labels must come from explicit source material with its original content and provenance. Preserve the observed label type and leave missing identity or state unknown. A supplied label is metadata rather than proof of repository identity, and never replaces exact file hashes.
 

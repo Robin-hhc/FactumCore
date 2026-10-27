@@ -17,7 +17,8 @@ def hashed(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def test_git_source_resolver_recovers_exact_original_without_local_evidence_objects(harness):
+@pytest.mark.parametrize("raw_class", ["specs", "troubleshooting"])
+def test_git_source_resolver_recovers_exact_original_without_local_evidence_objects(harness, raw_class):
     import base64
     import yaml
 
@@ -28,7 +29,13 @@ def test_git_source_resolver_recovers_exact_original_without_local_evidence_obje
         entry["sha256"] = hashed((harness.root / entry["path"]).read_bytes())
     lock_path.write_text(yaml.safe_dump(lock, sort_keys=False), encoding="utf-8")
     harness.rules = hashed(lock_path.read_bytes())
-    ref, bundle = harness.capture("git-old", b"# Source\nCommitted exact version.\n")
+    source_path = "docs-raw/" + raw_class + "/wifi/source.md"
+    original_bytes = b"# Source\nCommitted exact version.\n"
+    harness.write(source_path, original_bytes)
+    captured = harness.run("source-capture", {
+        "operation_id": "git-old", "source_path": source_path, "source_id": "synthetic",
+    })
+    bundle = harness.record(captured["data"]["bundle_ref"])
     workspace = harness.root.parent
     (workspace / "config.yml").write_text(yaml.safe_dump({"schema_version": "2.0", "workspace_id": "synthetic",
         "knowledge_roots": {"wifi": harness.root.name}, "repos": []}), encoding="utf-8")
@@ -36,7 +43,7 @@ def test_git_source_resolver_recovers_exact_original_without_local_evidence_obje
         result = subprocess.run(["git", "-C", str(workspace), *args], capture_output=True, check=True)
         return result.stdout.decode().strip()
     git("init")
-    path = harness.root.name + "/docs-raw/specs/source.md"
+    path = harness.root.name + "/" + source_path
     git("add", "--", path)
     git("-c", "user.name=Synthetic", "-c", "user.email=synthetic@example.invalid", "commit", "-m", "Synthetic original only")
     commit = git("rev-parse", "HEAD")
@@ -47,11 +54,11 @@ def test_git_source_resolver_recovers_exact_original_without_local_evidence_obje
     git_ref = harness.write(".build/operations/git-old/git-capture.json", canonical(bundle))
     original = harness.root / "logs/evidence/objects" / (bundle["snapshots"][0]["sha256"] + ".bin")
     original.unlink()
-    harness.write("docs-raw/specs/source.md", b"# Source\nUncommitted newer version.\n")
+    harness.write(source_path, b"# Source\nUncommitted newer version.\n")
     response = harness.run("source-capture", {"operation_id": "git-read", "bundle_ref": git_ref,
         "source_ref": {"evidence_ref": "e1", "source_id": "synthetic", "snapshot_id": bundle["snapshots"][0]["snapshot_id"],
                        "locator": {"kind": "lines", "start": 1, "end": 2}}}, "resolve-source")
-    assert base64.b64decode(response["data"]["bytes_b64"]) == b"# Source\nCommitted exact version.\n"
+    assert base64.b64decode(response["data"]["bytes_b64"]) == original_bytes
     assert response["data"]["current_source_matches"] is False
 
 
@@ -118,6 +125,8 @@ def test_missing_request_returns_structured_error_without_creating_knowledge(tmp
     [
         "../outside.md",
         "docs-raw/sources/link.md",
+        "docs-raw/troubleshooting-extra/case.md",
+        "docs-raw/troubleshooting/../specs/source.md",
         "https://example.invalid/doc",
         "C:/secret.md",
     ],
@@ -130,6 +139,32 @@ def test_raw_scope_rejects_outside_and_deferred_inputs(harness, path):
     )
     assert result["status"] == "error"
     assert not (harness.root / "logs").exists()
+
+
+def test_troubleshooting_original_and_attachment_retain_exact_bytes(harness):
+    original = "docs-raw/troubleshooting/wifi/case.md"
+    attachment = "docs-raw/troubleshooting/wifi/trace.txt"
+    inputs = {
+        original: b"# Case\nDiagnostic observation: [trace](trace.txt).\n",
+        attachment: b"Synthetic observation trace\n",
+    }
+    for path, data in inputs.items():
+        harness.write(path, data)
+    result = harness.run("source-capture", {
+        "operation_id": "troubleshooting", "source_path": original,
+        "source_id": "case", "attachments": [attachment],
+    })
+    bundle = harness.record(result["data"]["bundle_ref"])
+    assert [(resource["path"], resource["kind"]) for resource in bundle["resources"]] == [
+        (original, "raw"), (attachment, "attachment"),
+    ]
+    snapshots = {snapshot["source_id"]: snapshot for snapshot in bundle["snapshots"]}
+    for resource in bundle["resources"]:
+        path = resource["path"]
+        snapshot = snapshots[resource["source_id"]]
+        assert snapshot["sha256"] == hashed(inputs[path])
+        assert (harness.root / snapshot["recovery"]["reference"]).read_bytes() == inputs[path]
+        assert (harness.root / path).read_bytes() == inputs[path]
 
 
 def test_exact_source_recovery_survives_original_replacement(harness):

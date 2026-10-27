@@ -138,8 +138,9 @@ def _recover_git(knowledge_root, recovery):
     else:
         prefix = root.relative_to(workspace).as_posix() + "/docs-raw/"
         tail = relative[len(prefix):] if relative.startswith(prefix) else ""
-        if tail.split("/", 1)[0] not in {"conventions", "chips", "storys", "specs", "protocols"} or "/" not in tail:
-            raise ContractError("RECOVERY_SCOPE_REQUIRED", "Default repository recovery accepts only five-class raw originals")
+        raw_classes = {"conventions", "chips", "storys", "specs", "protocols", "troubleshooting"}
+        if tail.split("/", 1)[0] not in raw_classes or "/" not in tail:
+            raise ContractError("RECOVERY_SCOPE_REQUIRED", "Default repository recovery requires a supported raw original")
         repository = workspace
     safe_path(repository, relative)
     def git(*args):

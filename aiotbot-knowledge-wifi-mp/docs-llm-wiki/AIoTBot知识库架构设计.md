@@ -227,7 +227,7 @@ Agent 会话入口。作用是"先路由，再消费"：代码静态事实读取
 
 #### main/ —— 真实代码工作区
 
-`main/` 是默认业务代码工作区；`config.yml` 以模块相对路径记录芯片、Host／Device、特性及用途，未知接入保持 unknown。业务代码保留实际目录结构，知识根和能力目录不另建嵌套 Git 仓。可用的 `.codegraph/` 提供代码定位，**本地生成不上库**：它是按目录可重建的派生物，且可能包含内部符号信息。知识卡结论必须能锚定到确切代码（`[函数](路径:行号)`）。首选部署使代码与知识在同一repo工作区可达；仓外存放需另行实现[部署适配](知识库关键点.md#13-例外知识库位于业务仓外)，默认入口尚不提供该接入。
+`main/` 是默认业务代码工作区；`config.yml` 以模块相对路径记录芯片、Host／Device、特性及用途，未知接入保持 unknown。业务代码保留实际目录结构，知识根和能力目录不另建嵌套 Git 仓。可用的 `.codegraph/` 提供代码定位，**本地生成不上库**：它是按目录可重建的派生物，且可能包含内部符号信息。知识卡的代码结论通过头部 `Claim.source_refs` 关联确切来源：固定快照中的逻辑仓／模块、相对文件及行段等定位；关键流程步骤可分别绑定对应原文与源码。后续 Agent 根据查询恢复的来源和实际模块映射定位源码，再使用可用的 CodeGraph 分析调用与实现。结构化引用即可承载这条链，正文可点击链接不是前提；只有规范依据时保留设计范围，不补造实现函数。首选部署使代码与知识在同一repo工作区可达；仓外存放需另行实现[部署适配](知识库关键点.md#13-例外知识库位于业务仓外)，默认入口尚不提供该接入。
 
 参与链路：生产取证、本地代码语义核验、CI 固定身份比对及消费的代码交叉印证。
 
@@ -238,6 +238,7 @@ Agent 会话入口。作用是"先路由，再消费"：代码静态事实读取
 | 技能 | 职责 | 一句话 |
 |------|------|--------|
 | `hs-workspace-explore/` | E0：缺上下文时发现知识库、代码图谱与入口规则 | 业务命令前可选调用 |
+| `hs-codegraph-setup/` | S0：按模块首次准备 CodeGraph 索引与 MCP 接入 | 纯说明 Skill；日常 Q6 直接用官方 MCP |
 | `hs-knowledge-source-scan/` | P1 扫描、P2 材料、P6 处理记录及进度查询 | scan / prepare / record / status |
 | `hs-knowledge-source-capture/` | 保存本次原文副本，恢复旧版阅读材料 | 默认捕获；resolve-source / resolve 恢复固定来源或捕获包 |
 | `hs-knowledge-change-plan/` | 六决策计划 | plan / review 保存作者计划与独立内容复核 |
@@ -256,7 +257,7 @@ Agent 会话入口。作用是"先路由，再消费"：代码静态事实读取
 | `hs-knowledge-maintain/` | 维护与阻断复核 | inspect-context 只读比较；事件登记与 advance 另行写入 |
 | `hs-knowledge-query/` | 消费知识 | search / read；延续 search 时绑定原 receipt |
 
-参与流程：ingest 编排 P1—P7，内部调用 lint Skill；query 使用知识、来源和索引能力。上表是能力清单，不表示上库必须逐个执行；固定 CI 复用 lint 的确定性检查函数。hs-workspace-explore 是命令前按需调用的 E0。
+参与流程：ingest 编排 P1—P7，内部调用 lint Skill；query 使用知识、来源和索引能力。上表是能力清单，不表示上库必须逐个执行；固定 CI 复用 lint 的确定性检查函数。hs-workspace-explore 是命令前按需调用的 E0。S0 仅在首次 setup 时按 `config.yml` 的真实模块准备代码图谱，消费 Q6 使用官方 MCP 定位源码，见[详细设计 §5.11](知识库详细设计.md#511-s0--q6codegraph-首次-setup-与源码定位)。
 
 #### `workflows/common/knowledge/` —— 增量更新与治理工作流
 
@@ -472,7 +473,7 @@ flowchart TB
 
 图中展示证据入口，主 Agent 根据问题综合材料；代码事实以所问版本的实际源码确认。下表沿用项目根／知识根 K 的路径基准；能力位置以 Agent 的实际目录 `S`、`F` 为准。
 
-查询用途与 stable 状态分开判断：current／implementation 需要相应的当前证据与适用范围，guidance／historical 不把未知条件提升为产品当前事实。P3 预先声明目标查询及用途，P7 按原计划验证；query 的 search 回执固定频道、索引代、用途、上下文及命中 Claim，read 仍重查当前资格，不能把回执当成永久授权。同一 K 最多一个 ingest，可并发 query，但活动代切换或内容变化时允许明确拒绝，机制见[详细设计 §5.9](知识库详细设计.md#59-q1q5路由查询同代精读与回答)。
+查询用途与 stable 状态分开判断：current／implementation 需要相应的当前证据与适用范围，guidance／historical 不把未知条件提升为产品当前事实。P3 预先声明目标查询及用途，P7 按原计划验证；query 的 search 回执固定频道、索引代、用途、上下文及命中 Claim，read 仍重查当前资格，不能把回执当成永久授权。同一 K 最多一个 ingest，可并发 query，但活动代切换或内容变化时允许明确拒绝，机制见[详细设计 §5.9](知识库详细设计.md#59-q1q6路由查询同代精读与回答)。
 
 #### 目录 × 链路参与矩阵
 

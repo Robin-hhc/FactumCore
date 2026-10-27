@@ -32,6 +32,7 @@
 | 查询背景与定位 | `hs-knowledge-query`；卡片提供背景、条件与索引，具体代码问题继续读取所问版本的实际源码，追查调用、宏条件和早退 |
 | 独立检查 | `hs-knowledge-lint`；只检查并报告，修订交回 ingest |
 | 查看进度 | `hs-knowledge-source-scan` 的 `status`；读取实际停点、待修订及材料缺口 |
+| 首次准备代码图谱 | `hs-codegraph-setup`；按 `config.yml` 的真实模块逐项初始化并核对 MCP 接入，日常代码定位直接使用官方 CodeGraph MCP |
 
 已有上下文直接调用；缺少知识库或代码入口信息时，才在业务命令前使用 `hs-workspace-explore`。`code_root` 相对项目根，模块 `path` 相对代码根；可覆盖多目录或共享模块，不要求手填六 Target／三 pair 或重复代码根授权。源码依据以确切文件和内容指纹留存，可选版本材料须保留出处，未知就保持 unknown，不阻断当前文件的静态核验；模块标签不证明实际宏、构建或产品适用。
 

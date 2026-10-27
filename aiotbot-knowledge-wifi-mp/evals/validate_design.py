@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import re
+import runpy
 import subprocess
 
 import yaml
@@ -36,6 +37,7 @@ SKILLS = ('hs-workspace-explore',
  'hs-knowledge-query',
  'hs-knowledge-source-scan',
  'hs-knowledge-lint')
+INSTRUCTION_SKILLS = ('hs-codegraph-setup',)
 ARTIFACT_SCOPE = {'hs-workspace-explore': ([], []),
  'hs-knowledge-source-capture': ([], []),
  'hs-knowledge-change-plan': (['plan_change'], ['planned']),
@@ -194,6 +196,23 @@ def validate(root):
     root = Path(root).resolve(strict=True)
     errors = []
     artifacts = set()
+    # Use the deployment allowlist for instruction packages; node requirements
+    # below remain unchanged. No material from the inspected packages is run.
+    installer = runpy.run_path(str(Path(__file__).resolve().parents[1]
+                                   / "tools/deploy/install_catalog.py"))
+    for skill in INSTRUCTION_SKILLS:
+        package = root / "skills/common/knowledge" / skill
+        try:
+            files = installer["package_files"](package)
+            text = files["SKILL.md"].decode("utf-8")
+            match = re.match(r"\A---\r?\n(.*?)\r?\n---(?:\r?\n|$)", text, re.S)
+            metadata = yaml.load(match[1], Loader=UniqueLoader) if match else None
+            if (not isinstance(metadata, dict) or metadata.get("name") != skill
+                    or not isinstance(metadata.get("description"), str)
+                    or not metadata["description"].strip()):
+                errors.append(f"{skill}: missing or inconsistent Skill identity")
+        except (OSError, ValueError, yaml.YAMLError) as exc:
+            errors.append(f"{skill}: {exc}")
     for skill in SKILLS:
         package = root / "skills/common/knowledge" / skill
         try:
@@ -371,7 +390,7 @@ const contracts=require(path.join(root,'src/config/skill-artifact-loader')).load
 const loader=require(path.join(root,'src/config/workflow-template-loader'));
 const layoutLoader=require(path.join(root,'src/config/workflow-template-layout-loader'));
 const workflows=loader.loadWorkflowTemplates(installed);
-if(workflows.length!==1||registry.skillIds.length!==18||contracts.length!==22) throw Error('Incomplete packages');
+if(workflows.length!==1||registry.skillIds.length!==19||contracts.length!==22) throw Error('Incomplete packages');
 for(const workflow of workflows){
  const layout=layoutLoader.loadWorkflowTemplateLayoutFromPackageDir(path.dirname(workflow.filePath),workflow.id);
  if(layout.template_id!==workflow.id) throw Error('Wrong layout identity');

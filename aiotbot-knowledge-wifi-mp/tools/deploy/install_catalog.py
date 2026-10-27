@@ -41,6 +41,7 @@ SKILLS = ("hs-workspace-explore",) + tuple(
         "lint",
     )
 )
+INSTRUCTION_SKILLS = ("hs-codegraph-setup",)
 WORKFLOWS = ("hs-knowledge-ingest",)
 COMMANDS = {
     "ingest": {"kind": "workflow", "target": "hs-knowledge-ingest", "entry_node": "scan_sources"},
@@ -64,6 +65,7 @@ REQUIRED = (
 IGNORED = {"__pycache__", ".pytest_cache", ".ruff_cache"}
 DIRECTORIES = {"scripts", "references", "artifacts", "tests"}
 SUFFIXES = {".py", ".md", ".yaml", ".yml", ".json", ".txt", ".toml", ".sh", ".ps1"}
+INSTRUCTION_SUFFIXES = {".md", ".txt", ".yaml", ".yml", ".json", ".toml"}
 
 
 class InstallError(ValueError):
@@ -108,7 +110,41 @@ def absolute(value, *, exists=True):
     return path.resolve(strict=exists)
 
 
+def instruction_files(package):
+    """Only explicitly approved instruction packages may omit node contracts."""
+    no_links(package)
+    files = {}
+    for path in sorted(package.rglob("*")):
+        rel = path.relative_to(package)
+        no_links(path)
+        if any(part.startswith(".") or part.lower() == "config.local.yml"
+               or Path(part).stem.lower() in {"credentials", "secrets"}
+               for part in rel.parts):
+            raise InstallError(f"UNPUBLISHABLE_PACKAGE_FILE: {rel}")
+        if rel.as_posix() != "SKILL.md" and (
+            rel.parts[0] != "references"
+            or path.is_file() and path.suffix.lower() not in INSTRUCTION_SUFFIXES
+        ):
+            raise InstallError(f"UNPUBLISHABLE_INSTRUCTION_FILE: {rel}")
+        if not path.is_file():
+            continue
+        data = public_bytes(path.read_bytes(), rel)
+        if "\x00" in data.decode("utf-8"):
+            raise InstallError(f"NON_TEXT_INSTRUCTION_FILE: {rel}")
+        files[rel.as_posix()] = data
+    if "SKILL.md" not in files:
+        raise InstallError(f"INCOMPLETE_PACKAGE: {package.name}: SKILL.md")
+    text = files["SKILL.md"].decode("utf-8")
+    for ref in re.findall(r"\]\((references/[^\s)]+)\)", text):
+        target = ref.split("#", 1)[0]
+        if target not in files:
+            raise InstallError(f"INVALID_INSTRUCTION_REFERENCE: {ref}")
+    return files
+
+
 def package_files(package, *, runtime_only=False):
+    if package.name in INSTRUCTION_SKILLS:
+        return instruction_files(package)
     no_links(package)
     files = {}
     for path in sorted(package.rglob("*")):
@@ -153,14 +189,14 @@ def package_files(package, *, runtime_only=False):
     return files
 
 
-def package_digest(files):
+def package_digest(files, *, include_tests=False):
     # Same canonical tree as every node's public support.package_digest.
     return sha(
         canonical(
             {
                 ref: sha(data)
                 for ref, data in files.items()
-                if "tests" not in Path(ref).parts
+                if include_tests or "tests" not in Path(ref).parts
             }
         )
     )
@@ -239,6 +275,8 @@ def validate_metadata(python, packages, templates):
         if not match:
             raise InstallError(f"MISSING_SKILL_FRONTMATTER: {identity}")
         documents[identity + ":skill"] = match[1]
+        if identity in INSTRUCTION_SKILLS:
+            continue
         documents[identity + ":artifact"] = files["artifacts/result.yaml"].decode(
             "utf-8"
         )
@@ -259,6 +297,8 @@ def validate_metadata(python, packages, templates):
             or not metadata["description"].strip()
         ):
             raise InstallError(f"INVALID_SKILL_METADATA: {identity}")
+        if identity in INSTRUCTION_SKILLS:
+            continue
         contract = parsed[identity + ":artifact"]
         if (
             not isinstance(contract, dict)
@@ -399,9 +439,9 @@ def install(source_root, destination, python_path, workspace_config=None, *,
         raise InstallError("DESTINATION_OVERLAPS_SOURCE")
     packages = {}
     pins = {}
-    for identity in SKILLS:
+    for identity in SKILLS + INSTRUCTION_SKILLS:
         files = package_files(skills_root / identity, runtime_only=register_existing)
-        for name, version in dependencies(files).items():
+        for name, version in (dependencies(files) if identity in SKILLS else {}).items():
             name = re.sub(r"[-_.]+", "-", name).lower()
             if name in pins and pins[name] != version:
                 raise InstallError("CONFLICTING_DEPENDENCY_LOCKS")
@@ -439,10 +479,12 @@ def install(source_root, destination, python_path, workspace_config=None, *,
                     manifest[(relative / ref).as_posix()] = sha(data)
             skills[identity] = {
                 "root": str(skills_root / identity if register_existing else destination / relative),
-                "entry": "scripts/cli.py",
-                "python": str(python),
-                "package_digest": package_digest(files),
+                "package_digest": package_digest(files, include_tests=identity in INSTRUCTION_SKILLS),
             }
+            if identity in INSTRUCTION_SKILLS:
+                skills[identity].update(kind="instructions", entry="SKILL.md")
+            else:
+                skills[identity].update(entry="scripts/cli.py", python=str(python))
         for identity, files in templates.items():
             for ref, data in files.items():
                 relative = Path("config/workflow-templates") / identity / ref

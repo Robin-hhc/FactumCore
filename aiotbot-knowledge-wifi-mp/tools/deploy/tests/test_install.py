@@ -35,6 +35,7 @@ IDS = ["hs-workspace-explore"] + [
         "lint",
     )
 ]
+INSTRUCTION_IDS = ["hs-codegraph-setup"]
 
 
 def test_catalog_declares_logical_commands_and_only_one_ingest_workflow(tmp_path):
@@ -52,6 +53,7 @@ def test_catalog_declares_logical_commands_and_only_one_ingest_workflow(tmp_path
 def test_current_catalog_omits_human_confirmation_capabilities():
     installer = runpy.run_path(str(SCRIPT))
     assert len(installer["SKILLS"]) == 18
+    assert installer["INSTRUCTION_SKILLS"] == tuple(INSTRUCTION_IDS)
     assert "hs-knowledge-confirmation-prepare" not in installer["SKILLS"]
     assert "hs-knowledge-confirmation-record" not in installer["SKILLS"]
 
@@ -119,6 +121,14 @@ def fixture_source(tmp_path):
             path = package / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content, encoding="utf-8")
+    for skill in INSTRUCTION_IDS:
+        package = source / "skills/common/knowledge" / skill
+        (package / "references").mkdir(parents=True)
+        (package / "SKILL.md").write_text(
+            f"---\nname: {skill}\ndescription: fixture setup instructions\n---\n"
+            "Read [commands](references/codegraph.md).\n", encoding="utf-8")
+        (package / "references/codegraph.md").write_text(
+            "# Fixture reference\nNo commands are executed during installation.\n", encoding="utf-8")
     for workflow in ("hs-knowledge-ingest", "hs-knowledge-lint"):
         package = source / "workflows/common/knowledge" / workflow
         package.mkdir(parents=True)
@@ -178,7 +188,7 @@ def test_install_complete_isolated_catalog_without_domain_assets(tmp_path):
     assert result.returncode == 0, result.stderr
     catalog = json.loads((destination / "catalog.json").read_text(encoding="utf-8"))
     assert catalog["schema_version"] == "2.0"
-    assert set(catalog["skills"]) == set(IDS)
+    assert set(catalog["skills"]) == set(IDS + INSTRUCTION_IDS)
     assert catalog["workspaces"] == {}
     entry = catalog["skills"]["hs-knowledge-apply"]
     assert entry["entry"] == "scripts/cli.py"
@@ -212,6 +222,87 @@ def test_install_refuses_existing_destination_and_preserves_contents(tmp_path):
     assert result.returncode != 0
     assert marker.read_bytes() == b"unchanged"
     assert not (destination / "catalog.json").exists()
+
+
+def test_instruction_skill_distributes_only_text_and_hashes_every_reference(tmp_path):
+    source = fixture_source(tmp_path)
+    package = source / "skills/common/knowledge/hs-codegraph-setup"
+    nested = package / "references/tests/notes.md"
+    nested.parent.mkdir()
+    nested.write_text("# Reference under a directory named tests\n", encoding="utf-8")
+    first = tmp_path / "instruction-install-first"
+    result = install(source, first)
+    assert result.returncode == 0, result.stderr
+    entry = json.loads((first / "catalog.json").read_bytes())["skills"][package.name]
+    assert entry["entry"] == "SKILL.md" and entry["kind"] == "instructions"
+    assert "python" not in entry
+    installed = Path(entry["root"])
+    assert not (installed / "scripts").exists()
+    assert not (installed / "artifacts").exists()
+    hashes = {path.relative_to(installed).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+              for path in installed.rglob("*") if path.is_file()}
+    expected = hashlib.sha256(json.dumps(hashes, ensure_ascii=False, sort_keys=True,
+                                        separators=(",", ":")).encode()).hexdigest()
+    assert entry["package_digest"] == expected
+    nested.write_text("# Changed setup reference\n", encoding="utf-8")
+    second = tmp_path / "instruction-install-second"
+    result = install(source, second)
+    assert result.returncode == 0, result.stderr
+    updated = json.loads((second / "catalog.json").read_bytes())["skills"][package.name]
+    assert updated["package_digest"] != entry["package_digest"]
+
+
+@pytest.mark.parametrize("broken,diagnostic", [
+    ("SKILL.md", "INCOMPLETE_PACKAGE"),
+    ("references/codegraph.md", "INVALID_INSTRUCTION_REFERENCE"),
+])
+def test_instruction_skill_missing_input_publishes_nothing(tmp_path, broken, diagnostic):
+    source = fixture_source(tmp_path)
+    (source / "skills/common/knowledge/hs-codegraph-setup" / broken).unlink()
+    destination = tmp_path / "missing-instruction"
+    result = install(source, destination)
+    assert result.returncode != 0 and diagnostic in result.stderr
+    assert not destination.exists()
+
+
+@pytest.mark.parametrize("frontmatter,diagnostic", [
+    ("name: wrong\ndescription: fixture", "INVALID_SKILL_METADATA"),
+    ("name: hs-codegraph-setup\ndescription: ''", "INVALID_SKILL_METADATA"),
+    ("name: hs-codegraph-setup\nname: hs-codegraph-setup\ndescription: fixture", "INVALID_YAML"),
+])
+def test_instruction_skill_metadata_is_strict(tmp_path, frontmatter, diagnostic):
+    source = fixture_source(tmp_path)
+    skill = source / "skills/common/knowledge/hs-codegraph-setup/SKILL.md"
+    skill.write_text("---\n" + frontmatter + "\n---\n# Instructions\n", encoding="utf-8")
+    destination = tmp_path / "invalid-instruction-metadata"
+    result = install(source, destination)
+    assert result.returncode != 0 and diagnostic in result.stderr
+    assert not destination.exists()
+
+
+@pytest.mark.parametrize("relative", [
+    "scripts/setup.py", "references/setup.ps1", "references/secret.bin",
+    "requirements.lock.txt", "references/.private.md", "references/secrets.txt",
+    "references/config.local.yml",
+])
+def test_instruction_skill_cannot_smuggle_executables_or_private_files(tmp_path, relative):
+    source = fixture_source(tmp_path)
+    unexpected = source / "skills/common/knowledge/hs-codegraph-setup" / relative
+    unexpected.parent.mkdir(parents=True, exist_ok=True)
+    unexpected.write_text("fixture bytes\n", encoding="utf-8")
+    destination = tmp_path / "unpublishable-instructions"
+    result = install(source, destination)
+    assert result.returncode != 0 and "UNPUBLISHABLE" in result.stderr
+    assert not destination.exists()
+
+
+def test_instruction_reference_must_be_text(tmp_path):
+    source = fixture_source(tmp_path)
+    (source / "skills/common/knowledge/hs-codegraph-setup/references/codegraph.md").write_bytes(b"binary\x00data")
+    destination = tmp_path / "binary-instructions"
+    result = install(source, destination)
+    assert result.returncode != 0 and "NON_TEXT_INSTRUCTION_FILE" in result.stderr
+    assert not destination.exists()
 
 
 @pytest.mark.parametrize(
@@ -329,11 +420,14 @@ def test_private_key_in_an_allowed_text_resource_is_rejected(tmp_path, key_type)
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows junction boundary")
 @pytest.mark.parametrize("dangling", [False, True], ids=["existing", "dangling"])
-def test_junction_package_directory_rejected(tmp_path, dangling):
+@pytest.mark.parametrize("package_path", [
+    "hs-knowledge-apply/scripts/escape", "hs-codegraph-setup/references/escape",
+])
+def test_junction_package_directory_rejected(tmp_path, dangling, package_path):
     import _winapi
 
     source = fixture_source(tmp_path)
-    link = source / "skills/common/knowledge/hs-knowledge-apply/scripts/escape"
+    link = source / "skills/common/knowledge" / package_path
     target = tmp_path / "external"
     target.mkdir()
     (target / "private.py").write_text("# outside\n", encoding="utf-8")

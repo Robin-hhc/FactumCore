@@ -61,6 +61,14 @@ def fixture_packages(root):
             path = package / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(data, encoding="utf-8")
+    for skill in module.INSTRUCTION_SKILLS:
+        package = root / "skills/common/knowledge" / skill
+        (package / "references").mkdir(parents=True)
+        (package / "SKILL.md").write_text(
+            f"---\nname: {skill}\ndescription: isolated setup fixture\n---\n"
+            "Read [commands](references/codegraph.md).\n", encoding="utf-8")
+        (package / "references/codegraph.md").write_text(
+            "# Setup fixture\nNo host settings are modified.\n", encoding="utf-8")
     shutil.copytree(ROOT / "workflows", root / "workflows")
     return root
 
@@ -164,6 +172,36 @@ def test_design_validation_checks_package_contracts_and_owners(tmp_path):
     assert any("review_content: wrong Skill/owner/type" in error for error in module.validate(source))
 
 
+def test_instruction_skill_has_no_node_contract_but_keeps_strict_metadata(tmp_path):
+    module = validator_module()
+    source = fixture_packages(tmp_path / "fixture")
+    package = source / "skills/common/knowledge/hs-codegraph-setup"
+    assert not (package / "scripts").exists() and not (package / "artifacts").exists()
+    assert module.validate(source) == []
+    (package / "SKILL.md").write_text(
+        "---\nname: hs-codegraph-setup\nname: duplicate\ndescription: fixture\n---\n", encoding="utf-8")
+    assert any("hs-codegraph-setup" in error for error in module.validate(source))
+
+
+def test_instruction_skill_rejects_missing_reference_and_executable_content(tmp_path):
+    module = validator_module()
+    source = fixture_packages(tmp_path / "fixture")
+    package = source / "skills/common/knowledge/hs-codegraph-setup"
+    reference = package / "references/codegraph.md"
+    reference.unlink()
+    assert any("INVALID_INSTRUCTION_REFERENCE" in error for error in module.validate(source))
+    reference.write_text("# Commands\n", encoding="utf-8")
+    (package / "references/setup.py").write_text("raise RuntimeError('must not execute')\n", encoding="utf-8")
+    assert any("UNPUBLISHABLE_INSTRUCTION_FILE" in error for error in module.validate(source))
+
+
+def test_instruction_exception_does_not_relax_node_cli_requirements(tmp_path):
+    module = validator_module()
+    source = fixture_packages(tmp_path / "fixture")
+    (source / "skills/common/knowledge/hs-knowledge-query/scripts/cli.py").unlink()
+    assert any("hs-knowledge-query: missing scripts/cli.py" in error for error in module.validate(source))
+
+
 def test_missing_reference_or_wrong_artifact_exit_is_rejected(tmp_path):
     module = validator_module()
     source = fixture_packages(tmp_path / "fixture")
@@ -213,7 +251,7 @@ def test_real_pinned_openflow_loader(tmp_path):
     assert installed.returncode == 0, installed.stderr
     result = validator_module().validate_openflow(Path(upstream), destination)
     assert result["workflow_ids"] == ["hs-knowledge-ingest"]
-    assert result["skill_count"] == 18
+    assert result["skill_count"] == 19
     assert result["contract_count"] == 22
 
 

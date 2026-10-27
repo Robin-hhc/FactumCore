@@ -154,14 +154,14 @@ def test_nested_domain_uses_registered_workspace_for_capture_and_scan(deployed):
     assert_scan_succeeded(layout, catalog_path, "nested-scan")
 
 
-
 @pytest.mark.parametrize("keep_dev_lock", [False, True])
 def test_existing_agent_packages_work_without_project_capability_folders(deployed, keep_dev_lock):
     layout = deployed
     if keep_dev_lock:
         for package in layout["skills"].iterdir():
-            shutil.copyfile(REPO / "skills/common/knowledge" / package.name / "requirements-dev.lock.txt",
-                            package / "requirements-dev.lock.txt")
+            development_lock = REPO / "skills/common/knowledge" / package.name / "requirements-dev.lock.txt"
+            if development_lock.is_file():
+                shutil.copyfile(development_lock, package / "requirements-dev.lock.txt")
     before_skills, before_workflows = fingerprint(layout["skills"]), fingerprint(layout["workflows"])
     assert not (layout["project"] / "skills").exists()
     assert not (layout["project"] / "workflows").exists()
@@ -172,7 +172,7 @@ def test_existing_agent_packages_work_without_project_capability_folders(deploye
     assert registered.returncode == 0, registered.stderr.decode(errors="replace")
     catalog_path = destination / "catalog.json"
     catalog = json.loads(catalog_path.read_bytes())
-    assert len(catalog["skills"]) == 18
+    assert len(catalog["skills"]) == 19
     assert all(Path(entry["root"]) == layout["skills"] / identity
                for identity, entry in catalog["skills"].items())
     assert not (destination / "config/skills").exists()
@@ -187,6 +187,48 @@ def test_existing_agent_packages_work_without_project_capability_folders(deploye
     assert_scan_succeeded(layout, catalog_path, "external-scan")
     assert fingerprint(layout["skills"]) == before_skills
     assert fingerprint(layout["workflows"]) == before_workflows
+
+
+def test_instruction_skill_registers_final_paths_and_binds_reference_changes(deployed):
+    layout = deployed
+    package = layout["skills"] / "hs-codegraph-setup"
+    before = fingerprint(layout["skills"])
+    first = layout["base"] / "instruction-first-registration"
+    result = register(layout, first)
+    assert result.returncode == 0, result.stderr.decode(errors="replace")
+    entry = json.loads((first / "catalog.json").read_bytes())["skills"][package.name]
+    assert entry["kind"] == "instructions" and entry["entry"] == "SKILL.md"
+    assert Path(entry["root"]) == package
+    assert "python" not in entry
+    assert fingerprint(layout["skills"]) == before
+    reference = package / "references/codegraph.md"
+    reference.write_bytes(reference.read_bytes() + b"\nAdditional fixture reference.\n")
+    changed = fingerprint(layout["skills"])
+    second = layout["base"] / "instruction-second-registration"
+    result = register(layout, second)
+    assert result.returncode == 0, result.stderr.decode(errors="replace")
+    updated = json.loads((second / "catalog.json").read_bytes())["skills"][package.name]
+    assert entry["package_digest"] != updated["package_digest"]
+    assert fingerprint(layout["skills"]) == changed
+
+
+def test_instruction_skill_is_not_callable_as_a_workflow_cli(deployed):
+    """The existing dispatch gate rejects instruction entries before execution."""
+    import importlib.util
+    from types import SimpleNamespace
+
+    layout = deployed
+    destination = layout["base"] / "instruction-dispatch-registration"
+    result = register(layout, destination)
+    assert result.returncode == 0, result.stderr.decode(errors="replace")
+    support = layout["skills"] / "hs-workspace-explore/scripts/support.py"
+    spec = importlib.util.spec_from_file_location("instruction_dispatch_support", support)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    context = object.__new__(module.Context)
+    context.args = SimpleNamespace(catalog=destination / "catalog.json")
+    with pytest.raises(module.NodeError, match="fixed public scripts/cli.py"):
+        context.call("hs-codegraph-setup", {})
 
 
 @pytest.mark.parametrize("filename", ["requirements.txt", "requirements-extra.txt"])

@@ -51,7 +51,7 @@ class Harness:
                 "AIOT_DOMAIN_FIXTURE",
                 str(
                     Path(__file__).resolve().parents[5]
-                    / "aiotbot-knowledge-wifi-mp/governance"
+                    / "himate-knowledge-wifi-mp/governance"
                 ),
             )
         )

@@ -245,7 +245,7 @@ def fixture_fault_allowed(ctx):
     fixture_root = ctx.catalog.get("test_fixture_root")
     return (
         marker.is_file()
-        and marker.read_text(encoding="utf-8").strip() == "AIOTBOT_SYNTHETIC_FIXTURE_V2"
+        and marker.read_text(encoding="utf-8").strip() == "HIMATE_SYNTHETIC_FIXTURE_V2"
         and isinstance(fixture_root, str)
         and pathlib.Path(fixture_root).resolve() == ctx.root
     )

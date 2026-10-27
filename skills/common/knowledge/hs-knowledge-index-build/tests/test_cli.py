@@ -10,7 +10,7 @@ def test_unrecognized_action_does_not_create_index(tmp_path):
     import hashlib
 
     domain = tmp_path / "domain"
-    shutil.copytree(root / "aiotbot-knowledge-wifi-mp/governance", domain / "governance")
+    shutil.copytree(root / "himate-knowledge-wifi-mp/governance", domain / "governance")
     (domain / "artifacts").mkdir()
     request = tmp_path / "request.json"
     response = tmp_path / "response.json"

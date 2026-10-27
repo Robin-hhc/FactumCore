@@ -1,9 +1,9 @@
 # 项目架构映射：人工维护相对路径和模块归属，工具读取实际文件并固定内容指纹。
 # 通常只需填写 code_root 和 modules，其余字段先保持现值。
 schema_version: '2.0'
-workspace_id: aiotbot-wifi-v1
+workspace_id: himate-wifi-v1
 knowledge_roots:
-  wifi: aiotbot-knowledge-wifi-mp
+  wifi: himate-knowledge-wifi-mp
 # 相对本 config.yml；main/ 可包含多个实际代码模块目录。
 code_root: main
 # 登记真实已拉取的模块。path 相对 code_root；chips、sides、features、description 按实际填写。

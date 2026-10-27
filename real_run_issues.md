@@ -2,7 +2,7 @@
 
 > 本文件供另一个开发 agent 接手解决。以**最新版 FactumCore**（`D:\knowledge_graph\FactumCore`，commit `2379f7b`）状态为准，只保留**当前仍未解决**的问题、各自的实际部署背景、根因与当前临时规避方案。已修复/已解决的历史问题不在此列。
 
-> **2026-10-27 开发修复状态**：以下现场问题的原始描述与历史成绩保留，按其原版本解释；现行状态以此表及复核结论为准。当前开发工作区已落实 A、B，以及 D 的调用防误用和 E 的规则升级续办验证；C 按用户要求暂不改动。SSH 配置与测量入口见 [`tools/deploy/EXECUTION.md`](aiotbot-knowledge-wifi-mp/tools/deploy/EXECUTION.md)。尚未提交或推送；开发测试及合成共享盘试验不代替内部部署验收。
+> **2026-10-27 开发修复状态**：以下现场问题的原始描述与历史成绩保留，按其原版本解释；现行状态以此表及复核结论为准。当前开发工作区已落实 A、B，以及 D 的调用防误用和 E 的规则升级续办验证；C 按用户要求暂不改动。SSH 配置与测量入口见 [`tools/deploy/EXECUTION.md`](himate-knowledge-wifi-mp/tools/deploy/EXECUTION.md)。修复已在 `2f51d09` 提交并推送；开发测试及合成共享盘试验不代替内部部署验收。
 
 | 项目 | 当前开发实现及验证边界 |
 |---|---|
@@ -19,6 +19,8 @@
 本轮统一 SSH 的部署工具测试在 Windows 分两组覆盖全部目录，共 215 passed／4 skipped；WSL 执行组 91 passed／11 skipped，Workflow 9 passed／1 skipped。UNC／映射盘路径拒绝及本机、服务器 worker 正常路径均有回归；真实内部 ingest 尚待按新包部署验证，不将旧 SMB 数据或隔离测试当作新版本的完整现场验收。原 timeout 和规则锁未改动。
 
 再次按本清单逐项复核后，B 已修，D 的用途隔离设计保留且入口漏校验已补，E 的旧记录拒绝／新操作重验证已通过完整链路；C 仍明确暂缓。当前源码新增定向验证共 84 passed、0 failed、0 skipped（query 38、嵌套及修订／规则升级 21、P3 18、P7 5、嵌套部署 2）。这些不表示旧内部两卡或旧 7 项环境失败已经现场重验。后续须分发最终新包、在服务器重新登记并取回 catalog，再在实际内部 SSH 环境复跑 status、目标 query 和 ingest；query 包也需包含本次新增校验。
+
+> 当前项目名称为 HiMate，知识根为 `himate-knowledge-wifi-mp/`；下方原始现场描述、命令和路径按当时版本保留，不作为现行部署入口。
 
 ## 一、实际部署场景（背景，务必先读）
 

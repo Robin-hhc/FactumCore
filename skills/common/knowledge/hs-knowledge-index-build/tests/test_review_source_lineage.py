@@ -11,7 +11,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 ROOT = Path(__file__).resolve().parents[5]
-spec = importlib.util.spec_from_file_location("lineage_fixture", ROOT / "aiotbot-knowledge-wifi-mp/evals/pipeline_harness.py")
+spec = importlib.util.spec_from_file_location("lineage_fixture", ROOT / "himate-knowledge-wifi-mp/evals/pipeline_harness.py")
 fixture = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fixture)
 
@@ -40,7 +40,7 @@ def test_published_reference_rejects_retargeted_local_snapshot(tmp_path):
         return subprocess.run(["git", "-c", "core.hooksPath=" + os.devnull, "-C", str(p.root.parent), *args], capture_output=True, check=True).stdout.decode().strip()
     git("init", "-q")
     git("config", "core.autocrlf", "false")
-    git("add", "aiotbot-knowledge-wifi-mp/knowledge", "aiotbot-knowledge-wifi-mp/governance", "aiotbot-knowledge-wifi-mp/logs/ingest", "aiotbot-knowledge-wifi-mp/logs/evidence")
+    git("add", "himate-knowledge-wifi-mp/knowledge", "himate-knowledge-wifi-mp/governance", "himate-knowledge-wifi-mp/logs/ingest", "himate-knowledge-wifi-mp/logs/evidence")
     git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "accepted fixture")
     p.catalog["publication_trust"] = {"fixture": {"synthetic": True, "fixture_root": str(p.root), "public_key_b64": base64.b64encode(publication_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)).decode()}}
     p.catalog_path.write_bytes(fixture.canonical(p.catalog))

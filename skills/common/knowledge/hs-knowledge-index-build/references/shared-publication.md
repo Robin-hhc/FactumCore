@@ -32,7 +32,7 @@ receipt has `adapter_id`, `payload`, and an Ed25519 `signature_b64` over sorted
 compact UTF-8 canonical JSON. The private installed catalog supplies
 `publication_trust[adapter_id].public_key_b64`. Synthetic keys are accepted only
 when that entry declares `synthetic: true`, its `fixture_root` is this exact K,
-and K/.isolated-knowledge-fixture contains `AIOTBOT_SYNTHETIC_FIXTURE_V2`.
+and K/.isolated-knowledge-fixture contains `HIMATE_SYNTHETIC_FIXTURE_V2`.
 
 The payload fixes:
 

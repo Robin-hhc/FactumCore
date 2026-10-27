@@ -9,7 +9,7 @@ import shutil
 def test_empty_case_set_never_activates(tmp_path):
     root = Path(__file__).resolve().parents[5]
     domain = tmp_path / "domain"
-    shutil.copytree(root / "aiotbot-knowledge-wifi-mp/governance", domain / "governance")
+    shutil.copytree(root / "himate-knowledge-wifi-mp/governance", domain / "governance")
     request = tmp_path / "request.json"
     response = tmp_path / "response.json"
     request.write_text(
@@ -42,7 +42,7 @@ def test_empty_case_set_never_activates(tmp_path):
 def test_cases_without_expected_behavior_never_activate(tmp_path):
     root = Path(__file__).resolve().parents[5]
     domain = tmp_path / "domain"
-    shutil.copytree(root / "aiotbot-knowledge-wifi-mp/governance", domain / "governance")
+    shutil.copytree(root / "himate-knowledge-wifi-mp/governance", domain / "governance")
     request, response = tmp_path / "request.json", tmp_path / "response.json"
     request.write_text(
         json.dumps(

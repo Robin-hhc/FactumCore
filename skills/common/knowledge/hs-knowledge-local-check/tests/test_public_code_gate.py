@@ -247,31 +247,31 @@ class PublicCodeGateTests(unittest.TestCase):
         self.assertEqual(applied["phase"], "committed")
 
     def setUp(self):
-        configured = os.environ.get("AIOTBOT_TEST_GOVERNANCE")
+        configured = os.environ.get("HIMATE_TEST_GOVERNANCE")
         domain = (
             pathlib.Path(configured)
             if configured
             else pathlib.Path(__file__).resolve().parents[5]
-            / "aiotbot-knowledge-wifi-mp/governance"
+            / "himate-knowledge-wifi-mp/governance"
         )
         if not domain.joinpath("contracts/validation.py").is_file():
             self.skipTest("2.0 domain fixture path not supplied")
         scratch = pathlib.Path(
-            os.environ.get("AIOTBOT_TEST_TMP", tempfile.gettempdir())
+            os.environ.get("HIMATE_TEST_TMP", tempfile.gettempdir())
         )
         scratch.mkdir(parents=True, exist_ok=True)
         self._fixture_scratch = scratch.resolve(strict=True)
         self.workspace = pathlib.Path(tempfile.mkdtemp(prefix="code-gate-", dir=str(self._fixture_scratch))).resolve(strict=True)
         self._fixture_target = self.workspace
         self.addCleanup(self.cleanup_fixture)
-        self.root = self.workspace / "aiotbot-knowledge-wifi-mp"
+        self.root = self.workspace / "himate-knowledge-wifi-mp"
         shutil.copytree(
             domain,
             self.root / "governance",
             ignore=shutil.ignore_patterns("__pycache__"),
         )
         self.root.joinpath(".isolated-knowledge-fixture").write_text(
-            "AIOTBOT_SYNTHETIC_FIXTURE_V2", encoding="utf-8"
+            "HIMATE_SYNTHETIC_FIXTURE_V2", encoding="utf-8"
         )
         self.rules_digest = digest(
             (self.root / "governance/framework.lock.yaml").read_bytes()

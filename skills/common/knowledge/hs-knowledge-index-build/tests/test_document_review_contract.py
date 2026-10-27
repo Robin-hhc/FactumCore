@@ -14,7 +14,7 @@ class DocumentReviewContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.schema = json.loads(
-            (ROOT / "aiotbot-knowledge-wifi-mp/governance/schemas/records.schema.json").read_bytes()
+            (ROOT / "himate-knowledge-wifi-mp/governance/schemas/records.schema.json").read_bytes()
         )
         cls.validator = Draft202012Validator(cls.schema)
 

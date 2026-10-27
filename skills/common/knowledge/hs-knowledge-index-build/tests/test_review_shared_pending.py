@@ -11,7 +11,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 ROOT = Path(__file__).resolve().parents[5]
-spec = importlib.util.spec_from_file_location("shared_pending_fixture", ROOT / "aiotbot-knowledge-wifi-mp/evals/pipeline_harness.py")
+spec = importlib.util.spec_from_file_location("shared_pending_fixture", ROOT / "himate-knowledge-wifi-mp/evals/pipeline_harness.py")
 fixture = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fixture)
 

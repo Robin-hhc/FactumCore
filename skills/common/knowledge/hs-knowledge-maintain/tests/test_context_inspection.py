@@ -4,7 +4,7 @@ import importlib.util
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[5]
-spec = importlib.util.spec_from_file_location("context_pipeline", ROOT / "aiotbot-knowledge-wifi-mp/evals/pipeline_harness.py")
+spec = importlib.util.spec_from_file_location("context_pipeline", ROOT / "himate-knowledge-wifi-mp/evals/pipeline_harness.py")
 fixture = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fixture)
 

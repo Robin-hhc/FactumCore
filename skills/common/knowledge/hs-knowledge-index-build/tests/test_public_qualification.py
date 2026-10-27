@@ -13,7 +13,7 @@ from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 ROOT = Path(__file__).resolve().parents[5]
 SPEC = importlib.util.spec_from_file_location(
-    "index_pipeline_fixture", ROOT / "aiotbot-knowledge-wifi-mp/evals/pipeline_harness.py"
+    "index_pipeline_fixture", ROOT / "himate-knowledge-wifi-mp/evals/pipeline_harness.py"
 )
 FIXTURE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(FIXTURE)
@@ -91,7 +91,7 @@ def test_shared_receipt_binds_actual_git_blobs_and_is_rechecked_by_query(tmp_pat
 
     git("init", "--initial-branch=main", "-q")
     git("config", "core.autocrlf", "false")
-    git("add", "aiotbot-knowledge-wifi-mp/knowledge", "aiotbot-knowledge-wifi-mp/governance")
+    git("add", "himate-knowledge-wifi-mp/knowledge", "himate-knowledge-wifi-mp/governance")
     git(
         "-c",
         "user.name=Fixture",

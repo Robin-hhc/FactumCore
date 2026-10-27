@@ -1,6 +1,6 @@
 """Real public CLIs + copied 2.0 domain and independent synthetic review.
 
-Set AIOTBOT_TEST_GOVERNANCE when running outside the monorepo. No private
+Set HIMATE_TEST_GOVERNANCE when running outside the monorepo. No private
 cross-Skill imports, real source documents, gold or installed host are used.
 """
 
@@ -210,17 +210,17 @@ class PublicGovernanceTests(unittest.TestCase):
         self.assertEqual(submitted["data"]["commit_sha"], commit)
 
     def setUp(self):
-        configured = os.environ.get("AIOTBOT_TEST_GOVERNANCE")
+        configured = os.environ.get("HIMATE_TEST_GOVERNANCE")
         domain = (
             pathlib.Path(configured)
             if configured
             else pathlib.Path(__file__).resolve().parents[5]
-            / "aiotbot-knowledge-wifi-mp/governance"
+            / "himate-knowledge-wifi-mp/governance"
         )
         if not domain.joinpath("contracts/validation.py").is_file():
             self.skipTest("2.0 domain fixture path not supplied")
         scratch = pathlib.Path(
-            os.environ.get("AIOTBOT_TEST_TMP", tempfile.gettempdir())
+            os.environ.get("HIMATE_TEST_TMP", tempfile.gettempdir())
         )
         scratch.mkdir(parents=True, exist_ok=True)
         self.tmp = tempfile.TemporaryDirectory(
@@ -237,7 +237,7 @@ class PublicGovernanceTests(unittest.TestCase):
             (self.root / "governance/framework.lock.yaml").read_bytes()
         )
         self.root.joinpath(".isolated-knowledge-fixture").write_text(
-            "AIOTBOT_SYNTHETIC_FIXTURE_V2", encoding="utf-8"
+            "HIMATE_SYNTHETIC_FIXTURE_V2", encoding="utf-8"
         )
         self.root.joinpath("knowledge").mkdir()
         self.root.joinpath("knowledge/index.md").write_bytes(b"old navigation")

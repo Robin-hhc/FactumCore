@@ -14,8 +14,8 @@ config.local.yml
 config.env
 
 # Project development artifacts stay local; shared design and usage remain versioned.
-/aiotbot-knowledge-wifi-mp/docs-llm-wiki/sdd/
-/aiotbot-knowledge-wifi-mp/docs-llm-wiki/task.md
+/himate-knowledge-wifi-mp/docs-llm-wiki/sdd/
+/himate-knowledge-wifi-mp/docs-llm-wiki/task.md
 
 # Business sources are registered separately; keep the slot only.
 /main/*
@@ -23,16 +23,16 @@ config.env
 **/.codegraph/
 
 # Domain runtime products: publish empty slots, never generated contents.
-/aiotbot-knowledge-wifi-mp/.build/*
-!/aiotbot-knowledge-wifi-mp/.build/.gitkeep
-/aiotbot-knowledge-wifi-mp/artifacts/*
-!/aiotbot-knowledge-wifi-mp/artifacts/.gitkeep
+/himate-knowledge-wifi-mp/.build/*
+!/himate-knowledge-wifi-mp/.build/.gitkeep
+/himate-knowledge-wifi-mp/artifacts/*
+!/himate-knowledge-wifi-mp/artifacts/.gitkeep
 
 # Keep audit metadata versionable; never publish copied original/code bytes or writer state.
-/aiotbot-knowledge-wifi-mp/logs/evidence/objects/
-/aiotbot-knowledge-wifi-mp/logs/evidence/checked-code/
-/aiotbot-knowledge-wifi-mp/logs/operations/.writer.lock
-/aiotbot-knowledge-wifi-mp/logs/operations/*/backups/
+/himate-knowledge-wifi-mp/logs/evidence/objects/
+/himate-knowledge-wifi-mp/logs/evidence/checked-code/
+/himate-knowledge-wifi-mp/logs/operations/.writer.lock
+/himate-knowledge-wifi-mp/logs/operations/*/backups/
 
 # Retired independent checkout, if still present locally.
 /aiot-knowledge/

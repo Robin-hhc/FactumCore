@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[5]
 fixture_spec = importlib.util.spec_from_file_location("current_code_fixture", ROOT / "skills/common/knowledge/hs-knowledge-local-check/tests/test_public_code_gate.py")
 fixture = importlib.util.module_from_spec(fixture_spec)
 fixture_spec.loader.exec_module(fixture)
-contract_spec = importlib.util.spec_from_file_location("current_code_contract", ROOT / "aiotbot-knowledge-wifi-mp/governance/contracts/__init__.py", submodule_search_locations=[str(ROOT / "aiotbot-knowledge-wifi-mp/governance/contracts")])
+contract_spec = importlib.util.spec_from_file_location("current_code_contract", ROOT / "himate-knowledge-wifi-mp/governance/contracts/__init__.py", submodule_search_locations=[str(ROOT / "himate-knowledge-wifi-mp/governance/contracts")])
 contract = importlib.util.module_from_spec(contract_spec)
 sys.modules[contract_spec.name] = contract
 contract_spec.loader.exec_module(contract)
@@ -21,7 +21,7 @@ from current_code_contract import knowledge, source_resources, validation  # noq
 
 
 def test_accepted_code_identity_detects_dirty_bytes_configuration_and_revision(tmp_path, monkeypatch):
-    monkeypatch.setenv("AIOTBOT_TEST_TMP", str(tmp_path))
+    monkeypatch.setenv("HIMATE_TEST_TMP", str(tmp_path))
     environment = fixture.PublicCodeGateTests(methodName="test_signed_positive_support_then_apply_and_verify")
     environment.setUp()
     try:

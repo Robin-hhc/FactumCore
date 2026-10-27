@@ -23,7 +23,7 @@ class EmptyIndex:
     def __init__(self, base):
         self.base, self.root = base, base / "knowledge-root"
         self.root.mkdir()
-        source = Path(__file__).resolve().parents[5] / "aiotbot-knowledge-wifi-mp/governance"
+        source = Path(__file__).resolve().parents[5] / "himate-knowledge-wifi-mp/governance"
         shutil.copytree(source, self.root / "governance", ignore=shutil.ignore_patterns("__pycache__"))
         (self.root / "knowledge").mkdir()
         (self.root / "knowledge/index.md").write_bytes(b"# Empty knowledge\n")

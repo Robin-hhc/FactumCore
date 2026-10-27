@@ -17,7 +17,7 @@ import yaml
 
 
 ROOT = Path(__file__).resolve().parents[5]
-CONTRACTS = ROOT / "aiotbot-knowledge-wifi-mp/governance/contracts"
+CONTRACTS = ROOT / "himate-knowledge-wifi-mp/governance/contracts"
 package_spec = importlib.util.spec_from_file_location(
     "module_mapping_contracts", CONTRACTS / "__init__.py", submodule_search_locations=[str(CONTRACTS)],
 )
@@ -38,7 +38,7 @@ def hashed(data):
     return hashlib.sha256(data).hexdigest()
 
 
-@pytest.fixture(params=["aiotbot-knowledge-wifi-mp", "aiotbot/aiotbot-knowledge-wifi-mp"], ids=["flat", "nested"])
+@pytest.fixture(params=["himate-knowledge-wifi-mp", "himate/himate-knowledge-wifi-mp"], ids=["flat", "nested"])
 def mapped(tmp_path, monkeypatch, request):
     workspace = tmp_path / "workspace"
     domain = workspace / request.param

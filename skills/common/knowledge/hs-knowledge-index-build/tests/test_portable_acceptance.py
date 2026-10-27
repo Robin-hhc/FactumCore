@@ -12,7 +12,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 ROOT = Path(__file__).resolve().parents[5]
-spec = importlib.util.spec_from_file_location("portable_fixture", ROOT / "aiotbot-knowledge-wifi-mp/evals/pipeline_harness.py")
+spec = importlib.util.spec_from_file_location("portable_fixture", ROOT / "himate-knowledge-wifi-mp/evals/pipeline_harness.py")
 fixture = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fixture)
 
@@ -24,7 +24,7 @@ def test_accepted_repository_works_without_machine_private_review_files(tmp_path
     pipeline = fixture.Pipeline(tmp_path)
     workspace = pipeline.root.parent
     if nested:
-        moved = workspace / "aiotbot" / pipeline.root.name
+        moved = workspace / "himate" / pipeline.root.name
         assert moved.resolve().is_relative_to(workspace.resolve())
         moved.parent.mkdir()
         pipeline.root.rename(moved)

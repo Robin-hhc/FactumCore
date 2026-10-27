@@ -248,7 +248,7 @@ def validate_publication(ctx, request, cards, qualifications=None, purpose="curr
         and Path(trust["fixture_root"]).resolve() == ctx.root
         and fixture.is_file()
         and fixture.read_text(encoding="utf-8").strip()
-        == "AIOTBOT_SYNTHETIC_FIXTURE_V2"
+        == "HIMATE_SYNTHETIC_FIXTURE_V2"
     )
     if not trust or (trust.get("synthetic") and not synthetic_allowed):
         raise NodeError(

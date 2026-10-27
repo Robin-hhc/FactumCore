@@ -16,7 +16,7 @@ class ApplyTests(unittest.TestCase):
         ctx = Context.synthetic(root, "hs-knowledge-apply")
         ctx.catalog = {"test_fixture_root": str(root.resolve())}
         root.joinpath(".isolated-knowledge-fixture").write_text(
-            "AIOTBOT_SYNTHETIC_FIXTURE_V2", encoding="utf-8"
+            "HIMATE_SYNTHETIC_FIXTURE_V2", encoding="utf-8"
         )
         (root / "knowledge").mkdir()
         (root / "knowledge/update.md").write_bytes(b"old")

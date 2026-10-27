@@ -120,10 +120,10 @@ def signed_publication(tmp_path, card_digest="a" * 64):
     from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
     key = Ed25519PrivateKey.generate()
-    root = tmp_path / "aiotbot-knowledge-wifi-mp"
+    root = tmp_path / "himate-knowledge-wifi-mp"
     root.mkdir()
     (root / ".isolated-knowledge-fixture").write_text(
-        "AIOTBOT_SYNTHETIC_FIXTURE_V2", encoding="utf-8"
+        "HIMATE_SYNTHETIC_FIXTURE_V2", encoding="utf-8"
     )
     card = {
         "path": "knowledge/rules/a.md",

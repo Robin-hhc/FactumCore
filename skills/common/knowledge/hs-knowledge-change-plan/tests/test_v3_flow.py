@@ -33,7 +33,7 @@ def pin_fixture(harness):
 @pytest.mark.parametrize("unrelated_nav_changes", [False, True, "historical_fallback", "local_only", "uncommitted_raw", "nested"])
 def test_current_ingest_review_lint_record_apply_query_without_human_confirmation(harness, unrelated_nav_changes):
     if unrelated_nav_changes == "nested":
-        nested = harness.base / "aiotbot" / harness.root.name
+        nested = harness.base / "himate" / harness.root.name
         assert nested.resolve().is_relative_to(harness.base.resolve())
         nested.parent.mkdir()
         harness.root.rename(nested)

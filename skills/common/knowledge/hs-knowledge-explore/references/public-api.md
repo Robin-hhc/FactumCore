@@ -1,4 +1,6 @@
-# Knowledge project interface 2.0
+# Read-only project discovery interface 2.0
+
+This CLI supplies optional project discovery for the Agent-facing [knowledge task entry](../SKILL.md). It does not implement ingest/query/lint/status routing, and an already valid project context does not require another discovery call. The Agent reads the actual knowledge root's `AGENTS.md` and documentation entry, then uses the relevant installed capability.
 
 Invoke `scripts/cli.py --input request.json --output response.json`. Request:
 

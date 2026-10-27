@@ -14,9 +14,11 @@
 
 默认使用机器已有全局 Python，不为正常使用新增虚拟环境、机器绑定、登记目录或工具副本。Skill／Workflow 的安装由宿主既有方式完成，setup 不复制能力或修改宿主。
 
-## 一次运行 setup
+## 按需首次运行 setup
 
-先由 Agent 读取项目入口并确认实际全局解释器；从项目根执行本包 `scripts/setup.py`，默认读取当前 `config.yml`：
+只在首次运行依赖尚未准备，或需要复查依赖时运行 setup。已有有效上下文和可用依赖时，按 [知识库任务入口](../SKILL.md) 直接转交对应已安装能力，不为每次 ingest、query、lint 或 status 重跑 setup。
+
+先由 Agent 读取实际业务仓 `AGENTS.md`、项目配置、解析后的 `K/AGENTS.md` 与文档入口，并确认实际全局解释器；从项目根执行本包 `scripts/setup.py`，默认读取当前 `config.yml`。业务仓使用实际 `AGENTS.md`；分发的 `AGENTS.md.example` 由人按真实仓复制或合并，setup 不复制模板，`ready` 也不证明业务入口已准备：
 
 ```text
 python PATH_TO_THIS_SKILL/scripts/setup.py --workspace-config config.yml
@@ -53,7 +55,7 @@ SSH 认证、端口、可达性、权限和命令结果由 harness 依据真实�
 
 ## 后续使用和产物
 
-项目结构继续只改根 `config.yml`。机器全局依赖已安装后，重复 setup 只是检查并读取入口；它不建立常驻服务，不自动初始化 CodeGraph 或进入 ingest。
+项目结构继续只改根 `config.yml`。机器全局依赖已安装后，重复 setup 只是检查并读取入口；它不建立常驻服务，也不自动初始化 CodeGraph。当前任务需要 ingest、query、lint、status 或首次 CodeGraph 准备时，Agent 按 [任务路由](../SKILL.md) 继续对应能力；setup 脚本本身不执行这些业务。
 
 Agent/harness 使用已安装的 Skill／Workflow 执行任务；跨机器节点及其子调用、来源读取和生成物留在项目所在服务器。稿件、操作请求与结果使用 K 的 `.build/`，正式记录与来源留痕使用 `logs/`，索引和报告使用 `artifacts/`，不新增外部产物位置。
 

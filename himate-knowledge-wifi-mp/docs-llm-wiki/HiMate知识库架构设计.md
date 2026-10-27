@@ -8,9 +8,10 @@ himate-knowledge知识库仓目录结构如下所示。
 
 本节以 `repo/` 表示项目根目录，实际目录名称和存放位置不限。下树以平铺布局示意；实际知识根 K 由项目 `config.yml` 的 `knowledge_roots.wifi` 相对配置目录解析，允许安全的前置子目录，与业务代码共同管理。开发仓保存 Skill／Workflow 分发源码；实际部署在 Agent 自己的能力目录，运行不依赖项目根保留源码副本。业务工作区可包含 Host、Device、特性和算法等多个代码模块；知识库按配置中的相对路径读取实际文件，以内容指纹核对引用。
 
-当前入口按同一业务工作区读取根 `config.yml`，项目配置全部由用户在这份文件维护。已安装 `hs-knowledge-explore` 是知识库的项目接口：首次用 setup 复用全局 Python、补齐实际缺依赖并读取入口，后续按需定位代码仓、知识根并加载上下文。跨机器 SSH 信息放该 Skill 的 `config.env`，连接与实际执行检查交给 harness。正常流程不增加私有环境或登记步骤。仓外知识库仍需另行适配，见[知识库关键点](知识库关键点.md#1-工作区路径与部署边界)。
+当前入口按同一业务工作区读取根 `config.yml`，项目配置全部由用户在这份文件维护。已安装 `hs-knowledge-explore` 是全库能力入口，提供 ingest、query、lint 等任务的选择与指引；首次用 setup 复用全局 Python、补齐实际缺依赖并读取入口，后续缺上下文时才运行只读发现。跨机器 SSH 信息放该 Skill 的 `config.env`，连接与实际执行检查交给 harness。正常流程不增加私有环境或登记步骤。仓外知识库仍需另行适配，见[知识库关键点](知识库关键点.md#1-工作区路径与部署边界)。
 
-- AGENTS.md：本工作区的消费路由契约
+- AGENTS.md：具体业务仓的代码架构、开发约定与位置说明；由该工作区维护
+- AGENTS.md.example：本项目分发的接入示例，供合并 main、config.yml、知识根及设计文档四项说明
 - config.yml：项目架构映射，登记代码根、模块相对路径及芯片／端／特性／用途
 - main/：真实代码工作区
 - skills/common/knowledge/：开发分发用的节点能力源码，部署位置由 Agent 决定
@@ -23,11 +24,12 @@ himate-knowledge知识库仓目录结构如下所示。
 
 ```text
 repo/
-├── AGENTS.md                      # 项目入口与消费路由
+├── AGENTS.md                      # 业务仓说明，本开发仓仅本地维护
+├── AGENTS.md.example              # 分发接入示例，合并到业务仓已有说明
 ├── config.yml                     # 代码根、模块相对路径与归属
 ├── main/                          # 业务代码工作区，可包含多个模块
 ├── skills/common/knowledge/   # 开发分发源码，部署时放入 Agent Skills
-│   ├── hs-knowledge-explore/             # 项目接口：首次 setup，后续按需定位和读取上下文
+│   ├── hs-knowledge-explore/             # 全库能力入口；按需 setup 与只读发现
 │   ├── hs-codegraph-setup/               # 按真实模块首次准备 CodeGraph；日常使用官方 MCP
 │   ├── hs-knowledge-source-scan/         # 增量扫描、材料与处理记录
 │   ├── hs-knowledge-source-capture/      # 保存本次原文副本与定位
@@ -134,7 +136,8 @@ flowchart TB
 
     subgraph S1["① 入口路由层 · 知识库前台"]
         direction LR
-        A2["AGENTS.md<br />消费路由契约"]
+        A1["hs-knowledge-explore<br />全库能力路由与指引"]
+        A2["业务仓 AGENTS.md<br />代码架构、开发约定与位置"]
         A3["config.yml<br />代码根、模块与归属"]
         A4["领域仓根四件套<br />README · CONTRIBUTING · check.py/check.sh"]
     end
@@ -188,7 +191,7 @@ flowchart TB
 
 | 层 | 一句话职责 | 承载目录/文件 |
 |---|---|---|
-| ① 入口路由层 | 已知上下文直接路由；缺失时先发现 | `AGENTS.md` · `config.yml` · 领域仓根四件套；`hs-knowledge-explore` 作为可选前置 E0 |
+| ① 入口路由层 | explore 提供能力路由；已知上下文直接复用，缺失时才发现 | `hs-knowledge-explore` 指引；业务仓 `AGENTS.md` · `config.yml` · 领域仓根四件套；脚本发现为可选前置 E0 |
 | ② 源事实层 | 证据底座：代码事实 + 原始材料，喂知识层 | `main/` · `docs-raw/` |
 | ③ 知识资产层 | 唯一检索对象：治理后的知识卡 | `knowledge/` |
 | ④ 治理与工具层 | Skill 执行业务检查，OpenFlow 编排顺序、角色与交棒；harness 执行命令 | `governance/` · Agent 的 `S`／`F` · 既有兼容工具 |
@@ -198,9 +201,9 @@ flowchart TB
 
 ### 11.2.1 根目录架构
 
-#### hs-knowledge-explore —— 首次准备与会话前置发现 E0
+#### hs-knowledge-explore —— 全库能力入口与按需前置发现 E0
 
-该 Skill 是知识库的项目接口。首次使用运行 `hs-knowledge-explore/scripts/setup.py`，检查现有全局依赖并读取根 `config.yml`；有 SSH 提示时由 harness 连接服务器实际执行。后续调用通过只读 E0 定位代码仓、知识根并读取 `AGENTS.md` 与配置；已有有效项目上下文就直接使用相应业务能力，无需重复 setup 或登记。
+该 Skill 集中介绍知识库能力并按任务引导 ingest、query、lint 及维护入口。Agent 阅读其指引后，已有有效上下文即可直接使用相应能力；阅读指引不要求执行脚本。首次准备时运行 `hs-knowledge-explore/scripts/setup.py`，检查现有全局依赖并读取根 `config.yml`；有 SSH 提示时由 harness 连接服务器实际执行。后续仅在上下文缺失时通过只读 E0 定位代码仓、知识根并读取业务仓 `AGENTS.md` 与配置，无需重复 setup 或登记。
 
 ```mermaid
 flowchart LR
@@ -213,13 +216,13 @@ flowchart LR
 
 只读发现依据显式配置、有限祖先路径或 harness 提供的既有上下文，不整盘猜测、不创建图谱或伪造配置。首次 setup 只准备全局依赖和入口，E0 继续处理会话信息缺口；它们位于业务命令之前，不属于 ingest，也不是每条命令的必调步骤。图谱线索和服务真实可用性分别核实，缺项保留 unknown。
 
-#### AGENTS.md —— 消费路由契约
+#### AGENTS.md / AGENTS.md.example —— 业务仓说明与接入示例
 
-Agent 会话入口。作用是"先路由，再消费"：代码静态事实读取实际源码，可用时借助 CodeGraph 定位；设计意图和机制背景读取知识卡，历史原始材料读取确切原件，按问题范围取得证据。没有这个入口，Agent 每次都要猜路径；有了它，一次会话的上下文预算花在刀刃上。
+根 `AGENTS.md` 介绍所在业务仓的真实代码架构和开发约定；未知业务结构只列大纲与 `...`，不编造模块。知识库接入只补 `main/`、`config.yml`、知识根和 `docs-llm-wiki/` 四项位置与职责，能力介绍和任务路由由已安装 `hs-knowledge-explore` 承担。
 
-默认复用已打开项目中加载的 `AGENTS.md`、`config.yml` 与知识库、代码图谱位置；只有上下文缺失才调用前置 E0。仓外会话按已有代码路径发现项目，仓外知识库部署需另行实现[知识库关键点 §1.3](知识库关键点.md#13-例外知识库位于业务仓外)的宿主适配；两种情况均不要求用户另选项目。
+本知识库开发仓的根 `AGENTS.md` 仅本地维护，不作为统一文件分发；共享仓保留 `AGENTS.md.example`。部署时保留业务仓已有的 `AGENTS.md`，只按真实路径合并示例的四项说明和 explore 入口指针，不覆盖原有业务规则；没有文件时才将示例改名并按真实仓补全。默认复用已加载的业务约定、配置和知识库位置；只有上下文缺失才调用前置 E0。仓外知识库部署仍需另行实现[知识库关键点 §1.3](知识库关键点.md#13-例外知识库位于业务仓外)的宿主适配。
 
-参与链路：消费以它进行前置路由；生产和治理也读取同一本仓约定。
+参与链路：生产、治理和消费均遵守业务仓约定，并按 explore 指引选择知识库能力。
 
 #### config.yml —— 项目代码架构映射
 
@@ -235,11 +238,11 @@ Agent 会话入口。作用是"先路由，再消费"：代码静态事实读取
 
 #### `skills/common/knowledge/` —— 项目入口与节点级能力
 
-该路径是开发分发源码；实际能力位于 Agent 的 `S` 目录，由 harness 使用，不依赖项目根同名目录。Skill 保存操作指引与所需脚本；`hs-knowledge-explore` 同时提供首次 setup 和后续项目定位接口，领域事实仍只放知识库：
+该路径是开发分发源码；实际能力位于 Agent 的 `S` 目录，由 harness 使用，不依赖项目根同名目录。Skill 保存操作指引与所需脚本；`hs-knowledge-explore` 承担全库能力路由，并提供按需首次 setup 和只读项目发现，领域事实仍只放知识库：
 
 | 技能 | 职责 | 一句话 |
 |------|------|--------|
-| `hs-knowledge-explore/` | 知识库项目接口：首次 setup，后续定位代码仓、知识根与上下文 | 已知上下文直接复用，缺入口信息时调用 |
+| `hs-knowledge-explore/` | 全库能力入口与任务指引；按需首次 setup、定位代码仓与知识根 | 读指引选择能力；已有上下文直接复用，缺项才运行脚本 |
 | `hs-codegraph-setup/` | S0：按模块首次准备 CodeGraph 索引与 MCP 接入 | 纯说明 Skill；日常 Q6 直接用官方 MCP |
 | `hs-knowledge-source-scan/` | P1 扫描、P2 材料、P6 处理记录及进度查询 | scan / prepare / record / status |
 | `hs-knowledge-source-capture/` | 保存本次原文副本，恢复旧版阅读材料 | 默认捕获；resolve-source / resolve 恢复固定来源或捕获包 |
@@ -283,14 +286,14 @@ WiFi 原件、知识和治理集中在 `himate-knowledge-wifi-mp/`，项目配�
 
 | 文件 | 职责 | 消费者 |
 |------|------|--------|
-| `AGENTS.md` | 知识边界、规则指针与技能入口 | Agent 会话第一步 |
+| 领域 `AGENTS.md` | 知识边界与治理规则指针 | Agent 读取领域材料时 |
 | `README.md` | 定位、实际能力、资料导航 | 人 |
 | `CONTRIBUTING.md` | 生产、核验和贡献流程 | 贡献者 |
 | `check.py / check.sh` | 固定 CI 检查入口，复用格式、导航、引用和索引构建规则 | 提交后的 CI 作业 |
 
-四个文件都是"入口与门禁"，不承载知识内容——它们把消费路由到 `knowledge/`，把贡献路由到 `governance/`。
+四个文件提供领域阅读、贡献和固定检查入口，不承载知识内容；全库任务路由归 explore，领域知识与治理材料分别位于 `knowledge/`、`governance/`。
 
-参与链路：`README.md` / `CONTRIBUTING.md` 是贡献者入口；`check.py / check.sh` 用于提交后的固定 CI 检查；`AGENTS.md` 提供消费路由，生产、治理也加载同一本仓约定。
+参与链路：`README.md` / `CONTRIBUTING.md` 是贡献者入口；`check.py / check.sh` 用于提交后的固定 CI 检查；领域 `AGENTS.md` 提供知识边界，生产、治理和消费均加载这些约定。
 
 #### knowledge/ —— 知识正文根（唯一检索对象）
 
@@ -401,7 +404,7 @@ flowchart LR
 
 ### 流程一：ingest —— 从原件到本地正式知识
 
-Agent 已在命令前读取项目 `AGENTS.md`、获知代码仓与知识库入口后，才执行 ingest；缺上下文时由前置 E0 辅助发现，不作为 ingest 的节点。ingest 从 P1 扫描原件开始，是完整的 P1—P7 Workflow。P4 的 draft 和修改预览是中间产物，完成适用的独立内容复核和代码核验后继续 P5，不要求用户另启动入库流程。
+Agent 已具备业务仓约定、代码仓与知识库位置，并按 explore 指引选择 ingest；缺上下文时由前置 E0 辅助发现，不作为 ingest 的节点。ingest 从 P1 扫描原件开始，是完整的 P1—P7 Workflow。P4 的 draft 和修改预览是中间产物，完成适用的独立内容复核和代码核验后继续 P5，不要求用户另启动入库流程。
 
 ```mermaid
 flowchart TD
@@ -455,11 +458,11 @@ L3 核对快照、文件指纹、路径、行页段及范围绑定，能定位�
 C1 位于提交之后，复用这些确定性检查及必要的 SQLite 构建验证；代码变化只核已固定文件的 hash、路径和范围。不匹配则失败返回本地修正，不自动修稿或重新组织 Agent 语义复审。
 ### 流程三：query —— 知识消费
 
-输入是问题与已有项目上下文，可补 Target 或指定历史版本，输出是带证据的回答。Agent 收到问题先读 `AGENTS.md` 路由契约，按**所需证据**选择入口：
+输入是问题与已有项目上下文，可补 Target 或指定历史版本，输出是带证据的回答。Agent 按 `hs-knowledge-explore` 的任务指引，结合业务仓约定与项目配置，按**所需证据**选择入口：
 
 ```mermaid
 flowchart TB
-    Q["用户提问"] --> R{"Agent 读 AGENTS.md 路由契约<br />按所需证据选择入口"}
+    Q["用户提问"] --> R{"Agent 按 explore 指引与项目上下文<br />选择所需证据入口"}
 
     R -->|"代码静态事实"| CODE["实际源码检索 / 可用的 CodeGraph<br />按 config.yml 定位符号与调用"]
     R -->|"历史原始材料"| RAW["docs-raw/ 直读原件<br />（问题本身要的就是原件，不经卡）"]

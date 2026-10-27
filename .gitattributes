@@ -2,7 +2,7 @@
 # Line-ending normalization would invalidate the byte-pinned framework and snapshots.
 /himate-knowledge-wifi-mp/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
 /config.yml -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
-/AGENTS.md -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+/AGENTS.md.example -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
 /skills/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
 /workflows/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
 

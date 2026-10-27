@@ -13,7 +13,7 @@
 
 现行名称和目录以架构设计 §5.3 为准，用户后续明确决定优先。唯一领域根为 `himate-knowledge-wifi-mp/`；项目根 `skills/common/knowledge/`、`workflows/common/knowledge/` 仅表示开发分发源码。实际能力在 Agent 自己的目录，首次使用其 `hs-knowledge-explore/scripts/setup.py` 检查现有全局依赖并读取项目配置，日常由 harness 调用。节点不要求 catalog 或流程登记，业务运行不依赖项目根能力源码。项目根统一以 `repo/` 示意，Git 在项目根执行；知识根和能力目录不建立嵌套 `.git`，业务代码保留项目实际多目录结构。
 
-目录图采用默认布局，实际知识根按根 `config.yml` 的 `knowledge_roots.wifi` 解析，允许安全嵌套；项目配置由用户在这份文件维护。`hs-knowledge-explore` 首次准备全局依赖，后续定位项目并加载上下文。SSH 信息放该 Skill 的 `config.env`，harness 负责连接并核对执行端实际可调用的能力；入口提示不代表已上传脚本或已验证远端，不将调用端路径当成远端路径。缺执行能力时先报告并讨论方案，不自建 runner 或工具副本。产物沿用 K 的 `.build/`、`logs/`、`artifacts/`，操作集中见[使用说明](使用说明.md)。
+目录图采用默认布局，实际知识根按根 `config.yml` 的 `knowledge_roots.wifi` 解析，允许安全嵌套；项目配置由用户在这份文件维护。根 `AGENTS.md` 由业务仓维护代码架构与开发约定，本开发仓仅本地保存；分发 `AGENTS.md.example` 供合并四项位置说明和 explore 入口指针，不覆盖业务仓已有文件。全库能力介绍和路由归 `hs-knowledge-explore`；首次准备与后续只读发现按需执行，已有上下文直接调用业务能力。SSH 信息放该 Skill 的 `config.env`，harness 负责连接并核对执行端实际可调用的能力；入口提示不代表已上传脚本或已验证远端，不将调用端路径当成远端路径。缺执行能力时先报告并讨论方案，不自建 runner 或工具副本。产物沿用 K 的 `.build/`、`logs/`、`artifacts/`，操作集中见[使用说明](使用说明.md)。
 
 项目配置以 `code_root` 和 `modules` 的相对路径、芯片、端、特性及用途说明架构；不要求手填绝对代码根、六 Target／三 pair 或重复授权。新配置按模块范围读取实际文件并固定内容指纹；版本仅采用有出处的材料，未知不阻断当前文件静态核验。目录标签不替代宏、构建或协议事实。使用说明讲填法和调用，详细设计第 5 章讲节点文件设计，知识库关键点讲共享映射和多仓文件核验；历史配置与验证记录按原版本解释。
 

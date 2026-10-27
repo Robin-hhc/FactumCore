@@ -10,6 +10,9 @@ __pycache__/
 .ruff_cache/
 *.pyc
 config.local.yml
+# This development checkout keeps its own Agent instructions locally.
+# Merge the tracked AGENTS.md.example into the real business repository's AGENTS.md.
+/AGENTS.md
 # Machine-owned execution connection data. The distributable template remains tracked.
 config.env
 

@@ -14,7 +14,7 @@ flowchart LR
 | [HiMate知识库架构设计.md](HiMate知识库架构设计.md) | 目录架构、分层职责与生产、治理、消费三条链路 |
 | [知识库详细设计.md](知识库详细设计.md) | 第 1 节说明前置发现和命令；第 2.1 节画完整 ingest P1—P7，第 3.1 节展开 lint 检查，第 3.2 节说明固定 CI，第 4 节说明查询与 Q6 源码定位；第 5 节按节点解释文件设计，§5.11 说明 S0 CodeGraph 首次 setup；第 6 节集中说明共用规则与运行约束 |
 | [知识库关键点.md](知识库关键点.md) | 工作区路径基准、默认与仓外部署边界，以及项目视图和文件核验约定 |
-| [使用说明.md](使用说明.md) | 从放好知识根、根 AGENTS 与 config.yml 且 Agent 已安装配套能力开始：`hs-knowledge-explore` 准备／定位项目 → harness 实际调用 → 人工逐个 Skill 完成入库与查询；接入 OpenFlow 后由 Workflow 编排；SSH 与 CodeGraph 按需阅读 |
+| [使用说明.md](使用说明.md) | 填写 `config.env` 与 `config.yml` → 发送首次安装 Prompt → 日常 `query`、`ingest`、`lint` 的用法与 Prompt |
 | [AGENTS.md](AGENTS.md) | Agent 阅读入口和文档修改边界 |
 
 项目自身的 `task.md` 与 `sdd/` 仅在本地保存开发任务、需求、测试计划和验收记录，已由 Git 忽略；共享仓库和能力包不包含这些工件，使用与部署无需准备它们。
@@ -33,7 +33,7 @@ flowchart LR
 
 设计文档描述职责、流程与边界，能力安装、实际宿主、六 Target、CI 合入和权限验证以各自环境的实际记录为准。本项目历史验证工件在本地 SDD 保存原始版本身份，不据此推断当前部署状态。
 
-详设中的 `knowledge ...` 是统一入口名称。部署完成后，按[使用说明](使用说明.md)向 Agent 点名调用 Workflow 或 Skill；底层接口参数见相应能力的 `SKILL.md` 与 `references/`。
+详设中的 `knowledge ...` 是统一入口名称。首次准备后，按[使用说明](使用说明.md)中的 Prompt 向 Agent 发起 `query`、`ingest`、`lint`；当前由 Agent 调用已安装 Skill，底层接口参数见相应能力的 `SKILL.md` 与 `references/`。
 
 `knowledge ingest` 是逻辑入口名称，默认扫描五类允许 raw 并选择新增、变化及待处理来源；限定范围时，在 source-scan 的请求中填写可选 `source`。首次导入和日常增量使用同一套能力，不要求安装同名终端命令。
 

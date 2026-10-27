@@ -1,1165 +1,329 @@
 version: 1
 id: hs-knowledge-ingest
-name: hs-knowledge-ingest
-description: 'One local raw-to-knowledge Workflow: scan, read, author/review, lint, record, apply and verify local
-  queries; people submit, run CI and merge afterward.'
+name: WiFi 知识入库
+description: 编排原件扫描、阅读计划、独立复核、检查及本地入库；索引、目标查询和活动代验证完成后结束。
 kind: custom
 source: user_created
 entry:
   skill: hs-knowledge-source-scan
 entry_node: scan_sources
 nodes:
-- id: scan_sources
-  title: P1 Scan raw changes and resume unfinished work
-  type: skill
-  owner: coder
-  skill: hs-knowledge-source-scan
-  prompt: |-
-    OpenFlow owns node order, role isolation and transitions. Use the installed public Skill CLI
-    with its business operation_id and actual inputs; do not add Workflow identities, manifests,
-    catalog registration or upstream passed tickets to Skill requests. Reuse known AGENTS/config.yml
-    context and the execution host global Python. Setup is outside ingest; do not repeat setup/E0.
-    The harness resolves installed paths and any SSH connection, checks execution results and keeps
-    one ingest writer. Originals and business code remain read-only. Resolve the actual knowledge
-    root K from config.yml; keep requests, drafts, diagnostics and results in its existing locations.
-
-    Read actual status/phase, diagnostics and exact business outputs; exit 0 alone is insufficient.
-    Before retrying, recheck source/rules/code/baseline and the original transaction. Unchanged inputs
-    may resume the same operation. Changed inputs or returned content require a new operation and
-    newly bound scan/material/plan/view; never overwrite sealed old files or repeat committed apply.
-    Honor user interruption. Allow at most three substantive revision attempts per batch; stop sooner
-    when the same issue repeats without progress. This budget does not authorize environment retries.
-
-    On missing indispensable material, invalid reports, runtime/SSH uncertainty or exhausted budget,
-    save the actual input/output references, diagnostics and next action under K/.build/operations/.
-    Record the stop using only resumeCapsule goal/done/currentFocus in the host-supported
-    workflow_runtime_patch. Do not call workflow_handoff or emit a handoff a2a-callback when no
-    exit condition is satisfied. End this turn with the unresolved reason and preserve the current
-    node; do not patch currentNode/batonHolder/flowState/recoveryContext or create a retry loop.
-    The retained Workflow is unfinished (active), not native waiting and never completed by failure.
-
-    For each artifact duty actually required by the selected exit, write a separate Markdown summary
-    of this CLI invocation and its original business references. Submit its exact artifact ID and
-    explicit location {kind: markdown_file, path: <artifact-root-relative-file>} in workflowCompletion.
-    Use K/.build/operations/<operation_id>/handoffs/<node_id>/<unique-attempt>/<artifact-id>.md,
-    resolving K relative to the actual project root and allocating a new attempt for every invocation.
-    These are resolved paths, not OpenFlow placeholder syntax. Never use a shared node-result.md or
-    rely on Skill default_location.path; the official contract loader drops that default field.
-    Use the host-rendered artifactLocationContext.projectRoot and any bound artifactRoots as
-    the artifact validation base, which can differ from the business project root. Resolve the
-    summary in K first, then submit its path relative to that actual validation base. Confirm
-    containment, exact file identity and readability before handoff. If K is outside that root
-    or bound scope, or the host does not expose a usable mapping, preserve this node and report
-    the host artifact-root integration gap. Do not create another business directory under the
-    OpenFlow installation, use escaping paths, or mistake a soft-record warning for saved evidence. If the execution
-    host differs, retain original host/path identities and stop on unavailable artifact access.
-    Summaries are pointers to actual Skill results, not fabricated success or replacement evidence.
-
-    Context is already known: do not invoke E0, bind a project or initialize services. --action scan
-    without source scans the five allowed raw directories. Optional source only narrows scope. Consume
-    portable ingest history and inspect-context affected Claims; unchanged raw does not prove code
-    validity. Resume recoverable transactions first. A draft made under older rules remains historical:
-    create a new operation and obtain current independent content review rather than reusing old proofs.
-    Other old terminal journals only establish writer liveness; they do not authorize current cards. A
-    committed apply remains committed even if indexing failed. Under new rules explicitly include
-    existing cards and originals, handle rules_changed maintenance units in P3/P6 and obtain new
-    acceptance without rewriting old digests. Unchanged-completed units become scan_unchanged
-    dispositions only when no user correction is requested. A user request to revise an existing card is
-    actionable even when raw fingerprints are unchanged: route to P2 with explicit unit_ids for the
-    relevant inventory units and candidate_card_ids for the requested cards; never take the unchanged
-    shortcut. P2 then rereads those originals and existing cards for a new semantic plan. Never infer
-    deletion from incomplete or partial scans.
-
-    Before allocating a new batch, read the original operation through source-scan --action status
-    and inspect its real journal/apply result, OpenFlow stop capsule and exact saved node outputs.
-    Status alone does not report content review, index or query completion. Recover nonterminal writes
-    first. For a valid uncommitted view, resume at independent review_content, never infer review from
-    candidate-inspect phase. Check the saved content_review_ref against this exact view or review it.
-    For committed content, verify actual applied files and retain the original operation/view/queries;
-    only resume indexing or query/activation. Do not send an applied view to inspect or apply again.
-    If sources/rules/code/content changed, prepare a new corrective operation instead of treating old
-    terminal facts as current acceptance. For unchanged completed input with no unresolved batch,
-    return no update; do not call record/apply or manufacture another logs/ingest processing record.
-    First-time substantive skip/defer/failed observations still use scanned and the record-only path.
-  exits:
-  - id: scanned
-    label: scanned
-    condition: Inventory fixed, with actionable raw/code work or a user-requested card correction, including unchanged
-      raw units.
-    target: prepare_material
-  - id: unchanged
-    label: unchanged
-    condition: A complete scan has only unchanged completed units (or no actionable input), no changed current context,
-      user correction, unresolved transaction or unfinished indexing/query; report no update without a new processing
-      record.
-    target: __end__
-  - id: resume
-    label: resume
-    condition: A still-valid complete view exists and has not been applied; resume independent content review before
-      preflight/inspection.
-    target: review_content
-  - id: recover
-    label: recover
-    condition: An interrupted apply transaction exists.
-    target: recover_transaction
-  - id: resume_index
-    label: resume local indexing
-    condition: Original content transaction is committed and actual applied bytes remain valid; no usable verified
-      candidate generation is saved. Continue only indexing under the original operation.
-    target: rebuild_index
-  - id: resume_queries
-    label: resume queries or verify activation
-    condition: Original content is committed and exact verified generation/expected_active/frozen cases are saved;
-      finish query/activation, or verify a prior successful activation whose response was lost.
-    target: query_regression
-- id: prepare_material
-  title: P2 Prepare current originals, adopted old versions and reading candidates
-  type: skill
-  owner: coder
-  skill: hs-knowledge-source-scan
-  prompt: |-
-    OpenFlow owns node order, role isolation and transitions. Use the installed public Skill CLI
-    with its business operation_id and actual inputs; do not add Workflow identities, manifests,
-    catalog registration or upstream passed tickets to Skill requests. Reuse known AGENTS/config.yml
-    context and the execution host global Python. Setup is outside ingest; do not repeat setup/E0.
-    The harness resolves installed paths and any SSH connection, checks execution results and keeps
-    one ingest writer. Originals and business code remain read-only. Resolve the actual knowledge
-    root K from config.yml; keep requests, drafts, diagnostics and results in its existing locations.
-
-    Read actual status/phase, diagnostics and exact business outputs; exit 0 alone is insufficient.
-    Before retrying, recheck source/rules/code/baseline and the original transaction. Unchanged inputs
-    may resume the same operation. Changed inputs or returned content require a new operation and
-    newly bound scan/material/plan/view; never overwrite sealed old files or repeat committed apply.
-    Honor user interruption. Allow at most three substantive revision attempts per batch; stop sooner
-    when the same issue repeats without progress. This budget does not authorize environment retries.
-
-    On missing indispensable material, invalid reports, runtime/SSH uncertainty or exhausted budget,
-    save the actual input/output references, diagnostics and next action under K/.build/operations/.
-    Record the stop using only resumeCapsule goal/done/currentFocus in the host-supported
-    workflow_runtime_patch. Do not call workflow_handoff or emit a handoff a2a-callback when no
-    exit condition is satisfied. End this turn with the unresolved reason and preserve the current
-    node; do not patch currentNode/batonHolder/flowState/recoveryContext or create a retry loop.
-    The retained Workflow is unfinished (active), not native waiting and never completed by failure.
-
-    For each artifact duty actually required by the selected exit, write a separate Markdown summary
-    of this CLI invocation and its original business references. Submit its exact artifact ID and
-    explicit location {kind: markdown_file, path: <artifact-root-relative-file>} in workflowCompletion.
-    Use K/.build/operations/<operation_id>/handoffs/<node_id>/<unique-attempt>/<artifact-id>.md,
-    resolving K relative to the actual project root and allocating a new attempt for every invocation.
-    These are resolved paths, not OpenFlow placeholder syntax. Never use a shared node-result.md or
-    rely on Skill default_location.path; the official contract loader drops that default field.
-    Use the host-rendered artifactLocationContext.projectRoot and any bound artifactRoots as
-    the artifact validation base, which can differ from the business project root. Resolve the
-    summary in K first, then submit its path relative to that actual validation base. Confirm
-    containment, exact file identity and readability before handoff. If K is outside that root
-    or bound scope, or the host does not expose a usable mapping, preserve this node and report
-    the host artifact-root integration gap. Do not create another business directory under the
-    OpenFlow installation, use escaping paths, or mistake a soft-record warning for saved evidence. If the execution
-    host differs, retain original host/path identities and stop on unavailable artifact access.
-    Summaries are pointers to actual Skill results, not fabricated success or replacement evidence.
-
-    --action prepare binds scan_ref. Rebuild source/Claim relations across all card states,
-    topic/entity/interface/symbol search and explicit requires/derived_from dependencies. Ordinary
-    related links do not expand. Return material_ref with current combined bundle, per-card adopted old
-    originals, full old cards, diffs, reasons and gaps. For affected code Claims capture actual current
-    code/Target/config through the public source-capture code action, using a separate child
-    operation_id for each code source (never the batch ID, and no forwarded workflow object). Pass
-    explicit code_bundle_refs [{bundle_ref,bundle_digest}] to prepare under the batch operation. In a
-    code_root/modules workspace the fixed scripts use the configured relative file scope. Optional
-    version labels must be backed by explicit material with its original content and provenance;
-    preserve the observed label type and leave unsupported identity or state unknown. Bind the original
-    config and actual file hashes, retain unknown version when no material supplies it, and preserve
-    current code bytes beside adopted old sources. Never substitute historical code for current
-    material. New concepts found later return here; no hit never proves a new card is needed.
-
-    If this return changes previously sealed material or semantic decisions, allocate a new business
-    operation_id. First call source-scan --action scan with the original raw scope and feedback,
-    then --action prepare with the new scan_ref and explicit affected units/cards/code bundles.
-    Use only that operation's new material_ref/scan_ref for the new semantic plan. Preserve the old
-    view and applied facts; do not rename an old scan/material/plan into the new operation.
-  exits:
-  - id: prepared
-    label: prepared
-    condition: Material package and its explicit gaps are recorded.
-    target: plan_change
-- id: plan_change
-  title: P3 Read each Claim and freeze semantic decisions
-  type: skill
-  owner: coder
-  skill: hs-knowledge-change-plan
-  prompt: |-
-    OpenFlow owns node order, role isolation and transitions. Use the installed public Skill CLI
-    with its business operation_id and actual inputs; do not add Workflow identities, manifests,
-    catalog registration or upstream passed tickets to Skill requests. Reuse known AGENTS/config.yml
-    context and the execution host global Python. Setup is outside ingest; do not repeat setup/E0.
-    The harness resolves installed paths and any SSH connection, checks execution results and keeps
-    one ingest writer. Originals and business code remain read-only. Resolve the actual knowledge
-    root K from config.yml; keep requests, drafts, diagnostics and results in its existing locations.
-
-    Read actual status/phase, diagnostics and exact business outputs; exit 0 alone is insufficient.
-    Before retrying, recheck source/rules/code/baseline and the original transaction. Unchanged inputs
-    may resume the same operation. Changed inputs or returned content require a new operation and
-    newly bound scan/material/plan/view; never overwrite sealed old files or repeat committed apply.
-    Honor user interruption. Allow at most three substantive revision attempts per batch; stop sooner
-    when the same issue repeats without progress. This budget does not authorize environment retries.
-
-    On missing indispensable material, invalid reports, runtime/SSH uncertainty or exhausted budget,
-    save the actual input/output references, diagnostics and next action under K/.build/operations/.
-    Record the stop using only resumeCapsule goal/done/currentFocus in the host-supported
-    workflow_runtime_patch. Do not call workflow_handoff or emit a handoff a2a-callback when no
-    exit condition is satisfied. End this turn with the unresolved reason and preserve the current
-    node; do not patch currentNode/batonHolder/flowState/recoveryContext or create a retry loop.
-    The retained Workflow is unfinished (active), not native waiting and never completed by failure.
-
-    For each artifact duty actually required by the selected exit, write a separate Markdown summary
-    of this CLI invocation and its original business references. Submit its exact artifact ID and
-    explicit location {kind: markdown_file, path: <artifact-root-relative-file>} in workflowCompletion.
-    Use K/.build/operations/<operation_id>/handoffs/<node_id>/<unique-attempt>/<artifact-id>.md,
-    resolving K relative to the actual project root and allocating a new attempt for every invocation.
-    These are resolved paths, not OpenFlow placeholder syntax. Never use a shared node-result.md or
-    rely on Skill default_location.path; the official contract loader drops that default field.
-    Use the host-rendered artifactLocationContext.projectRoot and any bound artifactRoots as
-    the artifact validation base, which can differ from the business project root. Resolve the
-    summary in K first, then submit its path relative to that actual validation base. Confirm
-    containment, exact file identity and readability before handoff. If K is outside that root
-    or bound scope, or the host does not expose a usable mapping, preserve this node and report
-    the host artifact-root integration gap. Do not create another business directory under the
-    OpenFlow installation, use escaping paths, or mistake a soft-record warning for saved evidence. If the execution
-    host differs, retain original host/path identities and stop on unavailable artifact access.
-    Summaries are pointers to actual Skill results, not fabricated success or replacement evidence.
-
-    --action plan reads scan_ref/material_ref and complete current/old originals and old cards. Compare
-    facts, conditions and evidence per Claim, then aggregate six card decisions; source skip is
-    separate. Cover raw units exactly. Separately provide maintenance_units for
-    scan.current_context.affected_claims, with unit_id maintenance:<card_id>#<claim_id>, card_id,
-    claim_id, outcome and reason; Claim/card.unit_ids may refer to these without inventing raw files.
-    This also supports code-only changes with an empty raw list. Single writer per target card; fuse
-    multi-source evidence. Missing material returns P2 or defer. Emit semantic_plan_ref and
-    target_queries cases [{id,query,purpose,required,forbidden?,context?,expected_claim_ids?}].
-    Explicitly choose purpose for every new case. Use guidance for design/specification background,
-    historical for fixed old versions, current or implementation only with the corresponding current
-    evidence and scope. An omitted purpose keeps the API's current default; it never includes guidance-
-    only Claims. Never treat doc design declarations as implemented-code proof.
-
-    If this return changes previously sealed material or semantic decisions, allocate a new business
-    operation_id. First call source-scan --action scan with the original raw scope and feedback,
-    then --action prepare with the new scan_ref and explicit affected units/cards/code bundles.
-    Use only that operation's new material_ref/scan_ref for the new semantic plan. Preserve the old
-    view and applied facts; do not rename an old scan/material/plan into the new operation.
-  exits:
-  - id: planned
-    label: planned
-    condition: 'Phase content_planned: semantic plan and source dispositions are sealed.'
-    target: review_plan
-  - id: needs_material
-    label: needs material
-    condition: Further original/card/code context needed.
-    target: prepare_material
-- id: review_plan
-  title: P3 Independently sample skip and new/update assignment
-  type: skill
-  owner: reviewer
-  skill: hs-knowledge-change-plan
-  prompt: |-
-    OpenFlow owns node order, role isolation and transitions. Use the installed public Skill CLI
-    with its business operation_id and actual inputs; do not add Workflow identities, manifests,
-    catalog registration or upstream passed tickets to Skill requests. Reuse known AGENTS/config.yml
-    context and the execution host global Python. Setup is outside ingest; do not repeat setup/E0.
-    The harness resolves installed paths and any SSH connection, checks execution results and keeps
-    one ingest writer. Originals and business code remain read-only. Resolve the actual knowledge
-    root K from config.yml; keep requests, drafts, diagnostics and results in its existing locations.
-
-    Read actual status/phase, diagnostics and exact business outputs; exit 0 alone is insufficient.
-    Before retrying, recheck source/rules/code/baseline and the original transaction. Unchanged inputs
-    may resume the same operation. Changed inputs or returned content require a new operation and
-    newly bound scan/material/plan/view; never overwrite sealed old files or repeat committed apply.
-    Honor user interruption. Allow at most three substantive revision attempts per batch; stop sooner
-    when the same issue repeats without progress. This budget does not authorize environment retries.
-
-    On missing indispensable material, invalid reports, runtime/SSH uncertainty or exhausted budget,
-    save the actual input/output references, diagnostics and next action under K/.build/operations/.
-    Record the stop using only resumeCapsule goal/done/currentFocus in the host-supported
-    workflow_runtime_patch. Do not call workflow_handoff or emit a handoff a2a-callback when no
-    exit condition is satisfied. End this turn with the unresolved reason and preserve the current
-    node; do not patch currentNode/batonHolder/flowState/recoveryContext or create a retry loop.
-    The retained Workflow is unfinished (active), not native waiting and never completed by failure.
-
-    For each artifact duty actually required by the selected exit, write a separate Markdown summary
-    of this CLI invocation and its original business references. Submit its exact artifact ID and
-    explicit location {kind: markdown_file, path: <artifact-root-relative-file>} in workflowCompletion.
-    Use K/.build/operations/<operation_id>/handoffs/<node_id>/<unique-attempt>/<artifact-id>.md,
-    resolving K relative to the actual project root and allocating a new attempt for every invocation.
-    These are resolved paths, not OpenFlow placeholder syntax. Never use a shared node-result.md or
-    rely on Skill default_location.path; the official contract loader drops that default field.
-    Use the host-rendered artifactLocationContext.projectRoot and any bound artifactRoots as
-    the artifact validation base, which can differ from the business project root. Resolve the
-    summary in K first, then submit its path relative to that actual validation base. Confirm
-    containment, exact file identity and readability before handoff. If K is outside that root
-    or bound scope, or the host does not expose a usable mapping, preserve this node and report
-    the host artifact-root integration gap. Do not create another business directory under the
-    OpenFlow installation, use escaping paths, or mistake a soft-record warning for saved evidence. If the execution
-    host differs, retain original host/path identities and stop on unavailable artifact access.
-    Summaries are pointers to actual Skill results, not fabricated success or replacement evidence.
-
-    --action review with semantic_plan_ref, separate reviewer_id, independent_context, sampled_unit_ids,
-    unreviewed_unit_ids, reason and evidence findings. Independently read selected originals/old
-    cards/plan; cover substantive skip and new/update risk. Unselected scope is recorded, never
-    reviewed-pass. Omission or wrong assignment returns P2/P3; evidence shortage is defer. P1 scan-only
-    skips need no semantic re-review.
-  exits:
-  - id: reviewed
-    label: reviewed
-    condition: Review passed and content changes are planned.
-    target: materialize_view
-  - id: record_only
-    label: record only
-    condition: Review recorded and only skip/defer/failed/uncovered dispositions remain; no failed card is forwarded.
-    target: record_ingest
-  - id: needs_material
-    label: needs material
-    condition: Review requires supplementary materials.
-    target: prepare_material
-  - id: needs_revision
-    label: needs revision
-    condition: Assignment or Claim decisions need revision.
-    target: plan_change
-- id: materialize_view
-  title: P4 Author and freeze the complete proposed view
-  type: skill
-  owner: coder
-  skill: hs-knowledge-view-materialize
-  prompt: |-
-    OpenFlow owns node order, role isolation and transitions. Use the installed public Skill CLI
-    with its business operation_id and actual inputs; do not add Workflow identities, manifests,
-    catalog registration or upstream passed tickets to Skill requests. Reuse known AGENTS/config.yml
-    context and the execution host global Python. Setup is outside ingest; do not repeat setup/E0.
-    The harness resolves installed paths and any SSH connection, checks execution results and keeps
-    one ingest writer. Originals and business code remain read-only. Resolve the actual knowledge
-    root K from config.yml; keep requests, drafts, diagnostics and results in its existing locations.
-
-    Read actual status/phase, diagnostics and exact business outputs; exit 0 alone is insufficient.
-    Before retrying, recheck source/rules/code/baseline and the original transaction. Unchanged inputs
-    may resume the same operation. Changed inputs or returned content require a new operation and
-    newly bound scan/material/plan/view; never overwrite sealed old files or repeat committed apply.
-    Honor user interruption. Allow at most three substantive revision attempts per batch; stop sooner
-    when the same issue repeats without progress. This budget does not authorize environment retries.
-
-    On missing indispensable material, invalid reports, runtime/SSH uncertainty or exhausted budget,
-    save the actual input/output references, diagnostics and next action under K/.build/operations/.
-    Record the stop using only resumeCapsule goal/done/currentFocus in the host-supported
-    workflow_runtime_patch. Do not call workflow_handoff or emit a handoff a2a-callback when no
-    exit condition is satisfied. End this turn with the unresolved reason and preserve the current
-    node; do not patch currentNode/batonHolder/flowState/recoveryContext or create a retry loop.
-    The retained Workflow is unfinished (active), not native waiting and never completed by failure.
-
-    For each artifact duty actually required by the selected exit, write a separate Markdown summary
-    of this CLI invocation and its original business references. Submit its exact artifact ID and
-    explicit location {kind: markdown_file, path: <artifact-root-relative-file>} in workflowCompletion.
-    Use K/.build/operations/<operation_id>/handoffs/<node_id>/<unique-attempt>/<artifact-id>.md,
-    resolving K relative to the actual project root and allocating a new attempt for every invocation.
-    These are resolved paths, not OpenFlow placeholder syntax. Never use a shared node-result.md or
-    rely on Skill default_location.path; the official contract loader drops that default field.
-    Use the host-rendered artifactLocationContext.projectRoot and any bound artifactRoots as
-    the artifact validation base, which can differ from the business project root. Resolve the
-    summary in K first, then submit its path relative to that actual validation base. Confirm
-    containment, exact file identity and readability before handoff. If K is outside that root
-    or bound scope, or the host does not expose a usable mapping, preserve this node and report
-    the host artifact-root integration gap. Do not create another business directory under the
-    OpenFlow installation, use escaping paths, or mistake a soft-record warning for saved evidence. If the execution
-    host differs, retain original host/path identities and stop on unavailable artifact access.
-    Summaries are pointers to actual Skill results, not fabricated success or replacement evidence.
-
-    Author the complete candidate cards under .build. First use change-plan run with v3_required true,
-    semantic_plan_ref/material_ref and decisions/card_inputs, then materialize its plan_ref. Include
-    exact card/navigation/source-lock writes/deletes, baselines and target queries; do not write formal
-    knowledge or originals. Preserve source facts and include only portable exact source recovery for
-    publication.
-
-    For change-plan run, pass an explicit context_ref from the freshly verified current material
-    combined bundle/configuration (null only for a document-only view). Do not inherit a previous view
-    context when code or configuration changed; resolve ambiguous code contexts before creating the view.
-  exits:
-  - id: ready
-    label: ready
-    condition: Complete fixed view exists.
-    target: review_content
-  - id: stale
-    label: stale
-    condition: Source/baseline changed; rebuild materials and plan.
-    target: prepare_material
-- id: review_content
-  title: P4 Independently review the exact complete candidate
-  type: skill
-  owner: reviewer
-  skill: hs-knowledge-change-plan
-  prompt: |-
-    OpenFlow owns node order, role isolation and transitions. Use the installed public Skill CLI
-    with its business operation_id and actual inputs; do not add Workflow identities, manifests,
-    catalog registration or upstream passed tickets to Skill requests. Reuse known AGENTS/config.yml
-    context and the execution host global Python. Setup is outside ingest; do not repeat setup/E0.
-    The harness resolves installed paths and any SSH connection, checks execution results and keeps
-    one ingest writer. Originals and business code remain read-only. Resolve the actual knowledge
-    root K from config.yml; keep requests, drafts, diagnostics and results in its existing locations.
-
-    Read actual status/phase, diagnostics and exact business outputs; exit 0 alone is insufficient.
-    Before retrying, recheck source/rules/code/baseline and the original transaction. Unchanged inputs
-    may resume the same operation. Changed inputs or returned content require a new operation and
-    newly bound scan/material/plan/view; never overwrite sealed old files or repeat committed apply.
-    Honor user interruption. Allow at most three substantive revision attempts per batch; stop sooner
-    when the same issue repeats without progress. This budget does not authorize environment retries.
-
-    On missing indispensable material, invalid reports, runtime/SSH uncertainty or exhausted budget,
-    save the actual input/output references, diagnostics and next action under K/.build/operations/.
-    Record the stop using only resumeCapsule goal/done/currentFocus in the host-supported
-    workflow_runtime_patch. Do not call workflow_handoff or emit a handoff a2a-callback when no
-    exit condition is satisfied. End this turn with the unresolved reason and preserve the current
-    node; do not patch currentNode/batonHolder/flowState/recoveryContext or create a retry loop.
-    The retained Workflow is unfinished (active), not native waiting and never completed by failure.
-
-    For each artifact duty actually required by the selected exit, write a separate Markdown summary
-    of this CLI invocation and its original business references. Submit its exact artifact ID and
-    explicit location {kind: markdown_file, path: <artifact-root-relative-file>} in workflowCompletion.
-    Use K/.build/operations/<operation_id>/handoffs/<node_id>/<unique-attempt>/<artifact-id>.md,
-    resolving K relative to the actual project root and allocating a new attempt for every invocation.
-    These are resolved paths, not OpenFlow placeholder syntax. Never use a shared node-result.md or
-    rely on Skill default_location.path; the official contract loader drops that default field.
-    Use the host-rendered artifactLocationContext.projectRoot and any bound artifactRoots as
-    the artifact validation base, which can differ from the business project root. Resolve the
-    summary in K first, then submit its path relative to that actual validation base. Confirm
-    containment, exact file identity and readability before handoff. If K is outside that root
-    or bound scope, or the host does not expose a usable mapping, preserve this node and report
-    the host artifact-root integration gap. Do not create another business directory under the
-    OpenFlow installation, use escaping paths, or mistake a soft-record warning for saved evidence. If the execution
-    host differs, retain original host/path identities and stop on unavailable artifact access.
-    Summaries are pointers to actual Skill results, not fabricated success or replacement evidence.
-
-    --action review binds semantic_plan_ref and exact view_ref. Read actual full candidate, source and
-    code evidence. Reuse unchanged assignment/skip adjudication, retain independent sampled/unreviewed
-    scopes. Content defects return to P2/P3/P4. Emit content_review_ref for this exact view.
-
-    On resume, the existence of a view or an inspect phase is not a content review. The independent
-    reviewer reads the actual complete candidate/material/plan. Reuse a saved review only after
-    confirming its exact view/source/rules bindings, sampled scope and absence of unresolved blockers;
-    otherwise perform --action review and save the actual content_review_ref before choosing reviewed.
-  exits:
-  - id: reviewed
-    label: reviewed
-    condition: Independent content review passed for the exact view.
-    target: lint_preflight
-  - id: needs_material
-    label: needs material
-    condition: Missing material.
-    target: prepare_material
-  - id: needs_plan
-    label: needs plan
-    condition: Wrong Claim or card assignment.
-    target: plan_change
-  - id: needs_revision
-    label: needs revision
-    condition: Candidate structure/content needs revision.
-    target: revise_candidate
-- id: lint_preflight
-  title: P4 Run fixed preflight before code checks
-  type: skill
-  owner: reviewer
-  skill: hs-knowledge-lint
-  prompt: |-
-    OpenFlow owns node order, role isolation and transitions. Use the installed public Skill CLI
-    with its business operation_id and actual inputs; do not add Workflow identities, manifests,
-    catalog registration or upstream passed tickets to Skill requests. Reuse known AGENTS/config.yml
-    context and the execution host global Python. Setup is outside ingest; do not repeat setup/E0.
-    The harness resolves installed paths and any SSH connection, checks execution results and keeps
-    one ingest writer. Originals and business code remain read-only. Resolve the actual knowledge
-    root K from config.yml; keep requests, drafts, diagnostics and results in its existing locations.
-
-    Read actual status/phase, diagnostics and exact business outputs; exit 0 alone is insufficient.
-    Before retrying, recheck source/rules/code/baseline and the original transaction. Unchanged inputs
-    may resume the same operation. Changed inputs or returned content require a new operation and
-    newly bound scan/material/plan/view; never overwrite sealed old files or repeat committed apply.
-    Honor user interruption. Allow at most three substantive revision attempts per batch; stop sooner
-    when the same issue repeats without progress. This budget does not authorize environment retries.
-
-    On missing indispensable material, invalid reports, runtime/SSH uncertainty or exhausted budget,
-    save the actual input/output references, diagnostics and next action under K/.build/operations/.
-    Record the stop using only resumeCapsule goal/done/currentFocus in the host-supported
-    workflow_runtime_patch. Do not call workflow_handoff or emit a handoff a2a-callback when no
-    exit condition is satisfied. End this turn with the unresolved reason and preserve the current
-    node; do not patch currentNode/batonHolder/flowState/recoveryContext or create a retry loop.
-    The retained Workflow is unfinished (active), not native waiting and never completed by failure.
-
-    For each artifact duty actually required by the selected exit, write a separate Markdown summary
-    of this CLI invocation and its original business references. Submit its exact artifact ID and
-    explicit location {kind: markdown_file, path: <artifact-root-relative-file>} in workflowCompletion.
-    Use K/.build/operations/<operation_id>/handoffs/<node_id>/<unique-attempt>/<artifact-id>.md,
-    resolving K relative to the actual project root and allocating a new attempt for every invocation.
-    These are resolved paths, not OpenFlow placeholder syntax. Never use a shared node-result.md or
-    rely on Skill default_location.path; the official contract loader drops that default field.
-    Use the host-rendered artifactLocationContext.projectRoot and any bound artifactRoots as
-    the artifact validation base, which can differ from the business project root. Resolve the
-    summary in K first, then submit its path relative to that actual validation base. Confirm
-    containment, exact file identity and readability before handoff. If K is outside that root
-    or bound scope, or the host does not expose a usable mapping, preserve this node and report
-    the host artifact-root integration gap. Do not create another business directory under the
-    OpenFlow installation, use escaping paths, or mistake a soft-record warning for saved evidence. If the execution
-    host differs, retain original host/path identities and stop on unavailable artifact access.
-    Summaries are pointers to actual Skill results, not fabricated success or replacement evidence.
-
-    Run candidate full-scope lint on the exact independently reviewed view. CheckReport is separate from
-    node envelopes: exit0/status=phase=passed/complete=true/scope.kind=full pass; exit1/failed content
-    findings route P2/P3/P4; exit2/incomplete saves missing input/runtime failure. Reject
-    empty/malformed/mismatched report. Preflight is not final P5.
-  exits:
-  - id: passed
-    label: passed
-    condition: All mandatory preflight rules ran and passed.
-    target: inspect_candidate
-  - id: needs_material
-    label: needs material
-    condition: Source/code locator material defect.
-    target: prepare_material
-  - id: needs_plan
-    label: needs plan
-    condition: Claim/reference choice defect.
-    target: plan_change
-  - id: needs_revision
-    label: needs revision
-    condition: Format/navigation/view defect.
-    target: revise_candidate
-- id: inspect_candidate
-  title: P4 Select actual document and code proof requirements
-  type: skill
-  owner: coder
-  skill: hs-knowledge-candidate-inspect
-  prompt: |-
-    OpenFlow owns node order, role isolation and transitions. Use the installed public Skill CLI
-    with its business operation_id and actual inputs; do not add Workflow identities, manifests,
-    catalog registration or upstream passed tickets to Skill requests. Reuse known AGENTS/config.yml
-    context and the execution host global Python. Setup is outside ingest; do not repeat setup/E0.
-    The harness resolves installed paths and any SSH connection, checks execution results and keeps
-    one ingest writer. Originals and business code remain read-only. Resolve the actual knowledge
-    root K from config.yml; keep requests, drafts, diagnostics and results in its existing locations.
-
-    Read actual status/phase, diagnostics and exact business outputs; exit 0 alone is insufficient.
-    Before retrying, recheck source/rules/code/baseline and the original transaction. Unchanged inputs
-    may resume the same operation. Changed inputs or returned content require a new operation and
-    newly bound scan/material/plan/view; never overwrite sealed old files or repeat committed apply.
-    Honor user interruption. Allow at most three substantive revision attempts per batch; stop sooner
-    when the same issue repeats without progress. This budget does not authorize environment retries.
-
-    On missing indispensable material, invalid reports, runtime/SSH uncertainty or exhausted budget,
-    save the actual input/output references, diagnostics and next action under K/.build/operations/.
-    Record the stop using only resumeCapsule goal/done/currentFocus in the host-supported
-    workflow_runtime_patch. Do not call workflow_handoff or emit a handoff a2a-callback when no
-    exit condition is satisfied. End this turn with the unresolved reason and preserve the current
-    node; do not patch currentNode/batonHolder/flowState/recoveryContext or create a retry loop.
-    The retained Workflow is unfinished (active), not native waiting and never completed by failure.
-
-    For each artifact duty actually required by the selected exit, write a separate Markdown summary
-    of this CLI invocation and its original business references. Submit its exact artifact ID and
-    explicit location {kind: markdown_file, path: <artifact-root-relative-file>} in workflowCompletion.
-    Use K/.build/operations/<operation_id>/handoffs/<node_id>/<unique-attempt>/<artifact-id>.md,
-    resolving K relative to the actual project root and allocating a new attempt for every invocation.
-    These are resolved paths, not OpenFlow placeholder syntax. Never use a shared node-result.md or
-    rely on Skill default_location.path; the official contract loader drops that default field.
-    Use the host-rendered artifactLocationContext.projectRoot and any bound artifactRoots as
-    the artifact validation base, which can differ from the business project root. Resolve the
-    summary in K first, then submit its path relative to that actual validation base. Confirm
-    containment, exact file identity and readability before handoff. If K is outside that root
-    or bound scope, or the host does not expose a usable mapping, preserve this node and report
-    the host artifact-root integration gap. Do not create another business directory under the
-    OpenFlow installation, use escaping paths, or mistake a soft-record warning for saved evidence. If the execution
-    host differs, retain original host/path identities and stop on unavailable artifact access.
-    Summaries are pointers to actual Skill results, not fabricated success or replacement evidence.
-
-    Inspect actual view and transaction state. Document views use the independent content review already
-    recorded for this exact view; code and mixed views additionally require current code evidence.
-    Recovery precedes any new apply. Existing valid proof may be reused only for unchanged exact content
-    and valid source/rules/context.
-
-    Before selecting a readiness exit, confirm OpenFlow has scheduled the independent content review for this exact view. If it is missing, do not equate manual_ready/code_ready/mixed_ready with review acceptance: retain this stop and resume via scan_sources.resume at review_content. A committed transaction uses the finishing routes instead.
-  exits:
-  - id: manual_ready
-    label: manual ready
-    condition: 'Phase manual_ready: the independently reviewed document-only view proceeds to final lint.'
-    target: lint_view
-  - id: mixed_ready
-    label: mixed ready
-    condition: 'Phase mixed_ready: the complete view has independent content review; verify its code portion.'
-    target: local_check
-  - id: code_ready
-    label: code ready
-    condition: 'Phase code_ready: the code-only view needs code verification.'
-    target: local_check
-  - id: recovery_required
-    label: recovery required
-    condition: Existing transaction needs recovery.
-    target: recover_transaction
-  - id: needs_revision
-    label: needs revision
-    condition: Candidate invalid.
-    target: revise_candidate
-- id: local_check
-  title: P4 Record independent code review and verify exact bindings
-  type: skill
-  owner: reviewer
-  skill: hs-knowledge-local-check
-  prompt: |-
-    OpenFlow owns node order, role isolation and transitions. Use the installed public Skill CLI
-    with its business operation_id and actual inputs; do not add Workflow identities, manifests,
-    catalog registration or upstream passed tickets to Skill requests. Reuse known AGENTS/config.yml
-    context and the execution host global Python. Setup is outside ingest; do not repeat setup/E0.
-    The harness resolves installed paths and any SSH connection, checks execution results and keeps
-    one ingest writer. Originals and business code remain read-only. Resolve the actual knowledge
-    root K from config.yml; keep requests, drafts, diagnostics and results in its existing locations.
-
-    Read actual status/phase, diagnostics and exact business outputs; exit 0 alone is insufficient.
-    Before retrying, recheck source/rules/code/baseline and the original transaction. Unchanged inputs
-    may resume the same operation. Changed inputs or returned content require a new operation and
-    newly bound scan/material/plan/view; never overwrite sealed old files or repeat committed apply.
-    Honor user interruption. Allow at most three substantive revision attempts per batch; stop sooner
-    when the same issue repeats without progress. This budget does not authorize environment retries.
-
-    On missing indispensable material, invalid reports, runtime/SSH uncertainty or exhausted budget,
-    save the actual input/output references, diagnostics and next action under K/.build/operations/.
-    Record the stop using only resumeCapsule goal/done/currentFocus in the host-supported
-    workflow_runtime_patch. Do not call workflow_handoff or emit a handoff a2a-callback when no
-    exit condition is satisfied. End this turn with the unresolved reason and preserve the current
-    node; do not patch currentNode/batonHolder/flowState/recoveryContext or create a retry loop.
-    The retained Workflow is unfinished (active), not native waiting and never completed by failure.
-
-    For each artifact duty actually required by the selected exit, write a separate Markdown summary
-    of this CLI invocation and its original business references. Submit its exact artifact ID and
-    explicit location {kind: markdown_file, path: <artifact-root-relative-file>} in workflowCompletion.
-    Use K/.build/operations/<operation_id>/handoffs/<node_id>/<unique-attempt>/<artifact-id>.md,
-    resolving K relative to the actual project root and allocating a new attempt for every invocation.
-    These are resolved paths, not OpenFlow placeholder syntax. Never use a shared node-result.md or
-    rely on Skill default_location.path; the official contract loader drops that default field.
-    Use the host-rendered artifactLocationContext.projectRoot and any bound artifactRoots as
-    the artifact validation base, which can differ from the business project root. Resolve the
-    summary in K first, then submit its path relative to that actual validation base. Confirm
-    containment, exact file identity and readability before handoff. If K is outside that root
-    or bound scope, or the host does not expose a usable mapping, preserve this node and report
-    the host artifact-root integration gap. Do not create another business directory under the
-    OpenFlow installation, use escaping paths, or mistake a soft-record warning for saved evidence. If the execution
-    host differs, retain original host/path identities and stop on unavailable artifact access.
-    Summaries are pointers to actual Skill results, not fabricated success or replacement evidence.
-
-    Read actual authorized code and config against each Claim's conditions and full final view. The
-    reviewer must use a fresh independent context, read the actual sources and candidate, and record
-    positive per-Claim support with reasons and exact snapshot/locator/hash evidence. Save a
-    semantic_review record with reviewer_id and payload author_id, independent_context, findings,
-    view_digest, context_digest, mode, issued_at and claims. Bind authors to the actual plan and keep
-    the reviewer distinct from every author. No reviewer public-key registry or cryptographic signature
-    is required. OpenFlow/harness enforces author separation and context isolation. The fixed script checks record completeness and exact content bindings; it
-    does not authenticate Agent identities or decide knowledge semantics. Static semantic-support
-    requires exact source-file hashes and the independent review record, not compiled artifacts. A
-    code_root/modules workspace uses ordinary mapped files without Git identity, HEAD, URL or duplicate
-    code_policy registration. Unknown version does not block current static source verification; module
-    labels do not prove enabled macros, build success or protocol compatibility. A current Claim still
-    needs its real mapped Target/config; without a Target only explicitly historical/guidance Claims
-    with unknown applicability and no concrete contexts may pass. build-support/runtime-support require
-    their actual evidence; never infer compiled or runtime behavior from source alone. Preserve exact
-    code context for the code portion. Independent Agent content review covers the complete view and
-    belongs to ingest; lint and CI perform only deterministic checks and never repeat that judgment.
-  exits:
-  - id: code_passed
-    label: code passed
-    condition: Required independent code review record and fixed source bindings bind the exact view and its code
-      Claims.
-    target: lint_view
-  - id: needs_revision
-    label: needs revision
-    condition: Evidence/content requires revision.
-    target: revise_candidate
-- id: revise_candidate
-  title: Revise the affected P2/P3/P4 work
-  type: skill
-  owner: coder
-  skill: hs-knowledge-candidate-revise
-  prompt: |-
-    OpenFlow owns node order, role isolation and transitions. Use the installed public Skill CLI
-    with its business operation_id and actual inputs; do not add Workflow identities, manifests,
-    catalog registration or upstream passed tickets to Skill requests. Reuse known AGENTS/config.yml
-    context and the execution host global Python. Setup is outside ingest; do not repeat setup/E0.
-    The harness resolves installed paths and any SSH connection, checks execution results and keeps
-    one ingest writer. Originals and business code remain read-only. Resolve the actual knowledge
-    root K from config.yml; keep requests, drafts, diagnostics and results in its existing locations.
-
-    Read actual status/phase, diagnostics and exact business outputs; exit 0 alone is insufficient.
-    Before retrying, recheck source/rules/code/baseline and the original transaction. Unchanged inputs
-    may resume the same operation. Changed inputs or returned content require a new operation and
-    newly bound scan/material/plan/view; never overwrite sealed old files or repeat committed apply.
-    Honor user interruption. Allow at most three substantive revision attempts per batch; stop sooner
-    when the same issue repeats without progress. This budget does not authorize environment retries.
-
-    On missing indispensable material, invalid reports, runtime/SSH uncertainty or exhausted budget,
-    save the actual input/output references, diagnostics and next action under K/.build/operations/.
-    Record the stop using only resumeCapsule goal/done/currentFocus in the host-supported
-    workflow_runtime_patch. Do not call workflow_handoff or emit a handoff a2a-callback when no
-    exit condition is satisfied. End this turn with the unresolved reason and preserve the current
-    node; do not patch currentNode/batonHolder/flowState/recoveryContext or create a retry loop.
-    The retained Workflow is unfinished (active), not native waiting and never completed by failure.
-
-    For each artifact duty actually required by the selected exit, write a separate Markdown summary
-    of this CLI invocation and its original business references. Submit its exact artifact ID and
-    explicit location {kind: markdown_file, path: <artifact-root-relative-file>} in workflowCompletion.
-    Use K/.build/operations/<operation_id>/handoffs/<node_id>/<unique-attempt>/<artifact-id>.md,
-    resolving K relative to the actual project root and allocating a new attempt for every invocation.
-    These are resolved paths, not OpenFlow placeholder syntax. Never use a shared node-result.md or
-    rely on Skill default_location.path; the official contract loader drops that default field.
-    Use the host-rendered artifactLocationContext.projectRoot and any bound artifactRoots as
-    the artifact validation base, which can differ from the business project root. Resolve the
-    summary in K first, then submit its path relative to that actual validation base. Confirm
-    containment, exact file identity and readability before handoff. If K is outside that root
-    or bound scope, or the host does not expose a usable mapping, preserve this node and report
-    the host artifact-root integration gap. Do not create another business directory under the
-    OpenFlow installation, use escaping paths, or mistake a soft-record warning for saved evidence. If the execution
-    host differs, retain original host/path identities and stop on unavailable artifact access.
-    Summaries are pointers to actual Skill results, not fabricated success or replacement evidence.
-
-    Route material defects to P2 and semantic/assignment defects to P3. For P4 content revision create
-    new plan/view and renew invalidated review/proof before recheck. Never rewrite the meaning of a
-    prior actual apply result. Bound revision attempts; stop on repeated no-progress failures.
-
-    For v3, save previous_view_ref and revision_reason, then allocate a NEW operation_id for the
-    returned candidate. Read the actual returned findings, current originals/code and retained old
-    cards. First call hs-knowledge-source-scan --action scan with the original scope; call
-    hs-knowledge-source-scan --action prepare using that new scan_ref, affected unit_ids and
-    candidate_card_ids, and recaptured current code_bundle_refs when applicable. Then call
-    hs-knowledge-change-plan --action plan with the new scan_ref/material_ref and complete authored
-    author_id, units, maintenance_units, claim_changes, card_actions and nonempty frozen
-    target_queries for content.
-    Invoke hs-knowledge-candidate-revise only after this new semantic_plan_ref exists, passing it
-    with previous_view_ref, revision_reason, newly authored decisions/card_inputs, v3_required=true,
-    and an explicit context_ref from the new combined bundle/current configuration. Use null only
-    for document-only material; do not inherit context_ref from the previous view. Resolve multiple
-    current code contexts before planning and keep this same context_ref in the revised view.
-    The revise Skill does not create the v3 scan/material/semantic plan for you. Its view must receive
-    renewed independent review before lint; never forward old view-bound review or code evidence.
-    Keep the original batch revision counter across new operation IDs. If preparation itself is
-    blocked, save its real stop and finish this turn; do not call revise with null or old plan inputs.
-  exits:
-  - id: ready
-    label: ready
-    condition: A fresh complete plan/view has been materialized.
-    target: review_content
-  - id: needs_material
-    label: needs material
-    condition: New material needed.
-    target: prepare_material
-  - id: needs_plan
-    label: needs plan
-    condition: Claim decisions need revision.
-    target: plan_change
-  - id: deferred
-    label: deferred
-    condition: Only explicit defer/failed/uncovered dispositions remain; omit failed candidate writes.
-    target: record_ingest
-- id: lint_view
-  title: P5 Call read-only lint on exact final view
-  type: skill
-  owner: reviewer
-  skill: hs-knowledge-lint
-  prompt: |-
-    OpenFlow owns node order, role isolation and transitions. Use the installed public Skill CLI
-    with its business operation_id and actual inputs; do not add Workflow identities, manifests,
-    catalog registration or upstream passed tickets to Skill requests. Reuse known AGENTS/config.yml
-    context and the execution host global Python. Setup is outside ingest; do not repeat setup/E0.
-    The harness resolves installed paths and any SSH connection, checks execution results and keeps
-    one ingest writer. Originals and business code remain read-only. Resolve the actual knowledge
-    root K from config.yml; keep requests, drafts, diagnostics and results in its existing locations.
-
-    Read actual status/phase, diagnostics and exact business outputs; exit 0 alone is insufficient.
-    Before retrying, recheck source/rules/code/baseline and the original transaction. Unchanged inputs
-    may resume the same operation. Changed inputs or returned content require a new operation and
-    newly bound scan/material/plan/view; never overwrite sealed old files or repeat committed apply.
-    Honor user interruption. Allow at most three substantive revision attempts per batch; stop sooner
-    when the same issue repeats without progress. This budget does not authorize environment retries.
-
-    On missing indispensable material, invalid reports, runtime/SSH uncertainty or exhausted budget,
-    save the actual input/output references, diagnostics and next action under K/.build/operations/.
-    Record the stop using only resumeCapsule goal/done/currentFocus in the host-supported
-    workflow_runtime_patch. Do not call workflow_handoff or emit a handoff a2a-callback when no
-    exit condition is satisfied. End this turn with the unresolved reason and preserve the current
-    node; do not patch currentNode/batonHolder/flowState/recoveryContext or create a retry loop.
-    The retained Workflow is unfinished (active), not native waiting and never completed by failure.
-
-    For each artifact duty actually required by the selected exit, write a separate Markdown summary
-    of this CLI invocation and its original business references. Submit its exact artifact ID and
-    explicit location {kind: markdown_file, path: <artifact-root-relative-file>} in workflowCompletion.
-    Use K/.build/operations/<operation_id>/handoffs/<node_id>/<unique-attempt>/<artifact-id>.md,
-    resolving K relative to the actual project root and allocating a new attempt for every invocation.
-    These are resolved paths, not OpenFlow placeholder syntax. Never use a shared node-result.md or
-    rely on Skill default_location.path; the official contract loader drops that default field.
-    Use the host-rendered artifactLocationContext.projectRoot and any bound artifactRoots as
-    the artifact validation base, which can differ from the business project root. Resolve the
-    summary in K first, then submit its path relative to that actual validation base. Confirm
-    containment, exact file identity and readability before handoff. If K is outside that root
-    or bound scope, or the host does not expose a usable mapping, preserve this node and report
-    the host artifact-root integration gap. Do not create another business directory under the
-    OpenFlow installation, use escaping paths, or mistake a soft-record warning for saved evidence. If the execution
-    host differs, retain original host/path identities and stop on unavailable artifact access.
-    Summaries are pointers to actual Skill results, not fabricated success or replacement evidence.
-
-    Use the same fixed full-view lint Skill as manual checks. CheckReport
-    exit0/phase=status=passed/complete=true/full scope must match final view after all applicable
-    content/code checks. When updating a card, use P2 material.candidates card_digest/card_ref objects
-    as historical_card_objects in lint inputs; retain the exact old bytes and resolve absolute paths
-    from this operation. The Agent supplies these inputs without asking for manual files or a prior Git
-    commit. Exit1 routes directly to P2/P3/P4 by finding; exit2 preserves incomplete/runtime stop. Lint
-    does not repair, apply or launch another Workflow.
-  exits:
-  - id: passed
-    label: passed
-    condition: Exact final full-view report complete and passed.
-    target: record_ingest
-  - id: needs_material
-    label: needs material
-    condition: Material/locator input defect.
-    target: prepare_material
-  - id: needs_plan
-    label: needs plan
-    condition: Claim/reference selection defect.
-    target: plan_change
-  - id: needs_revision
-    label: needs revision
-    condition: Candidate format/navigation/view defect.
-    target: revise_candidate
-- id: record_ingest
-  title: P6 Reconcile the unique portable raw processing record
-  type: skill
-  owner: coder
-  skill: hs-knowledge-source-scan
-  prompt: |-
-    OpenFlow owns node order, role isolation and transitions. Use the installed public Skill CLI
-    with its business operation_id and actual inputs; do not add Workflow identities, manifests,
-    catalog registration or upstream passed tickets to Skill requests. Reuse known AGENTS/config.yml
-    context and the execution host global Python. Setup is outside ingest; do not repeat setup/E0.
-    The harness resolves installed paths and any SSH connection, checks execution results and keeps
-    one ingest writer. Originals and business code remain read-only. Resolve the actual knowledge
-    root K from config.yml; keep requests, drafts, diagnostics and results in its existing locations.
-
-    Read actual status/phase, diagnostics and exact business outputs; exit 0 alone is insufficient.
-    Before retrying, recheck source/rules/code/baseline and the original transaction. Unchanged inputs
-    may resume the same operation. Changed inputs or returned content require a new operation and
-    newly bound scan/material/plan/view; never overwrite sealed old files or repeat committed apply.
-    Honor user interruption. Allow at most three substantive revision attempts per batch; stop sooner
-    when the same issue repeats without progress. This budget does not authorize environment retries.
-
-    On missing indispensable material, invalid reports, runtime/SSH uncertainty or exhausted budget,
-    save the actual input/output references, diagnostics and next action under K/.build/operations/.
-    Record the stop using only resumeCapsule goal/done/currentFocus in the host-supported
-    workflow_runtime_patch. Do not call workflow_handoff or emit a handoff a2a-callback when no
-    exit condition is satisfied. End this turn with the unresolved reason and preserve the current
-    node; do not patch currentNode/batonHolder/flowState/recoveryContext or create a retry loop.
-    The retained Workflow is unfinished (active), not native waiting and never completed by failure.
-
-    For each artifact duty actually required by the selected exit, write a separate Markdown summary
-    of this CLI invocation and its original business references. Submit its exact artifact ID and
-    explicit location {kind: markdown_file, path: <artifact-root-relative-file>} in workflowCompletion.
-    Use K/.build/operations/<operation_id>/handoffs/<node_id>/<unique-attempt>/<artifact-id>.md,
-    resolving K relative to the actual project root and allocating a new attempt for every invocation.
-    These are resolved paths, not OpenFlow placeholder syntax. Never use a shared node-result.md or
-    rely on Skill default_location.path; the official contract loader drops that default field.
-    Use the host-rendered artifactLocationContext.projectRoot and any bound artifactRoots as
-    the artifact validation base, which can differ from the business project root. Resolve the
-    summary in K first, then submit its path relative to that actual validation base. Confirm
-    containment, exact file identity and readability before handoff. If K is outside that root
-    or bound scope, or the host does not expose a usable mapping, preserve this node and report
-    the host artifact-root integration gap. Do not create another business directory under the
-    OpenFlow installation, use escaping paths, or mistake a soft-record warning for saved evidence. If the execution
-    host differs, retain original host/path identities and stop on unavailable artifact access.
-    Summaries are pointers to actual Skill results, not fabricated success or replacement evidence.
-
-    --action record binds exact scan_ref, semantic_plan_ref and all per-raw-unit dispositions. Copy
-    authored maintenance_units as shared maintenance_dispositions and pending summaries even when raw
-    units are empty. Include skip/defer/failed/uncovered, observed vs adopted fingerprints, covered
-    scope/pending, card/Claim refs and applicable independent skip sample. Content batch binds final
-    plan/view/lint/review/proof summaries; record-only has no failed card/navigation/lock writes and no
-    fabricated P5 or content review. Fixed record validation must pass; invalid record stays at P6.
-    Output ingest_record_ref only under .build; P7 formalizes it.
-  exits:
-  - id: recorded
-    label: recorded
-    condition: Record coverage/structure/bindings validated; ready to apply content or record-only batch.
-    target: apply_view
-  - id: needs_record
-    label: needs record
-    condition: Record itself has fixable errors within revision budget.
-    target: record_ingest
-- id: apply_view
-  title: P7 Apply exact content and record in one transaction
-  type: skill
-  owner: coder
-  skill: hs-knowledge-apply
-  prompt: |-
-    OpenFlow owns node order, role isolation and transitions. Use the installed public Skill CLI
-    with its business operation_id and actual inputs; do not add Workflow identities, manifests,
-    catalog registration or upstream passed tickets to Skill requests. Reuse known AGENTS/config.yml
-    context and the execution host global Python. Setup is outside ingest; do not repeat setup/E0.
-    The harness resolves installed paths and any SSH connection, checks execution results and keeps
-    one ingest writer. Originals and business code remain read-only. Resolve the actual knowledge
-    root K from config.yml; keep requests, drafts, diagnostics and results in its existing locations.
-
-    Read actual status/phase, diagnostics and exact business outputs; exit 0 alone is insufficient.
-    Before retrying, recheck source/rules/code/baseline and the original transaction. Unchanged inputs
-    may resume the same operation. Changed inputs or returned content require a new operation and
-    newly bound scan/material/plan/view; never overwrite sealed old files or repeat committed apply.
-    Honor user interruption. Allow at most three substantive revision attempts per batch; stop sooner
-    when the same issue repeats without progress. This budget does not authorize environment retries.
-
-    On missing indispensable material, invalid reports, runtime/SSH uncertainty or exhausted budget,
-    save the actual input/output references, diagnostics and next action under K/.build/operations/.
-    Record the stop using only resumeCapsule goal/done/currentFocus in the host-supported
-    workflow_runtime_patch. Do not call workflow_handoff or emit a handoff a2a-callback when no
-    exit condition is satisfied. End this turn with the unresolved reason and preserve the current
-    node; do not patch currentNode/batonHolder/flowState/recoveryContext or create a retry loop.
-    The retained Workflow is unfinished (active), not native waiting and never completed by failure.
-
-    For each artifact duty actually required by the selected exit, write a separate Markdown summary
-    of this CLI invocation and its original business references. Submit its exact artifact ID and
-    explicit location {kind: markdown_file, path: <artifact-root-relative-file>} in workflowCompletion.
-    Use K/.build/operations/<operation_id>/handoffs/<node_id>/<unique-attempt>/<artifact-id>.md,
-    resolving K relative to the actual project root and allocating a new attempt for every invocation.
-    These are resolved paths, not OpenFlow placeholder syntax. Never use a shared node-result.md or
-    rely on Skill default_location.path; the official contract loader drops that default field.
-    Use the host-rendered artifactLocationContext.projectRoot and any bound artifactRoots as
-    the artifact validation base, which can differ from the business project root. Resolve the
-    summary in K first, then submit its path relative to that actual validation base. Confirm
-    containment, exact file identity and readability before handoff. If K is outside that root
-    or bound scope, or the host does not expose a usable mapping, preserve this node and report
-    the host artifact-root integration gap. Do not create another business directory under the
-    OpenFlow installation, use escaping paths, or mistake a soft-record warning for saved evidence. If the execution
-    host differs, retain original host/path identities and stop on unavailable artifact access.
-    Summaries are pointers to actual Skill results, not fabricated success or replacement evidence.
-
-    --action run with v3_required true and ingest_record_ref. Content also needs view_ref, final
-    lint_report_ref/content_review_ref and the code proof_ref for code/mixed views, plus check_inputs
-    identical to final lint fixed inputs (a code batch explicitly supplies code_checkout). For card
-    updates, carry the same historical_card_objects mapping from the P2 retained card_digest/card_ref
-    objects used by final lint; no prior Git commit or manual historical-file preparation is required.
-    Rerun the actual fixed checks; caller claims do not replace these checks. Document admission uses
-    the exact independent content_review_ref as its proof; no human event is required. Record-only omits
-    view/proofs and contains no card/nav/lock writes. Recheck baseline and exact locally recoverable
-    captured originals; update/revalidate only actual record apply facts in the same transaction.
-    Portable source availability for other clones belongs to subsequent human publishing. Git
-    submission, fixed CI and merge are subsequent human operations, not local completion prerequisites.
-    Already committed local transaction must return existing result, never reapply.
-  exits:
-  - id: applied
-    label: applied
-    condition: Content transaction committed locally with actual record facts.
-    target: rebuild_index
-  - id: record_only
-    label: record only
-    condition: Valid processing record applied; local ingest is complete with unresolved dispositions preserved;
-      indexing/query and Git are not required.
-    target: __end__
-  - id: recovery_required
-    label: recovery required
-    condition: Interrupted transaction; preserve exact original journal.
-    target: recover_transaction
-  - id: stale
-    label: stale
-    condition: Baseline or evidence changed before apply.
-    target: prepare_material
-- id: recover_transaction
-  title: P7 Recover the existing transaction before new work
-  type: skill
-  owner: coder
-  skill: hs-knowledge-recover
-  prompt: |-
-    OpenFlow owns node order, role isolation and transitions. Use the installed public Skill CLI
-    with its business operation_id and actual inputs; do not add Workflow identities, manifests,
-    catalog registration or upstream passed tickets to Skill requests. Reuse known AGENTS/config.yml
-    context and the execution host global Python. Setup is outside ingest; do not repeat setup/E0.
-    The harness resolves installed paths and any SSH connection, checks execution results and keeps
-    one ingest writer. Originals and business code remain read-only. Resolve the actual knowledge
-    root K from config.yml; keep requests, drafts, diagnostics and results in its existing locations.
-
-    Read actual status/phase, diagnostics and exact business outputs; exit 0 alone is insufficient.
-    Before retrying, recheck source/rules/code/baseline and the original transaction. Unchanged inputs
-    may resume the same operation. Changed inputs or returned content require a new operation and
-    newly bound scan/material/plan/view; never overwrite sealed old files or repeat committed apply.
-    Honor user interruption. Allow at most three substantive revision attempts per batch; stop sooner
-    when the same issue repeats without progress. This budget does not authorize environment retries.
-
-    On missing indispensable material, invalid reports, runtime/SSH uncertainty or exhausted budget,
-    save the actual input/output references, diagnostics and next action under K/.build/operations/.
-    Record the stop using only resumeCapsule goal/done/currentFocus in the host-supported
-    workflow_runtime_patch. Do not call workflow_handoff or emit a handoff a2a-callback when no
-    exit condition is satisfied. End this turn with the unresolved reason and preserve the current
-    node; do not patch currentNode/batonHolder/flowState/recoveryContext or create a retry loop.
-    The retained Workflow is unfinished (active), not native waiting and never completed by failure.
-
-    For each artifact duty actually required by the selected exit, write a separate Markdown summary
-    of this CLI invocation and its original business references. Submit its exact artifact ID and
-    explicit location {kind: markdown_file, path: <artifact-root-relative-file>} in workflowCompletion.
-    Use K/.build/operations/<operation_id>/handoffs/<node_id>/<unique-attempt>/<artifact-id>.md,
-    resolving K relative to the actual project root and allocating a new attempt for every invocation.
-    These are resolved paths, not OpenFlow placeholder syntax. Never use a shared node-result.md or
-    rely on Skill default_location.path; the official contract loader drops that default field.
-    Use the host-rendered artifactLocationContext.projectRoot and any bound artifactRoots as
-    the artifact validation base, which can differ from the business project root. Resolve the
-    summary in K first, then submit its path relative to that actual validation base. Confirm
-    containment, exact file identity and readability before handoff. If K is outside that root
-    or bound scope, or the host does not expose a usable mapping, preserve this node and report
-    the host artifact-root integration gap. Do not create another business directory under the
-    OpenFlow installation, use escaping paths, or mistake a soft-record warning for saved evidence. If the execution
-    host differs, retain original host/path identities and stop on unavailable artifact access.
-    Summaries are pointers to actual Skill results, not fabricated success or replacement evidence.
-
-    Inspect actual journal, locks, backups and final bytes. Resume or rollback only the original
-    transaction. A recovered committed content batch continues unfinished indexing/query; recovered
-    record-only completes local ingest immediately, preserving unresolved dispositions. Do not create
-    duplicate knowledge or rewrite prior history.
-  exits:
-  - id: recovered
-    label: recovered
-    condition: Original content transaction actual state verified/applied.
-    target: rebuild_index
-  - id: record_only
-    label: record only
-    condition: Original record-only transaction recovered; local ingest is complete and its recorded pending work
-      remains pending.
-    target: __end__
-  - id: rolled_back
-    label: rolled back
-    condition: Original transaction rolled back; new content preparation needed.
-    target: prepare_material
-- id: rebuild_index
-  title: P7 Build and fully verify the actual local index
-  type: skill
-  owner: coder
-  skill: hs-knowledge-index-build
-  prompt: |-
-    OpenFlow owns node order, role isolation and transitions. Use the installed public Skill CLI
-    with its business operation_id and actual inputs; do not add Workflow identities, manifests,
-    catalog registration or upstream passed tickets to Skill requests. Reuse known AGENTS/config.yml
-    context and the execution host global Python. Setup is outside ingest; do not repeat setup/E0.
-    The harness resolves installed paths and any SSH connection, checks execution results and keeps
-    one ingest writer. Originals and business code remain read-only. Resolve the actual knowledge
-    root K from config.yml; keep requests, drafts, diagnostics and results in its existing locations.
-
-    Read actual status/phase, diagnostics and exact business outputs; exit 0 alone is insufficient.
-    Before retrying, recheck source/rules/code/baseline and the original transaction. Unchanged inputs
-    may resume the same operation. Changed inputs or returned content require a new operation and
-    newly bound scan/material/plan/view; never overwrite sealed old files or repeat committed apply.
-    Honor user interruption. Allow at most three substantive revision attempts per batch; stop sooner
-    when the same issue repeats without progress. This budget does not authorize environment retries.
-
-    On missing indispensable material, invalid reports, runtime/SSH uncertainty or exhausted budget,
-    save the actual input/output references, diagnostics and next action under K/.build/operations/.
-    Record the stop using only resumeCapsule goal/done/currentFocus in the host-supported
-    workflow_runtime_patch. Do not call workflow_handoff or emit a handoff a2a-callback when no
-    exit condition is satisfied. End this turn with the unresolved reason and preserve the current
-    node; do not patch currentNode/batonHolder/flowState/recoveryContext or create a retry loop.
-    The retained Workflow is unfinished (active), not native waiting and never completed by failure.
-
-    For each artifact duty actually required by the selected exit, write a separate Markdown summary
-    of this CLI invocation and its original business references. Submit its exact artifact ID and
-    explicit location {kind: markdown_file, path: <artifact-root-relative-file>} in workflowCompletion.
-    Use K/.build/operations/<operation_id>/handoffs/<node_id>/<unique-attempt>/<artifact-id>.md,
-    resolving K relative to the actual project root and allocating a new attempt for every invocation.
-    These are resolved paths, not OpenFlow placeholder syntax. Never use a shared node-result.md or
-    rely on Skill default_location.path; the official contract loader drops that default field.
-    Use the host-rendered artifactLocationContext.projectRoot and any bound artifactRoots as
-    the artifact validation base, which can differ from the business project root. Resolve the
-    summary in K first, then submit its path relative to that actual validation base. Confirm
-    containment, exact file identity and readability before handoff. If K is outside that root
-    or bound scope, or the host does not expose a usable mapping, preserve this node and report
-    the host artifact-root integration gap. Do not create another business directory under the
-    OpenFlow installation, use escaping paths, or mistake a soft-record warning for saved evidence. If the execution
-    host differs, retain original host/path identities and stop on unavailable artifact access.
-    Summaries are pointers to actual Skill results, not fabricated success or replacement evidence.
-
-    Build/verify actual applied content with current rules. Do not publish before full verification.
-    Construction/runtime failure retries this finishing step only; content failure creates a new
-    correction operation through P3/P4/P5-P7, retaining the prior apply fact.
-  exits:
-  - id: built
-    label: built
-    condition: Actual candidate generation built and fully verified.
-    target: query_regression
-  - id: content_error
-    label: content error
-    condition: An actual content defect is identified after commit; preserve the original apply fact and prepare
-      a new corrective operation and current materials, then plan/review/lint/apply it.
-    target: prepare_material
-- id: query_regression
-  title: P7 Verify this batch's target queries and activate
-  type: skill
-  owner: reviewer
-  skill: hs-knowledge-query-regression
-  prompt: |-
-    OpenFlow owns node order, role isolation and transitions. Use the installed public Skill CLI
-    with its business operation_id and actual inputs; do not add Workflow identities, manifests,
-    catalog registration or upstream passed tickets to Skill requests. Reuse known AGENTS/config.yml
-    context and the execution host global Python. Setup is outside ingest; do not repeat setup/E0.
-    The harness resolves installed paths and any SSH connection, checks execution results and keeps
-    one ingest writer. Originals and business code remain read-only. Resolve the actual knowledge
-    root K from config.yml; keep requests, drafts, diagnostics and results in its existing locations.
-
-    Read actual status/phase, diagnostics and exact business outputs; exit 0 alone is insufficient.
-    Before retrying, recheck source/rules/code/baseline and the original transaction. Unchanged inputs
-    may resume the same operation. Changed inputs or returned content require a new operation and
-    newly bound scan/material/plan/view; never overwrite sealed old files or repeat committed apply.
-    Honor user interruption. Allow at most three substantive revision attempts per batch; stop sooner
-    when the same issue repeats without progress. This budget does not authorize environment retries.
-
-    On missing indispensable material, invalid reports, runtime/SSH uncertainty or exhausted budget,
-    save the actual input/output references, diagnostics and next action under K/.build/operations/.
-    Record the stop using only resumeCapsule goal/done/currentFocus in the host-supported
-    workflow_runtime_patch. Do not call workflow_handoff or emit a handoff a2a-callback when no
-    exit condition is satisfied. End this turn with the unresolved reason and preserve the current
-    node; do not patch currentNode/batonHolder/flowState/recoveryContext or create a retry loop.
-    The retained Workflow is unfinished (active), not native waiting and never completed by failure.
-
-    For each artifact duty actually required by the selected exit, write a separate Markdown summary
-    of this CLI invocation and its original business references. Submit its exact artifact ID and
-    explicit location {kind: markdown_file, path: <artifact-root-relative-file>} in workflowCompletion.
-    Use K/.build/operations/<operation_id>/handoffs/<node_id>/<unique-attempt>/<artifact-id>.md,
-    resolving K relative to the actual project root and allocating a new attempt for every invocation.
-    These are resolved paths, not OpenFlow placeholder syntax. Never use a shared node-result.md or
-    rely on Skill default_location.path; the official contract loader drops that default field.
-    Use the host-rendered artifactLocationContext.projectRoot and any bound artifactRoots as
-    the artifact validation base, which can differ from the business project root. Resolve the
-    summary in K first, then submit its path relative to that actual validation base. Confirm
-    containment, exact file identity and readability before handoff. If K is outside that root
-    or bound scope, or the host does not expose a usable mapping, preserve this node and report
-    the host artifact-root integration gap. Do not create another business directory under the
-    OpenFlow installation, use escaping paths, or mistake a soft-record warning for saved evidence. If the execution
-    host differs, retain original host/path identities and stop on unavailable artifact access.
-    Summaries are pointers to actual Skill results, not fabricated success or replacement evidence.
-
-    Load representative cases from the frozen plan/view; v3 content cannot accept a caller-supplied
-    empty cases list. Verify expected cards/Claims and current-context filtering on the exact generation
-    before activation. Pass generation_ref and expected_active exactly as returned by index-build; null
-    is valid only when it returned no prior active pointer. Never overwrite a concurrently changed
-    pointer. Verified activation completes local ingest; Git submission, fixed CI and merge are
-    subsequent human operations and never prerequisites for this success. Runtime failure retries this
-    finishing step; content error starts a new correction operation and preserves prior apply fact.
-
-    If activation succeeded but its response was lost, do not replay activation with stale expected_active.
-    Locate the saved passed regression report by the exact generation/view and original frozen cases;
-    call query-regression --action verify with its report_ref and generation_ref, then reread the actual
-    channel active pointer and confirm it still resolves to that same verified generation. Only this
-    confirmed passed-and-active state selects checked. If no report or binding is available, preserve
-    the stop; do not guess success. If the candidate is not active and the pointer still matches the
-    original expected_active, run the normal regression/activation with those original inputs.
-    A different active pointer is a concurrent-baseline conflict: stop without overwriting it.
-    Never rebase expected_active onto a newly observed pointer merely to obtain activation success.
-  exits:
-  - id: checked
-    label: checked
-    condition: All frozen target cases passed and the verified local generation is active; local ingest is complete
-      without a Git commit, CI result or merge.
-    target: __end__
-  - id: content_error
-    label: content error
-    condition: An actual content defect is identified after commit; preserve the original apply fact and prepare
-      a new corrective operation and current materials, then plan/review/lint/apply it.
-    target: prepare_material
+  - id: scan_sources
+    title: P1 扫描原件与续办
+    type: skill
+    owner: coder
+    skill: hs-knowledge-source-scan
+    prompt: 扫描五类原件及实际停点，区分新处理、未入库复核和已入库收尾；无变化不写记录。先核宿主产物根，摘要用独立显式路径；不兼容或阻断时保存停点，不交棒。
+    exits:
+      - id: scanned
+        label: 准备材料
+        condition: 有新增、变化、未完成事项或用户修订请求。
+        target: prepare_material
+      - id: unchanged
+        label: 无需更新
+        condition: 扫描完整且无变化、修订、维护或未完成事项；不新增处理记录。
+        target: __end__
+      - id: resume
+        label: 续办内容复核
+        condition: 完整视图仍有效且尚未入库，先确认独立内容复核。
+        target: review_content
+      - id: recover
+        label: 恢复事务
+        condition: 存在未结束的写入事务。
+        target: recover_transaction
+      - id: resume_index
+        label: 续办索引
+        condition: 原事务已本地落位、文件仍有效，但候选索引尚未完整验证。
+        target: rebuild_index
+      - id: resume_queries
+        label: 续办查询
+        condition: 原事务已本地落位，已有确切候选代、冻结查询和活动指针基线。
+        target: query_regression
+  - id: prepare_material
+    title: P2 准备新旧材料
+    type: skill
+    owner: coder
+    skill: hs-knowledge-source-scan
+    prompt: 准备本次原文、采用旧版、关联旧卡及代码材料，保留旧卡确切字节。输入变化时新建操作并重扫；摘要用独立显式路径，材料缺失或异常时保存停点，不交棒。
+    exits:
+      - id: prepared
+        label: 材料就绪
+        condition: 新旧材料及明确缺口已保存。
+        target: plan_change
+  - id: plan_change
+    title: P3 阅读并制定计划
+    type: skill
+    owner: coder
+    skill: hs-knowledge-change-plan
+    prompt: 逐条对照事实、条件和证据，冻结六决策计划及查询预期，覆盖原件和维护单元。输入变化时先按新操作准备材料；摘要用独立显式路径，阻断时保留停点、不交棒。
+    exits:
+      - id: planned
+        label: 计划就绪
+        condition: 语义计划、来源处理判断和查询预期已固定。
+        target: review_plan
+      - id: needs_material
+        label: 补充材料
+        condition: 材料或定位需补充，且可在当前范围内继续处理。
+        target: prepare_material
+  - id: review_plan
+    title: P3 独立复核归卡与跳过
+    type: skill
+    owner: reviewer
+    skill: hs-knowledge-change-plan
+    prompt: 独立审查归卡和实质跳过，注明样本、问题与未审范围；未选项不冒称通过。摘要用独立显式路径；缺材料或异常时保存停点，不交棒。
+    exits:
+      - id: reviewed
+        label: 复核通过
+        condition: 本次范围的独立复核通过，没有未解决的阻断项。
+        target: materialize_view
+      - id: record_only
+        label: 仅处理记录
+        condition: 复核已记录，仅有跳过、暂缓、失败或未覆盖事项。
+        target: record_ingest
+      - id: needs_material
+        label: 补充材料
+        condition: 材料或定位需补充，且可在当前范围内继续处理。
+        target: prepare_material
+      - id: needs_revision
+        label: 修订计划
+        condition: 归卡、结论或计划决策需要重判。
+        target: plan_change
+  - id: materialize_view
+    title: P4 保存完整候选
+    type: skill
+    owner: coder
+    skill: hs-knowledge-view-materialize
+    prompt: 按计划撰写候选卡，固定导航、来源锁、基线和查询预期；显式传本次context_ref，代码上下文不继承旧视图。摘要用独立显式路径；阻断时保留停点、不交棒。
+    exits:
+      - id: ready
+        label: 候选就绪
+        condition: 新计划和完整视图已固定。
+        target: review_content
+      - id: stale
+        label: 重新准备材料
+        condition: 原件、规则、代码或基线变化，需按新操作准备材料。
+        target: prepare_material
+  - id: review_content
+    title: P4 独立内容复核
+    type: skill
+    owner: reviewer
+    skill: hs-knowledge-change-plan
+    prompt: 独立阅读完整候选、原文和计划，复核断言、条件及融合关系；续办须确认复核绑定确切视图。摘要用独立显式路径；阻断时保留停点、不交棒。
+    exits:
+      - id: reviewed
+        label: 复核通过
+        condition: 本次范围的独立复核通过，没有未解决的阻断项。
+        target: lint_preflight
+      - id: needs_material
+        label: 补充材料
+        condition: 材料或定位需补充，且可在当前范围内继续处理。
+        target: prepare_material
+      - id: needs_plan
+        label: 修订计划
+        condition: 结论、适用范围或归卡关系需要重判。
+        target: plan_change
+      - id: needs_revision
+        label: 修订候选
+        condition: 候选内容、结构或导航需要修订。
+        target: revise_candidate
+  - id: lint_preflight
+    title: P4 固定预检
+    type: skill
+    owner: reviewer
+    skill: hs-knowledge-lint
+    prompt: 对已独立复核的完整候选做固定预检，读取实际报告；材料、语义、格式问题分别返回补充材料、计划或修稿。摘要用独立显式路径；异常时保存停点、不交棒。
+    exits:
+      - id: passed
+        label: 检查通过
+        condition: 本次确切视图的必需检查已完整执行并通过。
+        target: inspect_candidate
+      - id: needs_material
+        label: 补充材料
+        condition: 材料或定位需补充，且可在当前范围内继续处理。
+        target: prepare_material
+      - id: needs_plan
+        label: 修订计划
+        condition: 结论、适用范围或归卡关系需要重判。
+        target: plan_change
+      - id: needs_revision
+        label: 修订候选
+        condition: 候选内容、结构或导航需要修订。
+        target: revise_candidate
+  - id: inspect_candidate
+    title: P4 分类与事务检查
+    type: skill
+    owner: coder
+    skill: hs-knowledge-candidate-inspect
+    prompt: 核对确切视图和事务，区分文档、代码及混合稿；分类不代表内容复核，已入库不得重查旧基线。摘要用独立显式路径；阻断时保留停点、不交棒。
+    exits:
+      - id: manual_ready
+        label: 文档稿就绪
+        condition: 确切文档稿已有独立内容复核，可进入最终检查。
+        target: lint_view
+      - id: mixed_ready
+        label: 混合稿就绪
+        condition: 确切混合稿已有独立内容复核，继续代码部分核验。
+        target: local_check
+      - id: code_ready
+        label: 代码稿就绪
+        condition: 确切代码稿已有独立内容复核，继续代码核验。
+        target: local_check
+      - id: recovery_required
+        label: 恢复事务
+        condition: 存在需恢复的未完成写入事务。
+        target: recover_transaction
+      - id: needs_revision
+        label: 修订候选
+        condition: 候选内容、结构或导航需要修订。
+        target: revise_candidate
+  - id: local_check
+    title: P4 独立代码核验
+    type: skill
+    owner: reviewer
+    skill: hs-knowledge-local-check
+    prompt: 独立逐Claim核对实际源码、配置、理由和引用，保存与本视图绑定的依据；角色和上下文隔离由宿主负责。摘要用独立显式路径；阻断时保存停点、不交棒。
+    exits:
+      - id: code_passed
+        label: 代码核验通过
+        condition: 逐Claim代码依据、条件及本次内容绑定核验通过。
+        target: lint_view
+      - id: needs_revision
+        label: 修订候选
+        condition: 候选内容、结构或导航需要修订。
+        target: revise_candidate
+  - id: revise_candidate
+    title: P4 修订候选
+    type: skill
+    owner: coder
+    skill: hs-knowledge-candidate-revise
+    prompt: 新建操作，依次扫描、准备材料、重作语义计划，再携新context_ref修订原视图并重新复核。最多三轮，无进展即停；摘要用独立显式路径，阻断时保留停点、不交棒。
+    exits:
+      - id: ready
+        label: 候选就绪
+        condition: 新计划和完整视图已固定。
+        target: review_content
+      - id: needs_material
+        label: 补充材料
+        condition: 材料或定位需补充，且可在当前范围内继续处理。
+        target: prepare_material
+      - id: needs_plan
+        label: 修订计划
+        condition: 结论、适用范围或归卡关系需要重判。
+        target: plan_change
+      - id: deferred
+        label: 登记暂缓
+        condition: 只剩明确暂缓、失败或未覆盖事项，不写失败稿件。
+        target: record_ingest
+  - id: lint_view
+    title: P5 最终完整检查
+    type: skill
+    owner: reviewer
+    skill: hs-knowledge-lint
+    prompt: 检查最终完整视图，带入材料阶段保留的旧卡正文；仅完整全库报告通过才登记，失败按问题返回。摘要用独立显式路径；运行故障保留停点、不交棒。
+    exits:
+      - id: passed
+        label: 检查通过
+        condition: 最终确切视图的完整全库报告通过。
+        target: record_ingest
+      - id: needs_material
+        label: 补充材料
+        condition: 材料或定位需补充，且可在当前范围内继续处理。
+        target: prepare_material
+      - id: needs_plan
+        label: 修订计划
+        condition: 结论、适用范围或归卡关系需要重判。
+        target: plan_change
+      - id: needs_revision
+        label: 修订候选
+        condition: 候选内容、结构或导航需要修订。
+        target: revise_candidate
+  - id: record_ingest
+    title: P6 登记处理记录
+    type: skill
+    owner: coder
+    skill: hs-knowledge-source-scan
+    prompt: 对账来源、维护单元、卡和真实处理结果，生成待入库记录；仅记录批不得夹带失败稿件。摘要用独立显式路径；阻断或重复错误无进展时保存停点，不交棒。
+    exits:
+      - id: recorded
+        label: 记录就绪
+        condition: 记录覆盖、结构和内容绑定已校验，可同批落位。
+        target: apply_view
+      - id: needs_record
+        label: 修正记录
+        condition: 记录自身可修正，仍有预算且未重复同错。
+        target: record_ingest
+  - id: apply_view
+    title: P7 本地入库
+    type: skill
+    owner: coder
+    skill: hs-knowledge-apply
+    prompt: 将卡、导航、来源锁和记录同批落位，重跑固定检查；保留历史卡输入，已落位事务不得重复写入。摘要用独立显式路径；异常先核事务，保存停点、不交棒。
+    exits:
+      - id: applied
+        label: 入库完成
+        condition: 内容与记录已同批提交到本地，继续检索收尾。
+        target: rebuild_index
+      - id: record_only
+        label: 仅处理记录
+        condition: 合法记录批已保存，未解决事项仍保留；无需索引。
+        target: __end__
+      - id: recovery_required
+        label: 恢复事务
+        condition: 存在需恢复的未完成写入事务。
+        target: recover_transaction
+      - id: stale
+        label: 重新准备材料
+        condition: 原件、规则、代码或基线变化，需按新操作准备材料。
+        target: prepare_material
+  - id: recover_transaction
+    title: P7 恢复原事务
+    type: skill
+    owner: coder
+    skill: hs-knowledge-recover
+    prompt: 核对原事务、备份和实际文件，恢复或回滚；内容批只继续检索收尾，记录批保存后结束。摘要用独立显式路径；恢复不明时保存停点、不交棒。
+    exits:
+      - id: recovered
+        label: 事务已恢复
+        condition: 原内容事务已恢复并核实，只继续检索收尾。
+        target: rebuild_index
+      - id: record_only
+        label: 仅处理记录
+        condition: 原记录批已恢复并保存，未解决事项仍保留。
+        target: __end__
+      - id: rolled_back
+        label: 事务已回滚
+        condition: 原事务已安全回滚，重新准备材料。
+        target: prepare_material
+  - id: rebuild_index
+    title: P7 构建并验证索引
+    type: skill
+    owner: coder
+    skill: hs-knowledge-index-build
+    prompt: 构建并完整验证本地索引，原样保存代次及活动指针基线；运行故障只重试收尾，内容错误新建修订。摘要用独立显式路径；异常时保存停点、不交棒。
+    exits:
+      - id: built
+        label: 索引已验证
+        condition: 实际候选索引已构建并完整验证。
+        target: query_regression
+      - id: content_error
+        label: 新建内容修订
+        condition: 确认内容有误，保留已入库事实并新建修订操作。
+        target: prepare_material
+  - id: query_regression
+    title: P7 查询回归与激活
+    type: skill
+    owner: reviewer
+    skill: hs-knowledge-query-regression
+    prompt: 沿用冻结查询及构建返回的代次、活动指针基线，验证后CAS激活；响应丢失先核报告和实际活动代，不重放或改基线。摘要用独立显式路径；异常保存停点、不交棒。
+    exits:
+      - id: checked
+        label: 查询与激活完成
+        condition: 冻结查询通过且确切代已激活；丢失响应须先复验报告和实际活动代。
+        target: __end__
+      - id: content_error
+        label: 新建内容修订
+        condition: 确认内容有误，保留已入库事实并新建修订操作。
+        target: prepare_material
 artifacts:
   primary: []
   optional: []

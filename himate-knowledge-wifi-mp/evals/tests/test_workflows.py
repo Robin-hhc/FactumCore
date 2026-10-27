@@ -1,11 +1,8 @@
-"""Workflow source checks and optional pinned upstream-loader integration."""
+"""Static package and Workflow source checks, independent of a workflow engine."""
 
 import importlib.util
-import os
 from pathlib import Path
 import shutil
-import subprocess
-import sys
 
 import pytest
 import yaml
@@ -13,9 +10,6 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[3]
 VALIDATOR = ROOT / "himate-knowledge-wifi-mp/evals/validate_design.py"
-INSTALLER = (
-    ROOT / "himate-knowledge-wifi-mp/tools/deploy/install_catalog.py"
-)
 
 
 def validator_module():
@@ -195,6 +189,66 @@ def test_instruction_skill_rejects_missing_reference_and_executable_content(tmp_
     assert any("UNPUBLISHABLE_INSTRUCTION_FILE" in error for error in module.validate(source))
 
 
+@pytest.mark.parametrize("relative", [
+    "scripts/setup.py", "references/setup.ps1", "references/secret.bin",
+    "requirements.lock.txt", "references/.private.md", "references/secrets.txt",
+    "references/config.local.yml",
+])
+def test_instruction_skill_rejects_executable_and_private_files(tmp_path, relative):
+    module = validator_module()
+    source = fixture_packages(tmp_path / "fixture")
+    path = source / "skills/common/knowledge/hs-codegraph-setup" / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("isolated fixture\n", encoding="utf-8")
+    assert any("UNPUBLISHABLE" in error for error in module.validate(source))
+
+
+@pytest.mark.parametrize("content,diagnostic", [
+    (b"binary\x00data", "NON_TEXT_INSTRUCTION_FILE"),
+    (b"\xff", "utf-8"),
+    (b"-----BEGIN PRIVATE KEY-----\nisolated fixture", "PRIVATE_KEY_IN_PACKAGE"),
+])
+def test_instruction_skill_requires_public_utf8_text(tmp_path, content, diagnostic):
+    module = validator_module()
+    source = fixture_packages(tmp_path / "fixture")
+    path = source / "skills/common/knowledge/hs-codegraph-setup/references/codegraph.md"
+    path.write_bytes(content)
+    assert any(diagnostic in error for error in module.validate(source))
+
+
+@pytest.mark.parametrize("metadata", [
+    "name: wrong\ndescription: fixture",
+    "name: hs-codegraph-setup\ndescription: ''",
+])
+def test_instruction_skill_rejects_inconsistent_metadata(tmp_path, metadata):
+    module = validator_module()
+    source = fixture_packages(tmp_path / "fixture")
+    path = source / "skills/common/knowledge/hs-codegraph-setup/SKILL.md"
+    path.write_text("---\n" + metadata + "\n---\n# Instructions\n", encoding="utf-8")
+    assert any("missing or inconsistent Skill identity" in error for error in module.validate(source))
+
+
+def test_instruction_skill_requires_entry_document(tmp_path):
+    module = validator_module()
+    source = fixture_packages(tmp_path / "fixture")
+    (source / "skills/common/knowledge/hs-codegraph-setup/SKILL.md").unlink()
+    assert any("INCOMPLETE_PACKAGE" in error for error in module.validate(source))
+
+
+def test_instruction_skill_rejects_linked_reference(tmp_path):
+    module = validator_module()
+    source = fixture_packages(tmp_path / "fixture")
+    external = tmp_path / "outside.md"
+    external.write_text("# Outside fixture\n", encoding="utf-8")
+    reference = source / "skills/common/knowledge/hs-codegraph-setup/references/codegraph.md"
+    reference.unlink()
+    try:
+        reference.symlink_to(external)
+    except OSError:
+        pytest.skip("OS permission to create a symlink is unavailable")
+    assert any("LINKED_PATH" in error for error in module.validate(source))
+
+
 def test_instruction_exception_does_not_relax_node_cli_requirements(tmp_path):
     module = validator_module()
     source = fixture_packages(tmp_path / "fixture")
@@ -224,34 +278,3 @@ def test_cross_template_edge_and_apply_after_index_failure_rejected(tmp_path):
     next(e for e in node["exits"] if e["id"] == "blocked")["target"] = "apply_view"
     path.write_text(yaml.safe_dump(doc), encoding="utf-8")
     assert any("transition" in e.lower() for e in module.validate(source))
-
-
-def test_real_pinned_openflow_loader(tmp_path):
-    upstream = os.environ.get("FACTUM_OPENFLOW_SOURCE")
-    if not upstream:
-        pytest.skip(
-            "set FACTUM_OPENFLOW_SOURCE to verified OpenFlow@1901a4 checkout for upstream integration"
-        )
-    source = fixture_packages(tmp_path / "fixture")
-    destination = tmp_path / "installed"
-    installed = subprocess.run(
-        [
-            sys.executable,
-            str(INSTALLER),
-            "--source-root",
-            str(source),
-            "--destination",
-            str(destination),
-            "--python",
-            sys.executable,
-        ],
-        capture_output=True,
-        text=True,
-    )
-    assert installed.returncode == 0, installed.stderr
-    result = validator_module().validate_openflow(Path(upstream), destination)
-    assert result["workflow_ids"] == ["hs-knowledge-ingest"]
-    assert result["skill_count"] == 19
-    assert result["contract_count"] == 22
-
-

@@ -1,20 +1,18 @@
 """Validate the approved node packages and the complete ingest Workflow.
 
 Local structural checks do not prove host triggering,
-knowledge semantics or CI permissions. --openflow-source additionally executes
-the actual pinned upstream loader against an explicit isolated installation.
+knowledge semantics or CI permissions. Manual Skill calls do not require a
+workflow engine or its source checkout.
 """
 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 from pathlib import Path
 import re
-import runpy
-import subprocess
+import stat
 
 import yaml
 
@@ -148,24 +146,6 @@ EDGES = {'hs-knowledge-ingest': {'scan_sources': {'scanned': 'prepare_material',
                          'query_regression': {'checked': '__end__',
                                               'content_error': 'plan_change',
                                               'blocked': '__end__'}}}
-OPENFLOW_REVISION = "1901a463efca222542a4634d7ce50c7b244b2bab"
-# Exact bytes retrieved from the upstream revision, including transitive local
-# imports of the real loader. No copied or invented replacement validator.
-OPENFLOW_HASHES = {
-    "skill-artifact-loader.js": "ac79387629fa4e7673fa637dfd3c4add14d9cd3b7abe9d4e8c2d1fc4ce8e5222",
-    "skill-registry.js": "9c2055579a8a375258c41926f89bec8768a65b10148c03863a86262e409a292e",
-    "built-ins.js": "59326a7c81f1fadf2771873a99feb6bb1784a4356887b4478fa376b57209580b",
-    "skill-default-loading.js": "4696076bb56375988ff71ac4245956c3f5689f28426a94ec2eb4f84761c84e61",
-    "workflow-resource-registry.js": "69dfa921a9a6059bdd48a270777d11d3111ee933dd0afdde7bf8940fdf2f744c",
-    "workflow-template-layout-loader.js": "a4aeee79c5a13fc3f4da4b182090a0c9bba78115439fb89fabc1357814f0b251",
-    "workflow-template-loader.js": "d4934348acbe1a86f90ac96adaaa02393a22e5f1f2617918f113511ca75c73f2",
-    "workflow-template-health.js": "e4f370bd5067b6eb783035f61ab78a736f7a2b9c79e9f1a46861658a50b0017d",
-    "workflow-template-validator.js": "50b4e6e12b9e8534ec337a047deebcdba988aac346c9ff6916813e783dac9d10",
-    "workflow-skill-bindings.js": "306e0ec593ecaec8b7c13745961cd25d404a7769a46b62af2e339198542818dc",
-    "built-in-overrides.js": "fe6a36dd46e88a15601d8763c5ab2c46c48cd92b8a2c3252e93f83dad0f1b405",
-}
-
-
 class UniqueLoader(yaml.SafeLoader):
     pass
 
@@ -192,18 +172,59 @@ def load(path):
     return value
 
 
+def no_links(path):
+    for part in (path, *path.parents):
+        if part.is_symlink() or (
+            os.path.lexists(part)
+            and getattr(part.lstat(), "st_file_attributes", 0)
+            & stat.FILE_ATTRIBUTE_REPARSE_POINT
+        ):
+            raise ValueError(f"LINKED_PATH: {part}")
+
+
+def instruction_files(package):
+    """Read an instruction-only package for static checks, without executing it."""
+    no_links(package)
+    suffixes = {".md", ".txt", ".yaml", ".yml", ".json", ".toml"}
+    files = {}
+    for path in sorted(package.rglob("*")):
+        relative = path.relative_to(package)
+        no_links(path)
+        if any(part.startswith(".") or part.lower() == "config.local.yml"
+               or Path(part).stem.lower() in {"credentials", "secrets"}
+               for part in relative.parts):
+            raise ValueError(f"UNPUBLISHABLE_PACKAGE_FILE: {relative}")
+        if relative.as_posix() != "SKILL.md" and (
+            relative.parts[0] != "references"
+            or path.is_file() and path.suffix.lower() not in suffixes
+        ):
+            raise ValueError(f"UNPUBLISHABLE_INSTRUCTION_FILE: {relative}")
+        if not path.is_file():
+            continue
+        data = path.read_bytes()
+        if re.search(rb"-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----", data):
+            raise ValueError(f"PRIVATE_KEY_IN_PACKAGE: {relative}")
+        if "\x00" in data.decode("utf-8"):
+            raise ValueError(f"NON_TEXT_INSTRUCTION_FILE: {relative}")
+        files[relative.as_posix()] = data
+    if "SKILL.md" not in files:
+        raise ValueError(f"INCOMPLETE_PACKAGE: {package.name}: SKILL.md")
+    for reference in re.findall(r"\]\((references/[^\s)]+)\)", files["SKILL.md"].decode("utf-8")):
+        if reference.split("#", 1)[0] not in files:
+            raise ValueError(f"INVALID_INSTRUCTION_REFERENCE: {reference}")
+    return files
+
+
 def validate(root):
     root = Path(root).resolve(strict=True)
     errors = []
     artifacts = set()
-    # Use the deployment allowlist for instruction packages; node requirements
-    # below remain unchanged. No material from the inspected packages is run.
-    installer = runpy.run_path(str(Path(__file__).resolve().parents[1]
-                                   / "tools/deploy/install_catalog.py"))
+    # Instruction packages have a text-only boundary; node requirements below
+    # remain unchanged. No material from the inspected packages is run.
     for skill in INSTRUCTION_SKILLS:
         package = root / "skills/common/knowledge" / skill
         try:
-            files = installer["package_files"](package)
+            files = instruction_files(package)
             text = files["SKILL.md"].decode("utf-8")
             match = re.match(r"\A---\r?\n(.*?)\r?\n---(?:\r?\n|$)", text, re.S)
             metadata = yaml.load(match[1], Loader=UniqueLoader) if match else None
@@ -373,60 +394,11 @@ def validate(root):
     return errors
 
 
-def validate_openflow(upstream, installed):
-    """Run actual upstream registry, artifact, Workflow and layout loaders."""
-    upstream = Path(upstream).resolve(strict=True)
-    installed = Path(installed).resolve(strict=True)
-    for name, expected in OPENFLOW_HASHES.items():
-        path = upstream / "src/config" / name
-        if hashlib.sha256(path.read_bytes()).hexdigest() != expected:
-            raise ValueError(
-                f"OpenFlow source differs from {OPENFLOW_REVISION}: {name}"
-            )
-    script = r"""
-const path=require('path'); const root=process.argv[1], installed=process.argv[2];
-const registry=require(path.join(root,'src/config/skill-registry')).loadSkillRegistry({projectRoot:installed});
-const contracts=require(path.join(root,'src/config/skill-artifact-loader')).loadSkillArtifactContracts(installed);
-const loader=require(path.join(root,'src/config/workflow-template-loader'));
-const layoutLoader=require(path.join(root,'src/config/workflow-template-layout-loader'));
-const workflows=loader.loadWorkflowTemplates(installed);
-if(workflows.length!==1||registry.skillIds.length!==19||contracts.length!==22) throw Error('Incomplete packages');
-for(const workflow of workflows){
- const layout=layoutLoader.loadWorkflowTemplateLayoutFromPackageDir(path.dirname(workflow.filePath),workflow.id);
- if(layout.template_id!==workflow.id) throw Error('Wrong layout identity');
- const ids=workflow.nodes.map(n=>n.id).sort();
- if(JSON.stringify(Object.keys(layout.canvas.nodes).sort())!==JSON.stringify(ids)) throw Error('Wrong layout nodes');
- if(workflow.nodes.some(n=>!['coder','reviewer'].includes(n.owner))) throw Error('Unavailable declared role');
-}
-console.log(JSON.stringify({workflow_ids:workflows.map(w=>w.id).sort(),skill_count:registry.skillIds.length,
-contract_count:contracts.length,role_ids:['coder','reviewer'],role_scope:'synthetic declared roles only; real host roles not verified'}));
-"""
-    env = dict(os.environ)
-    modules = upstream / "validation-deps/node_modules"
-    if modules.is_dir():
-        env["NODE_PATH"] = str(modules)
-    result = subprocess.run(
-        ["node", "-e", script, str(upstream), str(installed)],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        env=env,
-        timeout=60,
-    )
-    if result.returncode:
-        raise ValueError(
-            "Pinned OpenFlow loader rejected installation: " + result.stderr
-        )
-    return {"revision": OPENFLOW_REVISION, **json.loads(result.stdout)}
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--source-root", type=Path, default=Path(__file__).resolve().parents[2]
     )
-    parser.add_argument("--openflow-source", type=Path)
-    parser.add_argument("--installed-root", type=Path)
     args = parser.parse_args()
     errors = validate(args.source_root)
     report = {
@@ -434,16 +406,6 @@ def main():
         "errors": errors,
         "limitations": ["Not real host/CI/permission or semantic acceptance."],
     }
-    if args.openflow_source:
-        if not args.installed_root:
-            errors.append("--installed-root required with --openflow-source")
-        elif not errors:
-            try:
-                report["openflow"] = validate_openflow(
-                    args.openflow_source, args.installed_root
-                )
-            except (OSError, ValueError, subprocess.SubprocessError) as exc:
-                errors.append(str(exc))
     if errors:
         report["status"] = "invalid"
     print(json.dumps(report, ensure_ascii=True))

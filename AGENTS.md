@@ -8,13 +8,12 @@
 
 涉及部署、运行环境或仓库操作时，如根目录存在 `LOCAL_DEPLOYMENT.md`，先读取其中的本机约定。该文件由 Git 本机排除规则管理，不作为共享设计、知识来源或能力包内容；其他机器可按自身环境维护同名文件。
 
-首次准备使用已安装 `hs-knowledge-explore` 的 `scripts/setup.py`：默认复用现有全局 Python，依赖已齐就读取根 `config.yml`，缺项再安装到同一解释器。跨机器连接信息在该 Skill 的 `config.env`，提示 Agent/harness 通过 SSH 去服务器原生路径执行并检查结果；不另建部署工具副本、私有环境或 runner。请求、稿件、记录和索引留在知识根已有 `.build/`、`logs/`、`artifacts/`。特殊位置或做法先与用户讨论，不新增 Git 或发布授权。入口见[执行说明](himate-knowledge-wifi-mp/tools/deploy/EXECUTION.md)。
+首次准备使用已安装 `hs-knowledge-explore` 的 `scripts/setup.py`：默认复用现有全局 Python，依赖已齐就读取根 `config.yml`，缺项再安装到同一解释器。跨机器连接信息在该 Skill 的 `config.env`，提示 Agent/harness 通过 SSH 去服务器原生路径执行并检查结果；不另建部署工具副本、私有环境或 runner。请求、稿件、记录和索引留在知识根已有 `.build/`、`logs/`、`artifacts/`。特殊位置或做法先与用户讨论，不新增 Git 或发布授权。首次准备与执行见[使用说明](himate-knowledge-wifi-mp/docs-llm-wiki/使用说明.md#首次准备运行依赖)。
 
 | 位置 | 职责 |
 |---|---|
 | `config.yml` | 项目架构映射：代码根、模块相对路径、芯片、Host／Device、特性及用途；工具按路径核对文件与内容指纹 |
 | `skills/common/knowledge/hs-knowledge-explore/` | 首次 setup 与只读项目发现的开发分发源码；实际脚本在 Agent 已安装 Skill 内 |
-| `himate-knowledge-wifi-mp/tools/deploy/` | 既有部署兼容工具、执行说明与回归，不是正常用户初始化入口 |
 | `main/` | 默认业务代码工作区，可含多个实际 Git 仓；未接入真实代码时不创建虚构源码树 |
 | `himate-knowledge-wifi-mp/` | 唯一领域根；原件、契约、知识及本地运行支撑按其 AGENTS 分层 |
 | `skills/common/knowledge/` | 节点 Skill 的开发分发源码；运行时由 harness 使用 Agent 已安装能力 |
@@ -35,7 +34,7 @@
 | 查看进度 | `hs-knowledge-source-scan` 的 `status`；读取实际停点、待修订及材料缺口 |
 | 首次准备代码图谱 | `hs-codegraph-setup`；按 `config.yml` 的真实模块逐项初始化并核对 MCP 接入，日常代码定位直接使用官方 CodeGraph MCP |
 
-首次使用先由 `hs-knowledge-explore` 检查全局依赖并读取项目入口；已有上下文直接使用已安装能力，缺入口信息时保留原只读发现功能。项目配置全部由用户在根 `config.yml` 维护；SSH 信息保存在 workspace Skill 的 `config.env`，由 harness 处理连接和执行检查。默认使用当前规则锁并逐文件核验；无需 catalog 登记。`code_root` 相对项目根，模块 `path` 相对代码根；可覆盖多目录或共享模块，不要求手填六 Target／三 pair 或重复代码根授权。源码依据以确切文件和内容指纹留存，未知版本保持 unknown，不阻断当前文件静态核验；模块标签不证明实际宏、构建或产品适用。
+首次使用先由 `hs-knowledge-explore` 检查全局依赖并读取项目入口；已有上下文直接使用已安装能力，缺入口信息时保留原只读发现功能。项目配置全部由用户在根 `config.yml` 维护；SSH 信息保存在已安装 `hs-knowledge-explore` 的 `config.env`，由 harness 处理连接和执行检查。默认使用当前规则锁并逐文件核验；无需 catalog 登记。`code_root` 相对项目根，模块 `path` 相对代码根；可覆盖多目录或共享模块，不要求手填六 Target／三 pair 或重复代码根授权。源码依据以确切文件和内容指纹留存，未知版本保持 unknown，不阻断当前文件静态核验；模块标签不证明实际宏、构建或产品适用。
 
 原件只读，稿件保留在知识库 `.build/`，正式卡、导航、来源登记和处理记录由 ingest 统一落位。卡片未写全细节时继续回源，回答区分背景、历史依据、当前代码事实和推断。内容批本地入库、索引及目标查询通过后 ingest 结束；Git 提交、固定 CI 和合入由人后续处理。
 

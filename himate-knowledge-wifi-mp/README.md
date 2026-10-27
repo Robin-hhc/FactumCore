@@ -15,7 +15,6 @@ flowchart LR
 | `docs-raw/` | conventions、chips、storys、specs、protocols 五类原件；`sources/` 留作后续接入 |
 | `knowledge/` | 七类正式知识卡及逐层导航，唯一知识正文根 |
 | `governance/` | Schema、契约、受控枚举、卡模板、规范及来源锁 |
-| `tools/deploy/` | 既有部署兼容工具、执行说明与回归；首次使用从 workspace Skill 的 setup 开始 |
 | `../skills/common/knowledge/` | 节点 Skill 的开发分发源码；实际由 harness 调用 Agent 已安装能力 |
 | `../workflows/common/knowledge/` | ingest 工作流的开发分发源码；实际部署到 Agent 的 Workflow 目录 |
 | `.build/` | 本地候选与转换暂存，生成内容不上库 |

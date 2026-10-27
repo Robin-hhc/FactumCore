@@ -23,7 +23,7 @@ flowchart LR
 
 项目配置全部由用户在根 `config.yml` 提供，包括知识根、代码根与模块映射。首次 setup 只检查实际全局依赖、读取这份配置并给出项目入口，不生成另一套 catalog、registry 或机器绑定。仓外知识库需要另行适配，增加连接字段不会扩展布局。路径见[工作区路径与部署边界](知识库关键点.md#1-工作区路径与部署边界)。
 
-同一工作区内的知识根可按 `knowledge_roots.wifi` 嵌套，项目根以实际 `config.yml` 为准。跨机器 SSH 信息放已安装 `hs-knowledge-explore` 的 `config.env`；harness 负责连接，并确认实际执行端的能力入口可调用。`ssh_entry` 不上传脚本或证明远端就绪，调用端路径不能直接当作远端路径；缺执行能力先报告并讨论方案。本机直接调用，请求、稿件、记录和索引沿用 K 的 `.build/`、`logs/`、`artifacts/`。机制见[执行说明](../tools/deploy/EXECUTION.md)。
+同一工作区内的知识根可按 `knowledge_roots.wifi` 嵌套，项目根以实际 `config.yml` 为准。跨机器 SSH 信息放已安装 `hs-knowledge-explore` 的 `config.env`；harness 负责连接，并确认实际执行端的能力入口可调用。`ssh_entry` 不上传脚本或证明远端就绪，调用端路径不能直接当作远端路径；缺执行能力先报告并讨论方案。本机直接调用，请求、稿件、记录和索引沿用 K 的 `.build/`、`logs/`、`artifacts/`。操作见[使用说明](使用说明.md#首次准备运行依赖)。
 
 `hs-knowledge-explore` 是知识库项目接口：首次通过 `setup.py` 检查现有全局依赖、读取项目配置；后续用只读发现定位代码仓、知识根并加载上下文，已有信息直接复用。它不属于 ingest 的 P1，不要求每次业务调用都重复 setup。业务 CLI 默认读取当前规则锁并核验文件，不要求 catalog、Workflow 身份或登记。首次操作见[使用说明](使用说明.md#首次准备运行依赖)。
 

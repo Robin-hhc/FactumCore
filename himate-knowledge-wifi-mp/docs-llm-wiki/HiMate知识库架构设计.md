@@ -19,7 +19,6 @@ himate-knowledge知识库仓目录结构如下所示。
   - knowledge/：知识卡，唯一检索对象，处理后知识的仓库
   - docs-raw/：源文档，原始证据层（LLM 只读）
   - governance/：治理文件夹，存放契约，模板，规范等
-  - tools/deploy/：已有部署兼容工具、执行说明和回归
   - .build/ · logs/ · evals/ · artifacts/ · docs-llm-wiki/：配套支撑层
 
 ```text
@@ -78,7 +77,6 @@ repo/
     │   └── glossaries/           # 术语
     ├── .build/                   # 候选暂存，Git 忽略
     ├── logs/                     # 来源、复核、操作和恢复留痕
-    ├── tools/deploy/             # 已有部署兼容、执行说明及回归
     ├── evals/                    # 检索案例和回归门禁
     ├── artifacts/                # 可重建索引和报告，Git 忽略
     └── docs-llm-wiki/             # 系统设计与使用说明；自身 SDD 仅本地维护
@@ -88,7 +86,7 @@ repo/
 
 上树展示开发分发源码。实际能力已经安装在 Agent 自己的 `S`、`F` 目录，由 harness 使用；不要求业务仓根保留能力源码。首次运行 `S/hs-knowledge-explore/scripts/setup.py` 检查当前全局 Python 和依赖、读取项目入口；需要跨机时从同 Skill 的 `config.env` 提示 harness 通过 SSH 执行，不另复制部署工具或建立机器绑定。业务产物仍在 K 已有 `.build/`、`logs/`、`artifacts/`。ingest 完成 P1—P7，lint 保持确定性检查；文档和代码均独立内容复核，代码及混合稿另做适用代码核验。
 
-服务器项目由 Agent/harness 按 `hs-knowledge-explore/config.env` 的 SSH 提示在服务器原生路径执行，使用当地现有全局 Python。harness 须确认实际执行端能调用对应 Skill 脚本；调用端的安装路径不能当作远端脚本路径。setup 只返回连接提示，不上传能力；执行端能力缺失时报告缺口，特殊处理先与用户讨论，不另建目录或工具副本。连接、权限与命令结果由 harness 判断，不另外建立 runner 硬校验层。“本地入库”和“本机索引”指实际执行端；生成物留在 K 原有目录。行为与恢复见[详细设计 §6.3](知识库详细设计.md#63-命令分派与工作流续办)，入口说明见[执行说明](../tools/deploy/EXECUTION.md)。
+服务器项目由 Agent/harness 按 `hs-knowledge-explore/config.env` 的 SSH 提示在服务器原生路径执行，使用当地现有全局 Python。harness 须确认实际执行端能调用对应 Skill 脚本；调用端的安装路径不能当作远端脚本路径。setup 只返回连接提示，不上传能力；执行端能力缺失时报告缺口，特殊处理先与用户讨论，不另建目录或工具副本。连接、权限与命令结果由 harness 判断，不另外建立 runner 硬校验层。“本地入库”和“本机索引”指实际执行端；生成物留在 K 原有目录。行为与恢复见[详细设计 §6.3](知识库详细设计.md#63-命令分派与工作流续办)，首次操作见[使用说明](使用说明.md#首次准备运行依赖)。
 
 
 

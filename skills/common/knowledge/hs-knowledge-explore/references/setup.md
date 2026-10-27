@@ -43,26 +43,20 @@ setup 不生成 catalog、registry 或 binding。业务 CLI 不要求这些登�
 
 ## SSH 配置放在本 Skill 内
 
-只有需要跨机器时，用户或 Agent 将下面模板保存为已安装 `hs-knowledge-explore/config.env`，按实际连接填写；不要放到业务资料里。它是普通连接数据，不作为 shell 脚本执行。
-
-```dotenv
-EXECUTION_MODE=ssh
-SSH_HOST=<服务器主机名或已有 SSH 别名>
-SSH_USER=<账号，可留空沿用 harness 的 SSH 设置>
-SSH_PORT=22
-SSH_IDENTITY_FILE=<已有密钥文件路径，可留空>
-REMOTE_PROJECT_ROOT=<服务器上的实际项目根>
-PYTHON=python3
-```
+本包根的 [config.env.example](../config.env.example) 随 Skill 分发，包含全部连接字段和中文注释。需要跨机器时，将它复制为同目录的 `config.env`，再按注释填写实际连接信息；同机使用可不创建。实际 `config.env` 是本机私有配置，不提交、不随能力包分发，也不放进业务资料。它是普通连接数据，不作为 shell 脚本执行。
 
 `SSH_PORT`、账号和密钥路径按实际需要填写，可复用 harness 已有连接设置。`REMOTE_PROJECT_ROOT` 为服务器原生路径，`PYTHON` 为服务器现有全局解释器的命令或路径。`EXECUTION_MODE=local` 或未填 `SSH_HOST` 时，setup 直接在当前机器处理；`--local` 用于 harness 已到服务器后的实际执行。
 
-这些字段只提示 Agent/harness 该去哪里运行。SSH 认证、端口、可达性、权限和命令结果由 harness 依据真实执行判断；不要求建立专用连接器或复制一份部署工具。缺少信息先问用户，特殊处理先说明具体方案，不保存密码或私钥正文。
+这些字段只提示 Agent/harness 该去哪里运行。`ssh_entry` 不上传 Skill 脚本；harness 须确认服务器上实际能力入口可调用，调用端的 Skill 路径不能当作远端路径。执行端能力缺失时先报告并讨论方案。
+
+SSH 认证、端口、可达性、权限和命令结果由 harness 依据真实执行判断；不要求建立专用连接器或复制一份部署工具。缺少信息先问用户，特殊处理先说明具体方案，不保存密码或私钥正文。
 
 ## 后续使用和产物
 
 项目结构继续只改根 `config.yml`。机器全局依赖已安装后，重复 setup 只是检查并读取入口；它不建立常驻服务，不自动初始化 CodeGraph 或进入 ingest。
 
 Agent/harness 使用已安装的 Skill／Workflow 执行任务；跨机器节点及其子调用、来源读取和生成物留在项目所在服务器。稿件、操作请求与结果使用 K 的 `.build/`，正式记录与来源留痕使用 `logs/`，索引和报告使用 `artifacts/`，不新增外部产物位置。
+
+SSH 结果不明或连接中断时，先由 harness 核对原执行端进程、操作记录、journal 和活动代，再决定续办；不推断远端未执行，也不重复已提交的写入。
 
 先验证一次实际 status；新项目操作列表为空正常。再选一份原件走 ingest、独立内容复核、lint、本地入库、索引及目标查询，并在活动代激活后用原回执 read 检查同代内容和来源定位。独立复核、单写、恢复和证据要求沿用业务规则，入口准备不代替这些检查。

@@ -104,6 +104,106 @@ class ApplyTests(unittest.TestCase):
             self.assertEqual(ctx.path("knowledge/update.md").read_bytes(), b"updated")
             self.assertFalse(ctx.path("knowledge/delete.md").exists())
 
+    def test_silent_target_write_failure_never_reports_committed_and_can_recover(self):
+        from transaction import execute, atomic_bytes
+        from support import Blocked
+        from unittest.mock import patch
+
+        for relative in ("knowledge/create.md", "knowledge/update.md"):
+            for recovery in ("resume", "rollback"):
+                with self.subTest(path=relative, recovery=recovery), tempfile.TemporaryDirectory() as tmp:
+                    ctx, request = self.fixture(pathlib.Path(tmp))
+                    target = ctx.path(relative)
+
+                    def silently_skip(path, raw):
+                        if path != target:
+                            return atomic_bytes(path, raw)
+
+                    with patch("transaction.atomic_bytes", side_effect=silently_skip):
+                        with self.assertRaisesRegex(Blocked, "verification failed"):
+                            execute(ctx, request)
+                    journal = ctx.read("logs/operations/op/journal.json")
+                    self.assertEqual(journal["status"], "recovery_required")
+                    failed = next(row for row in journal["entries"] if row["path"] == relative)
+                    self.assertTrue(failed["attempted"])
+                    self.assertFalse(failed["installed"])
+                    self.assertFalse(ctx.path("logs/operations/op/apply-result.json").exists())
+                    result = execute(ctx, {"operation_id": "op"}, recovery)
+                    self.assertEqual(result["transaction_status"], "committed" if recovery == "resume" else "rolled_back")
+                    self.assertEqual(ctx.path("knowledge/update.md").read_bytes(), b"updated" if recovery == "resume" else b"old")
+                    self.assertEqual(ctx.path("knowledge/create.md").exists(), recovery == "resume")
+
+    def test_silent_delete_failure_never_reports_committed(self):
+        from transaction import execute
+        from support import Blocked
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ctx, request = self.fixture(pathlib.Path(tmp))
+            target = ctx.path("knowledge/delete.md")
+            original_unlink = pathlib.Path.unlink
+
+            def silently_skip(path, *args, **kwargs):
+                if path != target:
+                    return original_unlink(path, *args, **kwargs)
+
+            with patch.object(pathlib.Path, "unlink", silently_skip):
+                with self.assertRaisesRegex(Blocked, "verification failed"):
+                    execute(ctx, request)
+            journal = ctx.read("logs/operations/op/journal.json")
+            self.assertEqual(journal["status"], "recovery_required")
+            self.assertFalse(journal["entries"][-1]["installed"])
+            self.assertFalse(ctx.path("logs/operations/op/apply-result.json").exists())
+            execute(ctx, {"operation_id": "op"}, "resume")
+            self.assertFalse(target.exists())
+
+    def test_commit_rechecks_all_targets_after_individual_installation(self):
+        from transaction import execute, save_journal
+        from support import Blocked
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ctx, request = self.fixture(pathlib.Path(tmp))
+            changed = False
+
+            def drift_after_last_install(context, journal):
+                nonlocal changed
+                save_journal(context, journal)
+                if not changed and all(row["installed"] for row in journal["entries"]):
+                    changed = True
+                    ctx.path("knowledge/update.md").write_bytes(b"external")
+
+            with patch("transaction.save_journal", side_effect=drift_after_last_install):
+                with self.assertRaisesRegex(Blocked, "verification failed"):
+                    execute(ctx, request)
+            self.assertTrue(changed)
+            self.assertEqual(ctx.read("logs/operations/op/journal.json")["status"], "recovery_required")
+            self.assertFalse(ctx.path("logs/operations/op/apply-result.json").exists())
+            for recovery in ("resume", "rollback"):
+                with self.assertRaises(Blocked):
+                    execute(ctx, {"operation_id": "op"}, recovery)
+            self.assertEqual(ctx.path("knowledge/update.md").read_bytes(), b"external")
+
+    def test_recovery_reconciles_install_marker_from_actual_bytes(self):
+        from transaction import execute, atomic_bytes
+        from support import Blocked
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ctx, request = self.fixture(pathlib.Path(tmp))
+
+            def interrupt_after_write(path, raw):
+                atomic_bytes(path, raw)
+                if path == ctx.path("knowledge/create.md"):
+                    raise OSError("synthetic interruption after replacement")
+
+            with patch("transaction.atomic_bytes", side_effect=interrupt_after_write):
+                with self.assertRaises(Blocked):
+                    execute(ctx, request)
+            self.assertFalse(ctx.read("logs/operations/op/journal.json")["entries"][0]["installed"])
+            execute(ctx, {"operation_id": "op"}, "resume")
+            self.assertTrue(all(row["installed"] for row in ctx.read("logs/operations/op/journal.json")["entries"]))
+
     def test_failure_then_rollback_restores_old_bytes(self):
         from transaction import execute
         from support import Blocked
@@ -116,6 +216,31 @@ class ApplyTests(unittest.TestCase):
             self.assertFalse(ctx.path("knowledge/create.md").exists())
             self.assertEqual(ctx.path("knowledge/update.md").read_bytes(), b"old")
             self.assertEqual(ctx.path("knowledge/delete.md").read_bytes(), b"delete")
+
+    def test_silent_rollback_restore_failure_never_reports_rolled_back(self):
+        from transaction import execute, atomic_bytes
+        from support import Blocked
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ctx, request = self.fixture(pathlib.Path(tmp))
+            with self.assertRaises(Blocked):
+                execute(ctx, {**request, "fault_after": 2})
+            target = ctx.path("knowledge/update.md")
+
+            def silently_skip(path, raw):
+                if path != target:
+                    return atomic_bytes(path, raw)
+
+            with patch("transaction.atomic_bytes", side_effect=silently_skip):
+                with self.assertRaisesRegex(Blocked, "verification failed"):
+                    execute(ctx, {"operation_id": "op"}, "rollback")
+            self.assertEqual(ctx.read("logs/operations/op/journal.json")["status"], "recovery_required")
+            self.assertEqual(target.read_bytes(), b"updated")
+            result = execute(ctx, {"operation_id": "op"}, "rollback")
+            self.assertEqual(result["transaction_status"], "rolled_back")
+            self.assertEqual(target.read_bytes(), b"old")
+            self.assertFalse(ctx.path("knowledge/create.md").exists())
 
     def test_recovery_preserves_external_edit(self):
         from transaction import execute

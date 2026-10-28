@@ -31,11 +31,14 @@ config.env
 /himate-knowledge-wifi-mp/artifacts/*
 !/himate-knowledge-wifi-mp/artifacts/.gitkeep
 
-# Keep audit metadata versionable; never publish copied original/code bytes or writer state.
+# Keep ingest records, applicability events and explicit verification materials
+# versionable; copied source caches and machine transaction state stay local.
 /himate-knowledge-wifi-mp/logs/evidence/objects/
 /himate-knowledge-wifi-mp/logs/evidence/checked-code/
-/himate-knowledge-wifi-mp/logs/operations/.writer.lock
-/himate-knowledge-wifi-mp/logs/operations/*/backups/
+/himate-knowledge-wifi-mp/logs/evidence/extractions/
+/himate-knowledge-wifi-mp/logs/evidence/locators/
+/himate-knowledge-wifi-mp/logs/operations/*
+!/himate-knowledge-wifi-mp/logs/operations/.gitkeep
 
 # Retired independent checkout, if still present locally.
 /aiot-knowledge/

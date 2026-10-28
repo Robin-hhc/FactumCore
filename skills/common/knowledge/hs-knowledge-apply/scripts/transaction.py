@@ -217,6 +217,12 @@ def validate_journal(ctx, journal, op):
 
 
 def finish_commit(ctx, journal):
+    # Installation markers describe observations, not proof of current bytes.
+    # Recheck the complete write/delete set before publishing a success result.
+    for row in journal["entries"]:
+        if current_digest(ctx, row["path"]) != row["new_digest"]:
+            row["installed"] = False
+            raise Blocked("final transaction verification failed: " + row["path"])
     op = journal["operation_id"]
     result_ref = f"logs/operations/{op}/apply-result.json"
     result = ctx.record(
@@ -261,6 +267,11 @@ def mutate(ctx, journal, fault_after=None):
             if actual == row["new_digest"] and (
                 row.get("attempted") or row["old_digest"] == row["new_digest"]
             ):
+                # Recovery can observe a completed replacement whose marker
+                # was never saved before the original process was interrupted.
+                if not row.get("installed"):
+                    row["installed"] = True
+                    save_journal(ctx, journal)
                 continue
             if actual != row["old_digest"]:
                 raise Blocked("external edit preserved during apply: " + row["path"])
@@ -276,6 +287,9 @@ def mutate(ctx, journal, fault_after=None):
                 if digest(content) != row["new_digest"]:
                     raise Invalid("journal final bytes changed")
                 atomic_bytes(target, content)
+            if current_digest(ctx, row["path"]) != row["new_digest"]:
+                row["installed"] = False
+                raise Blocked("target installation verification failed: " + row["path"])
             performed += 1
             # A crash here is reconciled from old/final digests on recovery.
             row["installed"] = True
@@ -515,6 +529,11 @@ def execute(ctx, request, action="run"):
                         sync_directory(target.parent)
                     else:
                         atomic_bytes(target, ctx.path(row["backup_ref"]).read_bytes())
+                    if current_digest(ctx, row["path"]) != row["old_digest"]:
+                        raise Blocked("rollback target restoration verification failed: " + row["path"])
+                for row in journal["entries"]:
+                    if current_digest(ctx, row["path"]) != row["old_digest"]:
+                        raise Blocked("final rollback verification failed: " + row["path"])
                 journal["status"] = "rolled_back"
                 save_journal(ctx, journal)
                 return {

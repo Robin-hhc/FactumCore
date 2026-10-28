@@ -3,6 +3,94 @@
 from .validation import ContractError, canonical_bytes, load_yaml, safe_path, sha256_bytes, workspace_config_path
 
 
+def extract_document(data, suffix, *, primary=True):
+    """The fixed document adapter shared by acquisition and read-only checks."""
+    import io
+    if suffix in {".md", ".txt"}:
+        text = data.decode("utf-8-sig")
+        if "\0" in text or not text.strip():
+            raise ContractError(
+                "UNREADABLE_DOCUMENT", "UTF-8 text must be nonempty and contain no NUL"
+            )
+        lines = text.splitlines()
+        return (
+            text,
+            [
+                {"kind": "lines", "start": i + 1, "end": i + 1, "text": line}
+                for i, line in enumerate(lines)
+            ],
+            "utf8",
+            [],
+        )
+    if suffix == ".pdf":
+        from pypdf import PdfReader, __version__
+
+        reader = PdfReader(io.BytesIO(data))
+        if reader.is_encrypted:
+            raise ContractError("ENCRYPTED_DOCUMENT", "Encrypted PDF is unsupported")
+        pages = [page.extract_text() or "" for page in reader.pages]
+        if not pages or any(not page.strip() for page in pages):
+            raise ContractError(
+                "PARTIAL_DOCUMENT",
+                "PDF page lacks a readable text layer; no OCR",
+            )
+        return (
+            "\n\n".join(pages),
+            [
+                {"kind": "page", "page": i + 1, "text": text}
+                for i, text in enumerate(pages)
+            ],
+            "pypdf:" + __version__,
+            ["PDF image content and visual layout are not interpreted"],
+        )
+    if suffix == ".docx":
+        import docx
+
+        document = docx.Document(io.BytesIO(data))
+        parts = []
+        for i, paragraph in enumerate(document.paragraphs):
+            if paragraph.text.strip():
+                parts.append(
+                    {"kind": "paragraph", "paragraph": i + 1, "text": paragraph.text}
+                )
+        for i, table in enumerate(document.tables):
+            for j, row in enumerate(table.rows):
+                parts.append(
+                    {
+                        "kind": "table_row",
+                        "table": i + 1,
+                        "row": j + 1,
+                        "text": " | ".join(cell.text for cell in row.cells),
+                    }
+                )
+        if not parts or not any(p["text"].strip() for p in parts):
+            raise ContractError(
+                "PARTIAL_DOCUMENT",
+                "DOCX has no readable paragraphs or tables",
+            )
+        if document.element.xpath(".//w:ins | .//w:del"):
+            raise ContractError(
+                "PARTIAL_DOCUMENT",
+                "DOCX tracked changes require explicit resolution",
+            )
+        return (
+            "\n\n".join(p["text"] for p in parts),
+            parts,
+            "python-docx:" + docx.__version__,
+            [
+                "Embedded images, floating text, headers, and visual table layout are not interpreted"
+            ],
+        )
+    if primary:
+        raise ContractError(
+            "UNSUPPORTED_DOCUMENT_FORMAT", "Supported primary formats: MD TXT PDF DOCX"
+        )
+    return (
+        None,
+        [],
+        "opaque",
+        ["Attachment bytes retained; content was not interpreted"],
+    )
 def extract_code_text(data, extractor):
     """Decode an explicitly fixed code adapter without changing original bytes."""
     codecs = {"code-utf8:1": "utf-8-sig", "code-gb18030:1": "gb18030"}
@@ -72,28 +160,131 @@ def validate_snapshot(bundle, expected=None):
 
 
 def recover_snapshot(knowledge_root, snapshot, *, allow_local_fallback=True):
+    return recover_snapshot_source(knowledge_root, snapshot, allow_local_fallback=allow_local_fallback)[0]
+
+
+def recover_snapshot_source(knowledge_root, snapshot, *, allow_local_fallback=True):
+    """Recover fixed bytes and report the actual source, including clean checkouts."""
     recovery = snapshot.get("recovery", {})
     if isinstance(recovery, dict) and (recovery.get("kind") == "git" or recovery.get("method") == "git"):
         try:
             data = _recover_git(knowledge_root, recovery)
         except ContractError as exc:
-            local = snapshot.get("local_recovery")
             unavailable = {"RECOVERY_CONFIG_REQUIRED", "RECOVERY_CONFIG_MISMATCH", "RECOVERY_REPO_UNKNOWN", "RECOVERY_REPO_MISMATCH", "GIT_SOURCE_UNAVAILABLE", "INVALID_YAML"}
-            if not allow_local_fallback or exc.code not in unavailable or not isinstance(local, dict) or local.get("method") != "evidence_object":
+            if not allow_local_fallback or exc.code not in unavailable:
                 raise
-            data = safe_path(knowledge_root, local["path"], ["logs/evidence"]).read_bytes()
+            local = snapshot.get("local_recovery")
+            data = None
+            if isinstance(local, dict) and local.get("method") == "evidence_object":
+                try:
+                    data = safe_path(knowledge_root, local["path"], ["logs/evidence"]).read_bytes()
+                    reference = local["path"]
+                except FileNotFoundError:
+                    pass
+            if data is None:
+                current = _current_registered_source(knowledge_root, snapshot)
+                if current is not None:
+                    return current
+                raise
+        else:
+            reference = "git:" + recovery.get("commit", recovery.get("revision", "")) + ":" + recovery["path"]
         if sha256_bytes(data) != snapshot.get("sha256") or len(data) != snapshot.get("bytes"):
             raise ContractError("EVIDENCE_OBJECT_CHANGED", snapshot.get("snapshot_id"))
-        return data
+        return data, reference
     path = recovery.get("path") if isinstance(recovery, dict) else recovery
     if not path:
         raise ContractError("UNSUPPORTED_RECOVERY", "Immutable local object required")
-    data = safe_path(knowledge_root, path, ["logs/evidence"]).read_bytes()
+    try:
+        data = safe_path(knowledge_root, path, ["logs/evidence"]).read_bytes()
+    except FileNotFoundError:
+        current = _current_registered_source(knowledge_root, snapshot) if allow_local_fallback else None
+        if current is not None:
+            return current
+        raise ContractError("SOURCE_INPUT_UNAVAILABLE", "Exact snapshot is unavailable in retained objects, registered current files, or local Git history (at most 1000 path changes; shallow clones may omit the version)")
     if sha256_bytes(data) != snapshot.get("sha256") or len(data) != snapshot.get(
         "bytes"
     ):
         raise ContractError("EVIDENCE_OBJECT_CHANGED", snapshot.get("snapshot_id"))
-    return data
+    return data, path
+
+
+def _current_registered_source(knowledge_root, snapshot):
+    """A shared lock may recover a current file only when its exact bytes match.
+
+    No scan, alternate path, or newer source substitutes for a missing version.
+    Candidate bundles still use retained objects until their lock is installed.
+    """
+    from pathlib import Path
+    from .validation import _workspace_no_links, normalize_workspace, workspace_file_allowed
+
+    try:
+        lock = read_source_lock(knowledge_root)
+    except FileNotFoundError:
+        return None
+    registered = [row for row in lock["snapshots"] if row.get("snapshot_id") == snapshot.get("snapshot_id")]
+    if len(registered) != 1 or any(registered[0].get(key) != snapshot.get(key) for key in ("source_id", "sha256", "bytes")):
+        return None
+    resources = [row for row in lock["resources"] if row.get("source_id") == snapshot.get("source_id")]
+    if len(resources) != 1:
+        return None
+    resource = resources[0]
+    if resource.get("kind") in {"raw", "attachment"}:
+        allowed = ["docs-raw/" + name for name in ("conventions", "chips", "storys", "specs", "protocols", "troubleshooting")]
+        path = safe_path(knowledge_root, resource["path"], allowed)
+        reference = resource["path"]
+    elif resource.get("kind") == "code":
+        config_path = workspace_config_path(knowledge_root)
+        workspace = config_path.parent
+        configuration = normalize_workspace(load_yaml(config_path), workspace)
+        rows = [row for row in configuration["repos"] if row["repo_id"] == resource.get("repo_id")]
+        if len(rows) != 1:
+            return None
+        if not workspace_file_allowed(configuration, resource["repo_id"], resource["path"]):
+            raise ContractError("RECOVERY_SCOPE_REQUIRED", "Recovered code must remain within its configured module scope")
+        declared = Path(rows[0]["root"])
+        repository = declared if declared.is_absolute() else safe_path(workspace, declared.as_posix())
+        path = safe_path(repository, resource["path"])
+        reference = "code:" + resource["repo_id"] + ":" + resource["path"]
+    else:
+        return None
+    _workspace_no_links(path)
+    try:
+        data = path.read_bytes()
+    except FileNotFoundError:
+        return _registered_raw_history(knowledge_root, resource, snapshot) if resource.get("kind") in {"raw", "attachment"} else None
+    if sha256_bytes(data) != snapshot.get("sha256") or len(data) != snapshot.get("bytes"):
+        if resource.get("kind") in {"raw", "attachment"}:
+            return _registered_raw_history(knowledge_root, resource, snapshot)
+        return None
+    return data, reference
+
+
+def _registered_raw_history(knowledge_root, resource, snapshot):
+    """Search only this registered raw path in bounded, already local history."""
+    from pathlib import Path
+
+    root = Path(knowledge_root).resolve()
+    try:
+        workspace = workspace_config_path(root).parent
+        if not (workspace / ".git").exists():
+            return None
+        top = Path(_git_read(workspace, "rev-parse", "--show-toplevel").decode().strip()).resolve()
+        if top != workspace:
+            return None
+        relative = root.relative_to(workspace).as_posix() + "/" + resource["path"]
+        commits = _git_read(workspace, "log", "--no-show-signature", "--format=%H", "--max-count=1001", "HEAD", "--", relative).decode("ascii").splitlines()
+        for commit in commits[:1000]:
+            try:
+                data = _git_read(workspace, "cat-file", "blob", commit + ":" + relative)
+            except ContractError as exc:
+                if exc.code == "GIT_SOURCE_UNAVAILABLE":
+                    continue
+                raise
+            if len(data) == snapshot.get("bytes") and sha256_bytes(data) == snapshot.get("sha256"):
+                return data, "git:" + commit + ":" + relative
+    except (ContractError, OSError, UnicodeError):
+        return None
+    return None
 
 
 def _recover_git(knowledge_root, recovery):
@@ -117,8 +308,6 @@ def _recover_git(knowledge_root, recovery):
     mapped = config.get("knowledge_roots", {}).get("wifi")
     if not isinstance(mapped, str) or (workspace / mapped).resolve() != root:
         raise ContractError("RECOVERY_CONFIG_MISMATCH", "Configured domain does not match this knowledge root")
-    if "code_root" in config or "modules" in config:
-        raise ContractError("RECOVERY_CONFIG_MISMATCH", "Filesystem workspaces recover retained evidence objects without Git")
     if any(key in recovery for key in ("repo_root", "repository_root", "workspace_root")):
         raise ContractError("UNTRUSTED_RECOVERY_ROOT", "Repository roots come only from config")
     commit = recovery.get("commit", recovery.get("revision"))
@@ -130,9 +319,16 @@ def _recover_git(knowledge_root, recovery):
         raise ContractError("UNSAFE_RECOVERY_PATH", "Expected an exact repository-relative file")
     repo_id = recovery.get("repo_id")
     if repo_id:
-        matches = [r for r in config.get("repos", []) if r.get("repo_id") == repo_id and r.get("root")]
+        from .validation import normalize_workspace, workspace_file_allowed
+        try:
+            configured = normalize_workspace(config, workspace) if "code_root" in config or "modules" in config else config
+        except (ContractError, OSError) as exc:
+            raise ContractError("RECOVERY_CONFIG_MISMATCH", "Current module layout is unavailable for fixed Git recovery") from exc
+        matches = [r for r in configured.get("repos", []) if r.get("repo_id") == repo_id and r.get("root")]
         if len(matches) != 1:
             raise ContractError("RECOVERY_REPO_UNKNOWN", str(repo_id))
+        if not workspace_file_allowed(configured, repo_id, relative):
+            raise ContractError("RECOVERY_SCOPE_REQUIRED", "Git code recovery must remain within its configured module scope")
         repository = Path(matches[0]["root"])
         repository = repository.resolve() if repository.is_absolute() else (workspace / repository).resolve()
     else:
@@ -157,13 +353,13 @@ def _recover_git(knowledge_root, recovery):
 def _git_read(repository, *args):
     import os
     import subprocess
-    if not args or args[0] not in {"rev-parse", "cat-file"}:
+    if not args or args[0] not in {"rev-parse", "cat-file", "log"}:
         raise ContractError("UNSAFE_GIT_READ", "Only fixed object/ref reads are supported")
     env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_") or key == "GIT_TEST_ASSUME_DIFFERENT_OWNER"}
     env.update({"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull, "GIT_TERMINAL_PROMPT": "0",
                 "GIT_OPTIONAL_LOCKS": "0", "GIT_PAGER": "cat", "GIT_NO_LAZY_FETCH": "1"})
     command = ["git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + os.devnull,
-               "-c", "diff.external=", "-c", "core.pager=cat", "-c", "protocol.allow=never", "-c", "protocol.file.allow=never",
+               "-c", "diff.external=", "-c", "core.pager=cat", "-c", "log.showSignature=false", "-c", "protocol.allow=never", "-c", "protocol.file.allow=never",
                "-c", "safe.directory=" + str(repository.resolve()).replace("\\", "/"), "-C", str(repository), *args]
     try:
         process = subprocess.run(command, capture_output=True, env=env, check=False, timeout=30)
@@ -184,8 +380,7 @@ def git_recovery_for_current(knowledge_root, source_path, expected_bytes):
     except (OSError, ContractError):
         return None
     workspace = config_path.parent
-    configuration = load_yaml(config_path)
-    if isinstance(configuration, dict) and "code_root" in configuration:
+    if not (workspace / ".git").exists():
         return None
     try:
         commit = _git_read(workspace, "rev-parse", "--verify", "HEAD").decode().strip()
@@ -199,6 +394,55 @@ def git_recovery_for_current(knowledge_root, source_path, expected_bytes):
         return None
 
 
+def document_segments(addresses, locator, suffix):
+    """Select native segments identically for fixed checks and source reads."""
+    kind = locator["kind"]
+    if suffix == ".pdf" and kind in {"page", "pages"}:
+        address_kind, field = "page", "page"
+    elif suffix == ".docx" and kind in {"paragraph", "paragraphs"}:
+        address_kind, field = "paragraph", "paragraph"
+    elif suffix == ".docx" and kind == "table_row":
+        table, row = locator.get("table"), locator.get("row")
+        if any(isinstance(value, bool) or not isinstance(value, int) or value < 1 for value in (table, row)):
+            raise ContractError("INVALID_SOURCE_LOCATOR", "Native table and row addresses must be positive integers")
+        selected = [item for item in addresses if item["kind"] == "table_row"
+                    and item["table"] == table and item["row"] == row]
+        if len(selected) != 1:
+            raise ContractError("INVALID_SOURCE_LOCATOR", "Native table row is outside the exact original")
+        return selected
+    else:
+        raise ContractError("INVALID_SOURCE_LOCATOR", "This document format requires a native page, paragraph or table-row address")
+    first = locator.get(field, locator.get("start", locator.get("number", locator.get("id"))))
+    last = locator.get("end", first)
+    if (isinstance(first, bool) or isinstance(last, bool) or not isinstance(first, int)
+            or not isinstance(last, int) or not 1 <= first <= last):
+        raise ContractError("INVALID_SOURCE_LOCATOR", "Native document address must be a positive integer range")
+    available = {row[field] for row in addresses if row["kind"] == address_kind}
+    if not available or last > max(available) or any(value not in available for value in range(first, last + 1)):
+        raise ContractError("INVALID_SOURCE_LOCATOR", "Native document address is outside the exact original")
+    return [row for row in addresses if row["kind"] == address_kind and first <= row[field] <= last]
+
+
+def _validate_document_reference(snapshot, data, locator):
+    """Replay frozen native document addresses from the already verified bytes."""
+    suffix, retained = snapshot.get("format"), snapshot.get("extraction")
+    if suffix not in {".pdf", ".docx"} or not retained:
+        return False
+    try:
+        text, addresses, extractor, _ = extract_document(data, suffix)
+    except (ImportError, ContractError) as exc:
+        raise ContractError("SOURCE_ADAPTER_UNAVAILABLE", "The fixed document adapter cannot recover native addresses") from exc
+    if extractor != retained.get("extractor"):
+        raise ContractError("SOURCE_ADAPTER_UNAVAILABLE", "The installed document adapter differs from the frozen adapter")
+    frozen_locator = sha256_bytes(canonical_bytes({"locators": addresses}))
+    if (sha256_bytes(text.encode("utf-8")) != retained.get("text_sha256")
+            or frozen_locator != retained.get("locator_sha256")
+            or snapshot.get("locator", {}).get("sha256", frozen_locator) != frozen_locator):
+        raise ContractError("SOURCE_EXTRACTION_UNAVAILABLE", "The exact original cannot reproduce frozen document text and addresses")
+    document_segments(addresses, locator, suffix)
+    return True
+
+
 def validate_reference(ref, lock, resolver, *, allowed_kinds=None):
     """Recover an exact object and validate its address, without semantic inference.
 
@@ -208,7 +452,7 @@ def validate_reference(ref, lock, resolver, *, allowed_kinds=None):
     """
     snapshot = validate_source_ref(ref, lock)
     locator = ref["locator"]
-    kinds = allowed_kinds or {"lines", "page", "pages", "paragraph", "paragraphs", "table", "attachment", "section"}
+    kinds = allowed_kinds or {"lines", "page", "pages", "paragraph", "paragraphs", "table", "table_row", "attachment", "section"}
     if not isinstance(locator, dict) or locator.get("kind") not in kinds:
         raise ContractError("INVALID_SOURCE_LOCATOR", "Unknown locator kind")
     try:
@@ -221,9 +465,11 @@ def validate_reference(ref, lock, resolver, *, allowed_kinds=None):
     if sha256_bytes(data) != snapshot.get("sha256") or len(data) != snapshot.get("bytes"):
         raise ContractError("EVIDENCE_OBJECT_CHANGED", "Exact source fingerprint differs")
     kind = locator["kind"]
-    if kind in {"lines", "paragraph", "paragraphs", "section"}:
+    code = any(item.get("source_id") == snapshot["source_id"] and item.get("kind") == "code" for item in lock["resources"])
+    if not code and _validate_document_reference(snapshot, data, locator):
+        pass
+    elif kind in {"lines", "paragraph", "paragraphs", "section"}:
         extraction = snapshot.get("extraction")
-        code = any(item.get("source_id") == snapshot["source_id"] and item.get("kind") == "code" for item in lock["resources"])
         if code and extraction:
             text, addresses = extract_code_text(data, extraction.get("extractor"))
             if (sha256_bytes(text.encode("utf-8")) != extraction.get("text_sha256")

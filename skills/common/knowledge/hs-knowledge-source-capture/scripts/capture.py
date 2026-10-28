@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import io
 import json
 import re
 from pathlib import PurePosixPath
@@ -22,95 +21,13 @@ from support import (
 RAW_CLASSES = {"conventions", "chips", "storys", "specs", "protocols", "troubleshooting"}
 
 
-def extract(data, suffix, *, primary=True):
-    if suffix in {".md", ".txt"}:
-        text = data.decode("utf-8-sig")
-        if "\0" in text or not text.strip():
-            raise NodeError(
-                "UNREADABLE_DOCUMENT", "UTF-8 text must be nonempty and contain no NUL"
-            )
-        lines = text.splitlines()
-        return (
-            text,
-            [
-                {"kind": "lines", "start": i + 1, "end": i + 1, "text": line}
-                for i, line in enumerate(lines)
-            ],
-            "utf8",
-            [],
-        )
-    if suffix == ".pdf":
-        from pypdf import PdfReader, __version__
-
-        reader = PdfReader(io.BytesIO(data))
-        if reader.is_encrypted:
-            raise NodeError("ENCRYPTED_DOCUMENT", "Encrypted PDF is unsupported")
-        pages = [page.extract_text() or "" for page in reader.pages]
-        if not pages or any(not page.strip() for page in pages):
-            raise NodeError(
-                "PARTIAL_DOCUMENT",
-                "PDF page lacks a readable text layer; no OCR",
-                blocked=True,
-            )
-        return (
-            "\n\n".join(pages),
-            [
-                {"kind": "page", "page": i + 1, "text": text}
-                for i, text in enumerate(pages)
-            ],
-            "pypdf:" + __version__,
-            ["PDF image content and visual layout are not interpreted"],
-        )
-    if suffix == ".docx":
-        import docx
-
-        document = docx.Document(io.BytesIO(data))
-        parts = []
-        for i, paragraph in enumerate(document.paragraphs):
-            if paragraph.text.strip():
-                parts.append(
-                    {"kind": "paragraph", "paragraph": i + 1, "text": paragraph.text}
-                )
-        for i, table in enumerate(document.tables):
-            for j, row in enumerate(table.rows):
-                parts.append(
-                    {
-                        "kind": "table_row",
-                        "table": i + 1,
-                        "row": j + 1,
-                        "text": " | ".join(cell.text for cell in row.cells),
-                    }
-                )
-        if not parts or not any(p["text"].strip() for p in parts):
-            raise NodeError(
-                "PARTIAL_DOCUMENT",
-                "DOCX has no readable paragraphs or tables",
-                blocked=True,
-            )
-        if document.element.xpath(".//w:ins | .//w:del"):
-            raise NodeError(
-                "PARTIAL_DOCUMENT",
-                "DOCX tracked changes require explicit resolution",
-                blocked=True,
-            )
-        return (
-            "\n\n".join(p["text"] for p in parts),
-            parts,
-            "python-docx:" + docx.__version__,
-            [
-                "Embedded images, floating text, headers, and visual table layout are not interpreted"
-            ],
-        )
-    if primary:
-        raise NodeError(
-            "UNSUPPORTED_DOCUMENT_FORMAT", "Supported primary formats: MD TXT PDF DOCX"
-        )
-    return (
-        None,
-        [],
-        "opaque",
-        ["Attachment bytes retained; content was not interpreted"],
-    )
+def extract(context, data, suffix, *, primary=True):
+    try:
+        return context.modules["source_resources"].extract_document(data, suffix, primary=primary)
+    except context.modules["validation"].ContractError as exc:
+        raise NodeError(exc.code, exc.message, exc.path, blocked=exc.code == "PARTIAL_DOCUMENT") from exc
+    except ImportError as exc:
+        raise NodeError("SOURCE_ADAPTER_UNAVAILABLE", "The fixed document adapter is unavailable", blocked=True) from exc
 
 
 def raw_member(context, ref):
@@ -202,9 +119,6 @@ def snapshot_text(context, snapshot, resource, data):
             locators = json.loads(locator_bytes)["locators"]
             gaps = list(retained.get("limitations", []))
         except OSError:
-            recovery = snapshot.get("recovery", {})
-            if recovery.get("kind") != "git" and recovery.get("method") != "git":
-                raise
             if resource.get("kind") == "code":
                 try:
                     text, locators = context.modules["source_resources"].extract_code_text(data, retained.get("extractor"))
@@ -212,7 +126,9 @@ def snapshot_text(context, snapshot, resource, data):
                     raise NodeError("SOURCE_EXTRACTION_UNAVAILABLE", "Frozen code extraction cannot be reproduced by its fixed adapter", blocked=True) from exc
                 gaps = list(retained.get("limitations", []))
             else:
-                text, locators, _, gaps = extract(data, suffix, primary=False)
+                text, locators, extractor, gaps = extract(context, data, suffix, primary=False)
+                if extractor != retained.get("extractor"):
+                    raise NodeError("SOURCE_EXTRACTION_UNAVAILABLE", "The installed document adapter differs from the frozen adapter", blocked=True)
             if text is None:
                 raise NodeError("SOURCE_EXTRACTION_UNAVAILABLE", "Exact original could not reproduce its frozen extraction", blocked=True)
             extracted = text.encode("utf-8")
@@ -226,7 +142,7 @@ def snapshot_text(context, snapshot, resource, data):
         return text, locators, gaps
     if resource.get("kind") == "code":
         return None, [], ["Frozen code snapshot has no interpreted text extraction; only exact original bytes are available"]
-    text, locators, _, gaps = extract(data, suffix, primary=False)
+    text, locators, _, gaps = extract(context, data, suffix, primary=False)
     if text is not None:
         gaps.append("This snapshot has no retained extraction; text was re-extracted by the current pinned resolver")
     return text, locators, gaps
@@ -276,7 +192,12 @@ def resolve_source(context, reference, bundle=None):
         raise NodeError("SOURCE_INTEGRITY_ERROR", "Recovery path aliases disagree")
     original_ref = ("git:" + recovery.get("commit", recovery.get("revision", "")) + ":" + recovery["path"]
                     if is_git else recovery.get("path", recovery.get("reference")))
-    data = recovered_bytes(context, snapshot)
+    try:
+        data, original_ref = context.modules["source_resources"].recover_snapshot_source(context.root, snapshot)
+    except context.modules["validation"].ContractError as exc:
+        if exc.code == "EVIDENCE_OBJECT_CHANGED":
+            raise NodeError("SOURCE_INTEGRITY_ERROR", "Recovered bytes differ from exact snapshot") from exc
+        raise
     if sha(data) != snapshot["sha256"] or len(data) != snapshot["bytes"]:
         raise NodeError(
             "SOURCE_INTEGRITY_ERROR", "Recovered bytes differ from exact snapshot"
@@ -330,24 +251,12 @@ def resolve_source(context, reference, bundle=None):
                     "Source line range is outside exact original",
                 )
             text = "".join(lines[start - 1 : end])
-        elif kind in {"page", "paragraph", "table_row"}:
-            keys = {
-                "page": ["page"],
-                "paragraph": ["paragraph"],
-                "table_row": ["table", "row"],
-            }[kind]
-            selected = [
-                item
-                for item in locators
-                if item["kind"] == kind
-                and all(item.get(key) == locator.get(key) for key in keys)
-            ]
-            if len(selected) != 1:
-                raise NodeError(
-                    "INVALID_SOURCE_LOCATOR",
-                    "Locator does not identify an extracted original segment",
-                )
-            text = selected[0]["text"]
+        elif kind in {"page", "pages", "paragraph", "paragraphs", "table_row"}:
+            try:
+                selected = context.modules["source_resources"].document_segments(locators, locator, suffix)
+            except context.modules["validation"].ContractError as exc:
+                raise NodeError(exc.code, exc.message, exc.path) from exc
+            text = "\n\n".join(item["text"] for item in selected)
         else:
             raise NodeError(
                 "UNSUPPORTED_SOURCE_LOCATOR",
@@ -475,7 +384,7 @@ def execute(context):
     for i, member in enumerate(members):
         ref, data = member["path"], member["data"]
         text, locators, extractor, gaps = extract(
-            data, PurePosixPath(ref).suffix.lower(), primary=i == 0
+            context, data, PurePosixPath(ref).suffix.lower(), primary=i == 0
         )
         limitations += gaps
         logical = (
@@ -528,6 +437,7 @@ def execute(context):
         )
         portable = context.modules["source_resources"].git_recovery_for_current(context.root, ref, data)
         if portable:
+            snapshots[-1]["local_recovery"] = dict(snapshots[-1]["recovery"])
             snapshots[-1]["recovery"] = portable
         if text is not None:
             text_ref = "logs/evidence/extractions/" + sha(text.encode()) + ".txt"

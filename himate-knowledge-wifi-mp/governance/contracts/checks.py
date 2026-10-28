@@ -34,7 +34,7 @@ def _record_resolver(cards, rules, inputs, root, identity):
 
     def git(arguments, repository=None):
         location = workspace if repository is None else repository
-        command = ["git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + os.devnull, "-c", "core.pager=cat", "-c", "protocol.allow=never", "-c", "safe.directory=" + location.as_posix(), "-C", str(location), *arguments]
+        command = ["git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + os.devnull, "-c", "core.pager=cat", "-c", "log.showSignature=false", "-c", "protocol.allow=never", "-c", "safe.directory=" + location.as_posix(), "-C", str(location), *arguments]
         result = subprocess.run(command, capture_output=True, timeout=30, env=environment)
         if result.returncode:
             raise v.ContractError("RECORD_HISTORY_UNAVAILABLE", "Required exact Git history is unavailable")

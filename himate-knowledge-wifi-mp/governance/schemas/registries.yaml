@@ -33,6 +33,7 @@ locator_kinds:
 - paragraphs
 - section
 - table
+- table_row
 - attachment
 scan_change:
 - new

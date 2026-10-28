@@ -1,131 +1,62 @@
-# FactumCore 知识库系统：待解决问题清单（2026-10-27）
+# FactumCore 知识库系统：待解决问题清单（2026-10-28）
 
-> 本文件供另一个开发 agent 接手解决。以**最新版 FactumCore**（`D:\knowledge_graph\FactumCore`，commit `2379f7b`）状态为准，只保留**当前仍未解决**的问题、各自的实际部署背景、根因与当前临时规避方案。已修复/已解决的历史问题不在此列。
+## 1. 【待开发者修复】apply 事务对「已存在文件」的原子替换静默失败，sources.lock.yaml 与 index.md 未落位
 
-> **2026-10-27 开发修复状态**：以下现场问题的原始描述与历史成绩保留，按其原版本解释；现行状态以此表及复核结论为准。当前开发工作区已落实 A、B，以及 D 的调用防误用和 E 的规则升级续办验证；C 按用户要求暂不改动。首次准备与 SSH 配置见[使用说明](himate-knowledge-wifi-mp/docs-llm-wiki/使用说明.md#首次准备运行依赖)。旧私有环境安装器、登记工具和 runner 已移除，下方涉及它们的路径、命令及测试成绩仅作历史记录。前述问题修复在 `2f51d09` 提交并推送；开发测试及合成共享盘试验不代替内部部署验收。
+### 问题现象
 
-| 项目 | 当前开发实现及验证边界 |
-|---|---|
-| A：SQLite UNC | index-build 与 query 共用只读 SQLite URI 构造，保留 Windows 扩展长路径并正确编码；真实 Samba 的 UNC／长路径用例通过，不再依赖本地镜像绕过 |
-| B：嵌套知识根 | 首次准备和业务消费者按真实 `config.yml` 定位知识根与代码根；校验明确映射、链接与歧义，不靠固定父目录层数 |
-| C：timeout | 用户已确认内部现场超时节点为 `hs-knowledge-change-plan`；具体 action、计时边界和原始报错待补。原有预算保持不变；VPS 的 query→apply 超时为另一条独立记录 |
-| D：purpose | 保留用途资格设计；P3／query／P7 提前拒绝无效用途。逐项复查又补齐独立 query 的空索引／无候选漏校验，回执 read 仍继承原用途，说明文档明确 guidance／historical 用法 |
-| E：rules-digest | 规则锁升级后仍拒绝旧记录；用新 operation 重跑验证未改字节的卡，不改旧记录、不自动重签，已补完整链路回归 |
-| Windows／Linux／SSH | 服务器项目由 harness 按已安装 Skill 内的 `config.env` 通过 SSH 执行完整节点及子 CLI，使用实际执行端的能力和全局 Python；产物留在知识根。真正本机部署仍可直接执行。原有测量只按其当时版本与范围解释 |
-| 原现场 7 项部署测试失败 | 原文只有依赖／Unicode 的概要归因，缺逐项 ID、trace 和环境版本；相关旧部署实现及专属测试已移除，历史结果不视为这 7 项现场问题已逐项闭环 |
+首次 ingest（operation `ingest-hwdl-20261027`）执行 apply 后，transaction journal 标记全部 12 个写入 `installed=True`、status=`committed`，但磁盘上 **6 个「已存在文件」实际保持旧内容**，未更新：
 
-前一修复批次的本机节点回归为 667 passed／3 skipped，部署组为 173 passed／2 skipped。其真实 Windows SMB 子集为 44 passed／5 failed：五项分别停在该共享的 NTFS junction 创建权限或跨所有者 Git 仓库的夹具前提；同五项改用本机 NTFS 临时目录为 5 passed。没有关闭 Git 所有权检查或把这些失败记作通过；远端全量组中途停止，不能声明全量通过。这些是当时版本的证据，当前服务器项目不再通过共享盘执行。
+| 路径 | 期望（journal new_digest） | 磁盘实际 | 结果 |
+|---|---|---|---|
+| `governance/sources.lock.yaml` | cf4b4842…（含 source_id→docs-raw 路径登记） | a175f32a…（空：resources=[] snapshots=[]） | ❌ 未落位 |
+| `knowledge/commands/index.md` | 9152edfb…（含 hwdl-tx-command 导航行） | da1ff39e…（13:47 初始化骨架版） | ❌ 未落位 |
+| `knowledge/concepts/flows/index.md` | f718fed5… | 006a4f7c… | ❌ 未落位 |
+| `knowledge/concepts/protocols/index.md` | b45e60ae… | 95f7fd45… | ❌ 未落位 |
+| `knowledge/rules/index.md` | f3b21dad… | 6abe01d8… | ❌ 未落位 |
+| `knowledge/commands/hwdl-tx-command.md`（新建） | b34ec8e3… | b34ec8e3… | ✅ 成功 |
+| 其余 4 张新建卡 + 处理记录 | 新 digest | 匹配 | ✅ 成功 |
 
-本轮统一 SSH 的部署工具测试在 Windows 分两组覆盖全部目录，共 215 passed／4 skipped；WSL 执行组 91 passed／11 skipped，Workflow 9 passed／1 skipped。UNC／映射盘路径拒绝及本机、服务器 worker 正常路径均有回归；真实内部 ingest 尚待按新包部署验证，不将旧 SMB 数据或隔离测试当作新版本的完整现场验收。原 timeout 和规则锁未改动。
+**规律：新建文件全部成功，已存在文件全部失败。**
 
-再次按本清单逐项复核后，B 已修，D 的用途隔离设计保留且入口漏校验已补，E 的旧记录拒绝／新操作重验证已通过完整链路；C 仍明确暂缓。当时源码新增定向验证共 84 passed、0 failed、0 skipped（query 38、嵌套及修订／规则升级 21、P3 18、P7 5、嵌套部署 2）。这些不表示旧内部两卡或旧 7 项环境失败已经现场重验。后续须安装最终能力包，由 harness 按 Skill 连接配置进入实际执行端，运行 `hs-knowledge-explore` 的 setup，再复跑 status、目标 query 和 ingest；query 包也需包含前述校验。
+### 影响
 
-> 当前项目名称为 HiMate，知识根为 `himate-knowledge-wifi-mp/`；下方原始现场描述、命令和路径按当时版本保留，不作为现行部署入口。
+- `governance/sources.lock.yaml` 是空的，**卡片 `sources` 里的 `source_id`（如 `raw:f3f6a07b…`）无法映射到 `docs-raw/` 真实路径**。别的机器拉取上库内容后（无 `.build/`），卡片来源链接无法解析。
+- 5 个 `index.md` 导航未更新，新卡不在人读导航中。
 
-## 一、实际部署场景（背景，务必先读）
+### 证据链
 
-1. **代码仓布局**：`aiotbot-knowledge-wifi-mp/` 是唯一领域根，**并非一定固定在代码仓根目录**——后续可能被前置文件夹嵌套，例如 `repo/aiotbot/aiotbot-knowledge-wifi-mp/`。`config.yml` 的 `knowledge_roots.wifi` 记录相对 `config.yml` 的相对路径，嵌套时值为 `aiotbot/aiotbot-knowledge-wifi-mp`。
-2. **skills / workflows 是能力分发源码，实际会移走**：最新版已将部署工具移到 `aiotbot-knowledge-wifi-mp/tools/deploy/`，skills/workflows 部署到 Agent 自己的目录，按最终位置用 `--register-existing` 登记，运行不要求项目根保留这两个目录。
-3. **运行环境**：**Windows电脑和linux服务器都支持运行agent，Windows 电脑上的 agent 需要通过网络盘/ssh访问 Linux 服务器上的代码仓**（`Y:` 映射 `\\7.151.107.107\workcode\...`）。网络盘延迟高 + venv 冷启动慢，跨节点 subprocess 调用实测单次可达 3 分钟+。
-4. **运行时依赖**：skill 跨节点调用（如 materialize 调 maintain、index-build 调 apply verify）通过 `subprocess.run(..., timeout=...)` 硬编码超时执行。网络盘环境下默认值偏小。
+- journal：`logs/operations/ingest-hwdl-20261027/journal.json`，status=`committed`，12 条 entries 全部 `attempted=True`、`installed=True`。
+- 磁盘内容 == `backups/*.bin`（旧内容），≠ journal `bytes_b64` 解码的新内容；5 个 backup 时间戳 20:45:00.5（apply 时正常备份）。
+- 磁盘文件 mtime 13:47（apply 前初始化时间），远早于 apply 20:45。
+- `apply-result.json` 只列 writes 路径列表，无逐文件落盘后校验。
 
-## 二、原始现场问题描述（当前状态见开头）
+### 根因怀疑
 
-### 问题 A：UNC 网络盘 SQLite URI bug（index-build / query 阻塞）★最关键
+`transaction.py` 的 `mutate()` 对每个 entry 执行 `atomic_bytes(target, content)`（tempfile.mkstemp → os.replace → fsync），随后**无条件** `row["installed"] = True`。对「已存在文件」的批量连续替换 + 频繁 `save_journal`(fsync) 在 overlayfs 环境（`/srv/workspace/friday` 为 overlay，`metacopy=on`）下出现静默未持久化，但 `installed=True` 无真实落盘校验，导致 journal 声称成功、磁盘未更新。
 
-**背景**：知识库在网络盘（UNC 路径）上，index-build 与 query 读 SQLite 索引失败。
+> 注：受控单文件复现（对同一文件单独跑同样 atomic_bytes）均成功，未稳定复现，疑似与批量连续替换+fsync 交互有关。
 
-**现象**：index-build 报 `INDEX_READ_FAILED invalid uri authority: 7.151.107.107`；query 同理。
+### 建议修复方向
 
-**根因**：网络盘映射 `Y:` 经 `Path.resolve()` 变成 `\\?\UNC\7.151.107.107\...` 扩展路径。
-- `governance/contracts/indexing.py:verify_database`（约 117-122 行）先剥离 `\\?\UNC\` 前缀得 `\\server\share\...`，再 `Path.as_uri()` 生成 `file://7.151.107.107/...`；
-- SQLite `uri=True` 把主机名 `7.151.107.107` 当 URI authority 拒绝 → `invalid uri authority`。
-- 同样问题在 `hs-knowledge-query/scripts/node.py:704`（`db.as_uri()`）。
+1. `mutate()` 写入后增加**落盘回读校验**：`atomic_bytes` 后立即 `current_digest(ctx, row["path"]) == row["new_digest"]`，不一致则抛错/标记未安装，而非无条件 `installed=True`。
+2. 事务 `finish_commit` 前对全部 entries 做最终一致性校验（磁盘 digest == new_digest），任一不满足则 recovery_required。
+3. 排查 overlayfs/metacopy 下 `os.replace` + 连续 fsync 的持久化问题；必要时写入后显式 `sync()` 或校验。
 
-**验证结论**（Python 实测）：
-| URI 形式 | 结果 |
-|---|---|
-| `file://7.151.107.107/...`（as_uri 产物） | FAIL `invalid uri authority` |
-| `file:////7.151.107.107/...`（4 斜杠 + 正斜杠路径） | OK |
-| RAW `sqlite3.connect('\\server\share\...')` | OK |
-| 本地盘 `C:`（drive-letter） | OK（as_uri 生成 `file:///C:/...`） |
+### 现场处置（2026-10-27 已做）
 
-**影响范围**：
-- `governance/contracts/indexing.py:122` —— 该文件被 `governance/framework.lock.yaml` 锁定（sha256 固定），**修改后必须同步更新 lock 中的 sha256，并重算 rules-digest**（`framework.lock.yaml` 的 SHA256），否则 `RULE_DIGEST_MISMATCH`。
-- `hs-knowledge-query/scripts/node.py:704` —— 不在 lock 内，改完直接生效。
+已从 journal `bytes_b64`（digest 校验一致）将这 6 个文件修复写回，现 12/12 entries 与磁盘一致。但 **root cause 未消除**，后续 apply 仍可能复现，需开发者修复。
 
-**当前临时规避**（不改代码）：把知识库镜像到本地盘 `C:`（`C:/Users/h00953751/AppData/Local/Temp/hs-test/mirror-wifi`，拷贝 knowledge/governance/logs/.build/operations），index-build/query/query-regression 全部指向镜像跑通。**注意**：改锁文件会连锁改变 rules-digest，导致已提交的 journal/apply-result/ingest-record（绑定旧 digest）全部变 stale（`TRANSACTION_PENDING`）——因此正式修复需规划重跑全链路。
+---
 
-**修复指引（供接手 agent）**：
-1. 两处 `as_uri()` 改为：UNC 路径用 4 斜杠 `file:////server/share/...`（正斜杠），非 UNC 保持 `as_uri()`。
-2. 更新 `governance/framework.lock.yaml` 中 `contracts/indexing.py` 的 sha256，重算 rules-digest。
-3. 因 rules-digest 变化，已提交的 processing records 会 stale，需新 operation_id 重跑 P1→P7（或按治理规则处理旧记录）。
-4. 建议在 `tools/deploy/tests/` 补一个 UNC 路径的回归用例。
+## 2. 【环境变更记录】2026-10-28 08:58 规则锁被外部升级
 
-### 问题 B：`install_catalog.py` 硬编码知识库在代码仓根目录（嵌套部署会失败）
+`governance/framework.lock.yaml` 今晨 08:58 被更新，rules_digest 由 `746350bd…` → `0ac65ee2…`，同时 `source_resources.py`、`schemas/registries.yaml`、`specs/sources.md`、evals 测试、docs-llm-wiki 等一批文件被改（非本 ingest 操作）。
 
-**背景**：知识库可能被前置文件夹嵌套（如 `aiotbot/aiotbot-knowledge-wifi-mp`），但部署工具假定它固定直放仓根。
+影响：旧索引代（rules_digest 746350bd）与当前规则锁不匹配，query 报 `STALE_RULES`，需基于新规则重建索引后恢复。这是设计内行为，非 bug。
 
-**现象**：把 `config.yml` 的 `knowledge_roots.wifi` 设为嵌套路径（`aiotbot/aiotbot-knowledge-wifi-mp`）后，运行 `install_catalog.py --register-existing` 报 `INVALID_WORKSPACE_MAPPING`，exit 3，catalog 未生成。
+---
 
-**根因**：`aiotbot-knowledge-wifi-mp/tools/deploy/install_catalog.py:workspace_registration()`（约 328-332 行）硬编码：
-```python
-if value.get("schema_version") != "2.0" or value.get("knowledge_roots") != {
-    "wifi": "aiotbot-knowledge-wifi-mp"
-}:
-    raise InstallError("INVALID_WORKSPACE_MAPPING")
-lock = config.parent / "aiotbot-knowledge-wifi-mp/governance/framework.lock.yaml"
-```
-- 要求 `knowledge_roots` **精确等于** `{"wifi": "aiotbot-knowledge-wifi-mp"}`（值写死），嵌套时值不同 → 报错。
-- lock 路径也写死 `config.parent / "aiotbot-knowledge-wifi-mp/..."`，嵌套时即使过了值校验也会解析到错误位置。
+## 3. 【环境已知项】overlayfs 部署提示
 
-**对照**：运行时 skill（`hs-workspace-explore/scripts/node.py`）已支持嵌套——`roots["wifi"]` 动态读取 + `safe(workspace, ...)` 用 `PurePosixPath.parts` 支持多段相对路径。**问题只在部署工具层**。已实证：flat（无嵌套）注册成功，嵌套注册失败。
+`/srv/workspace/friday` 为 overlay 文件系统（`metacopy=on`），`/srv/workspace` 为 ext4。涉及原子替换/批量写入的 skill 在部署机需关注持久化行为；本机验证请用服务器原生路径而非网络盘映射（后者会触发 UNC `invalid uri authority`）。
 
-**当前临时规避**：嵌套场景下手动绕过 `workspace_registration` 校验（或先把 config 改成 flat 注册完再改回），或用旧版打过补丁的 `install_catalog.py`（工作区 `Y:\friday\work_code` 下有动态读取版本）。
-
-**修复指引（供接手 agent）**：
-1. `workspace_registration()` 改为动态读取 `value["knowledge_roots"]["wifi"]`（校验其为安全相对路径：无 `\`、无 `:`、非绝对、无 `..`），lock 路径用 `config.parent / wifi_root / "governance/framework.lock.yaml"`。
-2. 建议保留对 `knowledge_roots` 键集合 == `{"wifi"}` 的校验（与运行时 node.py 一致）。
-3. 在 `tools/deploy/tests/test_relocation.py` 补一个嵌套（`aiotbot/aiotbot-knowledge-wifi-mp`）fixture 用例。
-
-### 问题 C：跨节点 subprocess 超时偏小（网络盘性能瓶颈）
-
-> **2026-10-27 现场补充**：用户确认内部现场的超时节点是 `hs-knowledge-change-plan`。目前尚未取得该次 `--action`、调用者／完整命令、原始超时报错、确切耗时及 600 秒临时补丁后的稳定性结果，不能仅凭节点名认定超时发生在它内部的某条 120 秒子调用。`plan`／`review` 路径未直接调用 `Context.call`；默认生成／`rederive` 和 `verify` 则有来源解析及嵌套子调用，且该节点也可能作为其他节点的子进程受外层预算限制。此前 VPS 记录的是 query→apply verify-result 的超时，耗时和结论不移用为本次 change-plan 的现场证据。下述原始归因和补丁思路保留供后续验证，本轮仍不修改 timeout。
-
-**背景**：Windows agent 经网络盘访问代码仓，网络盘延迟高 + venv 冷启动慢，跨节点 subprocess 调用实测单次可达 3 分钟+。
-
-**现象**：materialize/verify 等跨节点调用在 `timeout=120` 下失败。
-
-**根因**：skill 脚本内 `subprocess.run(..., timeout=120)` 硬编码（约 17 处，分布在 `skills/common/knowledge/*/scripts/support.py` 及个别 `transaction.py`/`merge.py`/`publish.py`/`recover.py`）。注意 `tools/deploy/install_catalog.py` 内部还有 `timeout=30`（subprocess 校验），属另一类。
-
-**当前临时规避**：批量改 `timeout=120` → `timeout=600`。**注意**：skill 源码改动后必须**重新生成 catalog**（catalog 存的是 skill 副本，旧副本不带新超时）。工作区 `Y:\friday\work_code\skills\common\knowledge\` 下 17 个文件已改（当前 grep 确认 0 处 `timeout=120` 残留）。
-
-**修复指引（供接手 agent）**：
-1. 将跨节点调用超时从硬编码 120 提高（如 600），或改为可配置（读 env/request）。
-2. 确认覆盖所有跨节点调用点（grep `timeout=120`）。
-3. 若改动在 skill 源码，发布后需重新生成 catalog。
-
-## 三、已确认无需处理（设计行为，非 bug）
-
-- **问题 D：`purpose: guidance` 查询**：`governance/contracts/knowledge.py:match_scope`——`purpose in ("current","implementation")` 时要求 `claim.usage == "current"`；纯文档卡 `usage: guidance` 仅 `guidance`/`historical` 目的可见。**这是设计行为**。使用方：query 带 `purpose: guidance`；P7 query-regression 的 target_queries 需显式带 `"purpose": "guidance"`（view 的 target_queries 已支持 purpose 字段）。
-- **问题 E：rules-digest 连锁变化**：契约文件受 `framework.lock.yaml` 锁定，改契约 → 需更新 lock sha256 → rules-digest 变化 → 已提交记录变 stale。这是治理设计，不是 bug；修复问题 A 时需规划重跑。
-
-## 四、原始现场验证状态（历史基线）
-
-- **ingest P1→P7 全通过**（operation `ingest-hwdl-v3`，新版本流程，真人确认门已移除）：两卡 `hwdl-frame-flow`（flow）与 `hwdl-snap-protocol`（protocol）已落库并登记 `logs/ingest/ingest-hwdl-v3.yaml`。
-- **index-build / query 已在本地盘镜像跑通**：gen-02f994d06c68725ebbf838dd，2 docs/2 claims/894 postings；query-regression passed（2 case 全绿）；query 命中两卡（目标卡排首位）。网络盘直接跑仍因问题 A 失败。
-- **FactumCore 自带部署测试**：`tools/deploy/tests/` 56 passed / 7 failed（失败为环境项 `DEPENDENCY_UNAVAILABLE` 缺锁定运行时版本、unicode 项，非逻辑失败）。
-- **关键路径/身份**：
-  - 知识库根（工作区）：`Y:/friday/work_code/aiotbot/aiotbot-knowledge-wifi-mp/`
-  - rules-digest（工作区，未改动）：`788c7c8902cfcb7fef63e40f7f02cd66a6d63d1fe11188c0ca780a1d1827c215`
-  - 本地盘 venv：`C:/Users/h00953751/AppData/Local/Temp/hs-test/factum-venv2/Scripts/python.exe`
-  - 本地盘 catalog：`C:/Users/h00953751/AppData/Local/Temp/hs-test/factum-catalog/catalog.json`
-  - 本地盘镜像：`C:/Users/h00953751/AppData/Local/Temp/hs-test/mirror-wifi`
-  - 测试文档：`docs-raw/storys/HWDL收发设计三分之二说明书_v1.md`
-  - 最新版来源：`D:\knowledge_graph\FactumCore`（commit `2379f7b`）
-
-## 五、原始建议修复顺序
-
-1. **问题 A（UNC URI）**——最优先，网络盘部署的硬阻塞，改动面明确（两处代码 + lock + 重跑）。
-2. **问题 B（嵌套部署）**——影响后续真实仓部署形态，改动小（一个函数动态化 + 补测试）。
-3. **问题 C（timeout）**——提升稳定性，改源码后需重新生成 catalog。

@@ -1,52 +1,50 @@
 # HiMate 设计与使用入口
 
-第一次使用直接从[使用说明](使用说明.md)开始：保留业务仓已有的根 `AGENTS.md`，按分发的 `AGENTS.md.example` 合并四项位置说明和 explore 入口指针；知识根与 `config.yml` 已放入项目，Agent 已安装配套能力。全库能力介绍与任务路由由 `hs-knowledge-explore` 提供，环境准备与项目发现脚本按需执行。架构与详细设计用于需要理解机制或修改实现时查阅。
+第一次使用从[使用说明](使用说明.md)开始：保留业务仓已有的根 `AGENTS.md`，按 `AGENTS.md.example` 合并位置说明和 `hs-knowledge-explore` 入口指针，核对项目 `config.yml`、知识根和 Agent 已安装的配套能力。已有环境与项目上下文时直接选择业务任务，首次准备和只读发现按需执行。
 
 ```mermaid
 flowchart LR
-    A["使用说明<br/>首次部署 → 入库 → 查询"] --> B["日常使用<br/>更新、查询、检查与续办"]
-    A -. "了解原理或修改实现" .-> C["架构设计<br/>目录与三条链路"]
-    C --> D["概要与详细设计<br/>流程判断及节点实现"]
+    A["使用说明<br/>配置与首次准备"] --> B["日常任务<br/>入库、查询、检查与续办"]
+    A -. "理解机制或修改实现" .-> C["架构设计<br/>目录与三条链路"]
+    C --> D["详细设计<br/>节点、判断及文件职责"]
 ```
 
-| 文件 / 目录 | 阅读目的 |
+| 文件 | 阅读目的 |
 |---|---|
-| [HiMate知识库架构设计.md](HiMate知识库架构设计.md) | 目录架构、分层职责与生产、治理、消费三条链路 |
-| [知识库详细设计.md](知识库详细设计.md) | 第 1 节说明前置发现和命令；第 2.1 节画完整 ingest P1—P7，第 3.1 节说明只读 lint 巡检 Workflow 与原 L1—L5 检查，第 3.2 节说明固定 CI，第 4 节说明查询与 Q6 源码定位；第 5 节按节点解释文件设计，§5.11 说明 explore 中的 CodeGraph 首次初始化；第 6 节集中说明共用规则与运行约束 |
-| [知识库关键点.md](知识库关键点.md) | WiFi-MP 方案适配其他领域时的目录、raw／Profile、领域契约和 Skill／Workflow 配套修改，以及共用的部署与核验边界 |
-| [使用说明.md](使用说明.md) | 配置 `config.env` 连接信息 → 按需首次准备 → OpenFlow 执行 ingest；按需使用 lint、query Skill 或只读巡检 Workflow |
-| [AGENTS.md](AGENTS.md) | Agent 阅读入口和文档修改边界 |
+| [使用说明.md](使用说明.md) | 两份配置、首次环境准备、日常任务和独立动作的使用方法 |
+| [HiMate知识库架构设计.md](HiMate知识库架构设计.md) | 目录架构、分层职责及生产、治理、消费三条链路 |
+| [知识库详细设计.md](知识库详细设计.md) | §2.1 七阶段 ingest；§3.1 只读 lint 巡检与 L1—L5 检查；§3.2 固定 CI；§4 查询；§5 节点文件；§6 共用规则与保存边界 |
+| [知识库关键点.md](知识库关键点.md) | 路径与部署边界，以及更换领域、raw 类别和卡片 Profile 时的配套改动 |
+| [AGENTS.md](AGENTS.md) | Agent 阅读入口与文档维护约定 |
 
-项目自身的 `task.md` 与 `sdd/` 仅在本地保存开发任务、需求、测试计划和验收记录，已由 Git 忽略；共享仓库和能力包不包含这些工件，使用与部署无需准备它们。
+本目录下的 `task.md`、`sdd/` 用于本机开发任务、需求、测试计划和验收记录，由 Git 忽略，部署无需准备。本目录的共享正文说明系统设计与使用方式；正式领域知识进入 `../knowledge/`。
 
-文档用 `repo/` 表示项目根目录的示意名称。业务代码工作区、业务仓 `AGENTS.md`、`config.yml` 与知识库 `himate-knowledge-wifi-mp/` 位于该根目录；本开发仓的根 `AGENTS.md` 仅本地维护，共享分发 `AGENTS.md.example`。开发仓的 `skills/common/knowledge/` 和 `workflows/common/knowledge/` 是分发源码；实际能力装在 Agent 自己的目录，由 harness 调用；项目根不要求保留能力源码。业务代码可包含多个实际代码仓或模块目录，不另建嵌套 `.git`。本目录只存系统说明与开发工件，正式领域知识只进入 `../knowledge/`。
+## 能力与任务入口
 
-项目配置全部由用户在根 `config.yml` 提供，包括知识根、代码根与模块映射。首次 setup 只检查实际全局依赖、读取这份配置并给出项目入口，不生成另一套 catalog、registry 或机器绑定。路径见[工作区路径与部署边界](知识库关键点.md#1-工作区路径与部署边界)。
+当前有9个公开 Skill，名称均以 `hs-knowledge-` 开头：explore、source-scan、source-prepare、change-plan、view-materialize、lint、apply、query、maintain。开发分发源码在项目根的 `skills/common/knowledge/`；实际运行使用 Agent 已安装的能力。两个 Workflow 的源码在 `workflows/common/knowledge/`，由 OpenFlow 加载和编排。
 
-同一工作区内的知识根可按 `knowledge_roots.wifi` 嵌套，项目根以实际 `config.yml` 为准。跨机器 SSH 信息放已安装 `hs-knowledge-explore` 的 `config.env`；harness 负责连接，并确认实际执行端的能力入口可调用。`ssh_entry` 不上传脚本或证明远端就绪，调用端路径不能直接当作远端路径；缺执行能力先报告并讨论方案。本机直接调用，请求、稿件、记录和索引沿用 K 的 `.build/`、`logs/`、`artifacts/`。操作见[使用说明](使用说明.md#首次准备运行依赖)。
+| 任务 | 使用哪个入口 | 做到哪里结束 |
+|---|---|---|
+| 新原件入库、增量更新或明确修订已有卡 | `hs-knowledge-ingest` **Workflow** | P1扫描、P2备料、P3内容决策、P4完整稿、P5审阅和检查、P6记录、P7安全落位与检索收尾；真正无变化则在P1结束 |
+| 单独检查正式库或候选稿 | `hs-knowledge-lint` **Skill** | 默认只读检查正式完整库；按请求也可检查候选，保存检查报告后结束 |
+| 巡检正式库及来源／代码引用 | `hs-knowledge-lint` **Workflow** | `check_formal` 调用 lint 默认正式全库检查，`audit_references` 调用 maintain 的只读引用巡检；保存 JSON／Markdown 报告后结束 |
+| 检索知识并分析问题 | `hs-knowledge-query` **Skill** | 按用途、范围和实际依据检索，使用回执精读同一代索引中的正文，再给出结论与缺口 |
+| 独立备料、进度观察、恢复或索引维护 | 对应 **Skill 的公开动作** | source-prepare准备材料，source-scan观察进度，apply提供事务恢复／索引／回归／提交核对，maintain负责维护状态；见[独立动作](使用说明.md#独立备料恢复索引与提交核对) |
 
-`hs-knowledge-explore` 是全库能力入口：Agent 按其指引选择任务；首次需要准备环境时通过 `setup.py` 检查全局依赖、读取项目配置，后续缺少上下文时才用只读发现定位代码仓与知识根。已有信息直接复用，阅读指引不要求执行脚本；E0 不属于 ingest 的 P1。业务 CLI 默认读取当前规则锁并核验文件，不要求 catalog、Workflow 身份或登记。首次操作见[使用说明](使用说明.md#首次准备运行依赖)。
+同名 lint Skill 与 Workflow 分属能力目录和工作流目录；ingest 的 P5 调用的是 lint **Skill** 的 `review` 动作，不嵌套 lint Workflow。独立 lint 默认仍为正式全库固定检查，周期巡检由外部系统触发；发现问题后，由人明确将修订要求交给 ingest，巡检不自动修稿。
 
-`config.yml` 维护代码根和模块相对路径，以及芯片、Host／Device、特性和用途；共享模块可关联多芯片、多端。无需逐项填写六 Target、三 pair 或重复代码根授权，取证按路径读取实际文件并固定内容指纹。配置文件职责与连接设置见[使用说明](使用说明.md#配置项目代码架构)，共享映射与核验逻辑见[知识库关键点](知识库关键点.md#1-工作区路径与部署边界)。
+内容批正常在P5完成独立审阅和一次完整质量检查，再由P6转写已定处置，P7调用 `apply --action batch`。P7核对实际输入、旧文件基线、写锁、字节和记录，再构建并完整验证真实索引、执行冻结查询、按原活动指针基线启用；不重复P5质量判断。仅记录批只保存处理结果并保留欠账，不新建或启用索引。旧 `apply --action run` 保留原完整固定检查和结果语义，不能当作新主线的安全收尾入口替换使用。
 
-能力共9个公开CLI Skill：explore、source-scan、source-prepare、change-plan、view-materialize、lint、apply、query、maintain（均以 `hs-knowledge-` 为前缀）；Workflow 设计包含 ingest 和只读 lint 巡检两条。`S/hs-knowledge-lint/` 是原检查 Skill，`F/hs-knowledge-lint/` 是同名巡检 Workflow，安装和宿主加载按实际环境核实。`hs-knowledge-explore` 负责全库能力路由及按需准备、发现，首次准备时由 Agent 按 `config.yml` 中配置的真实代码仓逐个初始化 CodeGraph；空模块列表不建图，MCP 由 harness 提供。卡头来源及查询结果提供模块、文件与定位，Agent 按实际 `config.yml` 匹配模块根后追查源码，不以正文可点击链接为前提；见[查询和追代码](使用说明.md#3-怎么查询和追代码)与[详细设计 §5.9](知识库详细设计.md#59-q1q6路由查询同代精读与回答)。
+P1只发现变化和续办事项，P2独立准备新旧材料，可按固定扫描清单或明确目标开始。P5缺材料回P2、内容判断有误回P3、稿件问题回P4；返工保存新操作及前序稿引用，不覆盖旧工件，输入有效时复用原扫描单元。采用的原件版本已变时，由P2要求刷新受影响的扫描范围。运行故障按原停点续办；已落位内容只补索引、查询或启用，不重复写入。完整分支见[详细设计 §2.1](知识库详细设计.md#21-完整流程与节点判断)。
 
-设计文档描述职责、流程与边界，能力安装、实际宿主、六 Target、CI 合入和权限验证以各自环境的实际记录为准。本项目历史验证工件在本地 SDD 保存原始版本身份，不据此推断当前部署状态。
+Workflow负责顺序、角色与交棒：P5由独立reviewer执行，其余节点由coder执行。Skill只核对本职业务数据，不认证角色、Workflow身份或上游通过票据；内部通过知识根的受锁公共函数复用规则，不调用兄弟Skill CLI。人工验证可逐个调用同一组Skill，真实宿主的角色隔离、出口选择和等待恢复仍需按部署环境核实。
 
-详设中的 `knowledge ...` 是统一入口名称。首次准备后，按[使用说明](使用说明.md)通过 OpenFlow 运行 `hs-knowledge-ingest` Workflow；独立检查和查询分别向 Agent 提出要求，并指定 `hs-knowledge-lint` 或 `hs-knowledge-query` Skill。底层接口参数见相应能力的 `SKILL.md` 与 `references/`。
+## 项目与执行位置
 
-手动或周期巡检另行启动同名 `hs-knowledge-lint` Workflow：`check_formal` 沿用原 lint Skill 默认 formal／full，`audit_references` 显式调用 maintain 的只读 `audit-references`，汇总固定检查、逐卡／Claim 的来源、旧定位、旧／当前 hash、差异与历史用途，生成 JSON／Markdown 报告后结束。外部系统负责周期触发；巡检不改知识、来源锁、事件／水位或活动索引，也不自动修复。需要修订时，人明确把报告中的问题交给 ingest；见[详细设计 §3.1](知识库详细设计.md#31-lint-的检查流程)。
+文档用 `repo/` 示意项目根。业务仓 `AGENTS.md`、用户维护的 `config.yml`、实际代码工作区和知识根位于该项目中；知识根按 `knowledge_roots.wifi` 相对配置目录解析，允许安全嵌套。代码按 `code_root` 和 `modules[].path` 映射真实文件，不要求另建六Target／三pair配置，也不按目录标签推断宏、构建或版本事实。填法见[两个配置文件](使用说明.md#1-两个配置文件)，路径规则见[知识库关键点](知识库关键点.md#1-工作区路径与部署边界)。
 
-`knowledge ingest` 是逻辑入口名称，默认扫描六类允许 raw 并选择新增、变化及待处理来源；限定范围时，在 source-scan 的请求中填写可选 `source`。首次导入和日常增量使用同一套能力，不要求安装同名终端命令。
+`hs-knowledge-explore` 负责全库路由、按需准备与项目发现。首次 `setup.py` 检查现有全局Python依赖并读取项目配置；已有有效环境与上下文后直接使用业务能力，不新增catalog、registry或机器绑定。首次CodeGraph准备由Agent按真实配置逐仓执行，空模块列表不建图，MCP由harness提供；见[首次环境安装](使用说明.md#2-首次环境安装)及[详细设计 §5.11](知识库详细设计.md#511-explorecodegraph-首次初始化)。
 
-开发测试可以由人工逐个调用 Skill，按实际业务文件传递输入输出；日常入库由OpenFlow按7个节点编排：P1扫描、P2独立备料、P3语义计划、P4直接成稿／修订、P5独立审阅及一次完整质量检查、P6记录、P7安全事务与实际检索收尾。P5为reviewer，其余为coder；宿主安排角色与上下文隔离。Skill 自身只检查本职数据，不要求前驱通过凭证。`hs-knowledge-lint` 独立只读检查，发现问题交回 ingest 修订；`hs-knowledge-query` 消费正式知识并支持检索分析。
+SSH提示保存在已安装explore的本机 `config.env`，harness连接后须核对执行端实际能力和原生路径；提示不代表远端已就绪，调用端路径不能直接用作远端路径。请求、稿件、记录和索引沿用实际知识根的 `.build/`、`logs/`、`artifacts/`。共享正式资产与本机执行材料的区别见[保存与提交边界](知识库详细设计.md#64-哪些内容上库哪些用于本机执行)。
 
-独立内容复核由人工测试者或 OpenFlow 安排；Skill 核对逐 Claim 理由、实际材料和确切内容绑定，不以作者名字或上下文标签校验角色隔离。P7使用apply.batch核对实际输入快照、路径、字节、CAS和记录，不重跑P5完整质量检查；写后重新固定索引基线。旧apply.run继续保留原完整固定检查，恢复遵守原journal语义；任何动作都不检查上游passed票据或自动颁发supported验收摘要。lint 与固定 CI 继续复用确定性检查。
-
-索引与查询直接核对卡片、来源、当前代码范围及采用材料；构建／运行结论使用随索引固定的 `code_contexts` 业务数据，不依赖apply或代码复核通过票据。共享索引构建时指定 `knowledge_commit` 只确认实际仓库快照；显式签名发布回执另核发布身份真实性，不能据快照或入库成功推断 CI、合入或语义复核通过。
-
-用户可在执行中要求退回，也可在入库后要求修改已有卡；原件未变的明确修订仍走新操作，重新完成复核、检查与入库。
-
-本地入库、完整索引验证、本批目标查询通过，且该代次成功激活后 ingest 结束；之后由人提交并触发固定 CI，复用 lint 的格式、导航、引用和索引检查脚本，通过后人工合入；见[上库流程](知识库详细设计.md#32-上库固定-ci-检查后合入)。
-
-P1与P2独立：P2可直接接受明确来源目标，也可按固定扫描单元备料。P5缺料回P2定向补齐，只有实际采用输入漂移才回P1。公共算法在知识根受锁contracts中同进程复用；不启动兄弟Skill CLI。独立索引、查询回归、恢复和只读提交清单均从apply调用，动作及完成事实见[使用说明](使用说明.md)。
+本地入库、索引启用、Git提交、固定CI和合入分别记录实际事实。ingest完成后，按本批清单由人提交并触发固定CI，复用确定性检查函数，再评审合入；见[上库流程](知识库详细设计.md#32-上库固定-ci-检查后合入)。设计图、目录、角色标签及机制测试各有说明范围，不能代替真实业务内容、宿主接入或权限验收。

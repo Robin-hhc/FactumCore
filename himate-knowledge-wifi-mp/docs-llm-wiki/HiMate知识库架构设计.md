@@ -15,7 +15,7 @@ himate-knowledge知识库仓目录结构如下所示。
 - config.yml：项目架构映射，登记代码根、模块相对路径及芯片／端／特性／用途
 - main/：真实代码工作区
 - skills/common/knowledge/：开发分发用的节点能力源码，部署位置由 Agent 决定
-- workflows/common/knowledge/：开发分发用的 ingest 工作流源码
+- workflows/common/knowledge/：开发分发用的 ingest 与只读 lint 巡检工作流源码
 - himate-knowledge-wifi-mp/：WiFi 领域根，集中维护原件、知识与治理
   - knowledge/：知识卡，唯一检索对象，处理后知识的仓库
   - docs-raw/：源文档，原始证据层（LLM 只读）
@@ -71,7 +71,7 @@ repo/
     │   ├── runbooks/             # 排障
     │   └── glossaries/           # 术语
     ├── .build/                   # 候选暂存，Git 忽略
-    ├── logs/                     # 来源、复核、操作和恢复留痕
+    ├── logs/                     # 共享处理／限制事实与本机执行留痕分开保存
     ├── evals/                    # 检索案例和回归门禁
     ├── artifacts/                # 可重建索引和报告，Git 忽略
     └── docs-llm-wiki/             # 系统设计与使用说明；自身 SDD 仅本地维护
@@ -87,7 +87,7 @@ repo/
 
 # 11 HiMate知识库架构
 
-知识库随代码仓一并拉取；首次运行依赖由 `hs-knowledge-explore` 准备，不需要额外业务初始化命令或常驻服务。`ingest` 默认处理六类允许 raw，从提炼 draft 连续完成检查、修订、独立内容复核和适用代码核验，最后将 stable 卡落位到 `knowledge/`；`lint` 是可单独调用的只读确定性检查入口，供手动修改和 CI 复用，不自动修稿或入库；`query` 消费知识。本地入库、索引全验、目标查询及活动代激活完成后，由人提交、触发固定 CI 并评审合入。`ingest --source` 可选限定来源；命令格式见[详细设计 §1.1](知识库详细设计.md#11-从命令进入流程)，OpenFlow 负责 Workflow 的调度和交棒校验；人工测试可逐个调用 Skill 并按实际结果继续。
+知识库随代码仓一并拉取；首次运行依赖由 `hs-knowledge-explore` 准备，不需要额外业务初始化命令或常驻服务。`ingest` 默认处理六类允许 raw，经扫描、独立备料、作者计划和完整成稿，在 P5 集中独立内容／代码审阅及完整质量检查，P6 转写处理记录，P7 将确切字节安全落位并完成检索收尾；有问题时返回相应阶段。`lint` 是可单独调用的只读确定性检查入口，供手动修改和 CI 复用，不自动修稿或入库；`query` 消费知识。内容批完成本地入库、真实索引全验、冻结目标查询和活动代激活后，由人提交、触发固定 CI 并评审合入；仅记录批保存处置和欠账，不建索引。`ingest --source` 可选限定来源；命令格式见[详细设计 §1.1](知识库详细设计.md#11-从命令进入流程)，OpenFlow 负责 Workflow 的调度和交棒校验；人工测试可逐个调用 Skill 并按实际结果继续。
 
 ingest 是原件到本地正式知识的完整流程；lint Skill 可被 ingest、独立命令和 CI 复用，query 负责消费。另有同名 lint Workflow，供手动或外部周期调度执行正式全库检查和引用巡检，出报告即结束。它直接调用两个 Skill，不嵌套 ingest，不改变原 lint Skill 默认行为或 ingest 节点。实际宿主加载、代码接入和周期触发需按部署环境验证；这些能力不要求用户顺序执行。
 
@@ -118,7 +118,7 @@ AIoT 业务横跨 WiFi、BGLE、定位、雷达、SLP、NFC、NPU、MCU 等十�
 | 人读与机读分离 | 谁来浏览、谁来召回？ | `index.md`（人读导航）↔ `artifacts/`（机器索引） |
 | 沉淀与暂存分离 | 什么入库、什么忽略？ | 上库目录 ↔ `.build/`（暂存，Git 忽略） |
 
-项目与知识库按层协作：下图的 `AGENTS.md`、`config.yml` 相对项目根，`docs-raw/`、`knowledge/`、`governance/`、`tools/` 及运行支撑目录相对知识根 K；`S`、`F` 是 Agent 实际能力目录。`main/` 是本仓代码工作区，真实业务目录按 `config.yml` 映射。总体架构如下：
+项目与知识库按层协作：下图的 `AGENTS.md`、`config.yml` 相对项目根，`docs-raw/`、`knowledge/`、`governance/` 及运行支撑目录相对知识根 K；`S`、`F` 是 Agent 实际能力目录。`main/` 是默认代码工作区，真实业务目录按 `config.yml` 映射。总体架构如下：
 
 ```mermaid
 flowchart TB
@@ -155,7 +155,7 @@ flowchart TB
     subgraph S4["④ 治理与工具层"]
         direction LR
         D1["governance/<br />templates · schemas · contracts · specs · sources.lock.yaml"]
-        D2["Agent Skills · S<br />source-prepare · change-plan · lint · apply · query"]
+        D2["Agent Skills · S<br />主线六包＋query · explore · maintain"]
         D3["OpenFlow · Agent Workflows · F<br />ingest：完整 P1—P7<br />lint：正式检查与引用报告"]
     end
 
@@ -174,7 +174,7 @@ flowchart TB
     E0 -->|"定位并加载后"| S1
     S1 --> S2
     S2 -->|"ingest 生产 draft"| E1
-    E1 -->|"独立内容复核及适用核验 → lint → 入库"| S3
+    E1 -->|"P5 独立审阅与固定检查 → P6 记录 → P7 安全落位"| S3
     S4 -.->|"Skill 核业务数据 · OpenFlow 管流程交接"| S3
     S5 -.->|"质量保障"| S3
 ```
@@ -186,7 +186,7 @@ flowchart TB
 | ① 入口路由层 | explore 提供能力路由；已知上下文直接复用，缺失时才发现 | `hs-knowledge-explore` 指引；业务仓 `AGENTS.md` · `config.yml` · 领域仓根四件套；脚本发现为可选前置 E0 |
 | ② 源事实层 | 证据底座：代码事实 + 原始材料，喂知识层 | `main/` · `docs-raw/` |
 | ③ 知识资产层 | 唯一检索对象：治理后的知识卡 | `knowledge/` |
-| ④ 治理与工具层 | Skill 执行业务检查，OpenFlow 编排顺序、角色与交棒；harness 执行命令 | `governance/` · Agent 的 `S`／`F` · 既有兼容工具 |
+| ④ 治理与工具层 | Skill 执行业务动作，OpenFlow 编排顺序、角色与交棒；harness 执行命令 | `governance/` 的受锁公共契约 · Agent 的 `S`／`F` |
 | ⑤ 配套支撑层 | 候选暂存 · 回归门禁 · 留痕 · 派生索引 | `.build/` · `evals/` · `logs/` · `artifacts/` · `docs-llm-wiki/` |
 
 递进一句话：证据层喂知识层，契约层束知识层，技能层跑知识层，配套层验知识层，入口层路由知识层。
@@ -237,7 +237,7 @@ flowchart LR
 | 技能 | 职责 | 公开动作 |
 |---|---|---|
 | `hs-knowledge-explore/` | 能力路由、按需setup／发现和CodeGraph准备 | setup及只读发现；已有上下文复用 |
-| `hs-knowledge-source-scan/` | P1观察变化、P6记录、实际进度与续办定位 | scan / record / status |
+| `hs-knowledge-source-scan/` | P1观察变化、P6机械转写冻结处置、实际进度与续办定位 | scan / record / status |
 | `hs-knowledge-source-prepare/` | P2按固定单元或显式目标备料，恢复确切新旧来源 | prepare（默认）/ capture / resolve / resolve-source |
 | `hs-knowledge-change-plan/` | P3记录作者语义决定、保留范围和目标查询 | plan；不生产字节或复核 |
 | `hs-knowledge-view-materialize/` | P4直接生产卡、导航、来源锁及完整视图，修订与描述 | run / revise / describe |
@@ -252,12 +252,12 @@ flowchart LR
 
 该路径是开发分发源码；实际 Workflow 放在 Agent 的 `F` 目录，由 OpenFlow 按 Skill ID 编排并校验流程顺序、角色隔离和交棒合法性。Skill 自身只处理本次业务输入与输出，不要求 Workflow run／node／attempt 身份或生成流程 manifest。运行脚本从已安装能力定位，不以项目根目录拼接；Workflow 不装领域事实：
 
-| 技能 | 职责 | 一句话 |
+| 工作流 | 职责 | 一句话 |
 |------|------|--------|
-| `hs-knowledge-ingest/` | P1 扫描或续办→P2 材料→P3 阅读计划→P4成稿／修订→P5独立审阅与完整检查→P6 处理记录→P7 入库、索引与目标查询 | 一次入口完成本地闭环 |
+| `hs-knowledge-ingest/` | P1 扫描或续办→P2 独立备料→P3 作者计划→P4成稿／修订→P5独立审阅与完整检查→P6 转写记录→P7 安全落位、索引、冻结查询与激活 | 内容批完成本地检索闭环；仅记录批只落记录 |
 | `hs-knowledge-lint/` | `check_formal` 调用原 lint 默认 formal／full → `audit_references` 显式调用 maintain 的只读 audit-references | 汇总固定检查及逐卡／Claim 的来源、代码差异，生成 JSON／Markdown 报告即结束 |
 
-ingest 不另分独立的生产和治理流程；它在 P5 继续调用原 `S/hs-knowledge-lint/` Skill，由返回的问题决定补材料、重判或修稿，再继续检查。新增 `F/hs-knowledge-lint/` Workflow 与同名 Skill 分目录保存，两个节点均为 `type: skill`，不改 ingest 的 YAML／布局或 lint 包默认参数。外部调度仅负责触发，不另建 runner 或 Workflow 子调用。
+ingest 不另分独立的生产和治理流程；P5 由 reviewer 使用 `S/hs-knowledge-lint/` 的 `review`，其余节点由 coder 执行。材料、作者判断和稿件问题分别返回 P2、P3、P4；运行故障保留原停点等待，不增加重试节点。`F/hs-knowledge-lint/` 与同名 Skill 分目录保存，恰有 `check_formal`、`audit_references` 两个 `type: skill` 节点，不改变 lint Skill 默认 formal／full 或 ingest 主线。外部调度仅负责触发，不另建 runner 或嵌套 Workflow。
 
 #### himate-knowledge-wifi-mp/ —— WiFi 领域知识库
 
@@ -300,7 +300,7 @@ flowchart LR
 
 目录按知识类型和读者问题组织，来源出处在卡内 `sources` 与来源锁登记；不能把 raw 分类或材料平台名当成卡类型。`AGENTS.md` + `index.md` 是领域规则与逐层导航。
 
-**上库管理标准**：正式卡、各级导航、来源锁、采用的原件及附件和 `logs/ingest/` 处理链按本批清单提交；项目映射、规则、模板和测试按项目版本管理。`logs/events/` 含有效使用限制，保留其业务状态；`.build/`、`logs/operations/`、派生索引、私有恢复备份及原始复核／证据日志不整体提交。来源锁登记不等于原版已随仓提供：被引用旧版须可从 Git 历史或同组持久位置恢复，源码及采用的构建／运行材料须在消费端可达。其他用户拉取后核对这些资产并重建、验证及激活本机索引，不能依赖原机私有对象。文档和代码结论须有独立 Agent 内容复核，代码另按 Claim 核对源码及条件；固定 CI 仅检查确定性项，详见[保存与提交边界](知识库详细设计.md#64-哪些内容上库哪些用于本机执行)。
+**上库管理标准**：正式卡、各级导航、来源锁、采用的原件及附件和 `logs/ingest/` 处理链按本批清单提交；项目映射、规则、模板和测试按项目版本管理。`logs/events/` 含有效使用限制，保留其业务状态；`.build/`、`logs/operations/`、派生索引、私有恢复备份及原始复核／证据日志不整体提交。来源锁登记不等于原版已随仓提供：被引用旧版须可从 Git 历史或同组持久位置恢复，源码及采用的构建／运行材料须在消费端可达。其他用户拉取后核对共享资产并重建、验证及激活本机索引，不依赖原作者的私有计划、审阅报告、事务或缓存，也不继承其本机续办义务。历史处理记录和原件保留原字节，不为升级规则重签或覆盖。文档和代码结论须在 P5 独立内容复核，代码另按 Claim 核对源码及条件；固定 CI 仅检查确定性项，详见[保存与提交边界](知识库详细设计.md#64-哪些内容上库哪些用于本机执行)。
 
 参与链路：治理链路（卡片落位上库）+ 消费链路（定位 / 精读）。
 
@@ -369,7 +369,7 @@ flowchart LR
 
 #### governance/ —— 治理规则层（契约 SSOT）
 
-`templates/`（七类卡、导航与处理记录模板）、`schemas/`（frontmatter / sources schema、profiles、registries）、`contracts/`（knowledge、source_resources 与共享 validation）、`specs/`（编写、复核、生命周期规范）、`sources.lock.yaml`（来源锁：声明版本/落点/hash/bytes/恢复说明）。生产、治理、消费**共用同一契约**，Skill 不维护私有例外。
+`templates/`（七类卡、导航与处理记录模板）、`schemas/`（frontmatter / sources schema、profiles、registries）、`contracts/`（来源、成稿、审阅、索引、查询与维护等公共函数）、`specs/`（编写、复核、生命周期规范）、`sources.lock.yaml`（来源锁：声明版本/落点/hash/bytes/恢复说明）。生产、治理、消费**共用同一套受锁契约**；Skill 在同进程复用公共函数，不启动兄弟 Skill CLI、不导入兄弟私有脚本，也不维护私有规则例外。
 
 参与链路：生产链路（建卡时套它的模板）+ 治理链路（契约为治理全程供给规则）+ 消费链路（过滤时按它的规范）。
 
@@ -408,16 +408,18 @@ flowchart TD
     P5 -->|needs_material| P2
     P5 -->|needs_plan| P3
     P5 -->|needs_revision| P4
-    P5 -->|passed| P6["P6 source-scan.record<br/>对账真实处理记录"]
+    P5 -->|passed| P6["P6 source-scan.record<br/>转写冻结处置记录"]
     P6 -->|recorded| P7["P7 apply.batch<br/>安全落位、真实索引、目标查询与CAS激活"]
     P7 -->|completed / recorded| END
 ```
 
 P1只观察，不捕获或制造记录。P2可以独立接受显式来源目标，P5缺料回P2定向补齐，不默认重扫全库；实际采用输入漂移时才回P1取得新清单。P3保存逐Claim的计划、理由、保留范围和查询预期，P4直接生产完整字节与输入快照，不安排质量或代码语义复核。
 
-P5独立阅读原文、旧卡、计划和完整稿件，审查知识结论、归卡及实质skip，并对代码Claim核对实际条件和证据；固定函数校验其确定性绑定并运行一次完整质量检查。记录不认证身份，流程不要求上游passed票据。用户可中断或入库后新建修订，历史原字节与旧操作事实保留。
+P5独立阅读原文、旧卡、计划和完整稿件，审查知识结论、归卡、全部来源／维护处置及实质skip，并对代码Claim核对实际条件和证据，披露抽样和未审范围；仅记录欠账也要审理由、缺口和下一步。内容无阻断时，同次调用执行一次完整固定检查；已有内容阻断时注明固定项未执行。记录不认证身份，流程不要求上游passed票据。
 
-P6只对账并准备处理记录。P7.batch重核输入快照、路径、旧基线、写删字节和记录，复用原事务引擎落位；不重跑P5完整质量检查。写后重新固定索引输入，构建及全量验证真实代，执行冻结查询和同代read，保持原expected_active完成CAS激活。仅记录批不带失败稿件、不建索引，保留暂缓／失败欠账。中断按原journal和停点续办，不重复已落位写入；旧apply.run仍保留原完整检查。
+P5退回P2／P3／P4时，以新operation、确切前序稿和实际理由保存新材料／计划／稿件；仅改表达可明确采用原稿绑定且未变的计划和材料。保留仍有效的原扫描与单元身份，旧工件不覆盖、不重签，新稿重新进P5。纯环境故障留在原节点；响应丢失先核执行端进程和已保存事实，不盲目重启入口。
+
+P6机械转写P3/P4已冻结的处置、理由、卡／Claim引用和欠账，不重作内容决定。P7.batch重核输入快照、路径、旧基线、写删字节和记录，复用原事务引擎安全落位，不重跑P5完整质量检查。写后固定实际索引输入，完整验证真实代，执行原冻结查询和同代read，按原expected_active完成CAS激活并回读。正常连续执行只复用同进程、确切字节绑定的核验对象，重启重新全验；重试省略参数也不能重设原CAS基线。完成事实须绑定本批写入、原查询及真实活动指针或其历史链，不能仅凭JSON通过摘要宣称完成。仅记录批不带失败稿件、不建索引，保留暂缓／失败欠账。中断按原journal模式和真实停点续办，不重复已落位写入；旧apply.run仍保留原完整固定检查，旧规则事务使用原配套版本恢复。
 
 本地完成后由人按本批清单提交并触发固定CI、评审合入。`prepare-submission` 只整理实际字节与删除，`verify-submission` 只读真实HEAD、commit、blob及变更范围；不执行Git写入，不把本地完成等同提交、CI或远端接纳。只有同范围完整扫描才能推断原路径缺失，不自动删知识。
 
@@ -445,7 +447,7 @@ flowchart LR
     REPORT -. "人工明确修订要求" .-> INGEST["另行交 ingest"]
 ```
 
-报告区分当前、指导性与历史用途。旧证据可恢复且定位有效时，与当前 `main/` 不同不直接等于历史引用错误；文件 hash 改变也不自动证明结论错误。覆盖以实际卡／Claim 的引用和已配置范围为准，材料缺失、读取失败和中途变化须保留缺口。巡检不修改知识、来源锁、事件／维护水位或活动索引，不自动修复或调用 ingest；原 lint 报告的失败／未完成状态继续保留。细节见[详细设计 §3.1](知识库详细设计.md#31-lint-的检查流程)。
+两个节点均由reviewer执行。有效的正式检查报告即使failed／incomplete，也交下一节点汇总差异与缺口；规则或运行失败导致有效报告未保存时，留在原节点等待。报告区分当前、指导性与历史用途：旧证据可恢复且定位有效时，与当前 `main/` 不同不直接等于历史引用错误；文件hash改变也不自动证明结论错误。覆盖以实际卡／Claim引用和已配置范围为准，材料缺失、读取失败和中途变化须保留缺口。巡检不修改知识、来源锁、事件／维护水位或活动索引，不自动修复或调用ingest；报告完成不等于知识健康或已修复。细节见[详细设计 §3.1](知识库详细设计.md#31-lint-的检查流程)。
 
 C1 位于提交之后，复用这些确定性检查及必要的 SQLite 构建验证；代码变化只核已固定文件的 hash、路径和范围。不匹配则失败返回本地修正，不自动修稿或重新组织 Agent 语义复审。
 ### 流程三：query —— 知识消费
@@ -477,7 +479,7 @@ flowchart TB
 
 查询用途与 stable 状态分开判断：current／implementation 直接核对实际来源、当前模块／Target 范围和工作树源码字节；涉及构建／运行断言时，还复查索引中 `code_contexts` 固定的实际材料和逐 Claim 引用指纹，不要求apply或代码复核通过票据。静态源码结论和纯文档不增加构建材料要求，guidance／historical 不把未知条件提升为产品当前事实。
 
-OpenFlow 在 P3 预先声明目标查询及用途，P7 沿用计划；apply的独立regression动作直接执行本次明确输入的查询断言。query 的 search 回执固定频道、索引代、用途、上下文及命中 Claim，read 仍核实际依据，不能把回执当成永久授权。
+作者在P3固定目标查询、用途及预期，P7沿用原计划；apply的独立regression动作也可直接执行明确输入的查询断言，启用仍绑定候选代原expected_active。query的search回执固定频道、索引代、用途、上下文及命中Claim，read沿原回执同代读取并核实际依据，不能因活动代变化偷换结果，也不能把回执当成永久授权。
 
 shared 索引可在构建时按 `knowledge_commit` 核对实际 Git 快照，query 复验所用代次的快照，结果只声明 `repository_snapshot`；显式提交签名发布回执时另核受信发布身份，不由此证明上游流程或 CI 已通过。OpenFlow 按同一 K 单个 ingest 编排；query 可并发，写入仍由事务锁和 CAS 保护，活动代切换或内容变化时可明确拒绝，机制见[详细设计 §5.9](知识库详细设计.md#59-q1q6路由查询同代精读与回答)。
 

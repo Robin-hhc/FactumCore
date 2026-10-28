@@ -30,7 +30,6 @@ repo/
 ├── main/                          # 业务代码工作区，可包含多个模块
 ├── skills/common/knowledge/   # 开发分发源码，部署时放入 Agent Skills
 │   ├── hs-knowledge-explore/             # 全库能力入口；按需 setup 与只读发现
-│   ├── hs-codegraph-setup/               # 按真实模块首次准备 CodeGraph；日常使用官方 MCP
 │   ├── hs-knowledge-source-scan/         # 增量扫描、材料与处理记录
 │   ├── hs-knowledge-source-capture/      # 保存本次原文副本与定位
 │   ├── hs-knowledge-change-plan/         # 六决策计划
@@ -243,8 +242,7 @@ flowchart LR
 
 | 技能 | 职责 | 一句话 |
 |------|------|--------|
-| `hs-knowledge-explore/` | 全库能力入口与任务指引；按需首次 setup、定位代码仓与知识根 | 读指引选择能力；已有上下文直接复用，缺项才运行脚本 |
-| `hs-codegraph-setup/` | S0：按模块首次准备 CodeGraph 索引与 MCP 接入 | 纯说明 Skill；日常 Q6 直接用官方 MCP |
+| `hs-knowledge-explore/` | 全库能力入口与任务指引；按需首次 setup、定位代码仓与知识根、逐仓初始化 CodeGraph | 读指引选择能力；已有上下文直接复用，缺项才运行脚本 |
 | `hs-knowledge-source-scan/` | P1 扫描、P2 材料、P6 处理记录及进度查询 | scan / prepare / record / status |
 | `hs-knowledge-source-capture/` | 保存本次原文副本，恢复旧版阅读材料 | 默认捕获；resolve-source / resolve 恢复固定来源或捕获包 |
 | `hs-knowledge-change-plan/` | 六决策计划 | plan / review 保存作者计划与独立内容复核 |
@@ -263,7 +261,7 @@ flowchart LR
 | `hs-knowledge-maintain/` | 维护与阻断复核；显式只读引用巡检 | inspect-context 保持默认；audit-references 汇总引用差异报告；事件登记与 advance 另行写入 |
 | `hs-knowledge-query/` | 消费知识 | search / read；延续 search 时绑定原 receipt |
 
-参与流程：OpenFlow 的 ingest Workflow 编排 P1—P7，内部调用 lint Skill；人工测试由人按需要逐个调用，Skill 不校验前驱步骤、角色身份或上游 passed 票据。query 使用实际知识、来源和索引。上表是能力清单，不表示上库必须逐个执行；固定 CI 复用 lint 的确定性检查函数。`hs-knowledge-explore` 提供首次 setup 和后续按需项目接口。S0 仅在首次 setup 时按 `config.yml` 的真实模块准备代码图谱，消费 Q6 使用官方 MCP 定位源码，见[详细设计 §5.11](知识库详细设计.md#511-s0--q6codegraph-首次-setup-与源码定位)。
+参与流程：OpenFlow 的 ingest Workflow 编排 P1—P7，内部调用 lint Skill；人工测试由人按需要逐个调用，Skill 不校验前驱步骤、角色身份或上游 passed 票据。query 使用实际知识、来源和索引。上表是能力清单，不表示上库必须逐个执行；固定 CI 复用 lint 的确定性检查函数。`hs-knowledge-explore` 提供首次准备和后续按需项目接口；首次准备时，Agent 按 `config.yml` 的真实代码仓逐个初始化 CodeGraph，MCP 及后续调用由 harness 提供，见[详细设计 §5.11](知识库详细设计.md#511-explorecodegraph-首次初始化)。
 
 #### `workflows/common/knowledge/` —— 增量更新与治理工作流
 

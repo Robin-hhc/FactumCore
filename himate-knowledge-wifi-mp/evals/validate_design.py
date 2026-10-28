@@ -9,10 +9,8 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 from pathlib import Path
 import re
-import stat
 
 import yaml
 
@@ -35,7 +33,6 @@ SKILLS = ('hs-knowledge-explore',
  'hs-knowledge-query',
  'hs-knowledge-source-scan',
  'hs-knowledge-lint')
-INSTRUCTION_SKILLS = ('hs-codegraph-setup',)
 ARTIFACT_SCOPE = {'hs-knowledge-explore': ([], []),
  'hs-knowledge-source-capture': ([], []),
  'hs-knowledge-change-plan': (['plan_change'], ['planned']),
@@ -157,68 +154,10 @@ def load(path):
     return value
 
 
-def no_links(path):
-    for part in (path, *path.parents):
-        if part.is_symlink() or (
-            os.path.lexists(part)
-            and getattr(part.lstat(), "st_file_attributes", 0)
-            & stat.FILE_ATTRIBUTE_REPARSE_POINT
-        ):
-            raise ValueError(f"LINKED_PATH: {part}")
-
-
-def instruction_files(package):
-    """Read an instruction-only package for static checks, without executing it."""
-    no_links(package)
-    suffixes = {".md", ".txt", ".yaml", ".yml", ".json", ".toml"}
-    files = {}
-    for path in sorted(package.rglob("*")):
-        relative = path.relative_to(package)
-        no_links(path)
-        if any(part.startswith(".") or part.lower() == "config.local.yml"
-               or Path(part).stem.lower() in {"credentials", "secrets"}
-               for part in relative.parts):
-            raise ValueError(f"UNPUBLISHABLE_PACKAGE_FILE: {relative}")
-        if relative.as_posix() != "SKILL.md" and (
-            relative.parts[0] != "references"
-            or path.is_file() and path.suffix.lower() not in suffixes
-        ):
-            raise ValueError(f"UNPUBLISHABLE_INSTRUCTION_FILE: {relative}")
-        if not path.is_file():
-            continue
-        data = path.read_bytes()
-        if re.search(rb"-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----", data):
-            raise ValueError(f"PRIVATE_KEY_IN_PACKAGE: {relative}")
-        if "\x00" in data.decode("utf-8"):
-            raise ValueError(f"NON_TEXT_INSTRUCTION_FILE: {relative}")
-        files[relative.as_posix()] = data
-    if "SKILL.md" not in files:
-        raise ValueError(f"INCOMPLETE_PACKAGE: {package.name}: SKILL.md")
-    for reference in re.findall(r"\]\((references/[^\s)]+)\)", files["SKILL.md"].decode("utf-8")):
-        if reference.split("#", 1)[0] not in files:
-            raise ValueError(f"INVALID_INSTRUCTION_REFERENCE: {reference}")
-    return files
-
-
 def validate(root):
     root = Path(root).resolve(strict=True)
     errors = []
     artifacts = set()
-    # Instruction packages have a text-only boundary; node requirements below
-    # remain unchanged. No material from the inspected packages is run.
-    for skill in INSTRUCTION_SKILLS:
-        package = root / "skills/common/knowledge" / skill
-        try:
-            files = instruction_files(package)
-            text = files["SKILL.md"].decode("utf-8")
-            match = re.match(r"\A---\r?\n(.*?)\r?\n---(?:\r?\n|$)", text, re.S)
-            metadata = yaml.load(match[1], Loader=UniqueLoader) if match else None
-            if (not isinstance(metadata, dict) or metadata.get("name") != skill
-                    or not isinstance(metadata.get("description"), str)
-                    or not metadata["description"].strip()):
-                errors.append(f"{skill}: missing or inconsistent Skill identity")
-        except (OSError, ValueError, yaml.YAMLError) as exc:
-            errors.append(f"{skill}: {exc}")
     for skill in SKILLS:
         package = root / "skills/common/knowledge" / skill
         try:

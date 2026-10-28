@@ -55,7 +55,7 @@ SSH 认证、端口、可达性、权限和命令结果由 harness 依据真实�
 
 ## 后续使用和产物
 
-项目结构继续只改根 `config.yml`。机器全局依赖已安装后，重复 setup 只是检查并读取入口；它不建立常驻服务，也不自动初始化 CodeGraph。当前任务需要 ingest、query、lint、status 或首次 CodeGraph 准备时，Agent 按 [任务路由](../SKILL.md) 继续对应能力；setup 脚本本身不执行这些业务。
+项目结构继续只改根 `config.yml`。机器全局依赖已安装后，重复 setup 脚本只是检查并读取入口。首次项目准备时，Agent 继续按 [首次初始化 CodeGraph](../SKILL.md#首次初始化-codegraph) 遍历配置中的代码仓；这部分由 Agent 执行，setup 脚本不建图。MCP 已由 harness 提供。日常 ingest、query、lint 或 status 按 [任务路由](../SKILL.md) 继续对应能力，已有准备结果直接复用。
 
 Agent/harness 使用已安装的 Skill／Workflow 执行任务；跨机器节点及其子调用、来源读取和生成物留在项目所在服务器。稿件、操作请求与结果使用 K 的 `.build/`，正式记录与来源留痕使用 `logs/`，索引和报告使用 `artifacts/`，不新增外部产物位置。
 

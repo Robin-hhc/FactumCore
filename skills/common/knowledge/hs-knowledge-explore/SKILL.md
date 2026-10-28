@@ -14,7 +14,7 @@ description: HiMate 知识库任务入口。用于原件入库与更新、续办
 | 独立检查知识库或候选 | `hs-knowledge-lint`；只检查并报告。需要修订时转交 ingest，检查本身不改稿、不入库。 |
 | 周期巡检正式库、查找过时代码引用 | 启动已安装的 `F/hs-knowledge-lint` Workflow：先调用原 `S/hs-knowledge-lint` 做正式完整库固定检查，再显式调用 `hs-knowledge-maintain --action audit-references`，生成可定位卡片、Claim、来源、代码文件及旧定位的 JSON／Markdown 报告；只出报告，不修改知识或自动启动 ingest。由用户手动将报告和目标卡交给 ingest；独立 `knowledge lint` 仍调用原只读 Skill。 |
 | 查看进度、未完成事项、材料缺口 | `hs-knowledge-source-scan` 的 `status`；读取实际操作停点和待修订信息，不推进流程，不把本地状态推断为已提交、CI 通过或合入。 |
-| 首次准备代码图谱与官方 MCP | `hs-codegraph-setup`；依据真实 `config.yml` 模块逐项准备和核对。它与本 Skill 的运行依赖 setup 分开；日常代码定位直接使用官方 CodeGraph MCP 或实际源码检索。 |
+| 首次准备代码图谱 | 由 Agent 按本 Skill 的“首次初始化 CodeGraph”逐仓执行；MCP 已由 harness 提供。 |
 | 首次准备运行依赖，或找不到项目入口 | 本 Skill 的 `scripts/setup.py` 或只读发现 CLI，按下面的前置条件使用。 |
 
 ## 取得必要上下文并路由
@@ -39,7 +39,18 @@ python PATH_TO_THIS_SKILL/scripts/setup.py --workspace-config config.yml
 
 不创建独立虚拟环境、catalog／registry／binding 或额外部署目录。日常节点直接由 harness 使用已安装能力；节点默认读取当前规则锁并核验其文件；不要求 catalog 或流程登记，人工可逐个调用。请求、稿件、记录和索引继续使用实际知识根已有 `.build/`、`logs/`、`artifacts/`。
 
-setup 不处理业务入库、CodeGraph、Git 或宿主配置。环境缺项、SSH 连接和权限问题由 harness 依据实际结果判断；需要新位置、系统组件或其他特殊处理时，先向用户说明方案。不将脚本返回的入口提示当作已验证远端连接，不将退出成功当作内容复核、代码证明或真实合入。
+setup 脚本不处理业务入库、CodeGraph、Git 或宿主配置；首次项目准备时，由 Agent 继续完成下面的逐仓初始化。环境缺项、SSH 连接和权限问题由 harness 依据实际结果判断；需要新位置、系统组件或其他特殊处理时，先向用户说明方案。不将脚本返回的入口提示当作已验证远端连接，不将退出成功当作内容复核、代码证明或真实合入。
+
+## 首次初始化 CodeGraph
+
+首次项目准备或用户要求补齐代码图谱时，由 Agent 使用源码所在执行端已提供的 CodeGraph CLI；跨机器沿用上面的 harness SSH 连接。缺少 CLI 时报告缺口。
+
+1. 读取当前 `config.yml`：`code_root` 相对配置所在目录，`modules[].path` 相对代码根。按解析后的实际目录去重，沿用项目路径校验，逐项确认目录存在、未越界且不是链接／junction。`modules: []` 就报告“未登记代码仓”，不扫描或初始化整个 `main/`。
+2. 逐个将命令工作目录设为已配置的代码仓目录，用 `codegraph status` 检查本目录自己的索引。已有可用索引就复用；没有自身索引时执行 `codegraph init`，再检查状态。父子目录分别按配置处理，不能用祖先索引代替当前目录的初始化。
+3. 按实际版本帮助处理首次交互，保留现有排除范围，跳过可选 Git hook 或额外集成，不用自动接受选项跳过这些选择。失败项保留诊断，不删除或强制重建索引；继续其余有效目录，重试时只补未完成项。
+4. 逐仓报告实际目录及新建、复用、缺失或失败结果。`.codegraph/` 是源码执行端的本地派生索引，不上库；初始化结果不代表知识入库或代码语义核验通过。
+
+CodeGraph MCP 已由 harness 安装；本 Skill 的准备工作到逐仓初始化结束。
 
 ## 交付与边界
 

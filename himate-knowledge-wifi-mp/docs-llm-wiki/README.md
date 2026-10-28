@@ -12,7 +12,7 @@ flowchart LR
 | 文件 / 目录 | 阅读目的 |
 |---|---|
 | [HiMate知识库架构设计.md](HiMate知识库架构设计.md) | 目录架构、分层职责与生产、治理、消费三条链路 |
-| [知识库详细设计.md](知识库详细设计.md) | 第 1 节说明前置发现和命令；第 2.1 节画完整 ingest P1—P7，第 3.1 节说明只读 lint 巡检 Workflow 与原 L1—L5 检查，第 3.2 节说明固定 CI，第 4 节说明查询与 Q6 源码定位；第 5 节按节点解释文件设计，§5.11 说明 S0 CodeGraph 首次 setup；第 6 节集中说明共用规则与运行约束 |
+| [知识库详细设计.md](知识库详细设计.md) | 第 1 节说明前置发现和命令；第 2.1 节画完整 ingest P1—P7，第 3.1 节说明只读 lint 巡检 Workflow 与原 L1—L5 检查，第 3.2 节说明固定 CI，第 4 节说明查询与 Q6 源码定位；第 5 节按节点解释文件设计，§5.11 说明 explore 中的 CodeGraph 首次初始化；第 6 节集中说明共用规则与运行约束 |
 | [知识库关键点.md](知识库关键点.md) | WiFi-MP 方案适配其他领域时的目录、raw／Profile、领域契约和 Skill／Workflow 配套修改，以及共用的部署与核验边界 |
 | [使用说明.md](使用说明.md) | 配置 `config.env` 连接信息 → 按需首次准备 → OpenFlow 执行 ingest；按需使用 lint、query Skill 或只读巡检 Workflow |
 | [AGENTS.md](AGENTS.md) | Agent 阅读入口和文档修改边界 |
@@ -29,7 +29,7 @@ flowchart LR
 
 `config.yml` 维护代码根和模块相对路径，以及芯片、Host／Device、特性和用途；共享模块可关联多芯片、多端。无需逐项填写六 Target、三 pair 或重复代码根授权，取证按路径读取实际文件并固定内容指纹。配置文件职责与连接设置见[使用说明](使用说明.md#配置项目代码架构)，共享映射与核验逻辑见[知识库关键点](知识库关键点.md#1-工作区路径与部署边界)。
 
-能力共 19 个 Skill：18 个公开 CLI 节点及 1 个纯说明 `hs-codegraph-setup`；Workflow 设计包含 ingest 和只读 lint 巡检两条。`S/hs-knowledge-lint/` 是原检查 Skill，`F/hs-knowledge-lint/` 是同名巡检 Workflow，安装和宿主加载按实际环境核实。`hs-knowledge-explore` 负责全库能力路由及按需准备、发现；`hs-codegraph-setup` 按真实模块准备图谱及官方 MCP，空模块列表不建图，日常 Q6 直接使用 MCP 或实际文件检索。卡头来源及查询结果提供模块、文件与定位，Agent 按实际 `config.yml` 匹配模块根后追查源码，不以正文可点击链接为前提；见[查询和追代码](使用说明.md#3-怎么查询和追代码)与[详细设计 §5.9](知识库详细设计.md#59-q1q6路由查询同代精读与回答)。
+能力共 18 个公开 CLI Skill；Workflow 设计包含 ingest 和只读 lint 巡检两条。`S/hs-knowledge-lint/` 是原检查 Skill，`F/hs-knowledge-lint/` 是同名巡检 Workflow，安装和宿主加载按实际环境核实。`hs-knowledge-explore` 负责全库能力路由及按需准备、发现，首次准备时由 Agent 按 `config.yml` 中配置的真实代码仓逐个初始化 CodeGraph；空模块列表不建图，MCP 由 harness 提供。卡头来源及查询结果提供模块、文件与定位，Agent 按实际 `config.yml` 匹配模块根后追查源码，不以正文可点击链接为前提；见[查询和追代码](使用说明.md#3-怎么查询和追代码)与[详细设计 §5.9](知识库详细设计.md#59-q1q6路由查询同代精读与回答)。
 
 设计文档描述职责、流程与边界，能力安装、实际宿主、六 Target、CI 合入和权限验证以各自环境的实际记录为准。本项目历史验证工件在本地 SDD 保存原始版本身份，不据此推断当前部署状态。
 

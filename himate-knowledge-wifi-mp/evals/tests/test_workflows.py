@@ -55,14 +55,6 @@ def fixture_packages(root):
             path = package / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(data, encoding="utf-8")
-    for skill in module.INSTRUCTION_SKILLS:
-        package = root / "skills/common/knowledge" / skill
-        (package / "references").mkdir(parents=True)
-        (package / "SKILL.md").write_text(
-            f"---\nname: {skill}\ndescription: isolated setup fixture\n---\n"
-            "Read [commands](references/codegraph.md).\n", encoding="utf-8")
-        (package / "references/codegraph.md").write_text(
-            "# Setup fixture\nNo host settings are modified.\n", encoding="utf-8")
     shutil.copytree(ROOT / "workflows", root / "workflows")
     return root
 
@@ -186,90 +178,29 @@ def test_design_validation_checks_package_contracts_and_owners(tmp_path):
     assert any("review_content: wrong Skill/owner/type" in error for error in module.validate(source))
 
 
-def test_instruction_skill_has_no_node_contract_but_keeps_strict_metadata(tmp_path):
-    module = validator_module()
-    source = fixture_packages(tmp_path / "fixture")
-    package = source / "skills/common/knowledge/hs-codegraph-setup"
-    assert not (package / "scripts").exists() and not (package / "artifacts").exists()
-    assert module.validate(source) == []
-    (package / "SKILL.md").write_text(
-        "---\nname: hs-codegraph-setup\nname: duplicate\ndescription: fixture\n---\n", encoding="utf-8")
-    assert any("hs-codegraph-setup" in error for error in module.validate(source))
-
-
-def test_instruction_skill_rejects_missing_reference_and_executable_content(tmp_path):
-    module = validator_module()
-    source = fixture_packages(tmp_path / "fixture")
-    package = source / "skills/common/knowledge/hs-codegraph-setup"
-    reference = package / "references/codegraph.md"
-    reference.unlink()
-    assert any("INVALID_INSTRUCTION_REFERENCE" in error for error in module.validate(source))
-    reference.write_text("# Commands\n", encoding="utf-8")
-    (package / "references/setup.py").write_text("raise RuntimeError('must not execute')\n", encoding="utf-8")
-    assert any("UNPUBLISHABLE_INSTRUCTION_FILE" in error for error in module.validate(source))
-
-
-@pytest.mark.parametrize("relative", [
-    "scripts/setup.py", "references/setup.ps1", "references/secret.bin",
-    "requirements.lock.txt", "references/.private.md", "references/secrets.txt",
-    "references/config.local.yml",
+@pytest.mark.parametrize("metadata,diagnostic", [
+    ("name: wrong\ndescription: fixture", "missing or inconsistent Skill identity"),
+    ("name: hs-knowledge-explore\ndescription: ''", "missing or inconsistent Skill identity"),
+    ("name: hs-knowledge-explore\nname: duplicate\ndescription: fixture", "duplicate YAML key"),
 ])
-def test_instruction_skill_rejects_executable_and_private_files(tmp_path, relative):
+def test_node_skill_rejects_invalid_metadata(tmp_path, metadata, diagnostic):
     module = validator_module()
     source = fixture_packages(tmp_path / "fixture")
-    path = source / "skills/common/knowledge/hs-codegraph-setup" / relative
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("isolated fixture\n", encoding="utf-8")
-    assert any("UNPUBLISHABLE" in error for error in module.validate(source))
+    path = source / "skills/common/knowledge/hs-knowledge-explore/SKILL.md"
+    path.write_text("---\n" + metadata + "\n---\n# Fixture\n", encoding="utf-8")
+    assert any("hs-knowledge-explore" in error and diagnostic in error
+               for error in module.validate(source))
 
 
-@pytest.mark.parametrize("content,diagnostic", [
-    (b"binary\x00data", "NON_TEXT_INSTRUCTION_FILE"),
-    (b"\xff", "utf-8"),
-    (b"-----BEGIN PRIVATE KEY-----\nisolated fixture", "PRIVATE_KEY_IN_PACKAGE"),
-])
-def test_instruction_skill_requires_public_utf8_text(tmp_path, content, diagnostic):
+def test_node_skill_requires_entry_document(tmp_path):
     module = validator_module()
     source = fixture_packages(tmp_path / "fixture")
-    path = source / "skills/common/knowledge/hs-codegraph-setup/references/codegraph.md"
-    path.write_bytes(content)
-    assert any(diagnostic in error for error in module.validate(source))
+    (source / "skills/common/knowledge/hs-knowledge-explore/SKILL.md").unlink()
+    assert any("hs-knowledge-explore" in error and "SKILL.md" in error
+               for error in module.validate(source))
 
 
-@pytest.mark.parametrize("metadata", [
-    "name: wrong\ndescription: fixture",
-    "name: hs-codegraph-setup\ndescription: ''",
-])
-def test_instruction_skill_rejects_inconsistent_metadata(tmp_path, metadata):
-    module = validator_module()
-    source = fixture_packages(tmp_path / "fixture")
-    path = source / "skills/common/knowledge/hs-codegraph-setup/SKILL.md"
-    path.write_text("---\n" + metadata + "\n---\n# Instructions\n", encoding="utf-8")
-    assert any("missing or inconsistent Skill identity" in error for error in module.validate(source))
-
-
-def test_instruction_skill_requires_entry_document(tmp_path):
-    module = validator_module()
-    source = fixture_packages(tmp_path / "fixture")
-    (source / "skills/common/knowledge/hs-codegraph-setup/SKILL.md").unlink()
-    assert any("INCOMPLETE_PACKAGE" in error for error in module.validate(source))
-
-
-def test_instruction_skill_rejects_linked_reference(tmp_path):
-    module = validator_module()
-    source = fixture_packages(tmp_path / "fixture")
-    external = tmp_path / "outside.md"
-    external.write_text("# Outside fixture\n", encoding="utf-8")
-    reference = source / "skills/common/knowledge/hs-codegraph-setup/references/codegraph.md"
-    reference.unlink()
-    try:
-        reference.symlink_to(external)
-    except OSError:
-        pytest.skip("OS permission to create a symlink is unavailable")
-    assert any("LINKED_PATH" in error for error in module.validate(source))
-
-
-def test_instruction_exception_does_not_relax_node_cli_requirements(tmp_path):
+def test_node_skill_requires_cli(tmp_path):
     module = validator_module()
     source = fixture_packages(tmp_path / "fixture")
     (source / "skills/common/knowledge/hs-knowledge-query/scripts/cli.py").unlink()

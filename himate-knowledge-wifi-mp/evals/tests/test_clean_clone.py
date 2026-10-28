@@ -208,6 +208,10 @@ def test_static_code_card_survives_clean_clone_with_configured_module_bytes(tmp_
     metadata["claims"][0].update(evidence_kind="implementation", context_ids=[scope["context_id"]],
                                  verification_requirements=["semantic-support"])
     metadata["sources"][0]["locator"] = {"kind": "lines", "start": 1, "end": 1, "repo_id": repo_id, "path": "wifi.c"}
+    metadata["sources"][0]["code_ref"] = {
+        "kind": "function", "name": "capture_marker", "scope": [],
+        "parameter_types": [], "role": "definition",
+    }
     card = ("---\n" + yaml.safe_dump(metadata, sort_keys=False) + "---" + body).encode()
     view_ref = p.view("code-clone", bundle_ref, "clone-code-rule", card, semantic=False)
     assert p.call("knowledge-apply", {"operation_id": "code-clone", "view_ref": view_ref})["phase"] == "committed"

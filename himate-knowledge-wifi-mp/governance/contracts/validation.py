@@ -194,6 +194,8 @@ def load_rules(knowledge_root, expected_digest):
     capabilities = lock.get("capabilities", {})
     if any(capabilities.get(name) != "1.0" for name in ("checks", "indexing", "ingest_records")):
         raise ContractError("RULE_CAPABILITY_UNAVAILABLE", "Compatible checks, indexing and ingest-record capabilities are required")
+    if capabilities.get("code_navigation") not in (None, "1.0"):
+        raise ContractError("RULE_CAPABILITY_UNAVAILABLE", "Unsupported code navigation capability")
     entries = lock.get("files", {})
     if not isinstance(entries, dict):
         raise ContractError("INVALID_RULE_LOCK", "files must be an object")
@@ -219,6 +221,8 @@ def load_rules(knowledge_root, expected_digest):
             "checks.py",
         )
     }
+    if capabilities.get("code_navigation") == "1.0":
+        code.add("governance/contracts/code_symbols.py")
     if not code.issubset(seen):
         raise ContractError(
             "UNPINNED_CONTRACT_CODE", "All domain modules must be pinned"

@@ -45,6 +45,8 @@ def code_fixture(harness, usages=("current",), source_bytes=None):
         meta["scope"] = {"applicability": "constrained", "contexts": [{"context_id": "host", "target_id": "chip12-host", "chip": "chip12", "side": "host",
             "build_profile": None, "features_all": [], "features_none": [], "protocol_versions": [], "revision_policy": "revalidate", "revision": None}]}
         meta["sources"][0]["locator"] = {"kind": "lines", "start": 1, "end": 1}
+        meta["sources"][0]["code_ref"] = {"kind": "function", "name": "selected_fixture", "scope": [],
+                                           "parameter_types": [], "role": "definition"}
         meta["claims"][0].update(usage=usage, evidence_kind="implementation", context_ids=["host"])
         harness.write("knowledge/rules/audit-" + usage + ".md", ("---\n" + yaml.safe_dump(meta, sort_keys=False) + "---" + body).encode())
     checkout = {"configuration": str(config_path), "config_digest": hashed(config_path.read_bytes()), "repos": {repo_id: {"root": str(code)}}}
@@ -97,14 +99,21 @@ def test_public_audit_reports_actual_code_drift_without_writing_assets(harness, 
     assert not (harness.root / "logs/events").exists()
 
 
-def test_audit_keeps_guidance_and_historical_uses_distinct(harness):
+@pytest.mark.parametrize("change", ["body", "symbol"])
+def test_audit_keeps_guidance_and_historical_uses_distinct(harness, change):
     source, raw, _, checkout = code_fixture(harness, ("current", "guidance", "historical"))
-    source.write_bytes(raw.replace(b"1", b"3"))
+    source.write_bytes(raw.replace(b"1", b"3") if change == "body"
+                       else raw.replace(b"selected_fixture", b"renamed_fixture"))
     fixed = lint_report(harness, checkout)
     result = harness.run("maintain", {"operation_id": "usages", "lint_report_ref": fixed}, "audit-references")
     rows = harness.record(result["data"]["audit_ref"])["references"]
     effects = {row["claims"][0]["usage"]: row["effect"] for row in rows}
-    assert effects == {"current": "current_reference_needs_review", "guidance": "guidance_navigation_needs_review", "historical": "historical_reference"}
+    assert effects == {"current": "current_reference_needs_review",
+                       "guidance": "guidance_navigation_resolved" if change == "body" else "guidance_navigation_needs_review",
+                       "historical": "historical_reference"}
+    guidance = next(row for row in rows if row["claims"][0]["usage"] == "guidance")
+    assert guidance["code_navigation"]["status"] == ("resolved" if change == "body" else "missing")
+    assert guidance["current_source_matches"] is False
 
 
 def test_empty_library_audit_is_complete_only_with_actual_fixed_report(harness):
@@ -174,19 +183,24 @@ def test_default_inspect_context_result_stays_unchanged(harness):
     assert before == after
 
 
-def test_audit_includes_unadopted_metadata_reference(harness):
+@pytest.mark.parametrize("change", ["body", "symbol"])
+def test_audit_includes_unadopted_metadata_reference(harness, change):
     source, raw, _, checkout = code_fixture(harness)
     path = harness.root / "knowledge/rules/audit-current.md"
     _, header, body = path.read_text(encoding="utf-8").split("---", 2)
     meta = yaml.safe_load(header)
     meta["sources"].append({**meta["sources"][0], "evidence_ref": "unused"})
     path.write_text("---\n" + yaml.safe_dump(meta, sort_keys=False) + "---" + body, encoding="utf-8")
-    source.write_bytes(raw.replace(b"1", b"4"))
+    source.write_bytes(raw.replace(b"1", b"4") if change == "body"
+                       else raw.replace(b"selected_fixture", b"renamed_fixture"))
     fixed = lint_report(harness, checkout)
     result = harness.run("maintain", {"operation_id": "metadata", "lint_report_ref": fixed}, "audit-references")
     rows = harness.record(result["data"]["audit_ref"])["references"]
     unused = next(row for row in rows if row["evidence_ref"] == "unused")
-    assert unused["claims"] == [] and unused["effect"] == "unadopted_reference_needs_review"
+    assert unused["claims"] == []
+    assert unused["effect"] == ("unadopted_navigation_resolved" if change == "body" else "unadopted_reference_needs_review")
+    assert unused["code_navigation"]["status"] == ("resolved" if change == "body" else "missing")
+    assert unused["current_source_matches"] is False
 
 
 def test_unreadable_location_and_unauthorized_mapping_are_not_reported_as_missing(harness):
@@ -289,7 +303,10 @@ def test_large_current_file_reports_explicit_bounded_text_omission(harness):
 
 
 def test_fragments_and_shared_file_diffs_are_bounded_and_explicit(harness):
-    old = b"".join(("/* old fixture line " + str(index) + " " + "x" * 100 + " */\n").encode() for index in range(100))
+    # Active code cards bind an actual definition while retaining 100 lines of
+    # source material for the original fragment/diff truncation assertions.
+    old = b"int selected_fixture(void) { return 1; }\n" + b"".join(
+        ("/* old fixture line " + str(index) + " " + "x" * 100 + " */\n").encode() for index in range(99))
     source, raw, _, checkout = code_fixture(harness, ("current", "guidance"), source_bytes=old)
     for usage in ("current", "guidance"):
         path = harness.root / ("knowledge/rules/audit-" + usage + ".md")

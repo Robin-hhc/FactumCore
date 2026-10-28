@@ -24,8 +24,10 @@ ingest 的 P5 显式使用 `--action review`。宿主安排独立 reviewer 读�
 
 独立数据用途也保留在本包：`record-review` 仅登记本次内容审阅；`code-check` 核对代码依据；`code-recheck` 复查当前代码材料；`verify-evidence` 按明确的 current／historical 用途复验已有证据。它们不代表完整 P5 已通过，不执行编译、Git 提交或合入。
 
+活动（非 deprecated）卡的每个 code 来源必须声明 `sources[].code_ref`，包括未被 Claim 采用的来源；公共固定检查缺失时报 `CODE_REF_REQUIRED`，独立于 `review_mode: code_gate`。旧活动卡经 ingest 补齐，历史来源恢复及 deprecated 卡保留原四字段兼容。纯文档不强制连代码，P5 根据实际内容判断是否遗漏必要入口；不能用 file／range 兜底。公共固定检查继续核对旧证据中的符号绑定及当前导航，文档背景卡同样适用。字段和状态规则见知识根 `governance/specs/cards.md`。missing／ambiguous 为失败，unavailable 为未完成，不猜条件分支或把解析失败当不存在；resolved 只说明可定位，不能替代现有逐 Claim 语义、当前字节或构建条件核验。
+
 旧处理记录采用了不同版本的卡时，将 P2 材料中真实保留的 `card_digest → card_ref` 作为 `inputs.historical_card_objects`（摘要到执行端绝对文件路径的映射）。沿用 P4 已固定的全文与指纹，不重新提取或用当前新稿拼造旧版；这些路径是本次作业数据，不能写进共享配置。正式库／CI 仍可按原有确切版本输入和仓库历史独立核验。
 
-报告对象绑定精确视图、规则、范围与输入；各固定检查明确 passed、failed、incomplete 或 not_applicable。退出 0 表示所选范围完整执行且无阻断；1 表示有阻断问题；2 表示输入、规则、运行或报告不可用。发现问题交回 ingest 的 P2／P3／P4 修订后重检；独立调用到报告为止。纯文档代码项不适用，缺必需材料必须未完成。格式合规不证明语义或真人同意。
+报告对象绑定精确视图、规则、范围与输入；各固定检查明确 passed、failed、incomplete 或 not_applicable。退出 0 表示所选范围完整执行且无阻断；1 表示有阻断问题；2 表示输入、规则、运行或报告不可用。发现问题交回 ingest 的 P2／P3／P4 修订后重检；独立调用到报告为止。纯文档免代码语义门禁，已声明 code_ref 的导航检查仍适用；缺必需材料必须未完成。格式合规不证明语义或真人同意。
 
 结果模板见 `artifacts/templates/result.md`。CI 从可信基线直接复用 contracts/checks，不调用 Agent、Workflow、安装 catalog 或此 Skill 的宿主编排。

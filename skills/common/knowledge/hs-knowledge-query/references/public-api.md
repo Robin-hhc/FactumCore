@@ -50,6 +50,10 @@ uncommitted local record does not establish a repository snapshot. Code/current 
 requires the current configuration fingerprint and actual referenced code
 bytes to match; unknown or changed context restricts those Claims.
 
+A source declaring `code_ref` also returns `code_navigation` from the common source resolver. Active-card code sources require the field at fixed lint/CI; historical recovery and deprecated cards remain compatible with four-field references. Its status is resolved, missing, ambiguous or unavailable; only a unique resolved result supplies a current range. The original source_ref, snapshot and locator remain fixed evidence. Current positions never rewrite that locator, and current_source_matches still reports whole-file byte equality. Navigation is rechecked during the query; changed navigation identity/status is not silently substituted between qualification and output. Guidance source-file drift does not by itself negate the document's background conclusion; current/implementation qualification keeps its existing source/configuration/build checks. A symbol result does not prove semantics or which conditional definition is active.
+
+The same code_ref is stored in card metadata and compiled Claim.source_records, so no new query index table, card-level symbol registry or CodeGraph node ID is needed. Rebuild derived indexes after adopting new locked rules; do not modify old generations. CodeGraph may assist the Agent with candidates and call relationships, but public fixed checks do not call MCP or install/build a graph.
+
 P2 maintenance candidate discovery is exposed by `hs-knowledge-source-prepare` and
 the shared knowledge relation functions. It includes non-answer states and
 does not relax this query API's answer eligibility. New-search index freshness

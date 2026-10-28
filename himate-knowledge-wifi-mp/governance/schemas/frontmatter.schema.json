@@ -83,6 +83,9 @@
           "locator": {
             "type": "object",
             "minProperties": 1
+          },
+          "code_ref": {
+            "$ref": "#/$defs/code_ref"
           }
         },
         "additionalProperties": false
@@ -148,6 +151,35 @@
   ],
   "additionalProperties": false,
   "$defs": {
+    "code_ref": {
+      "type": "object",
+      "required": ["kind", "name"],
+      "properties": {
+        "kind": {"enum": ["function", "struct", "class", "enum", "enum_member", "macro", "type_alias", "variable"]},
+        "name": {"type": "string", "minLength": 1},
+        "scope": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "language": {"enum": ["c", "cpp"]},
+        "parameter_types": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "qualifiers": {"type": "array", "uniqueItems": true, "items": {"enum": ["const", "volatile", "&", "&&"]}},
+        "role": {"enum": ["definition", "declaration"]},
+        "form": {"enum": ["object", "function"]},
+        "parameter_count": {"type": "integer", "minimum": 0},
+        "variadic": {"type": "boolean"}
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {"not": {"required": ["qualifiers"], "properties": {"qualifiers": {
+          "allOf": [{"contains": {"const": "&"}}, {"contains": {"const": "&&"}}]
+        }}}},
+        {"if": {"properties": {"kind": {"const": "function"}}},
+         "then": {"not": {"anyOf": [{"required": ["form"]}, {"required": ["parameter_count"]}, {"required": ["variadic"]}]}},
+         "else": {"not": {"anyOf": [{"required": ["parameter_types"]}, {"required": ["qualifiers"]}, {"required": ["role"]}]}}},
+        {"if": {"properties": {"kind": {"const": "macro"}}},
+         "then": {"if": {"properties": {"form": {"const": "object"}}, "required": ["form"]},
+                  "then": {"not": {"anyOf": [{"required": ["parameter_count"]}, {"required": ["variadic"]}]}}},
+         "else": {"not": {"anyOf": [{"required": ["form"]}, {"required": ["parameter_count"]}, {"required": ["variadic"]}]}}}
+      ]
+    },
     "context": {
       "type": "object",
       "properties": {

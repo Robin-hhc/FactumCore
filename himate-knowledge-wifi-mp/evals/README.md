@@ -16,3 +16,7 @@
 P1/P2独立测试分别验证观察不备料、固定清单／显式目标备料、定向补料及漂移回P1。P3保留语义／六决策oracle，P4验证实际字节和旧Claim去向，P5独立审阅与完整质量检查及代码证据绑定。apply/tests承接安全事务、恢复、独立index/regression/submission及真实公开batch，lint/tests承接原local/merge代码业务oracle，maintain/tests保事件pending／恢复／advance及只读audit。旧兄弟CLI的缺安装和子调用超时包装随架构消除，保留其业务失败不冒称通过、停点和原字节保护断言。
 
 最终验收使用发出的真实规则锁，不自动重pin陈旧锁；只有测试明确修改规则或注入检查计数时，才在独立夹具中生成并标注该测试版本。contract_test_support.py仅帮助可信开发夹具加载同一公共算法，公开CLI仍独立验证复制的规则锁。P7内部验证对象不从JSON passed声明创建；写后基线、完整数据库／正文、原冻结查询和CAS均独立验证。各组测试分别运行，避免私有同名模块污染；新增机制和静态测试不替代真实OpenFlow/API/SSH/六Target/CI/权限验收。
+
+`test_code_symbols.py`、`test_code_ref_contracts.py` 及 query／maintain 包的 `test_code_navigation.py` 验证补充式 `sources[].code_ref`：旧快照绑定与当前符号导航分别检查，涵盖插行、改体、删除、歧义、安全配置绑定、用途边界和公开 CLI。解析使用锁定的 Tree-sitter C/C++ 语法，不执行目标代码；语法或能力不足返回 unavailable。
+
+符号性能诊断可在 `repo/` 执行 `python himate-knowledge-wifi-mp/evals/benchmark_ingest.py --checkout . --output-dir .scratch/symbol-benchmark-new --symbols`。它单独测量 1000 个合成 C 函数的冷解析及同文件操作缓存查询，保留 summary.json；不包含 CLI、文件系统、构建、模型或宿主延迟，也不作为速度阈值。

@@ -72,12 +72,40 @@ def worker(checkout, output):
             "verified": ["actual_activation", "formal_search", "same_generation_read", "unchanged_original"]}
 
 
+def symbol_worker(checkout):
+    """Measure the public byte resolver separately from CLI and document work."""
+    helper_path = checkout / "himate-knowledge-wifi-mp/evals/contract_test_support.py"
+    spec = importlib.util.spec_from_file_location("measured_symbol_contracts", helper_path)
+    helper = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(helper)
+    symbols = helper.module("code_symbols")
+    count = 1000
+    original = "".join(f"int symbol_{i}(const int *value) {{ return *value; }}\n" for i in range(count)).encode()
+    selector = {"kind": "function", "name": "symbol_0", "parameter_types": ["const int *"]}
+    cache = {}
+    started = time.perf_counter()
+    first = symbols.resolve(original, selector, path="synthetic.c", cache=cache)
+    cold = time.perf_counter() - started
+    assert first["status"] == "resolved" and first["range"]["start_line"] == 1
+    started = time.perf_counter()
+    for number in range(count):
+        result = symbols.resolve(original, {**selector, "name": f"symbol_{number}"}, path="synthetic.c", cache=cache)
+        assert result["status"] == "resolved" and result["range"]["start_line"] == number + 1
+    return {"verification_tier": "local_synthetic_symbol_lookup", "python": sys.version,
+            "symbols": count, "lookups": count, "cold_seconds": round(cold, 6),
+            "cached_lookup_seconds": round(time.perf_counter() - started, 6),
+            "source_sha256": hashlib.sha256(original).hexdigest(),
+            "limitations": ["In-memory C source only; no CLI, filesystem, build, LLM or host latency",
+                            "Timing is diagnostic and is not a correctness or speed threshold"]}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkout", required=True)
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--runs", type=int, default=3, choices=range(1, 6))
     parser.add_argument("--instrument", action="store_true", help="Separate call-count probe; includes profiling overhead")
+    parser.add_argument("--symbols", action="store_true", help="Measure symbol parsing and same-file cached lookups only")
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
     checkout, output = Path(args.checkout).resolve(strict=True), Path(args.output_dir).absolute()
@@ -87,6 +115,11 @@ def main():
     if output.exists() or any(path.is_symlink() for path in (output, *output.parents)):
         parser.error("Use a fresh, unlinked output directory")
     output.mkdir(parents=True)
+    if args.symbols:
+        report = symbol_worker(checkout)
+        (output / "summary.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+        print(json.dumps(report))
+        return 0
     probe = output / "probe"
     probe.mkdir()
     (probe / "sitecustomize.py").write_text(PROBE, encoding="utf-8")

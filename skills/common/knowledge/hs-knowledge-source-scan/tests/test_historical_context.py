@@ -81,7 +81,9 @@ def historical_batch(harness, definitions=None):
         else:
             meta["review_mode"] = "code_gate"
             meta["sources"].append({"evidence_ref": "code", "source_id": code_snapshot["source_id"],
-                "snapshot_id": code_snapshot["snapshot_id"], "locator": {"kind": "lines", "start": 1, "end": 1}})
+                "snapshot_id": code_snapshot["snapshot_id"], "locator": {"kind": "lines", "start": 1, "end": 1},
+                "code_ref": {"kind": "function", "name": "historical_example", "scope": [],
+                             "parameter_types": [], "role": "definition"}})
             meta["claims"][0].update(usage=usage, evidence_kind="implementation", source_refs=["e1", "code"],
                                     verification_requirements=["semantic-support"])
             if usage == "current":
@@ -202,15 +204,22 @@ def test_completed_historical_code_drift_does_not_reopen_unchanged_raw(harness):
 
 
 @pytest.mark.parametrize("historical_first", [True, False], ids=["historical-first", "current-first"])
-def test_same_source_freshness_keeps_current_and_guidance_affected(harness, historical_first):
+@pytest.mark.parametrize("change", ["body", "symbol"])
+def test_same_source_freshness_distinguishes_current_and_guidance_navigation(harness, historical_first, change):
     definitions = ([("a-history", "historical", None), ("b-current", "current", None), ("c-guidance", "guidance", None)]
                    if historical_first else
                    [("a-current", "current", None), ("b-guidance", "guidance", None), ("z-history", "historical", None)])
     source, original, old_snapshot, raw = historical_batch(harness, definitions)
-    source.write_bytes(original.replace(b"1", b"2"))
-    expected = {identity for identity, usage, _ in definitions if usage != "historical"}
+    source.write_bytes(original.replace(b"1", b"2") if change == "body"
+                       else original.replace(b"historical_example", b"renamed_example"))
+    expected = {identity for identity, usage, _ in definitions
+                if usage == "current" or (usage == "guidance" and change == "symbol")}
     observed = harness.run("maintain", {"operation_id": "mixed-live-drift"}, "inspect-context")["data"]
     assert {row["card_id"] for row in observed["affected_claims"]} == expected
+    guidance = next(row for row in observed["code_navigation"]
+                    if row["card_id"] == next(identity for identity, usage, _ in definitions if usage == "guidance"))
+    assert guidance["code_navigation"]["status"] == ("resolved" if change == "body" else "missing")
+    assert guidance["current_source_matches"] is False
     new_bundle = harness.run("source-prepare", {"operation_id": "mixed-new-code", "kind": "code",
         "repo_id": old_snapshot["code_identity"]["repo_id"], "relative_path": "file.c",
         "source_id": "historical-code"}, action="capture")["data"]["bundle_ref"]

@@ -90,6 +90,8 @@ def trusted_contracts(root, expected):
     try:
         importlib.import_module(name)
         modules = {part: importlib.import_module(name + '.' + part) for part in ('validation', 'knowledge', 'source_resources', 'records', 'indexing', 'checks')}
+        if 'governance/contracts/code_symbols.py' in verified:
+            modules['code_symbols'] = importlib.import_module(name + '.code_symbols')
         rules = modules['validation'].load_rules(root, expected)
     finally:
         sys.meta_path.remove(finder)
@@ -126,7 +128,7 @@ def main():
         output.parent.mkdir(parents=True, exist_ok=True)
         with output.open('xb') as stream:
             stream.write(canonical(report))
-        print(canonical(report).decode('utf-8'))
+        print(json.dumps(report, ensure_ascii=True))
         return modules['checks'].exit_code(report)
     except Exception as exc:
         print(json.dumps({'report_version': '1.0', 'status': 'incomplete', 'phase': 'incomplete', 'exit_code': 2, 'complete': False, 'checks': [], 'findings': [{'code': 'CI_INPUT_UNAVAILABLE', 'severity': 'error', 'reason': str(exc)}]}, ensure_ascii=True))

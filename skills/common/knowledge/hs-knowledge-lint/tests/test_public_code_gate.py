@@ -456,6 +456,10 @@ class PublicCodeGateTests(unittest.TestCase):
             scope={"applicability": "constrained", "contexts": [scope]},
         )
         meta["sources"][0]["locator"] = locator
+        meta["sources"][0]["code_ref"] = {
+            "kind": "function", "name": "fixture_wifi_ready", "scope": [],
+            "parameter_types": [], "role": "definition",
+        }
         meta["claims"][0].update(
             evidence_kind="implementation",
             usage="current",

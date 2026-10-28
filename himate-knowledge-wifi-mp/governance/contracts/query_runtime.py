@@ -434,13 +434,15 @@ def validate_live_code_claim(ctx, card, claim, query_context=None):
             {**claim, "scope": scope}, query_context, "current")]
         if not scopes:
             raise NodeError("CODE_SCOPE_CHANGED", "No Claim code context matches this query")
+    symbol_options = ({"symbol_cache": ctx.modules["source_operations"].symbol_cache(ctx)}
+                      if any("code_ref" in ref for ref in refs) else {})
     for scope in scopes or [claim["scope"]]:
         scoped_card = {**card, "metadata": {**card["metadata"],
                        "scope": scope, "sources": refs}}
         resources.validate_code_references(scoped_card, lock, {
             "configuration": str(config_path), "config_digest": sha(config_bytes),
             "repos": repositories,
-        }, ctx.rules)
+        }, ctx.rules, **symbol_options)
     if config_path.read_bytes() != config_bytes:
         raise NodeError("CODE_CONFIGURATION_CHANGED", "config.yml changed during the query")
 
@@ -534,6 +536,13 @@ def qualify_sources(ctx, card, eligible, purpose, cache, code_sources=(), query_
                     }
             result = cache[key]
             resolutions[key] = result
+            navigation = result.get("code_navigation")
+            if purpose == "guidance" and navigation and navigation["status"] != "resolved":
+                gaps.append({
+                    "code": navigation["code"], "card_id": card["metadata"]["id"],
+                    "claim_id": claim["id"], "source_ref": source,
+                    "reason": navigation["reason"],
+                })
             if result.get("unavailable") or (
                 purpose in ("current", "implementation")
                 and result.get("current_source_matches") is not True
@@ -577,13 +586,54 @@ def qualify_sources(ctx, card, eligible, purpose, cache, code_sources=(), query_
     )
 
 
+def _navigation_identity(navigation):
+    matches = navigation.get("matches", [])
+    if navigation.get("status") != "resolved" or len(matches) != 1:
+        return None
+    return {key: matches[0][key] for key in (
+        "kind", "name", "scope", "parameter_types", "qualifiers", "form",
+        "parameter_count", "variadic",
+        "role",
+    ) if key in matches[0]}
+
+
+def _navigation_changed(previous, current):
+    return (previous.get("status") != current.get("status")
+            or (previous.get("status") == "resolved"
+                and (_navigation_identity(previous) is None
+                     or _navigation_identity(previous) != _navigation_identity(current))))
+
+
+def _validate_navigation_observations(previous, current, purpose, code_sources):
+    if purpose != "guidance":
+        return
+    observed = {digest(source["source_ref"]): source for source in current}
+    for source in previous:
+        reference = source["source_ref"]
+        if "code_ref" not in reference or reference["source_id"] not in code_sources:
+            continue
+        fresh = observed.get(digest(reference))
+        if fresh is None or _navigation_changed(
+                source.get("code_navigation", {}), fresh.get("code_navigation", {})):
+            raise NodeError("SOURCE_CHANGED_DURING_QUERY",
+                            "A source changed after candidate qualification; retry", blocked=True)
+
+
 def refresh_sources(ctx, sources, purpose, code_sources=()):
     result = []
     for source in sources:
         fresh = ctx.modules["source_operations"].resolve_source(ctx, ({'operation_id': ctx.operation, 'source_ref': source['source_ref']})["source_ref"])
+        navigation_only = (purpose == "guidance"
+                           and "code_ref" in source["source_ref"]
+                           and source["source_ref"]["source_id"] in code_sources)
+        old_navigation = source.get("code_navigation", {})
+        fresh_navigation = fresh.get("code_navigation", {})
+        navigation_changed = navigation_only and _navigation_changed(old_navigation, fresh_navigation)
         if (
             fresh.get("snapshot_digest") != source.get("snapshot_digest")
-            or fresh.get("current_source_sha256") != source.get("current_source_sha256")
+            or (not navigation_only
+                and fresh.get("current_source_sha256") != source.get("current_source_sha256"))
+            or navigation_changed
             or (
                 purpose in ("current", "implementation")
                 and fresh.get("current_source_matches") is not True
@@ -805,6 +855,10 @@ def execute(ctx, *, verified_generation=None):
                     "Card or dependency qualification changed before output; retry",
                     blocked=True,
                 )
+            _validate_navigation_observations(
+                evaluator.evaluate(match["card_id"])[2], sources,
+                request.get("purpose", "current"), fresh.code_sources,
+            )
             match["sources"] = refresh_sources(
                 ctx, sources, request.get("purpose", "current"), fresh.code_sources
             )
@@ -871,7 +925,7 @@ def execute(ctx, *, verified_generation=None):
             "card_digest": card["sha256"],
         }
         fresh = EligibilityEvaluator(ctx, manifest, request, event_state(ctx))
-        fresh_claims = fresh.evaluate(card["metadata"]["id"])[1]
+        _, fresh_claims, fresh_sources, _ = fresh.evaluate(card["metadata"]["id"])
         if authorized_claims is not None:
             fresh_claims &= authorized_claims
         if fresh_claims != eligible:
@@ -880,6 +934,9 @@ def execute(ctx, *, verified_generation=None):
                 "Card or dependency qualification changed before read output",
                 blocked=True,
             )
+        _validate_navigation_observations(
+            data["sources"], fresh_sources, request.get("purpose", "current"), fresh.code_sources,
+        )
         if search_receipt is not None:
             data["source_search_receipt_ref"] = request["receipt_ref"]
     else:

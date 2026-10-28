@@ -523,7 +523,9 @@ def run(view, rules, inputs=None, scope=None):
             raise OSError("CI requires explicitly supplied exact source inputs")
         return source_resources.recover_snapshot(root, snapshot)
 
+    resource_kinds = {item["source_id"]: item["kind"] for item in lock["resources"]} if lock is not None else {}
     code_cards = []
+    symbol_cache = {}
     for card in cards.values():
         ref = card["path"]
         if not selected(ref):
@@ -541,9 +543,25 @@ def run(view, rules, inputs=None, scope=None):
                     "claims": [claim for claim in card["claims"] if claim["id"] in {item["id"] for item in current_claims}]})
         if lock is not None:
             for source in card["metadata"]["sources"]:
+                if (metadata["lifecycle"] != "deprecated"
+                        and resource_kinds.get(source["source_id"]) == "code" and "code_ref" not in source):
+                    finding("source", "CODE_REF_REQUIRED",
+                            "Active code source requires code_ref: " + source["evidence_ref"], ref)
                 try:
-                    checked_source = source_resources.validate_reference(source, lock, resolver, allowed_kinds=set(rules["registries"].get("locator_kinds", [])) or None)
+                    checked_source = source_resources.validate_reference(source, lock, resolver,
+                        allowed_kinds=set(rules["registries"].get("locator_kinds", [])) or None,
+                        symbol_cache=symbol_cache)
                     by_group["source"].setdefault("inputs", []).append(checked_source)
+                    if "code_ref" in source and metadata["lifecycle"] != "deprecated":
+                        if report["mode"] == "ci" and not inputs.get("code_checkout"):
+                            raise v.ContractError("CODE_INPUT_UNAVAILABLE", "Symbol navigation requires the CI job's fixed code checkout")
+                        navigation = source_resources.resolve_code_navigation(root, source, lock,
+                            inputs.get("code_checkout"), cache=symbol_cache)
+                        by_group["source"].setdefault("code_navigation", []).append({
+                            "card_id": metadata["id"], "evidence_ref": source["evidence_ref"], **navigation})
+                        if navigation["status"] != "resolved":
+                            finding("source", navigation["code"], navigation["reason"], ref,
+                                    incomplete=navigation["status"] == "unavailable")
                 except (v.ContractError, OSError, ValueError, KeyError) as exc:
                     caught("source", exc, ref)
     report["code_check_status"] = "not_applicable" if not code_cards else "passed"
@@ -553,7 +571,8 @@ def run(view, rules, inputs=None, scope=None):
     elif code_cards and lock is not None:
         for card in code_cards:
             try:
-                checked_code = source_resources.validate_code_references(card, lock, inputs["code_checkout"], rules)
+                checked_code = source_resources.validate_code_references(card, lock, inputs["code_checkout"], rules,
+                    symbol_cache=symbol_cache)
                 by_group["source"].setdefault("code_inputs", []).extend(checked_code)
             except (v.ContractError, OSError, ValueError, KeyError, TypeError) as exc:
                 caught("source", exc, card["path"])

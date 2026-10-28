@@ -5,3 +5,6 @@ jsonschema-specifications==2025.4.1
 referencing==0.36.2
 rpds-py==0.25.1
 typing_extensions==4.14.1
+tree-sitter==0.25.2
+tree-sitter-c==0.24.1
+tree-sitter-cpp==0.23.4

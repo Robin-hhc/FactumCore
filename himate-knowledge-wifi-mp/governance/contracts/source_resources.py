@@ -133,8 +133,14 @@ def validate_source_ref(ref, lock, roots=None):
     matches = [s for s in lock["snapshots"] if s["snapshot_id"] == ref["snapshot_id"]]
     if len(matches) != 1 or matches[0]["source_id"] != ref["source_id"]:
         raise ContractError("SOURCE_SNAPSHOT_MISMATCH", ref["snapshot_id"])
-    if not any(s["source_id"] == ref["source_id"] for s in lock["resources"]):
+    resources = [s for s in lock["resources"] if s["source_id"] == ref["source_id"]]
+    if len(resources) != 1:
         raise ContractError("SOURCE_RESOURCE_MISSING", ref["source_id"])
+    if "code_ref" in ref:
+        if resources[0].get("kind") != "code":
+            raise ContractError("CODE_REF_NON_CODE_SOURCE", "code_ref is only valid on code sources")
+        from . import code_symbols
+        code_symbols.validate_code_ref(ref["code_ref"])
     return matches[0]
 
 
@@ -443,7 +449,7 @@ def _validate_document_reference(snapshot, data, locator):
     return True
 
 
-def validate_reference(ref, lock, resolver, *, allowed_kinds=None):
+def validate_reference(ref, lock, resolver, *, allowed_kinds=None, symbol_cache=None):
     """Recover an exact object and validate its address, without semantic inference.
 
     Resolvers return bytes, or {bytes, locators}; structured locators must be
@@ -503,10 +509,84 @@ def validate_reference(ref, lock, resolver, *, allowed_kinds=None):
         wanted = list(range(identity, end + 1)) if isinstance(identity, int) and isinstance(end, int) else [identity]
         if not isinstance(addresses, (list, dict)) or not wanted or any(value not in addresses for value in wanted):
             raise ContractError("INVALID_SOURCE_LOCATOR", "Structured source locator is not readable")
-    return {"snapshot_id": snapshot["snapshot_id"], "sha256": snapshot["sha256"], "locator": locator}
+    result = {"snapshot_id": snapshot["snapshot_id"], "sha256": snapshot["sha256"], "locator": locator}
+    if "code_ref" in ref:
+        from . import code_symbols
+        resource = next(row for row in lock["resources"] if row["source_id"] == ref["source_id"])
+        observed = code_symbols.resolve(data, ref["code_ref"], path=locator.get("path") or resource["path"],
+            extractor=snapshot.get("extraction", {}).get("extractor"), cache=symbol_cache)
+        if observed["status"] != "resolved":
+            raise ContractError(observed["code"], "Adopted snapshot: " + observed["reason"], resource["path"])
+        if locator.get("kind") != "lines":
+            raise ContractError("CODE_REF_LOCATOR_MISMATCH", "Symbol evidence requires a fixed line locator")
+        position = observed["range"]
+        first = locator.get("start", locator.get("number"))
+        last = locator.get("end", first)
+        if last < position["start_line"] or first > position["end_line"]:
+            raise ContractError("CODE_REF_LOCATOR_MISMATCH", "Fixed lines do not overlap the declared symbol", resource["path"])
+        result["code_ref"] = ref["code_ref"]
+    return result
 
 
-def validate_code_references(card, lock, checkout, rules):
+def resolve_code_navigation(root, reference, lock, checkout=None, cache=None):
+    """Locate a symbol in actual registered code; never replace its old evidence."""
+    from pathlib import Path
+    from . import code_symbols
+    from .validation import normalize_workspace, workspace_file_allowed
+
+    snapshot = validate_source_ref(reference, lock)
+    if "code_ref" not in reference:
+        return None
+    resource = next(row for row in lock["resources"] if row["source_id"] == reference["source_id"])
+    locator = reference["locator"]
+    relative = locator.get("path") or resource.get("path")
+    repo_id = locator.get("repo_id") or resource.get("repo_id")
+
+    def unavailable(reason, *, status="unavailable", code="CODE_SYMBOL_UNAVAILABLE"):
+        return {"status": status, "code": code, "reason": reason, "path": relative,
+                "repo_id": repo_id, "source_id": reference["source_id"], "matches": []}
+
+    try:
+        config_path = workspace_config_path(root,
+            config_path=checkout["configuration"] if checkout is not None else None)
+        config_bytes = config_path.read_bytes()
+        if checkout is not None and (
+                not checkout.get("config_digest") or sha256_bytes(config_bytes) != checkout["config_digest"]):
+            return unavailable("Fixed workspace configuration fingerprint differs")
+        config = normalize_workspace(load_yaml(config_bytes), config_path.parent)
+        mapping = next((row for row in config.get("repos", []) if row["repo_id"] == repo_id), None)
+        if mapping is None or not workspace_file_allowed(config, repo_id, relative):
+            return unavailable("Code reference is outside the current configured module scope")
+        repository = (checkout.get("repos", {}).get(repo_id) if checkout is not None else mapping)
+        if not repository or not repository.get("root"):
+            return unavailable("Current code checkout is unavailable")
+        code_root = Path(repository["root"])
+        mapped_root = Path(mapping["root"])
+        if not mapped_root.is_absolute():
+            mapped_root = config_path.parent / mapped_root
+        if checkout is not None and (not code_root.is_absolute() or code_root.resolve() != mapped_root.resolve()):
+            return unavailable("Checkout differs from the sole configured repository mapping")
+        if checkout is None and not code_root.is_absolute():
+            code_root = config_path.parent / code_root
+        source_path = safe_path(code_root.resolve(strict=True), relative)
+        try:
+            raw = source_path.read_bytes()
+        except FileNotFoundError:
+            return unavailable("Registered current code file does not exist", status="missing", code="CODE_SYMBOL_MISSING")
+        declared = repository.get("files", {}).get(relative)
+        if declared is not None and declared != sha256_bytes(raw):
+            return unavailable("Actual current code differs from the job's fixed input")
+        result = code_symbols.resolve(raw, reference["code_ref"], path=relative,
+            extractor=snapshot.get("extraction", {}).get("extractor"), cache=cache)
+        if source_path.read_bytes() != raw or config_path.read_bytes() != config_bytes:
+            return unavailable("Source or configuration changed during symbol lookup")
+        return {**result, "repo_id": repo_id, "source_id": reference["source_id"],
+                "config_digest": sha256_bytes(config_bytes)}
+    except (OSError, KeyError, TypeError, ValueError) as exc:
+        return unavailable(str(exc))
+
+
+def validate_code_references(card, lock, checkout, rules, *, symbol_cache=None):
     """Check fixed code addresses against job-supplied Git, never support claims.
 
     checkout = {configuration: exact config.yml path, config_digest: SHA,
@@ -568,7 +648,7 @@ def validate_code_references(card, lock, checkout, rules):
                 raise ContractError("CODE_FINGERPRINT_MISMATCH", "Current fixed code differs; return to local ingest")
             if job_repo.get("files") and job_repo["files"].get(relative) != sha256_bytes(raw):
                 raise ContractError("CODE_FINGERPRINT_MISMATCH", "Job file fingerprint differs from actual source")
-            validate_reference(ref, lock, lambda snapshot: raw)
+            validate_reference(ref, lock, lambda snapshot: raw, symbol_cache=symbol_cache)
             verified.append({"repo_id": repo_id, "path": relative, "commit": None,
                              "sha256": snapshot["sha256"], "evidence_basis": "filesystem"})
             continue
@@ -594,7 +674,7 @@ def validate_code_references(card, lock, checkout, rules):
         snapshot = validate_source_ref(ref, lock)
         if sha256_bytes(raw) != snapshot["sha256"] or len(raw) != snapshot["bytes"]:
             raise ContractError("CODE_FINGERPRINT_MISMATCH", "Current fixed code differs; return to local ingest")
-        validate_reference(ref, lock, lambda snapshot: raw)
+        validate_reference(ref, lock, lambda snapshot: raw, symbol_cache=symbol_cache)
         verified.append({"repo_id": repo_id, "path": relative, "commit": commit, "sha256": snapshot["sha256"]})
     return verified
 

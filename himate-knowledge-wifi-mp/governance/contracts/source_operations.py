@@ -161,6 +161,15 @@ def recovered_bytes(context, snapshot):
         raise
 
 
+def symbol_cache(context):
+    """Reuse parsed bytes only within this operation, never current observations."""
+    cache = getattr(context, "_code_symbol_cache", None)
+    if cache is None:
+        cache = {}
+        context._code_symbol_cache = cache
+    return cache
+
+
 def resolve_source(context, reference, bundle=None):
     lock = bundle
     if lock is None:
@@ -205,6 +214,11 @@ def resolve_source(context, reference, bundle=None):
     if sha(data) != snapshot["sha256"] or len(data) != snapshot["bytes"]:
         raise NodeError(
             "SOURCE_INTEGRITY_ERROR", "Recovered bytes differ from exact snapshot"
+        )
+    if "code_ref" in reference:
+        context.modules["source_resources"].validate_reference(
+            reference, lock, lambda fixed_snapshot: data,
+            symbol_cache=symbol_cache(context),
         )
     resource = next(
         r for r in lock["resources"] if r["source_id"] == reference["source_id"]
@@ -288,7 +302,7 @@ def resolve_source(context, reference, bundle=None):
         )
     if current_matches is False:
         gaps.append("Current source bytes differ from this fixed historical snapshot")
-    return {
+    result = {
         "source_ref": reference,
         "source_kind": resource.get("kind"),
         "resource": resource,
@@ -304,6 +318,16 @@ def resolve_source(context, reference, bundle=None):
         "current_source_matches": current_matches,
         "current_source_sha256": current_hash,
     }
+    if "code_ref" in reference:
+        navigation = context.modules["source_resources"].resolve_code_navigation(
+            context.root, reference, lock, cache=symbol_cache(context),
+        )
+        result["code_navigation"] = navigation
+        if navigation["status"] != "resolved":
+            result["limitations"].append(
+                "Current code navigation is " + navigation["status"] + ": " + navigation["reason"]
+            )
+    return result
 
 
 

@@ -179,6 +179,9 @@ def test_current_code_check_projects_claim_sources_and_keeps_current_version_str
     import os
     import subprocess
     from wifi_v3 import checks
+    knowledge_root = tmp_path / "wiki"
+    knowledge_root.mkdir()
+    rules = dict(rules, knowledge_root=knowledge_root)
     code = tmp_path / "code"
     code.mkdir()
     def git(*args):
@@ -186,7 +189,8 @@ def test_current_code_check_projects_claim_sources_and_keeps_current_version_str
     git("init", "-q")
     git("config", "core.autocrlf", "false")
     git("remote", "add", "origin", "fixture-origin")
-    old, current = b"old implementation\n", b"current implementation\n"
+    old = b"int projected_fixture(void) { return 1; }\n"
+    current = b"int projected_fixture(void) { return 2; }\n"
     (code / "source.c").write_bytes(old)
     git("add", "source.c")
     git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "old")
@@ -198,7 +202,10 @@ def test_current_code_check_projects_claim_sources_and_keeps_current_version_str
     legacy_fields = ("schema_version", "workspace_id", "knowledge_roots", "repos", "architecture",
                      "wiki_entities", "symbol_aliases", "targets", "pairs", "query")
     config = {field: normalized[field] for field in legacy_fields}
+    config["knowledge_roots"] = {"wifi": "wiki"}
     config["repos"] = [{"repo_id": "fixture", "kind": "git", "root": str(code), "expected_identity": "fixture-origin"}]
+    config["architecture"] = [{"binding_id": "fixture-code", "repo_id": "fixture", "module_root": ".",
+                               "knowledge_domain": "wifi", "override_nested": False}]
     configuration = tmp_path / "config.yml"
     configuration.write_bytes(yaml.safe_dump(config).encode())
     card_spec = importlib.util.spec_from_file_location("mixed_code_card_fixture", DOMAIN / "evals/tests/test_contracts.py")
@@ -206,7 +213,12 @@ def test_current_code_check_projects_claim_sources_and_keeps_current_version_str
     card_spec.loader.exec_module(card_fixture)
     _, front, body = card_fixture.card_data(review_mode="code_gate").decode().split("---", 2)
     meta = yaml.safe_load(front)
-    meta["sources"] = [{"evidence_ref": "e-" + label, "source_id": "s-" + label, "snapshot_id": "code:" + label, "locator": {"kind": "lines", "repo_id": "fixture", "path": "source.c", "start": 1, "end": 1}} for label in ("old", "current")]
+    meta["sources"] = [{
+        "evidence_ref": "e-" + label, "source_id": "s-" + label, "snapshot_id": "code:" + label,
+        "locator": {"kind": "lines", "repo_id": "fixture", "path": "source.c", "start": 1, "end": 1},
+        "code_ref": {"kind": "function", "name": "projected_fixture", "scope": [],
+                     "parameter_types": [], "role": "definition"},
+    } for label in ("old", "current")]
     now = dict(meta["claims"][0], id="now", source_refs=["e-current"], usage="current", evidence_kind="implementation")
     history = dict(meta["claims"][0], id="old", text_ref="#old", source_refs=["e-old"], usage="historical", evidence_kind="implementation")
     meta["claims"] = [now, history]

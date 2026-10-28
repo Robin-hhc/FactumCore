@@ -467,7 +467,7 @@ def inspect_context(context):
         config_digest = sha(config_path.read_bytes())
     except (ValueError, OSError):
         config_digest = None
-    cached, affected, gaps = {}, [], []
+    cached, affected, gaps, navigation_observations = {}, [], [], {}
     record_root = context.root / "logs/ingest"
     if record_root.exists():
         for path in sorted(record_root.iterdir()):
@@ -489,16 +489,46 @@ def inspect_context(context):
                 if key not in cached:
                     try:
                         resolved = context.modules["source_operations"].resolve_source(context, ({'operation_id': context.operation, 'source_ref': source})["source_ref"])
-                        cached[key] = (None if resolved.get("current_source_matches") is True else "source_changed", None)
+                        cached[key] = (None if resolved.get("current_source_matches") is True else "source_changed",
+                                       None, resolved)
                     except (ValueError, OSError, KeyError) as exc:
-                        cached[key] = ("source_unavailable", str(exc))
-                reason, details = cached[key]
+                        cached[key] = ("source_unavailable", str(exc), None)
+                reason, details, resolved = cached[key]
+                navigation = (resolved or {}).get("code_navigation")
+                if "code_ref" in source and navigation is not None:
+                    observation = navigation_observations.setdefault((card_id, key), {
+                        "card_id": card_id, "claim_ids": [], "source_ref": source,
+                        "current_source_matches": resolved.get("current_source_matches"),
+                        "current_source_sha256": resolved.get("current_source_sha256"),
+                        "code_navigation": navigation,
+                    })
+                    observation["claim_ids"].append(claim["id"])
+                if claim["usage"] == "guidance" and "code_ref" in source and reason != "source_unavailable":
+                    if navigation and navigation.get("status") == "resolved":
+                        reason = None
+                    else:
+                        reason = "code_navigation_" + (navigation or {}).get("status", "unavailable")
+                        details = (navigation or {}).get("reason", "Current symbolic navigation is unavailable")
                 # A recovered historical snapshot need not match today's file.
                 # Keep the cached resolver fact shared across all Claim usages.
                 if reason and not (claim["usage"] == "historical" and reason == "source_changed"):
                     reasons.append({"reason": reason, "source_id": source["source_id"], "details": details})
             for block in persisted.get("blocked_claims", []):
                 if block.get("card_id") in {card_id, "*"} and block.get("claim_id") in {claim["id"], "*"}:
+                    if (claim["usage"] == "guidance"
+                            and block.get("reason") in {"source_changed", "code_changed", "code_source_changed"}
+                            and (block.get("source_id") or block.get("old_snapshot_ids"))):
+                        navigation_sources = [source for source in claim["source_records"]
+                            if (not block.get("source_id") or source["source_id"] == block["source_id"])
+                            and (not block.get("old_snapshot_ids") or source["snapshot_id"] in block["old_snapshot_ids"])]
+                        if navigation_sources and all(
+                                "code_ref" in source
+                                and cached[digest(source)][0] != "source_unavailable"
+                                and (cached[digest(source)][2] or {}).get("code_navigation", {}).get("status") == "resolved"
+                                for source in navigation_sources):
+                            # A navigation observation never clears the durable event
+                            # or weakens its effect on current implementation Claims.
+                            continue
                     if (claim["usage"] == "historical"
                             and block.get("reason") in {"source_changed", "code_changed", "code_source_changed"}
                             and (block.get("source_id") or block.get("old_snapshot_ids"))):
@@ -528,9 +558,12 @@ def inspect_context(context):
                                  "dependencies": sorted(targets)} for claim in card["claims"])
                 blocked_cards.add(card_id)
                 changed = True
-    return {"complete": not gaps, "affected_claims": affected, "gaps": gaps,
-            "rules_digest": context.args.rules_digest, "config_digest": config_digest,
-            "state": persisted}, "inspected"
+    result = {"complete": not gaps, "affected_claims": affected, "gaps": gaps,
+              "rules_digest": context.args.rules_digest, "config_digest": config_digest,
+              "state": persisted}
+    if navigation_observations:
+        result["code_navigation"] = list(navigation_observations.values())
+    return result, "inspected"
 
 
 def execute(context):

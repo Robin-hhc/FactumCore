@@ -1,6 +1,6 @@
 schema_version: '2.0'
 contract_family: aiot-wifi
-tool_version: 0.4.0
+tool_version: 0.4.2
 files:
   contracts/__init__.py:
     path: governance/contracts/__init__.py
@@ -13,13 +13,13 @@ files:
     sha256: 42c9d2d386b500748a38c286792d3861d46777224bb899dcdf5789aea843f48a
   contracts/source_resources.py:
     path: governance/contracts/source_resources.py
-    sha256: 4e379b71c82044ad76265a3ce48ca7c3e3cde746e6c4f2ca6287f580466506f5
+    sha256: da75cc5442e047019189861343a4303906490d1a3f3cdd4a202a5ade0f06bbd7
   contracts/validation.py:
     path: governance/contracts/validation.py
-    sha256: 832209d97677cfd4573e39ca74a43dc856d1a18af8db221c4062455e8647b655
+    sha256: 9e9291687cc6c55850871c1f6e6a3ebeabebfae85857548d3682309172e41306
   schemas/frontmatter.schema.json:
     path: governance/schemas/frontmatter.schema.json
-    sha256: 796f5032fb764b95cc24c76b468120646a23d090506b00eac0e77101c17b08f8
+    sha256: c4fb6ea94eb12ff206be238f25073e0e1784d1becbf76af54a4b546c7a8cc819
   schemas/profiles.yaml:
     path: governance/schemas/profiles.yaml
     sha256: ec9eae684e484dd79cfe0f546a336d95d68ba5da7345f88e93733483d0d638be
@@ -61,7 +61,7 @@ files:
     sha256: 45e465c2b5725c85addad44b17c44ea70db2515a5d21fbe976fa54a7b0ec7fdf
   specs/cards.md:
     path: governance/specs/cards.md
-    sha256: 2b6d29e137f6f4b6433d8cd5806fdfb759b16417cd6669982174d86ed7d60a21
+    sha256: ac2a2affc08ac08427aca7bf912ba1aace6e607b139fa3f63189a15b3dcab3fe
   specs/lifecycle.md:
     path: governance/specs/lifecycle.md
     sha256: 8a825806ec5c918ec561968190daf571aac706af8798be47e6f9a42f4d7fab5c
@@ -70,10 +70,10 @@ files:
     sha256: b2093f1fed694acbec5406222db6072e141acd0f4687024530e14274e6447a86
   specs/sources.md:
     path: governance/specs/sources.md
-    sha256: d805888ba24022fcb8ee9f9768e36f1062e1de15a4a29d8ae1a2b7ea34a20b1d
+    sha256: 1c027ad8e70ec552f2ecafe431901d5e78c2a6e5ae4d747154aa3361745fa08e
   contracts/checks.py:
     path: governance/contracts/checks.py
-    sha256: 6ebf9ce80947af6190f52547a06b87dc37a133b1e811bc0dc3e9b1d2869184f2
+    sha256: b469007a85a25bb507d23d601bef13f75f17ff341e97382abd9bc08a8d3e8341
   contracts/indexing.py:
     path: governance/contracts/indexing.py
     sha256: f343946a197d2fa6beaec789bc8cf6d2440208c474da58ecbdb6d725d0703a36
@@ -100,7 +100,7 @@ files:
     sha256: b327df8ec2f1cd82d856104c93c0e78d48ee3a26393b9aa2e22f98ddd47b20d8
   contracts/maintenance.py:
     path: governance/contracts/maintenance.py
-    sha256: 50c37c8493d2feaffcb7f50d79f0e7bdd0e9dcd3a0daeb2c24c2eeb7ff6274f3
+    sha256: 9f2c2872cda85a11ef5477036ede7ef6bc513e30695ab9c3465ee61cf874603f
   contracts/production.py:
     path: governance/contracts/production.py
     sha256: e8fe77dcc173c42c40869036035d30999c44682de79e036b5f6cb032ba125d59
@@ -109,10 +109,10 @@ files:
     sha256: 091cc276a471d1511ca3e990283087fffdbcd7c959833f0aade1512585c0774f
   contracts/query_runtime.py:
     path: governance/contracts/query_runtime.py
-    sha256: bc91bf1387c36ea6fceb0e7b924d5fe8e26fbd6b76e6350e195e579bff301d23
+    sha256: 5b75cab7006ed92d95b176721161c1d69fa2c0386651997b1e4470582aea5a5e
   contracts/reference_audit.py:
     path: governance/contracts/reference_audit.py
-    sha256: 577239dcc4d3c2fab48f0f470472e53d0fbd2a1ba64dd5774a59ce175a1d890e
+    sha256: b30c0f326c9e6bbbf9bad6e79cdace4ea4af37002621f3c329dbb7c92bf76a6c
   contracts/review_inputs.py:
     path: governance/contracts/review_inputs.py
     sha256: 829f91e5560765e22548a7705edab2169c465a0a7d55224b2206c179ba01e03d
@@ -124,12 +124,16 @@ files:
     sha256: 14d3dda54f0652337141c00020d8e99e2c800bf47564e53a63edd33bc03d84ea
   contracts/source_operations.py:
     path: governance/contracts/source_operations.py
-    sha256: 32ec9a50094e41825168d5268547bd56384eec875ab7893246f6b9608e27eb35
+    sha256: 44b833ce8ea22500ffc43dff1676440d5e9be03eadd33b305f51cb54f4dcbc26
   contracts/submission.py:
     path: governance/contracts/submission.py
     sha256: 824ad30ee508b6a2b0bc90d3ded530ca48a7cd4a81be8efc872f1f3fc64d5d58
+  contracts/code_symbols.py:
+    path: governance/contracts/code_symbols.py
+    sha256: b9763b817969a65476c9b46788939463f2d08a276513b807fc09275a9e8d09c6
 capabilities:
   checks: '1.0'
   indexing: '1.0'
   ingest_records: '1.0'
   workspace_mapping: '1.0'
+  code_navigation: '1.0'

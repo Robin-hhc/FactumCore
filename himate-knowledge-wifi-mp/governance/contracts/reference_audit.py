@@ -102,10 +102,14 @@ def current_source(context, config_state, resource):
         return {"observation": "unavailable", "current_sha256": None, "gap": issue(getattr(exc, "code", "CODE_FILE_UNREADABLE"), exc)}
 
 
-def effect_for(claims, changed):
+def effect_for(claims, changed, navigation=None):
     usages = {row["usage"] for row in claims}
     if usages == {"historical"}:
         return "historical_reference"
+    if navigation is not None and "current" not in usages:
+        if navigation.get("status") == "resolved":
+            return "guidance_navigation_resolved" if "guidance" in usages else "unadopted_navigation_resolved"
+        return "guidance_navigation_needs_review" if "guidance" in usages else "unadopted_reference_needs_review"
     if not changed:
         return "unchanged_reference"
     if "current" in usages:
@@ -160,12 +164,26 @@ def reference_row(context, card, reference, resource, lock, config_state, observ
                 row["old_fragment"], row["old_fragment_truncated"] = excerpt(resolved["text"], MAX_FRAGMENT_LINES, MAX_FRAGMENT_CHARS)
     except (OSError, ValueError, KeyError, TypeError) as exc:
         row["gaps"].append(issue("ADOPTED_CODE_UNAVAILABLE", exc))
+    if "code_ref" in reference:
+        row["code_ref"] = reference["code_ref"]
+        try:
+            row["code_navigation"] = context.modules["source_resources"].resolve_code_navigation(
+                context.root, reference, lock,
+                cache=context.modules["source_operations"].symbol_cache(context),
+            )
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            row["code_navigation"] = {"status": "unavailable", "code": "CODE_NAVIGATION_UNAVAILABLE",
+                                      "reason": str(exc), "path": resource["path"], "matches": []}
+        if row["code_navigation"]["status"] == "unavailable":
+            row["gaps"].append(issue(row["code_navigation"]["code"], row["code_navigation"]["reason"]))
     changed = row["current_source_matches"] is not True
-    row["effect"] = effect_for(claims, changed)
+    row["effect"] = effect_for(claims, changed, row.get("code_navigation"))
     row["suggestion"] = {
         "historical_reference": "Keep the fixed historical purpose; current-file drift alone does not invalidate this historical Claim.",
         "current_reference_needs_review": "Ask ingest to read the actual current implementation, assess the Claim and update or narrow its evidence and scope.",
         "guidance_navigation_needs_review": "Review this code-navigation reference through ingest; do not infer that the guidance content is false.",
+        "guidance_navigation_resolved": "The declared current symbol remains uniquely navigable; retain the fixed document guidance and its historical evidence.",
+        "unadopted_navigation_resolved": "The metadata-only symbol remains uniquely navigable; no Claim adopts this reference.",
         "unadopted_reference_needs_review": "Review this metadata-only code reference through ingest; no Claim currently adopts it.",
         "unchanged_reference": "Reference bytes match; this mechanical observation does not establish semantic support.",
     }[row["effect"]]
@@ -197,6 +215,12 @@ def markdown(payload, audit_ref):
                   f"来源／快照：`{row['source_id']}` / `{row['snapshot_id']}`。", "",
                   f"旧 hash：`{row['old_sha256']}`；当前 hash：`{row['current_sha256']}`。", "",
                   f"观察：`{row['observation']}`；匹配：`{row['current_source_matches']}`；用途判断：`{row['effect']}`。", ""]
+        if row.get("code_navigation"):
+            navigation = row["code_navigation"]
+            position = navigation.get("path") or row["path"]
+            if navigation.get("range"):
+                position += f"#L{navigation['range']['start_line']}-L{navigation['range']['end_line']}"
+            lines += [f"当前符号导航：`{navigation['status']}`；位置：`{position}`。{navigation['reason']}", ""]
         if row["old_fragment"] is not None:
             lines += ["旧片段：", "", *["> " + line for line in row["old_fragment"].splitlines()], ""]
         if row["difference"]:

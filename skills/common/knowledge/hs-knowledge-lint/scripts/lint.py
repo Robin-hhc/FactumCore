@@ -48,7 +48,7 @@ def main():
             output.parent.mkdir(parents=True, exist_ok=True)
             with output.open("xb") as stream:
                 stream.write(raw)
-            print(raw.decode("utf-8"))
+            print(json.dumps(report, ensure_ascii=True))
             return code
         mode = request.get("mode", "candidate" if request.get("view_ref") else "formal")
         if mode not in {"formal", "candidate"}:
@@ -69,7 +69,7 @@ def main():
         output.parent.mkdir(parents=True, exist_ok=True)
         with output.open("xb") as stream:
             stream.write(raw)
-        print(raw.decode("utf-8"))
+        print(json.dumps(report, ensure_ascii=True))
         return checks.exit_code(report)
     except Exception as exc:
         if args.action in {"review", "record-review", "code-check", "code-recheck", "verify-evidence"}:

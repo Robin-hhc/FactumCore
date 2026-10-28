@@ -14,6 +14,8 @@ When a project context is adopted, P2 reads its actual record and fixes `context
 
 Candidate discovery decodes formal card data and follows adopted sources, requested topics/IDs and downstream `requires/derived_from` relations across all lifecycle states. Ordinary `related` does not imply a mandatory dependency. Only selected candidates acquire full old originals. P2 does not repeat whole-library Profile/Claim quality checks; P5 owns those checks.
 
+Existing `sources[].code_ref` values are retained in adopted old-source records. They describe symbols only for registered code resources; authors fill new values in the P4 card from actual prepared source, following K's `governance/specs/cards.md`. Capture requests and immutable snapshots do not acquire a separate symbol registry. A resolved source may also return `code_navigation`; it describes the current configured file separately from the exact retained snapshot and `current_source_matches`.
+
 `--action capture` retains the original independent capture behavior below.
 
 Capture request: `operation_id`, `source_path`, `source_id`; optional `version`, explicit `attachments`, `context_ref`. Only landed `docs-raw/{conventions,chips,storys,specs,protocols,troubleshooting}` files are supported. Primary MD/TXT must be nonempty UTF-8, PDF needs a text layer on every page, DOCX supports paragraphs/tables with explicit visual gaps. No URLs, sources links, OCR, active content, network access or writes to originals.

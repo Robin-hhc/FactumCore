@@ -182,64 +182,6 @@ def safe(root, relative, prefixes=None):
     return current
 
 
-def reserve_output(value, knowledge_root=None, prefixes=(".build", "logs")):
-    """Claim a fresh response path before any business operation runs."""
-    path = Path(value).absolute()
-    if ".." in path.parts:
-        raise ValueError("Output path traversal is not permitted")
-    reserved = {"CON", "PRN", "AUX", "NUL"} | {
-        prefix + str(number) for prefix in ("COM", "LPT") for number in range(1, 10)
-    }
-    if any(
-        part.rstrip(" .") != part or part.split(".")[0].upper() in reserved
-        or any(ord(char) < 32 or char in '<>:"|?*' for char in part)
-        for part in path.parts[1:]
-    ):
-        raise ValueError("Output path contains a reserved or nonportable component")
-
-    def check_links():
-        for current in (path, *path.parents):
-            try:
-                info = current.lstat()
-            except FileNotFoundError:
-                continue
-            if stat.S_ISLNK(info.st_mode) or (
-                getattr(info, "st_file_attributes", 0)
-                & stat.FILE_ATTRIBUTE_REPARSE_POINT
-            ):
-                raise ValueError("Linked output paths are not permitted")
-
-    check_links()
-    if knowledge_root:
-        root = Path(knowledge_root).resolve()
-        if path.is_relative_to(root):
-            relative = path.relative_to(root)
-            if not relative.parts or relative.parts[0] not in prefixes:
-                raise ValueError("Output cannot replace domain source or governed data")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    check_links()
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-    flags |= getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
-    try:
-        descriptor = os.open(native_path(path), flags, 0o600)
-    except FileExistsError as exc:
-        raise ValueError("Output path already exists; use a new output path") from exc
-    try:
-        check_links()
-        return os.fdopen(descriptor, "wb")
-    except BaseException:
-        os.close(descriptor)
-        raise
-
-
-def finish_output(stream, content):
-    """Write only to this invocation's exclusively created response file."""
-    with stream:
-        stream.write(content)
-        stream.flush()
-        os.fsync(stream.fileno())
-
-
 def fixed_bytes(root, ref, prefixes=None):
     path = safe(root, ref, prefixes)
     data = Path(native_path(path)).read_bytes()
@@ -552,15 +494,7 @@ class Context:
                 name,
                 blocked=True,
             ) from exc
-        try:
-            response = read_json(safe(self.root, outgoing))
-        except (OSError, ValueError, UnicodeError) as exc:
-            raise NodeError(
-                "SIBLING_RESULT_UNAVAILABLE",
-                f"{name} did not publish a valid response (exit {result.returncode}); inspect the saved operation before retrying",
-                name,
-                blocked=True,
-            ) from exc
+        response = read_json(safe(self.root, outgoing))
         if response.get("digest") != digest(
             {key: value for key, value in response.items() if key != "digest"}
         ):
@@ -591,11 +525,6 @@ def run(handler, package):
     parser.add_argument("--catalog")
     parser.add_argument("--action")
     args = parser.parse_args()
-    try:
-        output_stream = reserve_output(args.output, args.knowledge_root)
-    except (OSError, ValueError) as exc:
-        sys.stderr.write(str(exc) + "\n")
-        return 2
     identity = tool_identity(package)
     envelope = {
         "schema_version": "2.0",
@@ -629,12 +558,13 @@ def run(handler, package):
         )
         code = 3 if blocked else 2
     envelope["rules_digest"] = args.rules_digest
+    output = Path(args.output).absolute()
+    root = Path(args.knowledge_root).resolve()
+    if root.exists() and output.is_relative_to(root):
+        safe(root, output.relative_to(root).as_posix(), [".build", "logs"])
+    output.parent.mkdir(parents=True, exist_ok=True)
     envelope["digest"] = digest(
         {key: value for key, value in envelope.items() if key != "digest"}
     )
-    try:
-        finish_output(output_stream, canonical(envelope))
-    except (OSError, ValueError) as exc:
-        sys.stderr.write("Output could not be saved: " + str(exc) + "\n")
-        return 2
+    output.write_bytes(canonical(envelope))
     return code

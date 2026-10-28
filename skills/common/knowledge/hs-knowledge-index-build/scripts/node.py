@@ -394,6 +394,17 @@ def execute(ctx):
                     canonical(pointer),
                     immutable=False,
                 )
+                # The query report precedes this CAS. Preserve the successful
+                # local activation even when a later generation becomes active.
+                actual_pointer = read_json(safe(ctx.root, f"artifacts/indexes/{manifest['channel']}/active.json"))
+                if actual_pointer != pointer:
+                    raise NodeError("ACTIVE_CHANGED", "Active pointer changed before observation", blocked=True)
+                observed = ctx.seal({
+                    "purpose": "index_activation_observation", "generation_ref": ref,
+                    "manifest_digest": manifest["digest"], "expected_active": request["expected_active"],
+                    "active_digest": pointer["digest"], "active_pointer": pointer,
+                }, "artifact_manifest")
+                ctx.save(ctx.base + "/activation/" + observed["digest"] + ".json", observed)
         return {
             "verified": True,
             "activated": action == "activate",

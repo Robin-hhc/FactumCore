@@ -13,7 +13,7 @@ nodes:
     type: skill
     owner: coder
     skill: hs-knowledge-source-scan
-    prompt: 扫描六类原件及实际停点，区分新处理、未入库复核和已入库收尾；无变化不写记录。先核宿主产物根，摘要用独立显式路径；不兼容或阻断时保存停点，不交棒。
+    prompt: 扫描六类原件及实际停点，分别读actionable_unit_ids与finalization_pending；空原件待办仍须核收尾。用status核确切视图和代次，未知先检查，不重放入库或改CAS基线；无变化不写记录。先核宿主产物根，摘要用独立显式路径；阻断时保留停点，不交棒。
     exits:
       - id: scanned
         label: 准备材料
@@ -21,7 +21,7 @@ nodes:
         target: prepare_material
       - id: unchanged
         label: 无需更新
-        condition: 扫描完整且无变化、修订、维护或未完成事项；不新增处理记录。
+        condition: 扫描完整且无变化、修订、维护或未完成事项，finalization_pending为空；不新增处理记录。
         target: __end__
       - id: resume
         label: 续办内容复核
@@ -314,7 +314,7 @@ nodes:
     type: skill
     owner: reviewer
     skill: hs-knowledge-query-regression
-    prompt: 沿用冻结查询及构建返回的代次、活动指针基线，验证后CAS激活；响应丢失先核报告和实际活动代，不重放或改基线。摘要用独立显式路径；异常保存停点、不交棒。
+    prompt: 传确切view_ref或apply_result_ref，沿用冻结查询、构建代次和原expected_active，验证后CAS激活；响应丢失先核报告及实际活动代，不重放或改基线。摘要用独立显式路径；异常保存停点、不交棒。
     exits:
       - id: checked
         label: 查询与激活完成

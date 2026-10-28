@@ -334,6 +334,33 @@ def load_generation(ctx, request, search_receipt=None):
     return explicit, manifest, db, active
 
 
+def require_fresh_generation(ctx, manifest):
+    """Match the index's public byte baseline without producer operation logs."""
+    try:
+        paths = [path for path in (ctx.root / "knowledge").rglob("*.md") if path.is_file()]
+        paths.append(ctx.root / "governance/sources.lock.yaml")
+        current = {
+            path.relative_to(ctx.root).as_posix(): sha(
+                fixed_bytes(ctx.root, path.relative_to(ctx.root).as_posix())
+            )
+            for path in sorted(paths)
+        }
+    except (OSError, NodeError) as exc:
+        if isinstance(exc, NodeError) and exc.code != "INPUT_CHANGED":
+            raise
+        raise NodeError(
+            "INDEX_STALE",
+            "Formal knowledge is unavailable or changed; rebuild, verify and activate the workspace index before a new query",
+            blocked=True,
+        ) from exc
+    if digest(current) != manifest.get("knowledge_baseline"):
+        raise NodeError(
+            "INDEX_STALE",
+            "Formal knowledge differs from the active index; rebuild, verify and activate the workspace index before a new query",
+            blocked=True,
+        )
+
+
 def load_card(ctx, manifest, card_id, purpose="current"):
     row = manifest["documents"].get(card_id)
     if not row:
@@ -747,6 +774,13 @@ def execute(ctx):
     generation_ref, manifest, db, active_observation = load_generation(
         ctx, request, search_receipt
     )
+    needs_fresh_generation = (
+        search_receipt is None
+        and not request.get("evaluation")
+        and request.get("purpose", "current") != "historical"
+    )
+    if needs_fresh_generation:
+        require_fresh_generation(ctx, manifest)
     binding = request_binding(request, action, generation_ref)
     initial_state = event_state(ctx)
     epoch = initial_state["validity_epoch"]
@@ -903,6 +937,8 @@ def execute(ctx):
         raise NodeError(
             "VALIDITY_CHANGED", "Validity changed before output", blocked=True
         )
+    if needs_fresh_generation:
+        require_fresh_generation(ctx, manifest)
     data["verification_tier"] = ctx.generation_verification_tier
     receipt = ctx.seal(
         {

@@ -31,8 +31,19 @@ require an apply/merge-check qualification chain. Current reads check actual
 source/configuration bytes; historical reads keep the exact retained source. If no
 original record or eligible claim remains, the read is refused.
 
-Without `receipt_ref`, `read` keeps the existing behavior of using the current
-active generation. A `read` receipt links back to its source search for audit;
+New formal `search`/`receipt` calls and `read` without `receipt_ref` require the
+active generation's `knowledge_baseline` to match the current exact bytes and
+path set of `knowledge/**/*.md` and `governance/sources.lock.yaml`. The check
+runs before retrieval and again before a successful response. A mismatch returns
+`status: blocked` with diagnostic `INDEX_STALE` and no answer data; rebuild,
+verify and activate the workspace index before retrying. Query does not rebuild
+or activate it automatically, and the comparison needs no producer transaction
+logs or private operation artifacts.
+
+Historical requests and explicit candidate evaluation retain their snapshot
+semantics. A valid original search receipt also retains its same-generation
+read semantics, while the existing live source, dependency and qualification
+checks still apply. A `read` receipt links back to its source search for audit;
 use the original search receipt for subsequent reads.
 
 Shared repository snapshots bind an explicit Git commit and card hashes. The consumer verifies actual Git blobs, current record
@@ -44,6 +55,6 @@ bytes to match; unknown or changed context restricts those Claims.
 
 P2 maintenance candidate discovery is exposed by `source-scan prepare` and
 the shared knowledge relation functions. It includes non-answer states and
-does not relax this query API's answer eligibility. New-search index freshness
-checking is outside this change; generation integrity and same-generation
-read checks remain mandatory.
+does not relax this query API's answer eligibility. Generation integrity,
+new-query freshness and same-generation read checks remain mandatory within
+their respective request modes.

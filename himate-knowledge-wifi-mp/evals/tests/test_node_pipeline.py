@@ -98,8 +98,13 @@ def test_raw_to_reviewed_stable_generation_and_post_ingest_correction(tmp_path):
     assert current["validity_epoch"] == advanced["validity_epoch"]
     # Pointer rollback cannot resurrect old current knowledge after the live blocker clears.
     p.write("artifacts/indexes/local/active.json", old_pointer)
-    rolled_back = p.call("knowledge-query", {**search, "operation_id": "consume-pointer-rollback"}, "search")["data"]
-    assert rolled_back["matches"] == []
+    rolled_back = p.call(
+        "knowledge-query", {**search, "operation_id": "consume-pointer-rollback"},
+        "search", expected=3,
+    )
+    assert rolled_back["status"] == "blocked"
+    assert rolled_back["diagnostics"][0]["code"] == "INDEX_STALE"
+    assert rolled_back["data"] == {}
     old = p.call(
         "knowledge-query",
         {"operation_id": "history-after-update", "card_id": "capture-rule", "purpose": "historical"},

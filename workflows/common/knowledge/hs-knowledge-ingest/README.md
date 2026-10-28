@@ -16,6 +16,8 @@
 
 无变化且无待办时直接结束；仅记录批保存记录后结束；中断按实际停点续办。
 
+扫描的 `actionable_unit_ids` 与 `finalization_pending` 分开读取：已入库待索引／查询的批次不重新提炼原件；后者非空或状态不明时不能选择无需更新。通过只读 `status` 核对确切视图、冻结查询、候选代及构建时原 `expected_active`；回归显式传 `view_ref` 或 `apply_result_ref`。缺绑定、旧规则或活动代已变化时先检查，不替换 CAS 基线或重复 apply。完整 no-op 不新增正式记录，也不制造下一次扫描的假待办。
+
 ## 使用前提与边界
 
 - 由 OpenFlow 加载模板，安装其引用的 Skill，并配置 `coder`、`reviewer` 角色。

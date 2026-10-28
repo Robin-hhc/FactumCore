@@ -118,8 +118,10 @@ def test_query_uses_shared_readonly_uri_for_unc_generation(monkeypatch):
         assert path == database
         raise SharedUriReached
 
+    # This isolated URI seam uses candidate evaluation; public query regressions
+    # exercise formal generation freshness with actual manifests and roots.
     ctx = SimpleNamespace(
-        request={"query": "marker"}, args=SimpleNamespace(action="search"),
+        request={"query": "marker", "evaluation": True}, args=SimpleNamespace(action="search"),
         modules={"indexing": SimpleNamespace(term_groups=lambda query: [], sqlite_readonly_uri=readonly_uri)},
     )
     with pytest.raises(SharedUriReached):

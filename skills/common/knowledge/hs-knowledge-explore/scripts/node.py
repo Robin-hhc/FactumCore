@@ -104,9 +104,9 @@ def resolve(request, registry=None):
     return target, workspace, knowledge_root, config_path, config, raw, entry, matches
 
 
-def execute(request, args, package):
-    target, workspace, root, config_path, config, raw, entry, matches = resolve(
-        request, args.registry
+def execute(request, args, package, *, resolved=None):
+    target, workspace, root, config_path, config, raw, entry, matches = (
+        resolved if resolved is not None else resolve(request, args.registry)
     )
     pinned = args.rules_digest or sha(safe(root, "governance/framework.lock.yaml").read_bytes())
     modules, rules = domain(root, pinned)

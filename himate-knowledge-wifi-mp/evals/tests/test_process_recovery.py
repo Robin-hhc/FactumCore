@@ -78,7 +78,12 @@ runpy.run_path(cli,run_name='__main__')
         timeout=90,
     )
     assert crashed.returncode == 73, (crashed.stdout, crashed.stderr)
-    assert not outgoing.exists(), "hard exit must happen before a normal ResultEnvelope is emitted"
+    # The public boundary reserves a fresh response before business writes.
+    # The genuine hard exit bypasses the result writer: this empty reservation
+    # is neither a complete ResultEnvelope nor evidence that apply finished.
+    assert outgoing.is_file()
+    interrupted_response = outgoing.read_bytes()
+    assert interrupted_response == b"", "hard exit must precede a complete ResultEnvelope"
     assert target.read_bytes() == expected[target_ref]
     journal_ref = f"logs/operations/{operation}/journal.json"
     result_ref = f"logs/operations/{operation}/apply-result.json"
@@ -91,12 +96,27 @@ runpy.run_path(cli,run_name='__main__')
     barrier = p.call("knowledge-index-build", {"operation_id": "index-after-hard-exit"}, expected=3)
     assert barrier["diagnostics"][0]["code"] == "TRANSACTION_PENDING"
     workflow = {"run_id": "crash-fixture", "node_id": "recover_transaction"}
+    reuse_input = tmp_path / "recovery-reuse-input.json"
+    reuse_input.write_bytes(FIXTURE.canonical({"operation_id": operation}))
+    journal_before_reuse = (p.root / journal_ref).read_bytes()
+    reused = subprocess.run([
+        sys.executable, str(p.skills / "hs-knowledge-recover/scripts/cli.py"),
+        "--input", str(reuse_input), "--output", str(outgoing),
+        "--knowledge-root", str(p.root), "--action", "inspect",
+    ], capture_output=True, timeout=90)
+    assert reused.returncode == 2
+    assert b"output path already exists" in reused.stderr.lower()
+    assert outgoing.read_bytes() == interrupted_response
+    assert (p.root / journal_ref).read_bytes() == journal_before_reuse
+    # Pipeline.call assigns a fresh response to every recovery invocation;
+    # inspect and resume consume journal facts, never the interrupted output.
     inspected = p.call(
         "knowledge-recover",
         {"operation_id": operation, "workflow": {**workflow, "attempt_id": "inspect-after-exit"}},
         "inspect",
     )
     assert inspected["data"]["transaction_status"] == journal["status"]
+    assert outgoing.read_bytes() == interrupted_response
     # Simulate a different writer touching the exact transaction target after
     # process death. Recovery must preserve these external bytes and refuse.
     concurrent_bytes = b"external concurrent edit; never overwrite automatically\n"
@@ -122,6 +142,7 @@ runpy.run_path(cli,run_name='__main__')
         "resume",
     )
     assert resumed["data"]["transaction_status"] == "committed"
+    assert outgoing.read_bytes() == interrupted_response
     assert p.record(journal_ref)["status"] == "committed"
     assert resumed["data"]["apply_result_ref"] == result_ref
     for ref, raw in expected.items():
@@ -156,6 +177,9 @@ runpy.run_path(cli,run_name='__main__')
                 "level": "actual_subprocess_hard_exit_with_isolated_synthetic_signed_approval",
                 "injection": "os._exit(73) after real os.replace of one exact card target; test process only",
                 "exit_code": crashed.returncode,
+                "interrupted_response_is_empty_reservation": True,
+                "response_path_reuse_rejected_before_recovery": True,
+                "recovery_uses_fresh_response_paths": True,
                 "interrupted_journal_status": journal["status"],
                 "barrier": "TRANSACTION_PENDING",
                 "external_edit_preserved": True,

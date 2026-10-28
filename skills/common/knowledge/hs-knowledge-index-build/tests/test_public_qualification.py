@@ -169,13 +169,24 @@ def test_shared_receipt_binds_actual_git_blobs_and_is_rechecked_by_query(tmp_pat
     sources["resources"].extend(unrelated["resources"])
     sources["snapshots"].extend(unrelated["snapshots"])
     p.write("governance/sources.lock.yaml", FIXTURE.canonical(sources))
-    for purpose in ("current", "historical"):
-        unchanged = p.call(
-            "knowledge-query",
-            {**request, "operation_id": "after-append-" + purpose, "purpose": purpose},
-        )["data"]
-        assert [row["card_id"] for row in unchanged["matches"]] == ["shared-rule"]
-        assert unchanged["generation_ref"] == built["generation_ref"]
+    # The unrelated append preserves the publication's exact used-source
+    # lineage, but a new current query also requires the full active byte
+    # baseline to match the working source lock.
+    stale = p.call(
+        "knowledge-query",
+        {**request, "operation_id": "after-append-current"},
+        expected=3,
+    )
+    assert stale["status"] == "blocked"
+    assert stale["diagnostics"][0]["code"] == "INDEX_STALE"
+    assert stale["data"] == {}
+    unchanged = p.call(
+        "knowledge-query",
+        {**request, "operation_id": "after-append-historical", "purpose": "historical"},
+    )["data"]
+    assert [row["card_id"] for row in unchanged["matches"]] == ["shared-rule"]
+    assert unchanged["generation_ref"] == built["generation_ref"]
+    assert unchanged["verification_tier"] == "synthetic_publication_identity"
     # A self-sealed generation must not bypass the actual receipt signature.
     manifest_path = p.root / built["generation_ref"]
     manifest = p.record(built["generation_ref"])

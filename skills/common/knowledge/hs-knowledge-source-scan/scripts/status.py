@@ -1,18 +1,99 @@
-"""Read saved execution facts without approving or advancing an operation."""
+"""Read saved stages and derived recovery hints without advancing work."""
 
-import json
-
-from support import fixed_bytes, identifier, safe
+from support import NodeError, identifier, safe
+from progress import catalog, catalog_gap, finalization, observation_only, paths, read_saved
 
 STAGES = (
     ("scan", ".build/operations/{op}/source-inventory.json"),
     ("materials", ".build/operations/{op}/material.json"),
+    ("semantic_plan", ".build/operations/{op}/semantic-plan.json"),
+    ("plan", ".build/operations/{op}/plan.json"),
+    ("view", ".build/operations/{op}/final-view.json"),
     ("record_prepared", ".build/operations/{op}/ingest-record.yaml"),
     ("record_formal", "logs/ingest/{op}.yaml"),
     ("transaction", "logs/operations/{op}/journal.json"),
     ("apply", "logs/operations/{op}/apply-result.json"),
     ("submission_handoff", "logs/operations/{op}/publish-handoff.json"),
 )
+ALL_STAGES = [stage for stage, _ in STAGES] + ["content_review", "local_check", "lint", "index", "regression", "activation"]
+
+
+def operation_details(ctx, op):
+    facts, gaps, values = [], [], {}
+    stage_status = {stage: "unknown" for stage in ALL_STAGES}
+
+    def add(stage, ref):
+        if any(fact["stage"] == stage and fact["ref"] == ref for fact in facts):
+            return
+        if not safe(ctx.root, ref).is_file():
+            return
+        try:
+            value = read_saved(ctx, ref)
+            if stage not in {"index", "regression", "activation", "lint"} and value.get("operation_id") != op:
+                raise NodeError("RECORD_BINDING_MISMATCH", "Saved stage belongs to another operation", ref)
+            values[stage] = value
+            current = value.get("rules_digest") == ctx.args.rules_digest
+            stage_status[stage] = "saved" if current else "historical_rules"
+            facts.append({"stage": stage, "ref": ref, "digest": value["digest"],
+                          "status": value.get("status"), "phase": value.get("phase"),
+                          "progress": value.get("progress"),
+                          "batch_kind": value.get("batch_kind", "content") if stage in {"transaction", "apply"} else value.get("batch_kind"),
+                          "rules_current": current,
+                          **{key: value[key] for key in ("view_ref", "view_digest", "plan_ref", "semantic_plan_ref",
+                                                        "generation_ref", "expected_active", "passed", "index_verified",
+                                                        "active_digest", "manifest_digest") if key in value}})
+        except (OSError, ValueError, KeyError) as exc:
+            gaps.append({"stage": stage, "ref": ref, "reason": str(exc)})
+
+    for stage, pattern in STAGES:
+        add(stage, pattern.format(op=op))
+    if "record_formal" not in values:
+        for pattern in ("logs/ingest/*.yaml", "logs/ingest/*.yml", "logs/ingest/*.json"):
+            for ref in paths(ctx, pattern):
+                try:
+                    value = read_saved(ctx, ref)
+                    if value.get("operation_id") == op:
+                        add("record_formal", ref)
+                except (OSError, ValueError, KeyError) as exc:
+                    catalog_gap(ctx, ref, exc)
+    for stage, pattern in (("content_review", f".build/operations/{op}/content-review/*.json"),
+                           ("local_check", f"logs/operations/{op}/local-check-*.json"),
+                           ("lint", f".build/operations/{op}/*lint*.json")):
+        for ref in paths(ctx, pattern):
+            if not ref.endswith("-input.json"):
+                add(stage, ref)
+    for stage, key in (("index", "generations"), ("regression", "regressions"), ("activation", "activations")):
+        for ref, value in catalog(ctx)[key]:
+            if value.get("operation_id") == op:
+                add(stage, ref)
+    journal = values.get("transaction")
+    if journal:
+        for stage, key in (("view", "view_ref"), ("lint", "lint_report_ref")):
+            if journal.get(key) and stage not in values:
+                add(stage, journal[key])
+        completion = finalization(ctx, journal, values.get("view"))
+        for stage, key in (("index", "generation_ref"), ("regression", "regression_ref"), ("activation", "activation_ref")):
+            if completion.get(key):
+                add(stage, completion[key])
+    elif any(gap["stage"] == "transaction" for gap in gaps):
+        completion = {"status": "unknown", "next_action": "recover_transaction",
+                      "reason": "Local transaction journal exists but cannot be verified; inspect it before further work"}
+    elif values.get("record_formal"):
+        completion = {"status": "unknown", "next_action": "check_local_index",
+                      "reason": "Portable processing history does not prove this machine's index state"}
+    elif values.get("view"):
+        completion = {"status": "pending", "next_action": "review_content", "view_ref": next(
+            fact["ref"] for fact in facts if fact["stage"] == "view")}
+    elif any(stage in values for stage in ("index", "regression", "activation")):
+        completion = {"status": "unknown", "next_action": "inspect_finalization", "scope": "supporting_stage",
+                      "reason": "Saved supporting-stage results alone do not identify a complete ingest batch"}
+    elif values.get("scan") and observation_only(values["scan"]) and not any(
+            stage in values for stage in ("materials", "plan", "semantic_plan")):
+        completion = {"status": "not_applicable", "next_action": None, "scope": "observation_only"}
+    else:
+        completion = {"status": "unknown", "next_action": "prepare_material"}
+    return {"operation_id": op, "facts": facts, "gaps": gaps, "stage_status": stage_status,
+            "completion": completion, "git_submission": "not_verified", "ci": "not_verified", "merge": "not_verified"}
 
 
 def status(context):
@@ -23,21 +104,14 @@ def status(context):
             root = safe(context.root, directory)
             if root.exists():
                 operations.update(identifier(p.name) for p in root.iterdir() if p.is_dir())
-    result = []
-    for op in sorted(operations):
-        facts, gaps = [], []
-        for stage, pattern in STAGES:
-            ref = pattern.format(op=op)
-            if not safe(context.root, ref).is_file():
-                continue
-            try:
-                value = json.loads(fixed_bytes(context.root, ref, [".build/operations", "logs/operations", "logs/ingest"]))
-                context.modules["records"].verify(value)
-                facts.append({"stage": stage, "ref": ref, "digest": value["digest"],
-                              "status": value.get("status"), "phase": value.get("phase"),
-                              "progress": value.get("progress"), "batch_kind": value.get("batch_kind")})
-            except (OSError, ValueError, context.modules["validation"].ContractError) as exc:
-                gaps.append({"stage": stage, "ref": ref, "reason": str(exc)})
-        result.append({"operation_id": op, "facts": facts, "gaps": gaps,
-                       "git_submission": "not_verified", "ci": "not_verified", "merge": "not_verified"})
-    return {"operations": result, "knowledge_root": str(context.root)}, "status"
+        for pattern in ("logs/ingest/*.yaml", "logs/ingest/*.yml", "logs/ingest/*.json"):
+            for ref in paths(context, pattern):
+                try:
+                    value = read_saved(context, ref)
+                    operations.add(identifier(value["operation_id"]))
+                except (OSError, ValueError, KeyError) as exc:
+                    catalog_gap(context, ref, exc)
+    result = [operation_details(context, op) for op in sorted(operations)]
+    gaps = catalog(context)["gaps"]
+    return {"operations": result, "knowledge_root": str(context.root), "catalog_gaps": gaps,
+            "complete": not gaps and not any(row["gaps"] for row in result)}, "status"

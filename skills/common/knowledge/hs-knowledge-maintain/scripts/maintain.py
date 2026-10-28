@@ -501,10 +501,23 @@ def inspect_context(context):
                     except (ValueError, OSError, KeyError) as exc:
                         cached[key] = ("source_unavailable", str(exc))
                 reason, details = cached[key]
-                if reason:
+                # A recovered historical snapshot need not match today's file.
+                # Keep the cached resolver fact shared across all Claim usages.
+                if reason and not (claim["usage"] == "historical" and reason == "source_changed"):
                     reasons.append({"reason": reason, "source_id": source["source_id"], "details": details})
             for block in persisted.get("blocked_claims", []):
                 if block.get("card_id") in {card_id, "*"} and block.get("claim_id") in {claim["id"], "*"}:
+                    if (claim["usage"] == "historical"
+                            and block.get("reason") in {"source_changed", "code_changed", "code_source_changed"}
+                            and (block.get("source_id") or block.get("old_snapshot_ids"))):
+                        historical_sources = [source for source in claim["source_records"]
+                            if (not block.get("source_id") or source["source_id"] == block["source_id"])
+                            and (not block.get("old_snapshot_ids") or source["snapshot_id"] in block["old_snapshot_ids"])]
+                        if historical_sources and all(cached[digest(source)][0] != "source_unavailable"
+                                                      for source in historical_sources):
+                            # This source-specific freshness event does not change
+                            # recoverable history. Retain the durable event/state.
+                            continue
                     reasons.append({"reason": block.get("reason", "pending_review")})
             affected.extend({"card_id": card_id, "claim_id": claim["id"], **row} for row in reasons)
     # Explicit dependencies propagate restrictions. Ordinary links never do.

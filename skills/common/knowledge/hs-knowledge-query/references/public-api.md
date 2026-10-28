@@ -31,6 +31,14 @@ require an apply/merge-check qualification chain. Current reads check actual
 source/configuration bytes; historical reads keep the exact retained source. If no
 original record or eligible claim remains, the read is refused.
 
+If a public source-resolution call times out, search, receipt and read return
+`status: blocked` with the original `SIBLING_TIMEOUT` diagnostic and no answer
+data. The same applies while qualifying dependencies or rechecking a result
+before output. A timeout is not a stale-source finding or a valid zero-hit
+answer. Normal source absence and non-current source qualification retain
+their existing per-Claim filtering and gap reports. This handling adds no
+Workflow identity, predecessor or handoff checks.
+
 Without `receipt_ref`, `read` keeps the existing behavior of using the current
 active generation. A `read` receipt links back to its source search for audit;
 use the original search receipt for subsequent reads.

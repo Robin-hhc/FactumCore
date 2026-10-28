@@ -540,6 +540,8 @@ def qualify_sources(ctx, card, eligible, purpose, cache, code_sources=(), query_
                         "resolve-source",
                     )["data"]
                 except (ValueError, OSError) as exc:
+                    if isinstance(exc, NodeError) and exc.code == "SIBLING_TIMEOUT":
+                        raise
                     cache[key] = {
                         "source_ref": source,
                         "unavailable": True,
@@ -718,6 +720,8 @@ class EligibilityEvaluator:
                 gaps,
             )
         except (ValueError, OSError, KeyError) as exc:
+            if isinstance(exc, NodeError) and exc.code == "SIBLING_TIMEOUT":
+                raise
             result = (
                 None,
                 set(),

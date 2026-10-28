@@ -218,6 +218,44 @@ def test_related_to_does_not_propagate_staleness(tmp_path):
     assert evaluated.evaluate("a")[1] == {"c1"}
 
 
+@pytest.mark.parametrize("relation", ["requires", "derived_from"])
+def test_dependency_source_timeout_keeps_the_original_runtime_diagnostic(tmp_path, relation):
+    values = {"a": card("a", (relation, "b")), "b": card("b")}
+    node, ctx, manifest, _ = fixture_context(tmp_path, values)
+    original_call = ctx.call
+    failure = node.NodeError(
+        "SIBLING_TIMEOUT", "Source resolver exceeded its call budget", "source-resolver", blocked=True
+    )
+
+    def resolve(skill, request, action):
+        if request["source_ref"]["source_id"] == "b":
+            raise failure
+        return original_call(skill, request, action)
+
+    ctx.call = resolve
+    evaluator = node.EligibilityEvaluator(
+        ctx, manifest, {"purpose": "current", "context": {}}, {"blocked_claims": []}
+    )
+    with pytest.raises(node.NodeError) as raised:
+        evaluator.evaluate("a")
+    assert raised.value is failure
+
+
+@pytest.mark.parametrize("code", ["SOURCE_UNAVAILABLE", "RECOVERY_UNAVAILABLE", "SOURCE_INPUT_UNAVAILABLE"])
+def test_source_absence_still_filters_claims_and_reports_a_gap(tmp_path, code):
+    node, ctx, manifest, _ = fixture_context(tmp_path, {"a": card("a")})
+
+    def unavailable(*args):
+        raise node.NodeError(code, "Exact source is unavailable", blocked=True)
+
+    ctx.call = unavailable
+    evaluated = node.EligibilityEvaluator(
+        ctx, manifest, {"purpose": "current", "context": {}}, {"blocked_claims": []}
+    ).evaluate("a")
+    assert evaluated[1] == set()
+    assert evaluated[3][0]["code"] == "SOURCE_NOT_CURRENT"
+
+
 def test_processing_review_status_does_not_gate_business_query(tmp_path):
     node, ctx, manifest, _ = fixture_context(tmp_path, {"a": card("a")})
     state = {"blocked_claims": [{"card_id": "a", "claim_id": "c1", "reason": "shared_pending_review", "conditions": {}}]}

@@ -19,7 +19,8 @@ spec = importlib.util.spec_from_file_location(
 package = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = package
 spec.loader.exec_module(package)
-from nested_workspace_contract import checks, knowledge, validation as v
+checks, knowledge, v = (importlib.import_module(spec.name + "." + name)
+                        for name in ("checks", "knowledge", "validation"))
 
 
 def fixture(tmp_path):
@@ -140,10 +141,6 @@ def test_git_history_reader_without_private_config_keeps_exact_old_card(tmp_path
         mapping["knowledge_roots"]["wifi"] = "config-link/../himate-knowledge-wifi-mp"
         (domain.parent / "config.yml").write_text(json.dumps(mapping), encoding="utf-8")
     lock_path = domain / "governance/framework.lock.yaml"
-    lock = v.load_yaml(lock_path)
-    for entry in lock["files"].values():
-        entry["sha256"] = hashlib.sha256((domain / entry["path"]).read_bytes()).hexdigest()
-    lock_path.write_text(json.dumps(lock), encoding="utf-8")
     rules_digest = hashlib.sha256(lock_path.read_bytes()).hexdigest()
     rules = v.load_rules(domain, rules_digest)
     current = knowledge.parse_card(path.read_bytes(), relative, rules)

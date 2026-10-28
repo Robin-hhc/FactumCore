@@ -90,24 +90,10 @@ def test_build_and_verify_long_generation_path(tmp_path):
 
 
 def test_query_uses_shared_readonly_uri_for_unc_generation(monkeypatch):
-    scripts = DOMAIN.parent / "skills/common/knowledge/hs-knowledge-query/scripts"
-    previous = sys.modules.get("support")
-    support_spec = importlib.util.spec_from_file_location("support", scripts / "support.py")
-    support = importlib.util.module_from_spec(support_spec)
-    sys.modules["support"] = support
-    support_spec.loader.exec_module(support)
-    try:
-        node_spec = importlib.util.spec_from_file_location("sqlite_path_query", scripts / "node.py")
-        node = importlib.util.module_from_spec(node_spec)
-        node_spec.loader.exec_module(node)
-    finally:
-        if previous is None:
-            sys.modules.pop("support", None)
-        else:
-            sys.modules["support"] = previous
+    from sqlite_path_contracts import query_runtime as node
 
     database = PureWindowsPath(r"\\?\UNC\server\share\index.sqlite")
-    monkeypatch.setattr(node, "load_generation", lambda *args: ("generation", {}, database, None))
+    monkeypatch.setattr(node, "load_generation", lambda *args, **kwargs: ("generation", {}, database, None))
     monkeypatch.setattr(node, "event_state", lambda ctx: {"validity_epoch": 0})
     monkeypatch.setattr(node, "EligibilityEvaluator", lambda *args: None)
 

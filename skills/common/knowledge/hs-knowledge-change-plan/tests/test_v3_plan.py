@@ -1,18 +1,6 @@
 import hashlib
 import json
 import pytest
-import yaml
-
-
-@pytest.fixture(autouse=True)
-def pin_isolated_rules(harness):
-    """Parallel implementation may leave the checkout lock temporarily stale."""
-    path = harness.root / "governance/framework.lock.yaml"
-    lock = yaml.safe_load(path.read_text(encoding="utf-8"))
-    for row in lock["files"].values():
-        row["sha256"] = hashlib.sha256((harness.root / row["path"]).read_bytes()).hexdigest()
-    path.write_text(yaml.safe_dump(lock, sort_keys=False), encoding="utf-8")
-    harness.rules = hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def sealed(harness, path, kind, **value):
@@ -56,6 +44,9 @@ def test_plan_precedes_draft_and_binds_claim_changes(harness):
     plan = harness.record(result["data"]["semantic_plan_ref"])
     assert result["phase"] == "content_planned"
     assert plan["claim_changes"][0]["after"] == "8 seconds"
+    assert plan["units"][0]["record_action"] == "update"
+    assert plan["units"][0]["card_refs"] == ["timeout"]
+    assert plan["units"][0]["claim_refs"] == ["timeout#limit"]
     assert plan["target_queries"][0]["required"] == ["timeout"]
     assert not (harness.root / "knowledge").exists()
 
@@ -98,73 +89,6 @@ def test_plan_rejects_conflicting_claims_skipped_writes_and_unrelated_queries(ha
     assert result["diagnostics"][0]["code"] == error
 
 
-def test_substantive_skip_review_records_unselected_scope(harness):
-    value = request(harness)
-    value["units"][0]["outcome"] = "skip"
-    value["claim_changes"], value["card_actions"] = [], []
-    plan = harness.run("change-plan", value, action="plan")["data"]["semantic_plan_ref"]
-    result = harness.run("change-plan", {"operation_id": "op", "semantic_plan_ref": plan,
-                         "reviewer_id": "reviewer", "independent_context": "fresh-context",
-                         "sampled_unit_ids": ["u1"], "unreviewed_unit_ids": [],
-                         "reason": "Changed numeric requirement is high risk", "findings": []}, action="review")
-    review = harness.record(result["data"]["content_review_ref"])
-    assert review["sampled_unit_ids"] == ["u1"]
-    assert review["status"] == "passed"
-    assert review["verification_tier"] == "declared_content_review"
-
-
-@pytest.mark.parametrize("identities", [{}, {"reviewer_id": "author", "independent_context": ""}])
-def test_review_checks_content_without_role_separation_gate(harness, identities):
-    value = request(harness)
-    plan = harness.run("change-plan", value, action="plan")["data"]["semantic_plan_ref"]
-    result = harness.run("change-plan", {"operation_id": "op", "semantic_plan_ref": plan,
-        "sampled_unit_ids": ["u1"], "unreviewed_unit_ids": [], "reason": "Read the exact changed scope",
-        "findings": [], **identities}, action="review")
-    review = harness.record(result["data"]["content_review_ref"])
-    assert review["status"] == "passed"
-    assert review["plan_digest"] == harness.record(plan)["digest"]
-    assert "independent" not in result["data"]["skip_sample"]
-    for key, expected in identities.items():
-        assert review[key] == expected
-    if not identities:
-        assert "reviewer_id" not in review and "independent_context" not in review
-
-
-def test_review_still_rejects_missing_business_scope_and_findings(harness):
-    value = request(harness)
-    plan = harness.run("change-plan", value, action="plan")["data"]["semantic_plan_ref"]
-    base = {"operation_id": "op", "semantic_plan_ref": plan, "reason": "Read the exact changed scope"}
-    scope = harness.run("change-plan", {**base, "findings": []}, action="review", expected=2)
-    assert scope["diagnostics"][0]["code"] == "REVIEW_SCOPE_INVALID"
-    findings = harness.run("change-plan", {**base, "sampled_unit_ids": ["u1"]}, action="review", expected=2)
-    assert findings["diagnostics"][0]["code"] == "REVIEW_FINDINGS_REQUIRED"
-
-
-def test_same_snapshot_can_gain_verified_git_recovery_without_semantic_version_change(harness):
-    import subprocess
-
-    _, old = harness.capture("old")
-    harness.write("governance/sources.lock.yaml", yaml.safe_dump({"schema_version": "2.0", "resources": old["resources"],
-                  "snapshots": old["snapshots"]}).encode())
-    (harness.base / "config.yml").write_text(yaml.safe_dump({"knowledge_roots": {"wifi": harness.root.name}, "repos": []}), encoding="utf-8")
-    def git(*args):
-        subprocess.run(["git", "-C", str(harness.base), *args], check=True, capture_output=True)
-    git("init", "-q")
-    git("add", "--", harness.root.name + "/docs-raw/specs/source.md")
-    git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "source")
-    ref, current = harness.capture("new")
-    assert old["snapshots"][0]["snapshot_id"] == current["snapshots"][0]["snapshot_id"]
-    assert current["snapshots"][0]["recovery"]["kind"] == "git"
-    current["snapshots"][0]["local_recovery"] = old["snapshots"][0]["recovery"]
-    current.pop("digest")
-    current["digest"] = hashlib.sha256(json.dumps(current, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    harness.write(ref, json.dumps(current).encode())
-    candidate = harness.write(".build/candidates/new.md", harness.card("new", current))
-    result = harness.run("change-plan", {"operation_id": "new", "bundle_ref": ref, "decisions": [
-        {"candidate_id": "new", "decision": "create", "reason": "First accepted card", "card_inputs": [candidate]}]})
-    assert result["phase"] == "planned"
-
-
 def test_code_only_maintenance_plan_does_not_invent_a_raw_processing_unit(harness):
     value = request(harness)
     scan = sealed(harness, value["scan_ref"], "source_inventory", scope=["docs-raw/specs"], full_scan=True, complete=True,
@@ -179,18 +103,55 @@ def test_code_only_maintenance_plan_does_not_invent_a_raw_processing_unit(harnes
     result = harness.run("change-plan", value, action="plan")
     plan = harness.record(result["data"]["semantic_plan_ref"])
     assert plan["units"] == []
-    assert plan["maintenance_units"] == value["maintenance_units"]
+    assert plan["maintenance_units"] == [{**value["maintenance_units"][0], "record_action": "update",
+                                           "card_refs": ["timeout"], "claim_refs": ["timeout#limit"]}]
 
 
-def test_mixed_batch_does_not_review_completed_unchanged_scan_skip_again(harness):
+@pytest.mark.parametrize("selected", [None, "defer", "split"])
+def test_mixed_content_unit_requires_an_authored_record_action(harness, selected):
     value = request(harness)
-    original = harness.record(value["scan_ref"])
-    old = {**original["units"][0], "unit_id": "u2", "path": "docs-raw/specs/unchanged.md", "change": "unchanged", "progress": "skipped"}
-    scan = sealed(harness, value["scan_ref"], "source_inventory", scope=original["scope"], full_scan=True, complete=True,
-                  units=original["units"] + [old])
-    sealed(harness, value["material_ref"], "artifact_manifest", purpose="source_materials", scan_ref=scan, scan_digest=harness.record(scan)["digest"])
-    value["units"].append({"unit_id": "u2", "outcome": "skip", "reason": "P1 unchanged completed scan skip"})
-    plan = harness.run("change-plan", value, "plan")["data"]["semantic_plan_ref"]
-    reviewed = harness.run("change-plan", {"operation_id": "op", "semantic_plan_ref": plan, "reviewer_id": "reviewer",
-        "independent_context": "fresh", "sampled_unit_ids": ["u1"], "unreviewed_unit_ids": [], "reason": "Only changed input needs review", "findings": []}, "review")
-    assert reviewed["phase"] == "reviewed"
+    value["card_actions"].append({**value["card_actions"][0], "card_id": "new-topic", "decision": "create"})
+    value["claim_changes"].append({**value["claim_changes"][0], "card_id": "new-topic", "action": "create"})
+    value["target_queries"][0]["required"].append("new-topic")
+    if selected is not None:
+        value["units"][0]["record_action"] = selected
+    result = harness.run("change-plan", value, action="plan", expected=2)
+    assert result["diagnostics"][0]["code"] == "PLAN_RECORD_ACTION_REQUIRED"
+    assert not (harness.root / ".build/operations/op/semantic-plan.json").exists()
+
+
+def test_mixed_content_unit_freezes_all_refs_and_selected_actual_action(harness):
+    value = request(harness)
+    value["card_actions"].append({**value["card_actions"][0], "card_id": "new-topic", "decision": "create"})
+    value["claim_changes"].append({**value["claim_changes"][0], "card_id": "new-topic", "action": "create"})
+    value["target_queries"][0]["required"].append("new-topic")
+    value["units"][0]["record_action"] = "create"
+    result = harness.run("change-plan", value, action="plan")
+    unit = harness.record(result["data"]["semantic_plan_ref"])["units"][0]
+    assert unit["record_action"] == "create"
+    assert unit["card_refs"] == ["new-topic", "timeout"]
+    assert unit["claim_refs"] == ["new-topic#limit", "timeout#limit"]
+
+
+def test_explicit_material_targets_need_no_scan_or_scan_semantics(harness):
+    value = request(harness)
+    del value["scan_ref"]
+    sealed(harness, value["material_ref"], "artifact_manifest", purpose="source_materials", units=[{
+        "unit_id": "u1", "origin": "explicit_target", "target_id": "u1", "source_kind": "raw",
+        "path": "docs-raw/specs/source.md", "observed_fingerprint": "a" * 64}])
+    result = harness.run("change-plan", value, action="plan")
+    plan = harness.record(result["data"]["semantic_plan_ref"])
+    assert plan["observation_basis"] == "explicit_material_targets"
+    assert "scan_ref" not in plan and "scan_digest" not in plan
+    assert plan["units"][0]["record_action"] == "update"
+
+
+@pytest.mark.parametrize("outcome", ["skip", "defer", "failed", "uncovered"])
+def test_noncontent_unit_freezes_its_actual_outcome_for_recording(harness, outcome):
+    value = request(harness)
+    value["units"][0]["outcome"] = outcome
+    value["claim_changes"], value["card_actions"] = [], []
+    result = harness.run("change-plan", value, action="plan")
+    unit = harness.record(result["data"]["semantic_plan_ref"])["units"][0]
+    assert unit["record_action"] == outcome
+    assert unit["card_refs"] == [] and unit["claim_refs"] == []

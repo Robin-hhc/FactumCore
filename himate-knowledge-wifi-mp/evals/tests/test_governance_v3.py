@@ -19,10 +19,6 @@ from wifi_v3 import records, source_resources, validation as v  # noqa: E402
 def rules(tmp_path):
     shutil.copytree(DOMAIN / "governance", tmp_path / "governance")
     lock_path = tmp_path / "governance/framework.lock.yaml"
-    lock = yaml.safe_load(lock_path.read_bytes())
-    for entry in lock["files"].values():
-        entry["sha256"] = hashlib.sha256((tmp_path / entry["path"]).read_bytes()).hexdigest()
-    lock_path.write_text(yaml.safe_dump(lock, allow_unicode=True, sort_keys=False), encoding="utf-8")
     return v.load_rules(tmp_path, hashlib.sha256(lock_path.read_bytes()).hexdigest())
 
 
@@ -435,3 +431,232 @@ def test_lint_recovers_the_record_version_from_real_git_without_archive_input(ru
     output = domain / "logs/git-result.json"
     result = subprocess.run([sys.executable, str(DOMAIN.parent / "skills/common/knowledge/hs-knowledge-lint/scripts/cli.py"), "--knowledge-root", str(domain), "--rules-digest", rules["rules_digest"], "--input", str(request), "--output", str(output)], capture_output=True, text=True)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def adopted_card_versions(rules, tmp_path):
+    """A real old adoption without an acceptance/card-hash extension."""
+    from wifi_v3 import knowledge
+    fixture_spec = importlib.util.spec_from_file_location("adoption_card_fixture", DOMAIN / "evals/tests/test_contracts.py")
+    fixture = importlib.util.module_from_spec(fixture_spec)
+    fixture_spec.loader.exec_module(fixture)
+    path = "knowledge/concepts/entities/a.md"
+    old_source, new_source = hashlib.sha256(b"old source").hexdigest(), hashlib.sha256(b"new source").hexdigest()
+    lock = {"resources": [{"source_id": "s1", "kind": "raw"}], "snapshots": [
+        {"source_id": "s1", "snapshot_id": "raw:one", "sha256": old_source},
+        {"source_id": "s1", "snapshot_id": "raw:two", "sha256": new_source}]}
+    old = knowledge.parse_card(fixture.card_data(lifecycle="stable"), path, rules)
+    new_raw = fixture.card_data(lifecycle="stable", sources=[{**old["metadata"]["sources"][0], "snapshot_id": "raw:two"}])
+    current = knowledge.parse_card(new_raw, path, rules)
+    inventory = scan()
+    tool = {"skill": "hs-fixture", "package_digest": "a" * 64, "runtime": "synthetic", "requirements_digest": "b" * 64}
+    inventory.update(rules_digest=rules["rules_digest"], tool_identity=tool)
+    inventory["units"][0]["observed_fingerprint"] = old_source
+    inventory = records.seal(inventory)
+    disposition = {"unit_id": "u1", "action": "update", "reason": "Adopted the original source version",
+        "observed_fingerprint": old_source, "adopted_fingerprint": old_source, "progress": "completed",
+        "card_refs": ["card-a"], "claim_refs": ["card-a#c1"]}
+    record = records.seal({"schema_version": "2.0", "record_kind": "ingest_record", "operation_id": "op",
+        "record_id": "old-adoption", "rules_digest": rules["rules_digest"], "tool_identity": tool,
+        "batch_kind": "content", "status": "applied", "content_view_digest": "d" * 64,
+        "progress": {"apply": {"status": "applied", "operation_id": "op", "view_digest": "d" * 64}},
+        "scan_ref": ".build/original/scan.json", "scan_digest": inventory["digest"], "inventory": inventory,
+        "dispositions": [disposition]})
+    return fixture, {**rules, "source_lock": lock}, record, old, current
+
+
+@pytest.mark.parametrize("reference", ["card-a", {"path": "knowledge/concepts/entities/a.md"}])
+def test_unpinned_adoption_selects_old_source_version_even_with_current_card_in_view(rules, tmp_path, reference):
+    from wifi_v3 import checks
+    _, rules, record, old, current = adopted_card_versions(rules, tmp_path)
+    record["dispositions"][0]["card_refs"] = [reference]
+    record = records.seal(record)
+    archive = tmp_path / "old-card.md"
+    archive.write_bytes(old["raw"])
+    resolver = checks._record_resolver({"card-a": current}, rules,
+        {"historical_card_objects": {old["sha256"]: str(archive)}}, tmp_path, {})
+    assert records.validate_ingest_record(record, view={"current": current}, rules=rules, version_resolver=resolver) == record
+
+
+def test_old_source_archive_precedes_same_id_current_card_with_other_sources(rules, tmp_path):
+    from wifi_v3 import checks, knowledge
+    fixture, rules, record, old, current = adopted_card_versions(rules, tmp_path)
+    current = knowledge.parse_card(fixture.card_data(lifecycle="stable", sources=[
+        {**current["metadata"]["sources"][0], "source_id": "s2"}]), current["path"], rules)
+    archive = tmp_path / "old-card.md"
+    archive.write_bytes(old["raw"])
+    resolver = checks._record_resolver({"card-a": current}, rules,
+        {"historical_card_objects": {old["sha256"]: str(archive)}}, tmp_path, {})
+    records.validate_ingest_record(record, rules=rules, version_resolver=resolver)
+
+
+@pytest.mark.parametrize("fault,code", [
+    ("missing", "RECORD_HISTORY_UNAVAILABLE"),
+    ("different_source_version", "RECORD_HISTORY_UNAVAILABLE"),
+    ("different_id", "RECORD_HISTORY_UNAVAILABLE"),
+    ("changed_archive", "HISTORICAL_CARD_CHANGED"),
+    ("snapshot_owner", "RECORD_HISTORY_UNAVAILABLE"),
+    ("claim_only_in_current", "RECORD_HISTORY_UNAVAILABLE"),
+    ("exact_sha_current", "ADOPTION_SOURCE_MISMATCH"),
+])
+def test_unpinned_history_cannot_use_latest_or_relax_exact_bindings(rules, tmp_path, fault, code):
+    from wifi_v3 import checks, knowledge
+    fixture, rules, record, old, current = adopted_card_versions(rules, tmp_path)
+    raw, expected = old["raw"], old["sha256"]
+    if fault == "different_source_version":
+        raw, expected = current["raw"], current["sha256"]
+    elif fault == "different_id":
+        raw = fixture.card_data(id="another-card", lifecycle="stable")
+        expected = hashlib.sha256(raw).hexdigest()
+    elif fault == "changed_archive":
+        raw += b"\n"
+    elif fault == "snapshot_owner":
+        rules["source_lock"]["snapshots"][0]["source_id"] = "s2"
+    elif fault == "claim_only_in_current":
+        claim = {**current["metadata"]["claims"][0], "id": "c2", "text_ref": "#c2"}
+        raw_current = fixture.card_data(lifecycle="stable", sources=current["metadata"]["sources"],
+            claims=[*current["metadata"]["claims"], claim]) + b'\n<a id="c2"></a>\nA new Claim.\n'
+        current = knowledge.parse_card(raw_current, current["path"], rules)
+        record["dispositions"][0]["claim_refs"] = ["card-a#c2"]
+    elif fault == "exact_sha_current":
+        record["dispositions"][0]["card_refs"] = [{"card_id": "card-a", "sha256": current["sha256"]}]
+    archive = tmp_path / "declared-card.md"
+    archive.write_bytes(raw)
+    inputs = {} if fault == "missing" else {"historical_card_objects": {expected: str(archive)}}
+    resolver = checks._record_resolver({"card-a": current}, rules, inputs, tmp_path, {})
+    with pytest.raises(v.ContractError) as caught:
+        records.validate_ingest_record(records.seal(record), view={"current": current}, rules=rules, version_resolver=resolver)
+    assert caught.value.code == code
+
+
+@pytest.mark.parametrize("compatible_body", [False, True])
+def test_one_historical_card_body_must_satisfy_all_completed_source_units(rules, tmp_path, compatible_body):
+    from wifi_v3 import checks, knowledge
+    fixture, rules, record, old, current = adopted_card_versions(rules, tmp_path)
+    old_b, new_b = hashlib.sha256(b"old b").hexdigest(), hashlib.sha256(b"new b").hexdigest()
+    rules["source_lock"]["snapshots"] += [
+        {"source_id": "s2", "snapshot_id": "raw:b-old", "sha256": old_b},
+        {"source_id": "s2", "snapshot_id": "raw:b-new", "sha256": new_b}]
+    unit = {**record["inventory"]["units"][0], "unit_id": "u2", "source_id": "s2",
+        "path": "docs-raw/specs/b.md", "observed_fingerprint": old_b}
+    record["inventory"]["units"].append(unit)
+    record["inventory"] = records.seal(record["inventory"])
+    record["scan_digest"] = record["inventory"]["digest"]
+    record["dispositions"].append({**record["dispositions"][0], "unit_id": "u2",
+        "observed_fingerprint": old_b, "adopted_fingerprint": old_b})
+    objects = {}
+    # Each fractured version satisfies a different unit. They cannot be spliced
+    # together into a card body that has never existed.
+    versions = [("raw:one", "raw:b-new"), ("raw:two", "raw:b-old")]
+    if compatible_body:
+        versions.append(("raw:one", "raw:b-old"))
+    for number, (source_a, source_b) in enumerate(versions):
+        sources = [{**old["metadata"]["sources"][0], "snapshot_id": source_a},
+                   {**old["metadata"]["sources"][0], "evidence_ref": "e2", "source_id": "s2", "snapshot_id": source_b}]
+        raw = fixture.card_data(lifecycle="stable", sources=sources,
+            claims=[{**old["metadata"]["claims"][0], "source_refs": ["e1", "e2"]}])
+        archive = tmp_path / ("card-version-" + str(number) + ".md")
+        archive.write_bytes(raw)
+        objects[hashlib.sha256(raw).hexdigest()] = str(archive)
+    # Include both sources in current, otherwise it would be an unrelated-card
+    # association and the collective adoption check would supply the constraint.
+    current_raw = fixture.card_data(lifecycle="stable", sources=[
+        {**old["metadata"]["sources"][0], "snapshot_id": "raw:two"},
+        {**old["metadata"]["sources"][0], "evidence_ref": "e2", "source_id": "s2", "snapshot_id": "raw:b-new"}],
+        claims=[{**old["metadata"]["claims"][0], "source_refs": ["e1", "e2"]}])
+    current = knowledge.parse_card(current_raw, current["path"], rules)
+    resolver = checks._record_resolver({"card-a": current}, rules, {"historical_card_objects": objects}, tmp_path, {})
+    record = records.seal(record)
+    if compatible_body:
+        records.validate_ingest_record(record, rules=rules, version_resolver=resolver)
+    else:
+        with pytest.raises(v.ContractError, match="RECORD_HISTORY_UNAVAILABLE"):
+            records.validate_ingest_record(record, rules=rules, version_resolver=resolver)
+
+
+def test_adoption_remains_a_collective_card_set_check(rules, tmp_path, monkeypatch):
+    from wifi_v3 import checks, knowledge
+    fixture, rules, record, old, current = adopted_card_versions(rules, tmp_path)
+    rules["source_lock"]["resources"].append({"source_id": "s2", "kind": "raw"})
+    rules["source_lock"]["snapshots"].append({"source_id": "s2", "snapshot_id": "raw:unrelated",
+        "sha256": hashlib.sha256(b"unrelated source").hexdigest()})
+    supporting = knowledge.parse_card(fixture.card_data(id="supporting", lifecycle="stable", sources=[
+        {**old["metadata"]["sources"][0], "source_id": "s2", "snapshot_id": "raw:unrelated"}]),
+        "knowledge/concepts/entities/supporting.md", rules)
+    record["dispositions"][0]["card_refs"].append("supporting")
+    record["dispositions"][0]["claim_refs"].append("supporting#c1")
+    archive = tmp_path / "old-card.md"
+    archive.write_bytes(old["raw"])
+    resolver = checks._record_resolver({"card-a": current, "supporting": supporting}, rules,
+        {"historical_card_objects": {old["sha256"]: str(archive)}}, tmp_path, {})
+    def unexpected_git(*args, **kwargs):
+        raise AssertionError("Declared adopted bodies and unrelated current associations do not require Git history")
+    monkeypatch.setattr(checks.subprocess, "run", unexpected_git)
+    records.validate_ingest_record(records.seal(record), rules=rules, version_resolver=resolver)
+
+
+@pytest.mark.parametrize("metadata_only", [False, True])
+def test_two_argument_python_record_resolver_keeps_its_call_contract(rules, tmp_path, metadata_only):
+    _, rules, record, old, current = adopted_card_versions(rules, tmp_path)
+    calls = []
+    def resolve(reference, fixed_record):
+        calls.append((reference, fixed_record["digest"]))
+        return old["metadata"] if metadata_only else old
+    records.validate_ingest_record(record, view={"current": current}, rules=rules, version_resolver=resolve)
+    assert calls == [("card-a", record["digest"])]
+
+
+@pytest.mark.parametrize("complete_archive", [True, False])
+def test_same_source_version_needs_one_body_with_all_recorded_claims(rules, tmp_path, complete_archive):
+    from wifi_v3 import checks, knowledge
+    fixture, rules, record, old, _ = adopted_card_versions(rules, tmp_path)
+    c1 = old["metadata"]["claims"][0]
+    c2 = {**c1, "id": "c2", "text_ref": "#c2"}
+    current_raw = fixture.card_data(lifecycle="stable", claims=[c2]).replace(b'id="c1"', b'id="c2"')
+    current = knowledge.parse_card(current_raw, old["path"], rules)
+    record["dispositions"][0]["claim_refs"] = ["card-a#c1", "card-a#c2"]
+    raw = (fixture.card_data(lifecycle="stable", claims=[c1, c2]) + b'\n<a id="c2"></a>\nSecond original Claim.\n') if complete_archive else old["raw"]
+    archive = tmp_path / "old-claims.md"
+    archive.write_bytes(raw)
+    resolver = checks._record_resolver({"card-a": current}, rules,
+        {"historical_card_objects": {hashlib.sha256(raw).hexdigest(): str(archive)}}, tmp_path, {})
+    record = records.seal(record)
+    if complete_archive:
+        records.validate_ingest_record(record, rules=rules, version_resolver=resolver)
+    else:
+        # c1 and c2 exist in separate bodies with the same source hash. Their
+        # existence cannot be combined into the one body named by this record.
+        with pytest.raises(v.ContractError, match="RECORD_HISTORY_UNAVAILABLE"):
+            records.validate_ingest_record(record, rules=rules, version_resolver=resolver)
+
+
+def test_record_resolver_typeerror_is_not_retried_or_hidden(rules, tmp_path):
+    _, rules, record, _, _ = adopted_card_versions(rules, tmp_path)
+    calls = []
+    def resolve(reference, fixed_record):
+        calls.append(reference)
+        raise TypeError("resolver body failed")
+    with pytest.raises(TypeError, match="resolver body failed"):
+        records.validate_ingest_record(record, rules=rules, version_resolver=resolve)
+    assert calls == ["card-a"]
+
+
+@pytest.mark.parametrize("metadata_only", [False, True])
+def test_python_resolver_cannot_splice_two_versions_of_one_card(rules, tmp_path, metadata_only):
+    from wifi_v3 import knowledge
+    fixture, rules, record, old, _ = adopted_card_versions(rules, tmp_path)
+    old_b = hashlib.sha256(b"old b").hexdigest()
+    rules["source_lock"]["snapshots"].append({"source_id": "s2", "snapshot_id": "raw:b", "sha256": old_b})
+    other = knowledge.parse_card(fixture.card_data(lifecycle="stable", sources=[
+        {**old["metadata"]["sources"][0], "source_id": "s2", "snapshot_id": "raw:b"}]), old["path"], rules)
+    record["inventory"]["units"].append({**record["inventory"]["units"][0], "unit_id": "u2", "source_id": "s2",
+        "path": "docs-raw/specs/b.md", "observed_fingerprint": old_b})
+    record["inventory"] = records.seal(record["inventory"])
+    record["scan_digest"] = record["inventory"]["digest"]
+    record["dispositions"].append({**record["dispositions"][0], "unit_id": "u2",
+        "observed_fingerprint": old_b, "adopted_fingerprint": old_b})
+    versions = iter([old, other])
+    def resolve(reference, fixed_record):
+        version = next(versions)
+        return version["metadata"] if metadata_only else version
+    with pytest.raises(v.ContractError, match="CARD_VERSION_MISMATCH"):
+        records.validate_ingest_record(records.seal(record), rules=rules, version_resolver=resolve)

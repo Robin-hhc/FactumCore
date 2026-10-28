@@ -4,10 +4,6 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
-import shutil
-import subprocess
-import sys
-from unittest.mock import patch
 
 import pytest
 import yaml
@@ -22,18 +18,14 @@ def canonical(value):
 
 @pytest.mark.parametrize("outcome", ["content", "skip"])
 def test_unchanged_source_is_exempt_only_when_the_plan_actually_skips_it(outcome):
-    scripts = ROOT / "skills/common/knowledge/hs-knowledge-change-plan/scripts"
-    spec = importlib.util.spec_from_file_location("post_ingest_plan_v3", scripts / "plan_v3.py")
-    module = importlib.util.module_from_spec(spec)
-    support_spec = importlib.util.spec_from_file_location("post_ingest_plan_support", scripts / "support.py")
-    support_module = importlib.util.module_from_spec(support_spec)
-    with patch.dict(sys.modules, {support_spec.name: support_module}):
-        support_spec.loader.exec_module(support_module)
-        with patch.dict(sys.modules, {"support": support_module}):
-            spec.loader.exec_module(module)
+    spec = importlib.util.spec_from_file_location("post_ingest_public_contracts", ROOT / "himate-knowledge-wifi-mp/evals/contract_test_support.py")
+    support = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(support)
+    module = support.module("review_inputs")
     plan = {"operation_id": "correction", "author_id": "author", "card_actions": [{"author_id": "author"}],
             "units": [{"unit_id": "u1", "outcome": outcome}], "scan_ref": "scan", "scan_digest": "a" * 64, "digest": "b" * 64}
-    scan = {"digest": "a" * 64, "units": [{"unit_id": "u1", "change": "unchanged", "progress": "completed"}]}
+    scan = {"operation_id": "correction", "digest": "a" * 64,
+            "units": [{"unit_id": "u1", "change": "unchanged", "progress": "completed"}]}
 
     class Context:
         operation = "correction"
@@ -66,10 +58,13 @@ def frozen_harness(tmp_path):
     fixture = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(fixture)
     harness = fixture.Harness(tmp_path)
-    frozen = tmp_path / "frozen-skills"
-    shutil.copytree(harness.packages, frozen, ignore=shutil.ignore_patterns("tests", "__pycache__"))
+    pipeline_spec = importlib.util.spec_from_file_location("post_ingest_installer", ROOT / "himate-knowledge-wifi-mp/evals/pipeline_harness.py")
+    pipeline = importlib.util.module_from_spec(pipeline_spec)
+    pipeline_spec.loader.exec_module(pipeline)
+    frozen = pipeline.install_packages(tmp_path / "frozen-skills")
     harness.packages = frozen
     catalog = json.loads(harness.catalog.read_bytes())
+    catalog["skills"] = {name: catalog["skills"][name] for name in pipeline.PUBLIC_SKILLS}
     for name, entry in catalog["skills"].items():
         entry.update(root=str(frozen / name), package_digest=fixture.package_hash(frozen / name))
     harness.catalog.write_bytes(canonical(catalog))
@@ -95,7 +90,7 @@ def complete_document_operation(harness, operation, decision, statement, *, expe
     if decision == "update":
         assert unit["change"] == expected_change
         material_request.update(unit_ids=[unit["unit_id"]], candidate_card_ids=["rule"])
-    material_ref = harness.run("source-scan", material_request, "prepare")["data"]["material_ref"]
+    material_ref = harness.run("source-prepare", material_request, "prepare")["data"]["material_ref"]
     material = harness.record(material_ref)
     check_inputs = {}
     if decision == "update":
@@ -123,45 +118,31 @@ def complete_document_operation(harness, operation, decision, statement, *, expe
     }, "plan")["data"]["semantic_plan_ref"]
     card = harness.card("rule", bundle).replace(b"Synthetic fixture statement.", statement.encode())
     candidate = harness.write(f".build/operations/{operation}/candidate.md", card)
-    plan_ref = harness.run("change-plan", {
+    view_ref = harness.run("view-materialize", {
         "operation_id": operation, "v3_required": True, "semantic_plan_ref": semantic,
         "bundle_ref": material["bundle_ref"],
         "decisions": [{"candidate_id": unit["unit_id"], "decision": decision,
                        "reason": reason, "card_inputs": [candidate]}],
-    })["data"]["plan_ref"]
-    view_ref = harness.run("view-materialize", {"operation_id": operation, "plan_ref": plan_ref})["data"]["view_ref"]
-    review_ref = harness.run("change-plan", {
+    })["data"]["view_ref"]
+    review_ref = harness.run("lint", {
         "operation_id": operation, "semantic_plan_ref": semantic, "view_ref": view_ref,
         "reviewer_id": "independent-reviewer", "independent_context": operation + "-review-context",
         "sampled_unit_ids": input_units, "unreviewed_unit_ids": [],
         "reason": "Read the exact candidate and unchanged original under current rules", "findings": [],
+        "inputs": check_inputs,
     }, "review")["data"]["content_review_ref"]
-    lint_ref = f".build/operations/{operation}/final-lint.json"
-    lint_input = harness.write(f".build/operations/{operation}/lint-input.json", canonical({"view_ref": view_ref, "inputs": check_inputs}))
-    lint = subprocess.run([
-        sys.executable, str(harness.packages / "hs-knowledge-lint/scripts/cli.py"),
-        "--knowledge-root", str(harness.root), "--rules-digest", harness.rules,
-        "--input", str(harness.root / lint_input), "--output", str(harness.root / lint_ref),
-    ], capture_output=True)
-    assert lint.returncode == 0, lint.stdout + lint.stderr
     record_ref = harness.run("source-scan", {
-        "operation_id": operation, "scan_ref": scan_ref, "view_ref": view_ref, "lint_ref": lint_ref,
+        "operation_id": operation, "scan_ref": scan_ref, "view_ref": view_ref,
         "semantic_plan_ref": semantic,
-        "dispositions": [{"unit_id": unit["unit_id"], "action": decision, "reason": reason,
-                          "observed_fingerprint": unit["observed_fingerprint"], "adopted_fingerprint": unit["observed_fingerprint"],
-                          "progress": "completed", "card_refs": ["rule"], "claim_refs": ["rule#rule-claim"]}],
+        "disposition_preview_ref": harness.record(view_ref)["disposition_preview_ref"],
     }, "record")["data"]["ingest_record_ref"]
-    applied = harness.run("apply", {
+    batch = harness.run("apply", {
         "operation_id": operation, "v3_required": True, "view_ref": view_ref,
-        "ingest_record_ref": record_ref, "lint_report_ref": lint_ref, "content_review_ref": review_ref,
+        "ingest_record_ref": record_ref,
         "check_inputs": check_inputs,
-    })["data"]["apply_result_ref"]
-    built = harness.run("index-build", {"operation_id": operation}, "build")["data"]
-    generation = built["generation_ref"]
-    harness.run("query-regression", {
-        "operation_id": operation, "v3_required": True, "apply_result_ref": applied, "generation_ref": generation,
-        "expected_active": built["expected_active"],
-    })
+    }, "batch")
+    assert batch["phase"] == "completed" and batch["data"]["activated"] is True
+    applied, generation = batch["data"]["apply_result_ref"], batch["data"]["generation_ref"]
     search = harness.run("query", {"operation_id": operation + "-search", "query": "Synthetic", "purpose": "guidance"}, "search")["data"]
     assert search["matches"][0]["card_id"] == "rule"
     read = harness.run("query", {"operation_id": operation + "-read", "receipt_ref": search["receipt_ref"], "card_id": "rule"}, "read")["data"]
@@ -226,7 +207,7 @@ def test_rules_upgrade_revalidates_identical_document_without_rewriting_old_acce
     assert refused["diagnostics"][0]["code"] == "STALE_RULES"
     refused = harness.run("apply", {"operation_id": "old-rules", "apply_result_ref": first["apply_result_ref"]}, "verify-result", expected=2)
     assert "rules identity mismatch" in refused["diagnostics"][0]["message"]
-    rebuilt = harness.run("index-build", {"operation_id": "new-rules-index"}, "build")
+    rebuilt = harness.run("apply", {"operation_id": "new-rules-index"}, "index-build")
     assert harness.record(rebuilt["data"]["generation_ref"])["rules_digest"] == harness.rules
 
     second = complete_document_operation(

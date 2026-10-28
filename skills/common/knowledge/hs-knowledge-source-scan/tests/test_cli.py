@@ -114,7 +114,7 @@ def test_prepare_reads_all_card_states_and_each_adopted_version(harness):
     }).encode())
     harness.write("docs-raw/specs/source.md", b"# Source\nCurrent third version.\n")
     scanned = harness.run("source-scan", {"operation_id": "batch"}, "scan")
-    prepared = harness.run("source-scan", {
+    prepared = harness.run("source-prepare", {
         "operation_id": "batch", "scan_ref": scanned["data"]["scan_ref"],
     }, "prepare")
     material = harness.record(prepared["data"]["material_ref"])
@@ -420,7 +420,7 @@ def test_prepare_expands_explicit_dependencies_but_not_related_links(harness):
     import yaml
     _, seed = harness.capture("seed-old")
     harness.write("docs-raw/specs/other.md", b"# Independent source\nUnrelated facts.\n")
-    response = harness.run("source-capture", {"operation_id": "other-old", "source_id": "other", "source_path": "docs-raw/specs/other.md"})
+    response = harness.run("source-prepare", {"operation_id": "other-old", "source_id": "other", "source_path": "docs-raw/specs/other.md"}, action="capture")
     other = harness.record(response["data"]["bundle_ref"])
     harness.write("governance/sources.lock.yaml", yaml.safe_dump({"schema_version": "2.0", "resources": seed["resources"] + other["resources"],
         "snapshots": seed["snapshots"] + other["snapshots"]}).encode())
@@ -429,7 +429,7 @@ def test_prepare_expands_explicit_dependencies_but_not_related_links(harness):
         harness.write("knowledge/rules/" + identity + ".md", harness.card(identity, other, relation=[{
             "type": kind, "target_card_id": "seed", "target_claim_id": "seed-claim", "context_ids": []}]))
     scanned = harness.run("source-scan", {"operation_id": "batch", "source": "docs-raw/specs/source.md"}, "scan")
-    prepared = harness.run("source-scan", {"operation_id": "batch", "scan_ref": scanned["data"]["scan_ref"]}, "prepare")
+    prepared = harness.run("source-prepare", {"operation_id": "batch", "scan_ref": scanned["data"]["scan_ref"]}, "prepare")
     material = harness.record(prepared["data"]["material_ref"])
     assert {c["card_id"] for c in material["candidates"]} == {"seed", "requires-card", "derived-card"}
     assert all((harness.root / source["original_ref"]).is_file() for candidate in material["candidates"] for source in candidate["adopted_sources"])
@@ -475,19 +475,19 @@ def test_scan_accepts_valid_object_progress_from_shared_processing_record(harnes
 
 def test_prepare_includes_explicit_current_code_evidence_without_fake_raw_units(harness):
     import importlib.util
-    helper = harness.packages / "hs-knowledge-source-capture/tests/test_code_capture.py"
+    helper = harness.packages / "hs-knowledge-source-prepare/tests/test_code_capture.py"
     spec = importlib.util.spec_from_file_location("source_scan_code_fixture", helper)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     repo, context_ref = module.setup_code(harness)
     current = b"int synthetic(void) { return 7; }\n"
     (repo / "sample.c").write_bytes(current)
-    captured = harness.run("source-capture", {"operation_id": "code-current", "kind": "code", "repo_id": "code",
-        "relative_path": "sample.c", "source_id": "synthetic-code", "context_ref": context_ref})
+    captured = harness.run("source-prepare", {"operation_id": "code-current", "kind": "code", "repo_id": "code",
+        "relative_path": "sample.c", "source_id": "synthetic-code", "context_ref": context_ref}, action="capture")
     code = harness.record(captured["data"]["bundle_ref"])
     scanned = harness.run("source-scan", {"operation_id": "code-batch"}, "scan")
     assert harness.record(scanned["data"]["scan_ref"])["units"] == []
-    prepared = harness.run("source-scan", {"operation_id": "code-batch", "scan_ref": scanned["data"]["scan_ref"],
+    prepared = harness.run("source-prepare", {"operation_id": "code-batch", "scan_ref": scanned["data"]["scan_ref"],
         "code_bundle_refs": [{"bundle_ref": captured["data"]["bundle_ref"], "bundle_digest": code["digest"]}]}, "prepare")
     material = harness.record(prepared["data"]["material_ref"])
     combined = harness.record(material["bundle_ref"])
@@ -496,7 +496,7 @@ def test_prepare_includes_explicit_current_code_evidence_without_fake_raw_units(
     assert material["current_code"][0]["current_source_matches"] is True
     (repo / "sample.c").write_bytes(b"int synthetic(void) { return 8; }\n")
     later = harness.run("source-scan", {"operation_id": "stale-code-batch"}, "scan")
-    rejected = harness.run("source-scan", {"operation_id": "stale-code-batch", "scan_ref": later["data"]["scan_ref"],
+    rejected = harness.run("source-prepare", {"operation_id": "stale-code-batch", "scan_ref": later["data"]["scan_ref"],
         "code_bundle_refs": [{"bundle_ref": captured["data"]["bundle_ref"], "bundle_digest": code["digest"]}]}, "prepare", expected=3)
     assert rejected["diagnostics"][0]["code"] == "CURRENT_CODE_REQUIRED"
 
@@ -509,9 +509,15 @@ def test_record_preserves_maintenance_defer_without_inventing_raw_units(harness)
     scan["digest"] = hashed(canonical(scan))
     harness.write(scanned["data"]["scan_ref"], canonical(scan))
     unit = {"unit_id": "maintenance:code-card#claim", "card_id": "code-card", "claim_id": "claim", "outcome": "defer", "reason": "Actual build evidence missing"}
+    material = {"schema_version": "2.0", "record_kind": "artifact_manifest", "operation_id": "maintenance",
+        "rules_digest": harness.rules, "tool_identity": scan["tool_identity"], "purpose": "source_materials",
+        "scan_ref": scanned["data"]["scan_ref"], "scan_digest": scan["digest"], "units": []}
+    material["digest"] = hashed(canonical(material))
+    material_ref = harness.write(".build/operations/maintenance/material.json", canonical(material))
     plan = {"schema_version": "2.0", "record_kind": "semantic_plan", "operation_id": "maintenance", "rules_digest": harness.rules,
         "tool_identity": scan["tool_identity"],
-        "scan_ref": scanned["data"]["scan_ref"], "scan_digest": scan["digest"], "material_ref": ".build/operations/maintenance/material.json",
+        "scan_ref": scanned["data"]["scan_ref"], "scan_digest": scan["digest"], "material_ref": material_ref,
+        "material_digest": material["digest"],
         "units": [], "card_actions": [], "target_queries": [], "maintenance_units": [unit]}
     plan["digest"] = hashed(canonical(plan))
     plan_ref = harness.write(".build/operations/maintenance/semantic-plan.json", canonical(plan))

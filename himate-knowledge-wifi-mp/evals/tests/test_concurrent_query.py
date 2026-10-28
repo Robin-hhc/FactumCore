@@ -24,7 +24,7 @@ def test_independent_queries_keep_receipt_generation_during_activation(tmp_path)
     pipeline.apply("seed", view)
     first = pipeline.call("knowledge-index-build", {"operation_id": "build-first"})["data"]
     pipeline.call("knowledge-index-build", {"operation_id": "activate-first",
-        "generation_ref": first["generation_ref"], "expected_active": None}, "activate")
+        "generation_ref": first["generation_ref"], "expected_active": first["expected_active"]}, "activate")
     second = pipeline.call("knowledge-index-build", {"operation_id": "build-second"})["data"]
     ready = Barrier(3)
 

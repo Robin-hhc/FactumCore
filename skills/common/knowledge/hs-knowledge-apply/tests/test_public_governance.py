@@ -20,6 +20,10 @@ import unittest
 SKILLS = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(SKILLS / "hs-knowledge-apply/scripts"))
 from support import canonical, digest, package_digest, seal  # noqa: E402 - isolated package test seam
+_p7_spec = importlib.util.spec_from_file_location("public_governance_p7_helpers", pathlib.Path(__file__).with_name("p7_test_helpers.py"))
+_p7_helpers = importlib.util.module_from_spec(_p7_spec)
+_p7_spec.loader.exec_module(_p7_helpers)
+map_call = _p7_helpers.map_call
 
 
 class PublicGovernanceTests(unittest.TestCase):
@@ -147,14 +151,6 @@ class PublicGovernanceTests(unittest.TestCase):
         self.assertEqual((self.root / "knowledge/index.md").read_bytes(), b"old navigation")
 
     def test_handoff_describes_files_without_a_target_query_pass_gate(self):
-        import yaml
-
-        path = self.root / "governance/framework.lock.yaml"
-        lock = yaml.safe_load(path.read_text(encoding="utf-8"))
-        for item in lock["files"].values():
-            item["sha256"] = digest((self.root / item["path"]).read_bytes())
-        path.write_text(yaml.safe_dump(lock, sort_keys=False), encoding="utf-8")
-        self.rules_digest = digest(path.read_bytes())
         request = self.prepare_reviewed("gate")
         applied = self.invoke("hs-knowledge-apply", request)
         result = self.invoke("hs-knowledge-publish-handoff", {"operation_id": "gate", "v3_required": True,
@@ -165,15 +161,6 @@ class PublicGovernanceTests(unittest.TestCase):
         self.assertNotIn("verification_tier", handoff)
 
     def test_record_only_batch_applies_shared_failure_fact_without_card_writes(self):
-        import yaml
-
-        # Freeze only the isolated fixture during concurrent rule development.
-        lock_path = self.root / "governance/framework.lock.yaml"
-        lock = yaml.safe_load(lock_path.read_text(encoding="utf-8"))
-        for item in lock["files"].values():
-            item["sha256"] = digest((self.root / item["path"]).read_bytes())
-        lock_path.write_text(yaml.safe_dump(lock, sort_keys=False), encoding="utf-8")
-        self.rules_digest = digest(lock_path.read_bytes())
         common = {"schema_version": "2.0", "operation_id": "facts", "rules_digest": self.rules_digest,
                   "tool_identity": {"skill": "hs-fixture", "package_digest": "0" * 64,
                                     "runtime": "fixture", "requirements_digest": "0" * 64}}
@@ -250,10 +237,8 @@ class PublicGovernanceTests(unittest.TestCase):
             "schema_version": "2.0", "skills": {}, "test_fixture_root": str(self.root.resolve()),
         }
         for name in (
-            "hs-knowledge-source-capture",
+            "hs-knowledge-source-prepare",
             "hs-knowledge-apply",
-            "hs-knowledge-recover",
-            "hs-knowledge-publish-handoff",
         ):
             package = SKILLS / name
             self.catalog["skills"][name] = {
@@ -266,6 +251,7 @@ class PublicGovernanceTests(unittest.TestCase):
         self.catalog_path.write_bytes(canonical(self.catalog))
 
     def invoke(self, skill, request, action="run", expected=0):
+        skill, action = map_call(skill, action)
         self.counter += 1
         parent = self.root / (".build/operations/" + request["operation_id"])
         parent.mkdir(parents=True, exist_ok=True)

@@ -1,5 +1,5 @@
 id: hs-knowledge-view-materialize-result
-title: view-materialize result
+title: assembled candidate and disposition preview
 required: true
 applies_to:
   node_ids:

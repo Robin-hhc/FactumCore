@@ -1,6 +1,7 @@
 """Synthetic domain copied from current pinned contracts; no production originals."""
 
 import hashlib
+import importlib.util
 import json
 import os
 import shutil
@@ -10,6 +11,29 @@ from pathlib import Path
 
 import pytest
 import yaml
+
+
+_helper_path = Path(__file__).resolve().parents[5] / "himate-knowledge-wifi-mp/evals/contract_test_support.py"
+_helper_spec = importlib.util.spec_from_file_location("maintenance_contract_test_support", _helper_path)
+_helper = importlib.util.module_from_spec(_helper_spec)
+_helper_spec.loader.exec_module(_helper)
+public_module = _helper.module
+
+
+def operation_context(harness, request, action):
+    """Trusted development fixture; real CLI calls still verify their own locks."""
+    lock = yaml.safe_load((harness.root / "governance/framework.lock.yaml").read_bytes())
+    names = {Path(row["path"]).stem for row in lock["files"].values()
+             if row["path"].startswith("governance/contracts/") and row["path"].endswith(".py")}
+    modules = {name: public_module(name) for name in names if name != "__init__"}
+    runtime = modules["runtime"]
+    return runtime.OperationContext(
+        harness.root, request, modules=modules,
+        rules=modules["validation"].load_rules(harness.root, harness.rules),
+        tool=runtime.tool_identity(harness.packages / "hs-knowledge-maintain"),
+        rules_digest=harness.rules, action=action,
+        package=harness.packages / "hs-knowledge-maintain", catalog=harness.catalog,
+    )
 
 
 def hashed(data):
@@ -122,12 +146,13 @@ class Harness:
     def capture(self, operation="op", text=b"# Source\nSynthetic evidence.\n"):
         self.write("docs-raw/specs/source.md", text)
         response = self.run(
-            "source-capture",
+            "source-prepare",
             {
                 "operation_id": operation,
                 "source_path": "docs-raw/specs/source.md",
                 "source_id": "synthetic",
             },
+            action="capture",
         )
         return response["data"]["bundle_ref"], self.record(
             response["data"]["bundle_ref"]
@@ -186,7 +211,7 @@ class Harness:
         ref, bundle = self.capture(operation)
         candidate = self.write(".build/candidates/new.md", self.card("new", bundle))
         planned = self.run(
-            "change-plan",
+            "view-materialize",
             {
                 "operation_id": operation,
                 "bundle_ref": ref,
@@ -205,7 +230,7 @@ class Harness:
     def view(self, operation="op"):
         plan, bundle = self.plan(operation)
         response = self.run(
-            "view-materialize", {"operation_id": operation, "plan_ref": plan}
+            "view-materialize", self.record(plan)["request"]
         )
         return response["data"]["view_ref"], bundle
 

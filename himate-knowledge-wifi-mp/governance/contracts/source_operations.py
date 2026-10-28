@@ -1,0 +1,985 @@
+"""Read-only raw acquisition with immutable local recovery objects."""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+from pathlib import Path, PurePosixPath
+import subprocess
+from urllib.parse import unquote, urlsplit
+
+import yaml
+
+from .runtime import (
+    NodeError,
+    canonical,
+    digest,
+    fixed_bytes,
+    load_yaml,
+    safe,
+    sha,
+    write_bytes,
+)
+
+RAW_CLASSES = {"conventions", "chips", "storys", "specs", "protocols", "troubleshooting"}
+
+
+def extract(context, data, suffix, *, primary=True):
+    try:
+        return context.modules["source_resources"].extract_document(data, suffix, primary=primary)
+    except context.modules["validation"].ContractError as exc:
+        raise NodeError(exc.code, exc.message, exc.path, blocked=exc.code == "PARTIAL_DOCUMENT") from exc
+    except ImportError as exc:
+        raise NodeError("SOURCE_ADAPTER_UNAVAILABLE", "The fixed document adapter is unavailable", blocked=True) from exc
+
+
+def raw_member(context, ref):
+    parts = PurePosixPath(ref).parts if isinstance(ref, str) else ()
+    if len(parts) < 3 or parts[0] != "docs-raw" or parts[1] not in RAW_CLASSES:
+        raise NodeError(
+            "RAW_SCOPE_REQUIRED", "Expected a file in a supported landed docs-raw class", ref
+        )
+    path = safe(context.root, ref)
+    if not path.is_file():
+        raise NodeError("SOURCE_MISSING", "Expected a landed regular raw file", ref)
+    before = path.stat()
+    data = fixed_bytes(context.root, ref)
+    after = path.stat()
+
+    def signature(s):
+        return s.st_dev, s.st_ino, s.st_size, s.st_mtime_ns
+
+    if signature(before) != signature(after):
+        raise NodeError("SOURCE_CHANGED", "Original changed while reading", ref)
+    return {"path": ref, "data": data, "signature": signature(after)}
+
+
+def check_attachments(members):
+    supplied = {member["path"] for member in members}
+    gaps = []
+    for member in members:
+        if PurePosixPath(member["path"]).suffix.lower() != ".md":
+            continue
+        text = member["data"].decode("utf-8-sig")
+        text = re.sub(r"(?ms)^\s*(`{3,}|~{3,}).*?^\s*\1\s*$", "", text)
+        text = re.sub(r"(?s)<!--.*?-->|`[^`\n]*`", "", text)
+        targets = re.findall(r"!?\[[^\]]*\]\(\s*(<[^>]+>|[^\s)]+)", text)
+        targets += re.findall(r"(?im)^\s*\[[^\]]+\]:\s*(<[^>]+>|\S+)", text)
+        targets += re.findall(
+            r"""(?is)<(?:img|object|iframe|source)\b[^>]*(?:src|data)\s*=\s*["']([^"']+)["']""",
+            text,
+        )
+        targets += re.findall(
+            r"""(?is)<(?:img|object|iframe|source)\b[^>]*(?:src|data)\s*=\s*([^\s"'=<>`]+)""",
+            text,
+        )
+        for target in targets:
+            target = target.strip("<>")
+            parsed = urlsplit(target)
+            if parsed.scheme or parsed.netloc or not parsed.path:
+                if parsed.scheme or parsed.netloc:
+                    gaps.append(
+                        "Remote and embedded URI references were not fetched or interpreted"
+                    )
+                continue  # references remain unvisited; remote bytes never become source evidence.
+            path = unquote(parsed.path)
+            if path.startswith("/") or "\\" in path or ":" in path:
+                raise NodeError(
+                    "UNSAFE_ATTACHMENT",
+                    "Attachment path must be local raw-relative",
+                    path,
+                )
+            parts = list(PurePosixPath(member["path"]).parent.parts)
+            for part in PurePosixPath(path).parts:
+                if part == "..":
+                    if not parts:
+                        raise NodeError(
+                            "UNSAFE_ATTACHMENT", "Attachment escapes raw root", target
+                        )
+                    parts.pop()
+                elif part != ".":
+                    parts.append(part)
+            resolved = "/".join(parts)
+            if resolved not in supplied:
+                raise NodeError(
+                    "ATTACHMENT_REQUIRED",
+                    "Referenced local attachment must be explicit",
+                    resolved,
+                )
+    return gaps
+
+
+def snapshot_text(context, snapshot, resource, data):
+    """Use frozen local extraction or reproduce it from the exact Git original."""
+    suffix = snapshot.get("format", PurePosixPath(resource["path"]).suffix.lower())
+    retained = snapshot.get("extraction")
+    if retained:
+        reconstructed = False
+        try:
+            extracted = fixed_bytes(context.root, retained["text_ref"], ["logs/evidence"])
+            locator_bytes = fixed_bytes(context.root, retained["locator_ref"], ["logs/evidence"])
+            text = extracted.decode("utf-8")
+            locators = json.loads(locator_bytes)["locators"]
+            gaps = list(retained.get("limitations", []))
+        except OSError:
+            if resource.get("kind") == "code":
+                try:
+                    text, locators = context.modules["source_resources"].extract_code_text(data, retained.get("extractor"))
+                except context.modules["validation"].ContractError as exc:
+                    raise NodeError("SOURCE_EXTRACTION_UNAVAILABLE", "Frozen code extraction cannot be reproduced by its fixed adapter", blocked=True) from exc
+                gaps = list(retained.get("limitations", []))
+            else:
+                text, locators, extractor, gaps = extract(context, data, suffix, primary=False)
+                if extractor != retained.get("extractor"):
+                    raise NodeError("SOURCE_EXTRACTION_UNAVAILABLE", "The installed document adapter differs from the frozen adapter", blocked=True)
+            if text is None:
+                raise NodeError("SOURCE_EXTRACTION_UNAVAILABLE", "Exact original could not reproduce its frozen extraction", blocked=True)
+            extracted = text.encode("utf-8")
+            locator_bytes = canonical({"locators": locators})
+            reconstructed = True
+        if (sha(extracted) != retained["text_sha256"] or sha(locator_bytes) != retained["locator_sha256"]
+                or (snapshot.get("locator", {}).get("sha256") and sha(locator_bytes) != snapshot["locator"]["sha256"])):
+            if reconstructed:
+                raise NodeError("SOURCE_EXTRACTION_UNAVAILABLE", "Exact original cannot reproduce frozen extraction and locators under current rules", blocked=True)
+            raise NodeError("SOURCE_INTEGRITY_ERROR", "Frozen or reconstructed extraction/locators differ")
+        return text, locators, gaps
+    if resource.get("kind") == "code":
+        return None, [], ["Frozen code snapshot has no interpreted text extraction; only exact original bytes are available"]
+    text, locators, _, gaps = extract(context, data, suffix, primary=False)
+    if text is not None:
+        gaps.append("This snapshot has no retained extraction; text was re-extracted by the current pinned resolver")
+    return text, locators, gaps
+
+
+def recovered_bytes(context, snapshot):
+    try:
+        return context.modules["source_resources"].recover_snapshot(context.root, snapshot)
+    except context.modules["validation"].ContractError as exc:
+        if exc.code == "EVIDENCE_OBJECT_CHANGED":
+            raise NodeError("SOURCE_INTEGRITY_ERROR", "Recovered bytes differ from exact snapshot") from exc
+        raise
+
+
+def resolve_source(context, reference, bundle=None):
+    lock = bundle
+    if lock is None:
+        lock = load_yaml(fixed_bytes(context.root, "governance/sources.lock.yaml"))
+    matches = [
+        s
+        for s in lock["snapshots"]
+        if s["snapshot_id"] == reference["snapshot_id"]
+        and s["source_id"] == reference["source_id"]
+    ]
+    if len(matches) != 1:
+        raise NodeError(
+            "SOURCE_UNAVAILABLE",
+            "Exact source snapshot is not uniquely registered",
+            blocked=True,
+        )
+    snapshot = matches[0]
+    recovery = snapshot.get("recovery", {})
+    is_git = isinstance(recovery, dict) and (recovery.get("kind") == "git" or recovery.get("method") == "git")
+    if not isinstance(recovery, dict) or not (
+        recovery.get("path") or recovery.get("reference")
+    ):
+        raise NodeError(
+            "RECOVERY_UNAVAILABLE",
+            "No supported immutable local recovery object",
+            blocked=True,
+        )
+    if (
+        recovery.get("path")
+        and recovery.get("reference")
+        and recovery["path"] != recovery["reference"]
+    ):
+        raise NodeError("SOURCE_INTEGRITY_ERROR", "Recovery path aliases disagree")
+    original_ref = ("git:" + recovery.get("commit", recovery.get("revision", "")) + ":" + recovery["path"]
+                    if is_git else recovery.get("path", recovery.get("reference")))
+    try:
+        data, original_ref = context.modules["source_resources"].recover_snapshot_source(context.root, snapshot)
+    except context.modules["validation"].ContractError as exc:
+        if exc.code == "EVIDENCE_OBJECT_CHANGED":
+            raise NodeError("SOURCE_INTEGRITY_ERROR", "Recovered bytes differ from exact snapshot") from exc
+        raise
+    if sha(data) != snapshot["sha256"] or len(data) != snapshot["bytes"]:
+        raise NodeError(
+            "SOURCE_INTEGRITY_ERROR", "Recovered bytes differ from exact snapshot"
+        )
+    resource = next(
+        r for r in lock["resources"] if r["source_id"] == reference["source_id"]
+    )
+    suffix = snapshot.get("format", PurePosixPath(resource["path"]).suffix.lower())
+    text, locators, gaps = snapshot_text(context, snapshot, resource, data)
+    locator = reference.get("locator", {})
+    if resource.get("kind") == "code" and locator.get("kind") == "bytes":
+        start, end = locator.get("start"), locator.get("end")
+        if (
+            isinstance(start, bool)
+            or isinstance(end, bool)
+            or not isinstance(start, int)
+            or not isinstance(end, int)
+            or not 0 <= start <= end <= len(data)
+        ):
+            raise NodeError(
+                "INVALID_SOURCE_LOCATOR", "Byte range is outside fixed code bytes"
+            )
+        text = None
+        gaps.append(
+            "Byte locator retains exact bytes without asserting semantic text interpretation"
+        )
+    if text is not None and not locator:
+        raise NodeError(
+            "INVALID_SOURCE_LOCATOR",
+            "Exact source reference requires a readable locator",
+        )
+    if text is not None and locator:
+        kind = locator.get("kind")
+        if kind in {"lines", "line"}:
+            if resource.get("kind") != "code" and suffix not in {".md", ".txt"}:
+                raise NodeError(
+                    "INVALID_SOURCE_LOCATOR",
+                    "This document format requires its native page/paragraph locator",
+                )
+            start, end = locator.get("start"), locator.get("end")
+            lines = text.splitlines(keepends=True)
+            if (
+                isinstance(start, bool)
+                or isinstance(end, bool)
+                or not isinstance(start, int)
+                or not isinstance(end, int)
+                or not 1 <= start <= end <= len(lines)
+            ):
+                raise NodeError(
+                    "INVALID_SOURCE_LOCATOR",
+                    "Source line range is outside exact original",
+                )
+            text = "".join(lines[start - 1 : end])
+        elif kind in {"page", "pages", "paragraph", "paragraphs", "table_row"}:
+            try:
+                selected = context.modules["source_resources"].document_segments(locators, locator, suffix)
+            except context.modules["validation"].ContractError as exc:
+                raise NodeError(exc.code, exc.message, exc.path) from exc
+            text = "\n\n".join(item["text"] for item in selected)
+        else:
+            raise NodeError(
+                "UNSUPPORTED_SOURCE_LOCATOR",
+                "Unsupported original locator",
+                blocked=True,
+            )
+    try:
+        if resource.get("kind") == "code":
+            current_hash = current_code_hash(context, resource)
+        else:
+            current_hash = sha(
+                fixed_bytes(context.root, resource["path"], ["docs-raw"])
+            )
+        current_matches = (
+            current_hash == snapshot["sha256"] if current_hash is not None else None
+        )
+    except OSError:
+        current_hash, current_matches = None, None
+        gaps.append(
+            "Current source location is unavailable; only exact retained evidence was recovered"
+        )
+    if current_matches is None and resource.get("kind") == "code":
+        gaps.append(
+            "Current registered code root is unavailable or unauthorized; fixed evidence is historical only"
+        )
+    if current_matches is False:
+        gaps.append("Current source bytes differ from this fixed historical snapshot")
+    return {
+        "source_ref": reference,
+        "source_kind": resource.get("kind"),
+        "resource": resource,
+        "snapshot": snapshot,
+        "snapshot_digest": digest(snapshot),
+        "original_ref": original_ref,
+        "sha256": snapshot["sha256"],
+        "bytes": len(data),
+        "bytes_b64": __import__("base64").b64encode(data).decode(),
+        "text": text,
+        "locator": locator,
+        "limitations": gaps,
+        "current_source_matches": current_matches,
+        "current_source_sha256": current_hash,
+    }
+
+
+
+def git_read(root, arguments, *, optional=False, authorized_root=None):
+    environment = {
+        key: value for key, value in os.environ.items() if not key.startswith("GIT_") or key == "GIT_TEST_ASSUME_DIFFERENT_OWNER"
+    }
+    environment.update(
+        GIT_CONFIG_NOSYSTEM="1",
+        GIT_CONFIG_GLOBAL=os.devnull,
+        GIT_OPTIONAL_LOCKS="0",
+        GIT_TERMINAL_PROMPT="0",
+        GIT_NO_LAZY_FETCH="1",
+    )
+    argv = [
+        "git",
+        "--no-pager",
+        "--no-optional-locks",
+        "-c",
+        "core.fsmonitor=false",
+        "-c",
+        "core.hooksPath=" + os.devnull,
+        "-c",
+        "diff.external=",
+        "-c",
+        "core.attributesFile=" + os.devnull,
+        "-c",
+        "protocol.allow=never",
+        "-c",
+        "protocol.file.allow=never",
+        "-c",
+        "safe.directory=" + (authorized_root or root).resolve().as_posix(),
+        "-C",
+        str(root),
+        *arguments,
+    ]
+    try:
+        result = subprocess.run(
+            argv, env=environment, capture_output=True, timeout=20, check=False
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise NodeError(
+            "GIT_UNAVAILABLE", "Cannot inspect registered Git metadata", blocked=True
+        ) from exc
+    if result.returncode:
+        if optional:
+            return None
+        raise NodeError(
+            "GIT_IDENTITY_UNAVAILABLE",
+            "Cannot inspect registered Git identity",
+            blocked=True,
+        )
+    return result.stdout
+
+
+def authorized_repo(context, repo_id, receipt=None):
+    try:
+        config_path = context.modules["validation"].workspace_config_path(
+            context.root
+        )
+    except (ValueError, OSError) as exc:
+        raise NodeError(
+            "CODE_AUTHORIZATION_REQUIRED",
+            "Exact workspace config is unavailable",
+            blocked=True,
+        ) from exc
+    workspace = config_path.parent
+    config_bytes = config_path.read_bytes()
+    config = load_yaml(config_bytes)
+    context.modules["validation"].validate_shape("workspace", config, context.rules)
+    config = context.modules["validation"].normalize_workspace(config, workspace)
+    policy = config.get("code_policy")
+    if safe(
+        workspace, config["knowledge_roots"]["wifi"]
+    ).resolve() != context.root or any(
+        row["knowledge_domain"] != "wifi" for row in config["architecture"]
+    ):
+        raise NodeError(
+            "CODE_DOMAIN_MISMATCH",
+            "Code registration must bind the selected WiFi knowledge root and domain",
+            blocked=True,
+        )
+    if not policy or config.get("code_policy") != policy:
+        raise NodeError(
+            "CODE_AUTHORIZATION_REQUIRED",
+            "Protected and declared code policies differ",
+            blocked=True,
+        )
+    rows = [row for row in config["repos"] if row["repo_id"] == repo_id]
+    root_value = policy.get("repo_roots", {}).get(repo_id)
+    if (
+        len(rows) != 1
+        or not rows[0].get("root")
+        or not root_value
+        or not Path(root_value).is_absolute()
+    ):
+        raise NodeError(
+            "CODE_AUTHORIZATION_REQUIRED",
+            "Repository root is not explicitly authorized",
+            blocked=True,
+        )
+    registered = Path(rows[0]["root"])
+    if not registered.is_absolute():
+        registered = workspace / registered
+    root = registered.resolve(strict=True)
+    if root != Path(root_value).resolve(strict=True) or not root.is_dir():
+        raise NodeError(
+            "CODE_ROOT_MISMATCH",
+            "Registered repository differs from protected root",
+            blocked=True,
+        )
+    item = None
+    if receipt is not None:
+        if (
+            receipt.get("state") != "context_loaded"
+            or receipt.get("workspace_id") != config["workspace_id"]
+            or receipt.get("config_digest") != sha(config_bytes)
+            or Path(receipt.get("knowledge_root", "")).resolve() != context.root
+            or Path(receipt.get("workspace_root", "")).resolve() != workspace
+        ):
+            raise NodeError(
+                "CODE_CONTEXT_STALE",
+                "Loaded context does not bind this workspace/config",
+                blocked=True,
+            )
+        repos = receipt.get("repos", {})
+        if isinstance(repos, list):
+            if len({row["repo_id"] for row in repos}) != len(repos):
+                raise NodeError(
+                    "CODE_CONTEXT_STALE",
+                    "Context repository identities are ambiguous",
+                    blocked=True,
+                )
+            repos = {row["repo_id"]: row for row in repos}
+        item = repos.get(repo_id)
+        if not item or Path(item.get("root", "")).resolve() != root:
+            raise NodeError(
+                "CODE_ROOT_MISMATCH",
+                "Context cannot authorize a different repository root",
+                blocked=True,
+            )
+    if config_path.read_bytes() != config_bytes:
+        raise NodeError(
+            "CODE_CONTEXT_STALE",
+            "Workspace config changed while resolving authorization",
+            blocked=True,
+        )
+    return root, rows[0], config, item, sha(config_bytes)
+
+
+def read_code(root, relative):
+    if ".git" in {part.casefold() for part in PurePosixPath(relative).parts}:
+        raise NodeError(
+            "UNSAFE_PATH", "Git internals are not selected source files", relative
+        )
+    path = safe(root, relative)
+    if not path.is_file():
+        raise NodeError(
+            "CODE_FILE_MISSING",
+            "Selected registered code file is unavailable",
+            relative,
+            blocked=True,
+        )
+    before = path.stat()
+    raw = fixed_bytes(root, relative)
+    after = path.stat()
+
+    def signature(value):
+        return (
+            value.st_dev,
+            value.st_ino,
+            value.st_size,
+            value.st_mtime_ns,
+        )
+
+    if signature(before) != signature(after):
+        raise NodeError(
+            "CODE_CHANGED", "Selected code changed during read", blocked=True
+        )
+    return raw, signature(after)
+
+
+def metadata(root, registered, relative, receipt=None):
+    kind = registered["kind"]
+    if registered.get("evidence_basis") == "filesystem":
+        return {"kind": "export", "revision": None, "checked_file_dirty": None,
+                "evidence_basis": "filesystem"}, None
+    if kind == "export":
+        current = root
+        for part in [None, *PurePosixPath(relative).parent.parts]:
+            if part not in (None, "."):
+                current = current / part
+            if (current / ".git").exists():
+                raise NodeError(
+                    "REPO_KIND_MISMATCH",
+                    "Export selection crosses Git metadata",
+                    blocked=True,
+                )
+        return {"kind": "export", "revision": None, "checked_file_dirty": None}, None
+    if kind != "git":
+        raise NodeError(
+            "UNSUPPORTED_CODE_KIND",
+            "Repository kind must be git or export",
+            blocked=True,
+        )
+    actual_root = Path(
+        git_read(root, ["rev-parse", "--show-toplevel"]).decode().strip()
+    ).resolve()
+    selected_root = Path(
+        git_read((root / relative).parent, ["rev-parse", "--show-toplevel"], authorized_root=root)
+        .decode()
+        .strip()
+    ).resolve()
+    if actual_root != root or selected_root != root:
+        raise NodeError(
+            "GIT_BOUNDARY_MISMATCH",
+            "Selection crosses the authorized Git checkout",
+            blocked=True,
+        )
+    origin = git_read(
+        root, ["config", "--local", "--get", "remote.origin.url"], optional=True
+    )
+    origin = origin.decode().strip() if origin is not None else None
+    if (
+        registered.get("expected_identity")
+        and registered["expected_identity"] != origin
+    ):
+        raise NodeError(
+            "GIT_IDENTITY_MISMATCH",
+            "Actual origin differs from registered identity",
+            blocked=True,
+        )
+    head = git_read(root, ["rev-parse", "--verify", "HEAD^{commit}"], optional=True)
+    head = head.decode("ascii").strip() if head is not None else None
+    if receipt and any(
+        receipt.get(field) not in (None, "", "unknown") and receipt[field] != head
+        for field in ("head", "commit")
+    ):
+        raise NodeError(
+            "CODE_CONTEXT_STALE", "Git HEAD changed after context loading", blocked=True
+        )
+    committed = (
+        git_read(root, ["cat-file", "blob", head + ":" + relative], optional=True)
+        if head
+        else None
+    )
+    return {"kind": "git", "revision": head, "checked_file_dirty": None}, committed
+
+
+def current_code_hash(context, resource):
+    try:
+        root, registered, config, _, config_digest = authorized_repo(
+            context, resource["repo_id"]
+        )
+        if not context.modules["validation"].workspace_file_allowed(config, resource["repo_id"], resource["path"]):
+            return None
+        before = metadata(root, registered, resource["path"])
+        raw, _ = read_code(root, resource["path"])
+        after = metadata(root, registered, resource["path"])
+        _, _, _, _, after_config = authorized_repo(context, resource["repo_id"])
+        if before != after or config_digest != after_config:
+            return None
+        return sha(raw)
+    except (OSError, NodeError, ValueError, yaml.YAMLError):
+        return None
+
+
+def capture_code(context):
+    request = context.request
+    encoding = request.get("text_encoding", "utf-8")
+    extractors = {"utf-8": "code-utf8:1", "gb18030": "code-gb18030:1"}
+    if not isinstance(encoding, str) or encoding not in extractors:
+        raise NodeError("INVALID_CODE_ENCODING", "text_encoding must be utf-8 or gb18030; encoding is never guessed")
+    extractor = extractors[encoding]
+    repo_id, relative, source_id = (
+        request.get("repo_id"),
+        request.get("relative_path"),
+        request.get("source_id"),
+    )
+    if (
+        not isinstance(source_id, str)
+        or not source_id.strip()
+        or any(ord(c) < 32 for c in source_id)
+    ):
+        raise NodeError("INVALID_SOURCE_ID", "Explicit logical source ID required")
+    receipt = context.record(request["context_ref"], "project_context") if request.get("context_ref") else None
+    root, registered, config, item, config_digest = authorized_repo(
+        context, repo_id, receipt
+    )
+    safe(root, relative)
+    if not context.modules["validation"].workspace_file_allowed(config, repo_id, relative):
+        raise NodeError(
+            "CODE_MODULE_UNKNOWN",
+            "Selected code is outside registered architecture modules",
+            blocked=True,
+        )
+    before, committed = metadata(root, registered, relative, item)
+    raw, signature = read_code(root, relative)
+    code_identity = {
+        **before,
+        "repo_id": repo_id,
+        **({"workspace_path": registered["workspace_path"]} if registered.get("workspace_path") else {}),
+        "dirty_scope": "selected_file",
+        "checked_file_dirty": (raw != committed) if before["revision"] else None,
+    }
+    limitations = [
+        "not_semantically_verified: actual code bytes are frozen; Target/build/macros require separate positive gate evidence"
+    ]
+    if before.get("evidence_basis") == "filesystem":
+        limitations.append("Version is unknown unless explicitly provided; current source checks use exact file bytes")
+    elif before["kind"] == "export":
+        limitations.append(
+            "No Git revision exists for this export; version remains explicitly unknown"
+        )
+    try:
+        text, locators = context.modules["source_resources"].extract_code_text(raw, extractor)
+    except context.modules["validation"].ContractError as exc:
+        if "text_encoding" in request:
+            raise NodeError("UNREADABLE_CODE_TEXT", "Selected code cannot be strictly decoded by the explicit encoding, or contains NUL") from exc
+        text, locators = None, []
+        limitations.append(
+            "Code encoding is unsupported; original bytes retained without interpreted text"
+        )
+    raw_hash = sha(raw)
+    snapshot_id = "code:" + digest(
+        {
+            "source_id": source_id,
+            "repo_id": repo_id,
+            "path": relative,
+            "sha256": raw_hash,
+            "identity": code_identity,
+            "version": request.get("version", "unknown"),
+            "text_digest": sha(text.encode()) if text is not None else None,
+            "locators": digest(locators),
+            **({"extractor": extractor} if encoding != "utf-8" else {}),
+        }
+    )
+    object_ref, locator_ref = (
+        "logs/evidence/objects/" + raw_hash + ".bin",
+        "logs/evidence/locators/" + digest(locators) + ".json",
+    )
+    payloads = {object_ref: raw, locator_ref: canonical({"locators": locators})}
+    snapshot = {
+        "source_id": source_id,
+        "snapshot_id": snapshot_id,
+        "sha256": raw_hash,
+        "bytes": len(raw),
+        "format": PurePosixPath(relative).suffix.lower(),
+        "version": request.get("version", "unknown"),
+        "code_identity": code_identity,
+        "locator": {
+            "kind": "locator_map",
+            "reference": locator_ref,
+            "sha256": sha(payloads[locator_ref]),
+        },
+        "recovery": {
+            "method": "evidence_object",
+            "path": object_ref,
+            "reference": object_ref,
+            "status": "available",
+        },
+    }
+    if before["kind"] == "git" and before["revision"] and committed is not None and raw == committed:
+        snapshot["local_recovery"] = dict(snapshot["recovery"])
+        snapshot["recovery"] = {"kind": "git", "method": "git", "repo_id": repo_id,
+                                "commit": before["revision"], "path": relative, "status": "available"}
+        recovered = context.modules["source_resources"].recover_snapshot(context.root, snapshot, allow_local_fallback=False)
+        if recovered != raw:
+            raise NodeError("SOURCE_INTEGRITY_ERROR", "Exact configured Git code differs from captured bytes")
+    extractions = []
+    if text is not None:
+        text_ref = "logs/evidence/extractions/" + sha(text.encode()) + ".txt"
+        payloads[text_ref] = text.encode()
+        extraction = {
+            "snapshot_id": snapshot_id,
+            "extractor": extractor,
+            "text_ref": text_ref,
+            "text_sha256": sha(text.encode()),
+            "locator_ref": locator_ref,
+            "locator_sha256": sha(payloads[locator_ref]),
+            "limitations": limitations,
+        }
+        snapshot["extraction"] = extraction
+        extractions.append(extraction)
+    bundle = context.seal(
+        {
+            "resources": [
+                {
+                    "source_id": source_id,
+                    "kind": "code",
+                    "repo_id": repo_id,
+                    "path": relative,
+                }
+            ],
+            "snapshots": [snapshot],
+            "extractions": extractions,
+            "context_ref": request.get("context_ref"),
+            "config_digest": config_digest,
+            "limitations": limitations,
+        },
+        "source_bundle",
+    )
+    for ref, data in payloads.items():
+        write_bytes(context.root, ref, data)
+    after, after_signature = read_code(root, relative)
+    after_identity, after_committed = metadata(root, registered, relative, item)
+    _, _, _, _, after_config = authorized_repo(context, repo_id, receipt)
+    if (
+        after != raw
+        or after_signature != signature
+        or after_identity != before
+        or after_committed != committed
+        or after_config != config_digest
+    ):
+        raise NodeError(
+            "CODE_CHANGED",
+            "Code or registration changed during evidence capture",
+            blocked=True,
+        )
+    ref = context.save(context.base + "/capture.json", bundle)
+    return {
+        "bundle_ref": ref,
+        "bundle_digest": bundle["digest"],
+        "event_refs": [],
+        "code_identity": code_identity,
+        "limitations": limitations,
+    }, "captured"
+
+
+def resolve_bundle(context, reference):
+    bundle = context.record(reference, "source_bundle")
+    portable_ids = set()
+    for snapshot in bundle["snapshots"]:
+        recovery = snapshot["recovery"]
+        if (
+            recovery.get("path")
+            and recovery.get("reference")
+            and recovery["path"] != recovery["reference"]
+        ):
+            raise NodeError(
+                "SOURCE_INTEGRITY_ERROR", "Recovery path aliases disagree"
+            )
+        data = recovered_bytes(context, snapshot)
+        if sha(data) != snapshot["sha256"] or len(data) != snapshot["bytes"]:
+            raise NodeError(
+                "SOURCE_INTEGRITY_ERROR", "Retained object differs from snapshot"
+            )
+        if recovery.get("kind") == "git" or recovery.get("method") == "git":
+            resource = next(r for r in bundle["resources"] if r["source_id"] == snapshot["source_id"])
+            snapshot_text(context, snapshot, resource, data)
+            portable_ids.add(snapshot["snapshot_id"])
+            continue
+        locator = snapshot.get("locator", {})
+        if locator.get("reference") and sha(
+            fixed_bytes(context.root, locator["reference"], ["logs/evidence"])
+        ) != locator.get("sha256"):
+            raise NodeError(
+                "SOURCE_INTEGRITY_ERROR",
+                "Retained locator map differs from snapshot",
+            )
+    for extraction in bundle.get("extractions", []):
+        if extraction["snapshot_id"] in portable_ids:
+            continue
+        if (
+            sha(
+                fixed_bytes(context.root, extraction["text_ref"], ["logs/evidence"])
+            )
+            != extraction["text_sha256"]
+        ):
+            raise NodeError(
+                "SOURCE_INTEGRITY_ERROR", "Retained extraction differs from bundle"
+            )
+    return {"bundle_ref": reference, "bundle": bundle}
+
+
+def capture(context):
+    request = context.request
+    if request.get("kind") == "code":
+        return capture_code(context)
+    if request.get("kind", "raw") != "raw":
+        raise NodeError(
+            "CODE_CONTEXT_REQUIRED",
+            "This node captures landed raw; code needs registered evidence",
+            blocked=True,
+        )
+    source_id = request.get("source_id")
+    if (
+        not isinstance(source_id, str)
+        or not source_id.strip()
+        or any(ord(c) < 32 for c in source_id)
+    ):
+        raise NodeError("INVALID_SOURCE_ID", "Explicit logical source ID required")
+    refs = [request["source_path"], *request.get("attachments", [])]
+    if len(set(refs)) != len(refs):
+        raise NodeError("DUPLICATE_ATTACHMENT", "Each original is enumerated once")
+    members = [raw_member(context, ref) for ref in refs]
+    reference_gaps = check_attachments(members)
+    resources, snapshots, extractions, payloads, limitations = [], [], [], {}, []
+    limitations += reference_gaps
+    for i, member in enumerate(members):
+        ref, data = member["path"], member["data"]
+        text, locators, extractor, gaps = extract(
+            context, data, PurePosixPath(ref).suffix.lower(), primary=i == 0
+        )
+        limitations += gaps
+        logical = (
+            source_id if i == 0 else source_id + ":attachment:" + sha(ref.encode())[:20]
+        )
+        object_hash = sha(data)
+        snapshot_id = "raw:" + digest(
+            {
+                "source_id": logical,
+                "sha256": object_hash,
+                "version": request.get("version"),
+                "extractor": extractor,
+                "text_digest": sha(text.encode()) if text is not None else None,
+                "locator_digest": digest(locators),
+            }
+        )
+        object_ref = "logs/evidence/objects/" + object_hash + ".bin"
+        locator_ref = "logs/evidence/locators/" + digest(locators) + ".json"
+        payloads[object_ref], payloads[locator_ref] = (
+            data,
+            canonical({"locators": locators}),
+        )
+        resources.append(
+            {
+                "source_id": logical,
+                "kind": "raw" if i == 0 else "attachment",
+                "path": ref,
+            }
+        )
+        snapshots.append(
+            {
+                "source_id": logical,
+                "snapshot_id": snapshot_id,
+                "sha256": object_hash,
+                "bytes": len(data),
+                "version": request.get("version"),
+                "format": PurePosixPath(ref).suffix.lower(),
+                "locator": {
+                    "kind": "locator_map",
+                    "reference": locator_ref,
+                    "sha256": sha(payloads[locator_ref]),
+                },
+                "recovery": {
+                    "method": "evidence_object",
+                    "path": object_ref,
+                    "reference": object_ref,
+                    "status": "available",
+                },
+            }
+        )
+        portable = context.modules["source_resources"].git_recovery_for_current(context.root, ref, data)
+        if portable:
+            snapshots[-1]["local_recovery"] = dict(snapshots[-1]["recovery"])
+            snapshots[-1]["recovery"] = portable
+        if text is not None:
+            text_ref = "logs/evidence/extractions/" + sha(text.encode()) + ".txt"
+            payloads[text_ref] = text.encode()
+            extractions.append(
+                {
+                    "snapshot_id": snapshot_id,
+                    "extractor": extractor,
+                    "text_ref": text_ref,
+                    "text_sha256": sha(text.encode()),
+                    "locator_ref": locator_ref,
+                    "locator_sha256": sha(payloads[locator_ref]),
+                    "limitations": gaps,
+                }
+            )
+            snapshots[-1]["extraction"] = dict(extractions[-1])
+    for member in members:
+        now = raw_member(context, member["path"])
+        if now["data"] != member["data"] or now["signature"] != member["signature"]:
+            raise NodeError(
+                "SOURCE_CHANGED",
+                "Original changed before evidence publication",
+                member["path"],
+            )
+    bundle = context.seal(
+        {
+            "resources": resources,
+            "snapshots": snapshots,
+            "extractions": extractions,
+            "context_ref": request.get("context_ref"),
+            "limitations": sorted(set(limitations)),
+        },
+        "source_bundle",
+    )
+    ref = context.base + "/capture.json"
+    existing = safe(context.root, ref)
+    if existing.exists() and existing.read_bytes() != canonical(bundle):
+        raise NodeError(
+            "OPERATION_CONFLICT", "Operation already captures different originals", ref
+        )
+    for path, data in payloads.items():
+        write_bytes(context.root, path, data)
+    for member in members:
+        now = raw_member(context, member["path"])
+        if now["data"] != member["data"] or now["signature"] != member["signature"]:
+            raise NodeError(
+                "SOURCE_CHANGED",
+                "Original changed during evidence publication",
+                member["path"],
+            )
+    context.save(ref, bundle)
+    lock_path = safe(context.root, "governance/sources.lock.yaml")
+    lock = (
+        load_yaml(lock_path.read_bytes())
+        if lock_path.exists()
+        else {"resources": [], "snapshots": []}
+    )
+    changes = []
+    for snapshot in snapshots:
+        prior = [
+            s
+            for s in lock.get("snapshots", [])
+            if s["source_id"] == snapshot["source_id"]
+        ]
+        if prior and snapshot["snapshot_id"] not in {s["snapshot_id"] for s in prior}:
+            changes.append(
+                {
+                    "source_id": snapshot["source_id"],
+                    "old_snapshot_ids": sorted(s["snapshot_id"] for s in prior),
+                    "new_snapshot_id": snapshot["snapshot_id"],
+                }
+            )
+    if changes:
+        response = context.modules["maintenance"].register_source_change(
+            context, {"operation_id": context.operation, "bundle_ref": ref, "changes": changes}
+        )
+        event_refs = response.get("event_refs", [])
+    else:
+        event_refs = []
+    return {
+        "bundle_ref": ref,
+        "bundle_digest": bundle["digest"],
+        "event_refs": event_refs,
+        "limitations": bundle["limitations"],
+    }, "captured"
+
+
+def current_source_bindings(context, resource, snapshot):
+    """Return authorized current paths only when they still match fixed bytes."""
+    if resource.get("kind") == "code":
+        root, _, config, _, config_digest = authorized_repo(context, resource["repo_id"])
+        if not context.modules["validation"].workspace_file_allowed(config, resource["repo_id"], resource["path"]):
+            raise NodeError("CODE_MODULE_UNKNOWN", "Selected code is outside configured modules", blocked=True)
+        raw, _ = read_code(root, resource["path"])
+        config_path = context.modules["validation"].workspace_config_path(context.root)
+        config_bytes = config_path.read_bytes()
+        if sha(config_bytes) != config_digest:
+            raise NodeError("SOURCE_CHANGED", "Workspace configuration changed during material binding", str(config_path), blocked=True,
+                            data={"needs_scan": True, "affected_scope": [str(config_path)]})
+        result = [{"path": safe(root, resource["path"]).as_posix(), "sha256": sha(raw), "bytes": len(raw), "kind": "code"},
+                  {"path": config_path.as_posix(), "sha256": config_digest, "bytes": len(config_bytes), "kind": "config"}]
+    else:
+        member = raw_member(context, resource["path"])
+        raw = member["data"]
+        result = [{"path": resource["path"], "sha256": sha(raw), "bytes": len(raw), "kind": "raw"}]
+    if sha(raw) != snapshot["sha256"] or len(raw) != snapshot["bytes"]:
+        raise NodeError("SOURCE_CHANGED", "Current source differs from adopted material", resource["path"], blocked=True,
+                        data={"needs_scan": True, "affected_scope": [resource["path"]]})
+    return result
+
+
+def execute(context):
+    """Public source operations; no ResultEnvelope or sibling process ownership."""
+    action = context.args.action or "capture"
+    if action in {"run", "capture"}:
+        return capture(context)
+    if action == "resolve":
+        return resolve_bundle(context, context.request["bundle_ref"]), "resolved"
+    if action == "resolve-source":
+        bundle = (context.record(context.request["bundle_ref"], "source_bundle")
+                  if context.request.get("bundle_ref") else None)
+        return resolve_source(context, context.request["source_ref"], bundle), "resolved"
+    raise NodeError("UNKNOWN_ACTION", "Expected capture, resolve or resolve-source", action)

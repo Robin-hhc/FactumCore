@@ -920,7 +920,6 @@
       },
       "then": {
         "required": [
-          "scan_ref",
           "material_ref",
           "units",
           "card_actions",

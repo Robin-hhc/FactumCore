@@ -136,11 +136,6 @@ def test_legacy_explicit_structured_source_without_frozen_adapter_still_works():
 
 def pipeline(tmp_path):
     result = FIXTURE.MANUAL.ManualPipeline(tmp_path)
-    lock_path = result.root / "governance/framework.lock.yaml"
-    lock = yaml.safe_load(lock_path.read_bytes())
-    for entry in lock["files"].values():
-        entry["sha256"] = v.sha256_bytes((result.root / entry["path"]).read_bytes())
-    lock_path.write_text(yaml.safe_dump(lock, sort_keys=False), encoding="utf-8")
     return result
 
 

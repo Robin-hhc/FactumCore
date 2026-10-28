@@ -59,6 +59,25 @@ def fixture_packages(root):
     return root
 
 
+def test_final_public_capability_set_is_exactly_nine_skills():
+    assert set(validator_module().SKILLS) == {
+        "hs-knowledge-explore", "hs-knowledge-source-scan", "hs-knowledge-source-prepare",
+        "hs-knowledge-change-plan", "hs-knowledge-view-materialize", "hs-knowledge-lint",
+        "hs-knowledge-apply", "hs-knowledge-query", "hs-knowledge-maintain",
+    }
+
+
+def test_active_old_skill_is_rejected_but_empty_historical_directory_is_not(tmp_path):
+    module = validator_module()
+    source = fixture_packages(tmp_path / "fixture")
+    package = source / "skills/common/knowledge/hs-knowledge-candidate-revise"
+    package.mkdir()
+    assert module.validate(source) == []
+    (package / "SKILL.md").write_text("# Active legacy package\n", encoding="utf-8")
+    assert any("active Skill set mismatch" in error and "hs-knowledge-candidate-revise" in error
+               for error in module.validate(source))
+
+
 def test_ingest_stays_complete_beside_the_read_only_lint_template():
     ingest = yaml.safe_load(
         (
@@ -71,15 +90,23 @@ def test_ingest_stays_complete_beside_the_read_only_lint_template():
     assert (ROOT / "workflows/common/knowledge/hs-knowledge-lint/workflow.yaml").is_file()
     assert not any(node["type"] == "gate" for node in nodes.values())
     assert not {"prepare_confirmation", "final_view_user_gate", "record_confirmation"} & nodes.keys()
-    assert nodes["review_content"]["owner"] == "reviewer"
+    assert list(nodes) == ["scan_sources", "prepare_material", "plan_change",
+                           "materialize_view", "lint_view", "record_ingest", "apply_view"]
+    assert [(key, node["owner"]) for key, node in nodes.items()] == [
+        ("scan_sources", "coder"), ("prepare_material", "coder"),
+        ("plan_change", "coder"), ("materialize_view", "coder"),
+        ("lint_view", "reviewer"), ("record_ingest", "coder"), ("apply_view", "coder"),
+    ]
     assert "verify_merge" not in nodes and "maintain_knowledge" not in nodes
     assert nodes["lint_view"]["skill"] == "hs-knowledge-lint"
+    assert nodes["prepare_material"]["skill"] == "hs-knowledge-source-prepare"
     assert nodes["record_ingest"]["skill"] == "hs-knowledge-source-scan"
     assert {e["id"]: e["target"] for e in nodes["record_ingest"]["exits"]}["recorded"] == "apply_view"
-    routes = {edge["id"]: edge["target"] for edge in nodes["inspect_candidate"]["exits"]}
-    assert routes["manual_ready"] == "lint_view"
-    assert routes["mixed_ready"] == routes["code_ready"] == "local_check"
-    assert "保留历史卡输入" in nodes["apply_view"]["prompt"]
+    routes = {edge["id"]: edge["target"] for edge in nodes["scan_sources"]["exits"]}
+    assert {key: routes[key] for key in ("recover", "resume_index", "resume_queries")} == {
+        "recover": "apply_view", "resume_index": "apply_view", "resume_queries": "apply_view",
+    }
+    assert "resume" not in routes
     assert "proof_set" not in nodes["apply_view"]["prompt"]
 
 
@@ -120,11 +147,8 @@ def test_ingest_finishes_locally_without_repository_submission():
             if edge["id"] == exit_id
         )
 
-    assert destination("apply_view", "applied") == "rebuild_index"
-    assert destination("rebuild_index", "built") == "query_regression"
-    assert destination("query_regression", "checked") == "__end__"
-    assert destination("apply_view", "record_only") == "__end__"
-    assert destination("recover_transaction", "record_only") == "__end__"
+    assert destination("apply_view", "completed") == "__end__"
+    assert destination("apply_view", "recorded") == "__end__"
     assert "publish_handoff" not in nodes
     assert "submit_batch" not in nodes
     assert not any(
@@ -134,11 +158,11 @@ def test_ingest_finishes_locally_without_repository_submission():
     # The independent tool remains available after the local Workflow completes.
     assert (
         ROOT
-        / "skills/common/knowledge/hs-knowledge-publish-handoff/scripts/cli.py"
+        / "skills/common/knowledge/hs-knowledge-apply/scripts/cli.py"
     ).is_file()
 
 
-def test_public_mixed_candidate_routes_to_code_check_without_human_confirmation(tmp_path):
+def test_public_mixed_candidate_keeps_classification_and_routes_to_independent_p5(tmp_path):
     fixture_path = ROOT / "skills/common/knowledge/hs-knowledge-source-scan/tests/conftest.py"
     spec = importlib.util.spec_from_file_location("workflow_mixed_public_fixture", fixture_path)
     fixture = importlib.util.module_from_spec(spec)
@@ -147,16 +171,23 @@ def test_public_mixed_candidate_routes_to_code_check_without_human_confirmation(
     bundle_ref, bundle = harness.capture("mixed-route")
     document = harness.write(".build/candidates/document.md", harness.card("document", bundle))
     code = harness.write(".build/candidates/code.md", harness.card("code", bundle).replace(b"review_mode: manual_document", b"review_mode: code_gate"))
-    plan = harness.run("change-plan", {"operation_id": "mixed-route", "bundle_ref": bundle_ref, "decisions": [
+    view = harness.run("view-materialize", {"operation_id": "mixed-route", "bundle_ref": bundle_ref, "decisions": [
         {"candidate_id": "document", "decision": "create", "reason": "Synthetic routing document", "card_inputs": [document]},
         {"candidate_id": "code", "decision": "create", "reason": "Synthetic routing code", "card_inputs": [code]},
     ]})
-    view = harness.run("view-materialize", {"operation_id": "mixed-route", "plan_ref": plan["data"]["plan_ref"]})
-    inspected = harness.run("candidate-inspect", {"operation_id": "mixed-route", "view_ref": view["data"]["view_ref"]})
-    assert inspected["phase"] == "mixed_ready"
+    inspected = harness.run("view-materialize", {"operation_id": "mixed-route", "view_ref": view["data"]["view_ref"]}, action="describe")
+    assert inspected["phase"] == "described"
+    assert inspected["data"]["review_mode"] == "mixed"
+    assert inspected["data"]["view_digest"] == view["data"]["view_digest"]
+    assert harness.record(view["data"]["view_ref"])["review_requirements"] == {
+        "manual_document": ["knowledge/rules/document.md"],
+        "code_gate": ["knowledge/rules/code.md"],
+    }
     workflow = yaml.safe_load((ROOT / "workflows/common/knowledge/hs-knowledge-ingest/workflow.yaml").read_bytes())
-    node = next(item for item in workflow["nodes"] if item["id"] == "inspect_candidate")
-    assert {edge["id"]: edge["target"] for edge in node["exits"]}.get(inspected["phase"]) == "local_check"
+    node = next(item for item in workflow["nodes"] if item["id"] == "materialize_view")
+    assert {edge["id"]: edge["target"] for edge in node["exits"]}["ready"] == "lint_view"
+    reviewer = next(item for item in workflow["nodes"] if item["id"] == "lint_view")
+    assert (reviewer["skill"], reviewer["owner"]) == ("hs-knowledge-lint", "reviewer")
 
 
 def test_design_validation_checks_package_contracts_and_owners(tmp_path):
@@ -165,7 +196,7 @@ def test_design_validation_checks_package_contracts_and_owners(tmp_path):
     assert module.validate(source) == []
     contract_path = (
         source
-        / "skills/common/knowledge/hs-knowledge-source-capture/artifacts/result.yaml"
+        / "skills/common/knowledge/hs-knowledge-source-prepare/artifacts/result.yaml"
     )
     contract = yaml.safe_load(contract_path.read_bytes())
     contract["default_location"]["path"] = "node-result.md"
@@ -173,9 +204,9 @@ def test_design_validation_checks_package_contracts_and_owners(tmp_path):
     assert module.validate(source) == []  # a standard default path is legal
     workflow = source / "workflows/common/knowledge/hs-knowledge-ingest/workflow.yaml"
     document = yaml.safe_load(workflow.read_bytes())
-    next(n for n in document["nodes"] if n["id"] == "review_content")["owner"] = "coder"
+    next(n for n in document["nodes"] if n["id"] == "lint_view")["owner"] = "coder"
     workflow.write_text(yaml.safe_dump(document), encoding="utf-8")
-    assert any("review_content: wrong Skill/owner/type" in error for error in module.validate(source))
+    assert any("lint_view: wrong Skill/owner/type" in error for error in module.validate(source))
 
 
 @pytest.mark.parametrize("metadata,diagnostic", [
@@ -218,6 +249,50 @@ def test_missing_reference_or_wrong_artifact_exit_is_rejected(tmp_path):
     contract["required_on"]["exit_ids"] = ["made_up_success"]
     (package / "result.yaml").write_text(yaml.safe_dump(contract), encoding="utf-8")
     assert any("exit" in error.lower() for error in module.validate(source))
+
+
+@pytest.mark.parametrize("mutation", ["stale_prepare", "unscoped_old_node", "extra_exit", "missing_failure_report"])
+def test_artifact_contracts_reject_retired_scope_and_missing_real_obligations(tmp_path, mutation):
+    module = validator_module()
+    source = fixture_packages(tmp_path / "fixture")
+    if mutation == "stale_prepare":
+        package = source / "skills/common/knowledge/hs-knowledge-source-scan/artifacts"
+        shutil.copyfile(package / "record-result.yaml", package / "prepare-result.yaml")
+        assert any("exact artifact contract set mismatch" in error for error in module.validate(source))
+        return
+    skill = "hs-knowledge-query" if mutation == "unscoped_old_node" else "hs-knowledge-lint"
+    path = source / "skills/common/knowledge" / skill / "artifacts/result.yaml"
+    contract = yaml.safe_load(path.read_bytes())
+    if mutation == "unscoped_old_node":
+        contract["applies_to"]["node_ids"] = ["query_regression"]
+    elif mutation == "extra_exit":
+        contract["required_on"]["exit_ids"].append("reviewed")
+    else:
+        contract["required_on"]["exit_ids"].remove("needs_material")
+    path.write_text(yaml.safe_dump(contract), encoding="utf-8")
+    assert any(skill in error and "artifact" in error for error in module.validate(source))
+
+
+@pytest.mark.parametrize("node_id,exit_id,target", [
+    ("scan_sources", "resume_index", "prepare_material"),
+    ("scan_sources", "resume_queries", "__end__"),
+    ("prepare_material", "source_changed", "plan_change"),
+    ("plan_change", "needs_material", "scan_sources"),
+    ("materialize_view", "ready", "record_ingest"),
+    ("lint_view", "needs_material", "scan_sources"),
+    ("lint_view", "needs_revision", "plan_change"),
+    ("record_ingest", "recorded", "__end__"),
+])
+def test_seven_stage_graph_rejects_skipped_review_wrong_reentry_and_full_rescan(tmp_path, node_id, exit_id, target):
+    module = validator_module()
+    source = fixture_packages(tmp_path / "fixture")
+    path = source / "workflows/common/knowledge/hs-knowledge-ingest/workflow.yaml"
+    workflow = yaml.safe_load(path.read_bytes())
+    node = next(item for item in workflow["nodes"] if item["id"] == node_id)
+    next(edge for edge in node["exits"] if edge["id"] == exit_id)["target"] = target
+    path.write_text(yaml.safe_dump(workflow), encoding="utf-8")
+    assert any(f".{node_id}: unsafe or missing transition" in error
+               for error in module.validate(source))
 
 
 @pytest.mark.parametrize("mutation, expected", [
@@ -271,12 +346,12 @@ def test_audit_report_contract_keeps_its_exact_identity_scope_and_obligation(tmp
     assert any("hs-knowledge-maintain/audit-result.yaml" in error for error in module.validate(source))
 
 
-def test_cross_template_edge_and_apply_after_index_failure_rejected(tmp_path):
+def test_apply_cannot_restart_materialization_after_its_completion_exit(tmp_path):
     module = validator_module()
     source = fixture_packages(tmp_path / "fixture")
     path = source / "workflows/common/knowledge/hs-knowledge-ingest/workflow.yaml"
     doc = yaml.safe_load(path.read_bytes())
-    node = next(n for n in doc["nodes"] if n["id"] == "query_regression")
-    next(e for e in node["exits"] if e["id"] == "content_error")["target"] = "apply_view"
+    node = next(n for n in doc["nodes"] if n["id"] == "apply_view")
+    next(e for e in node["exits"] if e["id"] == "completed")["target"] = "materialize_view"
     path.write_text(yaml.safe_dump(doc), encoding="utf-8")
     assert any("transition" in e.lower() for e in module.validate(source))

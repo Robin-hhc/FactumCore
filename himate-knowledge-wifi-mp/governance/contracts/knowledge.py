@@ -41,6 +41,20 @@ def _unique(items, field):
 
 
 def parse_card(data, path, rules):
+    """Full card quality validation, used by lint and trusted fixed CI."""
+    return _decode_card(data, path, rules, quality=True)
+
+
+def decode_card(data, path, rules):
+    """Decode exact card data and spans without re-running quality policy.
+
+    Producers, indexing and consumers need unambiguous identity/span data.
+    Profile, completeness and whole-library quality remain lint's work.
+    """
+    return _decode_card(data, path, rules, quality=False)
+
+
+def _decode_card(data, path, rules, *, quality):
     try:
         text = data.decode("utf-8-sig")
     except UnicodeError as exc:
@@ -51,24 +65,26 @@ def parse_card(data, path, rules):
     if not match:
         raise ContractError("FRONTMATTER_REQUIRED", "Expected YAML frontmatter", path)
     meta = load_yaml(match.group(1))
-    validate_shape("card", meta, rules)
+    if quality:
+        validate_shape("card", meta, rules)
+    elif not isinstance(meta, dict) or not all(key in meta for key in
+            ("id", "profile", "title", "summary", "scope", "sources", "claims", "relations")):
+        raise ContractError("CARD_DATA_REQUIRED", "Card data cannot be decoded", path)
     body, visible = text[match.end() :], _unfenced(text[match.end() :])
     sections = set(re.findall(r"^#{1,6}\s+(.+?)\s*#*\s*$", visible, re.M))
-    missing = (
-        set(rules["profiles"]["profiles"][meta["profile"]]["required_sections"])
-        - sections
-    )
+    missing = (set(rules["profiles"]["profiles"][meta["profile"]]["required_sections"]) - sections
+               if quality else set())
     if missing:
         raise ContractError("MISSING_SECTIONS", ", ".join(sorted(missing)), path)
     validate_id(meta["id"])
     _unique(meta["claims"], "id")
     _unique(meta["scope"]["contexts"], "context_id")
     contexts = {c["context_id"]: c for c in meta["scope"]["contexts"]}
-    if any(not _has_condition(c) for c in contexts.values()):
+    if quality and any(not _has_condition(c) for c in contexts.values()):
         raise ContractError(
             "EMPTY_CONTEXT", "A context must constrain a real dimension", path
         )
-    if meta["scope"]["applicability"] == "constrained" and not contexts:
+    if quality and meta["scope"]["applicability"] == "constrained" and not contexts:
         raise ContractError(
             "EMPTY_SCOPE", "Constrained scope requires conditions", path
         )
@@ -123,7 +139,7 @@ def parse_card(data, path, rules):
             source_records=[sources[s] for s in claim["source_refs"]],
         )
         if (
-            compiled["scope"]["applicability"] == "constrained"
+            quality and compiled["scope"]["applicability"] == "constrained"
             and not compiled["scope"]["contexts"]
         ):
             raise ContractError("CLAIM_SCOPE_REQUIRED", claim["id"], path)

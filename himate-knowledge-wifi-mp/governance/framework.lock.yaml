@@ -1,16 +1,16 @@
 schema_version: '2.0'
 contract_family: aiot-wifi
-tool_version: 0.3.5
+tool_version: 0.4.0
 files:
   contracts/__init__.py:
     path: governance/contracts/__init__.py
     sha256: ccc90c8e3b38e19264e3c6843099880b6f293779fc7222051ea5a47c3316c8db
   contracts/knowledge.py:
     path: governance/contracts/knowledge.py
-    sha256: 833f55179ea674f87d39928cb5dab145c362a78ad0d81299b0a4da290718512e
+    sha256: 304769b321863d0e1e918e5178da387fd6dbb20aab56eef624eb0422ebd9474d
   contracts/records.py:
     path: governance/contracts/records.py
-    sha256: 65e3115b28be7bd3c1ee3b0e7c5b0d8ed2e8cddd9ec8ad864454beb2358a458d
+    sha256: 42c9d2d386b500748a38c286792d3861d46777224bb899dcdf5789aea843f48a
   contracts/source_resources.py:
     path: governance/contracts/source_resources.py
     sha256: 4e379b71c82044ad76265a3ce48ca7c3e3cde746e6c4f2ca6287f580466506f5
@@ -25,7 +25,7 @@ files:
     sha256: ec9eae684e484dd79cfe0f546a336d95d68ba5da7345f88e93733483d0d638be
   schemas/records.schema.json:
     path: governance/schemas/records.schema.json
-    sha256: 94ea4a0ef0981c51c7e15e14d207360c658bee0e9826dc39bcf43aa53650830c
+    sha256: a51693c5ae5ebc0ddc981cd342bc0eb73d216c3d79774f03c31c6de44d9bf8df
   schemas/registries.yaml:
     path: governance/schemas/registries.yaml
     sha256: 0c6d8bf0d143426baac714d563bfdf6ee4b80e517b6ba89bf1f90b69f4fd2cec
@@ -61,28 +61,73 @@ files:
     sha256: 45e465c2b5725c85addad44b17c44ea70db2515a5d21fbe976fa54a7b0ec7fdf
   specs/cards.md:
     path: governance/specs/cards.md
-    sha256: b647aa7c5fddf6fff6841a800787c5f6124ec7929b93b220b0de252b8ca8b70e
+    sha256: 2b6d29e137f6f4b6433d8cd5806fdfb759b16417cd6669982174d86ed7d60a21
   specs/lifecycle.md:
     path: governance/specs/lifecycle.md
     sha256: 8a825806ec5c918ec561968190daf571aac706af8798be47e6f9a42f4d7fab5c
   specs/records.md:
     path: governance/specs/records.md
-    sha256: 53233778ab8042e3d4e6522a6b6c1fd9c172611bac0580d2d2d603dfe9f4bc2d
+    sha256: b2093f1fed694acbec5406222db6072e141acd0f4687024530e14274e6447a86
   specs/sources.md:
     path: governance/specs/sources.md
-    sha256: 64e8139f422e7873deae98ff05b234df52137c015dfeb252dca78e1cde0674fe
+    sha256: d805888ba24022fcb8ee9f9768e36f1062e1de15a4a29d8ae1a2b7ea34a20b1d
   contracts/checks.py:
     path: governance/contracts/checks.py
-    sha256: 6781751a2c8de59a63b5f74bb78161059141b13e71b3f49bfff55a3fd89cc159
+    sha256: 6ebf9ce80947af6190f52547a06b87dc37a133b1e811bc0dc3e9b1d2869184f2
   contracts/indexing.py:
     path: governance/contracts/indexing.py
-    sha256: 265f89d4fdbf654ad5e40480b4357dbbd781011590fbf3c5786be89a19a4c5bf
+    sha256: f343946a197d2fa6beaec789bc8cf6d2440208c474da58ecbdb6d725d0703a36
   templates/ingest-record.yaml:
     path: governance/templates/ingest-record.yaml
     sha256: 8afd7df6d6f45766b5b64ce025b98d6245e90a549d826e10a058449cea3346db
   specs/ci-runner.md:
     path: governance/specs/ci-runner.md
     sha256: ed3b630838ed9ec2352231d0ac11571edc9a5274d77f8d3c5cbb36e260a8d9ea
+  contracts/code_review.py:
+    path: governance/contracts/code_review.py
+    sha256: b0ac8790534bf0250ca49ff79ee89315339fd49d48f6ca69e0771f514298e10b
+  contracts/index_runtime.py:
+    path: governance/contracts/index_runtime.py
+    sha256: 7cb4203ef6dc707be4f8fe463a7a9a38b92ff5abaa69b2978084b4b3be4a5e80
+  contracts/ingest_execution.py:
+    path: governance/contracts/ingest_execution.py
+    sha256: 33cd90efc6f70bfe523021c3a675e378f0d5dfe3c791de18ecd11ac8f81b19aa
+  contracts/input_snapshot.py:
+    path: governance/contracts/input_snapshot.py
+    sha256: f11b937d5b80e411655846575a0fc209d49988ef1bd3316ebd74c7fb6f736559
+  contracts/legacy_runtime.py:
+    path: governance/contracts/legacy_runtime.py
+    sha256: b327df8ec2f1cd82d856104c93c0e78d48ee3a26393b9aa2e22f98ddd47b20d8
+  contracts/maintenance.py:
+    path: governance/contracts/maintenance.py
+    sha256: 50c37c8493d2feaffcb7f50d79f0e7bdd0e9dcd3a0daeb2c24c2eeb7ff6274f3
+  contracts/production.py:
+    path: governance/contracts/production.py
+    sha256: e8fe77dcc173c42c40869036035d30999c44682de79e036b5f6cb032ba125d59
+  contracts/query_regression.py:
+    path: governance/contracts/query_regression.py
+    sha256: 091cc276a471d1511ca3e990283087fffdbcd7c959833f0aade1512585c0774f
+  contracts/query_runtime.py:
+    path: governance/contracts/query_runtime.py
+    sha256: bc91bf1387c36ea6fceb0e7b924d5fe8e26fbd6b76e6350e195e579bff301d23
+  contracts/reference_audit.py:
+    path: governance/contracts/reference_audit.py
+    sha256: 577239dcc4d3c2fab48f0f470472e53d0fbd2a1ba64dd5774a59ce175a1d890e
+  contracts/review_inputs.py:
+    path: governance/contracts/review_inputs.py
+    sha256: 829f91e5560765e22548a7705edab2169c465a0a7d55224b2206c179ba01e03d
+  contracts/runtime.py:
+    path: governance/contracts/runtime.py
+    sha256: 5608e377821ad24075c2ad36540f3681f2198c972fbcae54a842bd80185fd285
+  contracts/source_materials.py:
+    path: governance/contracts/source_materials.py
+    sha256: 14d3dda54f0652337141c00020d8e99e2c800bf47564e53a63edd33bc03d84ea
+  contracts/source_operations.py:
+    path: governance/contracts/source_operations.py
+    sha256: 32ec9a50094e41825168d5268547bd56384eec875ab7893246f6b9608e27eb35
+  contracts/submission.py:
+    path: governance/contracts/submission.py
+    sha256: 824ad30ee508b6a2b0bc90d3ded530ca48a7cd4a81be8efc872f1f3fc64d5d58
 capabilities:
   checks: '1.0'
   indexing: '1.0'

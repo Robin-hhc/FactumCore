@@ -9,7 +9,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[5]
 spec = importlib.util.spec_from_file_location(
-    "direct_material_fixture", ROOT / "skills/common/knowledge/hs-knowledge-local-check/tests/test_public_code_gate.py"
+    "direct_material_fixture", ROOT / "skills/common/knowledge/hs-knowledge-lint/tests/test_public_code_gate.py"
 )
 fixture = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fixture)

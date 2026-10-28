@@ -36,11 +36,11 @@ def historical_batch(harness, definitions=None):
     scan_ref = harness.run("source-scan", {"operation_id": "seed"}, "scan")["data"]["scan_ref"]
     unit = harness.record(scan_ref)["units"][0]
     unit_id = unit["unit_id"]
-    code_bundle_ref = harness.run("source-capture", {"operation_id": "seed-code", "kind": "code",
-        "repo_id": repo_id, "relative_path": "file.c", "source_id": "historical-code"})["data"]["bundle_ref"]
+    code_bundle_ref = harness.run("source-prepare", {"operation_id": "seed-code", "kind": "code",
+        "repo_id": repo_id, "relative_path": "file.c", "source_id": "historical-code"}, action="capture")["data"]["bundle_ref"]
     code_bundle = harness.record(code_bundle_ref)
     code_snapshot = code_bundle["snapshots"][0]
-    material_ref = harness.run("source-scan", {"operation_id": "seed", "scan_ref": scan_ref,
+    material_ref = harness.run("source-prepare", {"operation_id": "seed", "scan_ref": scan_ref,
         "code_bundle_refs": [{"bundle_ref": code_bundle_ref, "bundle_digest": code_bundle["digest"]}]},
         "prepare")["data"]["material_ref"]
     material = harness.record(material_ref)
@@ -61,9 +61,6 @@ def historical_batch(harness, definitions=None):
         "card_actions": [{"card_id": identity, "decision": "create", "author_id": "author",
             "unit_ids": [unit_id], "reason": "One bounded topic"} for identity, _, _ in definitions],
         "target_queries": cases}, "plan")["data"]["semantic_plan_ref"]
-    harness.run("change-plan", {"operation_id": "seed", "semantic_plan_ref": semantic_ref,
-        "reviewer_id": "reviewer", "sampled_unit_ids": [unit_id], "unreviewed_unit_ids": [],
-        "reason": "Read the source and reviewed grouping before drafting", "findings": []}, "review")
     context = {"schema_version": "2.0", "record_kind": "project_context", "operation_id": "seed",
         "rules_digest": harness.rules, "tool_identity": code_bundle["tool_identity"], "state": "context_loaded",
         "workspace_id": "historical-context", "workspace_root": str(harness.base), "knowledge_root": str(harness.root),
@@ -102,51 +99,37 @@ def historical_batch(harness, definitions=None):
                                   ("---\n" + yaml.safe_dump(meta, sort_keys=False) + "---" + body).encode())
         decisions.append({"candidate_id": identity, "decision": "create", "reason": "Planned source study",
                           "card_inputs": [candidate]})
-    plan_ref = harness.run("change-plan", {"operation_id": "seed", "v3_required": True,
+    produced = harness.run("view-materialize", {"operation_id": "seed", "v3_required": True,
         "semantic_plan_ref": semantic_ref, "bundle_ref": material["bundle_ref"], "context_ref": context_ref,
-        "decisions": decisions})["data"]["plan_ref"]
-    view_ref = harness.run("view-materialize", {"operation_id": "seed", "plan_ref": plan_ref})["data"]["view_ref"]
+        "decisions": decisions})["data"]
+    view_ref = produced["view_ref"]
     view = harness.record(view_ref)
-    review_ref = harness.run("change-plan", {"operation_id": "seed", "semantic_plan_ref": semantic_ref,
-        "view_ref": view_ref, "reviewer_id": "reviewer", "sampled_unit_ids": [unit_id], "unreviewed_unit_ids": [],
-        "reason": "Independently read complete candidates and exact evidence", "findings": []},
-        "review")["data"]["content_review_ref"]
     inputs = {"code_checkout": {"configuration": str(config_path), "config_digest": context["config_digest"],
                                "repos": {repo_id: {"root": str(code)}}}}
 
-    def lint(name):
-        incoming = harness.write(".build/operations/seed/" + name + "-input.json",
-                                 canonical({"view_ref": view_ref, "inputs": inputs}))
-        output = ".build/operations/seed/" + name + ".json"
-        completed = subprocess.run([sys.executable, str(harness.packages / "hs-knowledge-lint/scripts/cli.py"),
-            "--knowledge-root", str(harness.root), "--input", str(harness.root / incoming),
-            "--output", str(harness.root / output)], capture_output=True, check=False)
-        assert completed.returncode == 0, (completed.stderr, harness.record(output))
-        return output
-
-    lint("preflight")
-    inspected = harness.run("candidate-inspect", {"operation_id": "seed", "view_ref": view_ref, "check_inputs": inputs})
-    assert inspected["phase"] in {"code_ready", "mixed_ready"}
     report_ref = harness.write(".build/operations/seed/code-review.json", canonical({"schema_version": "2.0",
         "record_kind": "semantic_review", "payload": {"findings": [], "view_digest": view["digest"],
             "context_digest": context["digest"], "mode": "local", "issued_at": time.time(), "claims": claim_reviews}}))
-    checked = harness.run("local-check", {"operation_id": "seed", "view_ref": view_ref,
-        "context_ref": context_ref, "semantic_report_ref": report_ref})
-    assert checked["data"]["check_status"] == "passed"
-    lint_ref = lint("final-lint")
+    incoming = harness.write(".build/operations/seed/p5-review-input.json", canonical({
+        "operation_id": "seed", "semantic_plan_ref": semantic_ref, "view_ref": view_ref,
+        "reviewer_id": "synthetic-reviewer", "sampled_unit_ids": [unit_id], "unreviewed_unit_ids": [],
+        "reason": "Synthetic reviewer declaration after reading exact old/current sources; no real host isolation claim",
+        "findings": [], "inputs": inputs,
+        "code_review": {"context_ref": context_ref, "semantic_report_ref": report_ref}}))
+    lint_ref = ".build/operations/seed/p5-review.json"
+    completed = subprocess.run([sys.executable, str(harness.packages / "hs-knowledge-lint/scripts/cli.py"),
+        "--knowledge-root", str(harness.root), "--input", str(harness.root / incoming),
+        "--output", str(harness.root / lint_ref), "--action", "review"], capture_output=True, check=False)
+    assert completed.returncode == 0, (completed.stderr, harness.record(lint_ref))
+    lint = harness.record(lint_ref)
+    assert lint["status"] == "passed" and lint["scope"]["kind"] == "full"
     record_ref = harness.run("source-scan", {"operation_id": "seed", "scan_ref": scan_ref,
         "semantic_plan_ref": semantic_ref, "view_ref": view_ref, "lint_ref": lint_ref,
-        "dispositions": [{"unit_id": unit_id, "action": "create", "reason": "Completed bounded source study",
-            "observed_fingerprint": unit["observed_fingerprint"], "adopted_fingerprint": unit["observed_fingerprint"],
-            "progress": "completed", "card_refs": [identity for identity, _, _ in definitions],
-            "claim_refs": [identity + "#" + identity + "-claim" for identity, _, _ in definitions]}]},
-        "record")["data"]["ingest_record_ref"]
-    harness.run("apply", {"operation_id": "seed", "view_ref": view_ref, "ingest_record_ref": record_ref,
-        "content_review_ref": review_ref, "lint_report_ref": lint_ref, "check_inputs": inputs})
-    built = harness.run("index-build", {"operation_id": "seed-index"})["data"]
-    activated = harness.run("query-regression", {"operation_id": "seed-query", "view_ref": view_ref,
-        "generation_ref": built["generation_ref"], "expected_active": built["expected_active"]})
-    assert activated["data"]["activated"]
+        "disposition_preview_ref": produced["disposition_preview_ref"]}, "record")["data"]["ingest_record_ref"]
+    applied = harness.run("apply", {"operation_id": "seed", "view_ref": view_ref, "ingest_record_ref": record_ref,
+        "content_review_ref": lint["data"]["content_review_ref"], "lint_report_ref": lint_ref,
+        "check_inputs": inputs}, "batch")
+    assert applied["phase"] == "completed" and applied["data"]["activated"]
     return source, original, code_snapshot, raw
 
 
@@ -162,9 +145,9 @@ def test_completed_historical_code_drift_does_not_reopen_unchanged_raw(harness):
         assert result["affected_claims"] == []
         assert result["actionable_unit_ids"] == result["finalization_pending"] == []
         assert harness.record(result["scan_ref"])["units"][0]["change"] == "unchanged"
-    captured = harness.run("source-capture", {"operation_id": "changed-code", "kind": "code",
+    captured = harness.run("source-prepare", {"operation_id": "changed-code", "kind": "code",
         "repo_id": old_snapshot["code_identity"]["repo_id"], "relative_path": "file.c",
-        "source_id": "historical-code"})["data"]["bundle_ref"]
+        "source_id": "historical-code"}, action="capture")["data"]["bundle_ref"]
     registered = harness.run("maintain", {"operation_id": "changed-code", "bundle_ref": captured},
                              "register-code-change")
     assert registered["data"]["blocked_claims"][0]["reason"] == "code_changed"
@@ -209,8 +192,8 @@ def test_completed_historical_code_drift_does_not_reopen_unchanged_raw(harness):
     # historical interpretation and exact original remain available.
     changed_raw = raw + b"A later source version adds a separate observation.\n"
     harness.write("docs-raw/specs/history.md", changed_raw)
-    harness.run("source-capture", {"operation_id": "raw-upgrade", "source_path": "docs-raw/specs/history.md",
-        "source_id": harness.record(before["scan_ref"])["units"][0]["source_id"]})
+    harness.run("source-prepare", {"operation_id": "raw-upgrade", "source_path": "docs-raw/specs/history.md",
+        "source_id": harness.record(before["scan_ref"])["units"][0]["source_id"]}, action="capture")
     raw_changed = harness.run("source-scan", {"operation_id": "raw-upgrade-scan"}, "scan")["data"]
     assert harness.record(raw_changed["scan_ref"])["units"][0]["change"] == "changed"
     assert raw_changed["actionable_unit_ids"]
@@ -228,9 +211,9 @@ def test_same_source_freshness_keeps_current_and_guidance_affected(harness, hist
     expected = {identity for identity, usage, _ in definitions if usage != "historical"}
     observed = harness.run("maintain", {"operation_id": "mixed-live-drift"}, "inspect-context")["data"]
     assert {row["card_id"] for row in observed["affected_claims"]} == expected
-    new_bundle = harness.run("source-capture", {"operation_id": "mixed-new-code", "kind": "code",
+    new_bundle = harness.run("source-prepare", {"operation_id": "mixed-new-code", "kind": "code",
         "repo_id": old_snapshot["code_identity"]["repo_id"], "relative_path": "file.c",
-        "source_id": "historical-code"})["data"]["bundle_ref"]
+        "source_id": "historical-code"}, action="capture")["data"]["bundle_ref"]
     harness.run("maintain", {"operation_id": "mixed-new-code", "bundle_ref": new_bundle}, "register-code-change")
     state_before = (harness.root / "logs/events/state.json").read_bytes()
     registered = harness.run("maintain", {"operation_id": "mixed-registered-drift"}, "inspect-context")["data"]

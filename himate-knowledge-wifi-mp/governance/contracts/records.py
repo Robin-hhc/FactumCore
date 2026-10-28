@@ -20,7 +20,7 @@ def verify(record, expected=None):
     return record
 
 
-def rebuild_restrictions(records, rules=None, *, cards=None):
+def rebuild_restrictions(records, rules=None, *, cards=None, _validated_records=()):
     """Reconstruct unresolved shared facts; input authenticity belongs to caller.
 
     No timestamps, names, raw text or local events choose a winner. A restriction
@@ -51,9 +51,13 @@ def rebuild_restrictions(records, rules=None, *, cards=None):
         blocks.append({"card_id": card_id, "claim_id": claim_id, "reason": "shared_pending_review", "details": row.get("reason", "Unresolved shared processing fact"),
                        "record_digest": record["digest"], "record_id": record.get("record_id", record["operation_id"]), "conditions": conditions})
 
+    validated_ids = {id(record) for record in _validated_records}
     for record in records:
         try:
-            validate_ingest_record(record, rules=rules)
+            # Only reuse this call's exact in-memory objects after the caller's
+            # stronger validation. No saved report or request flag is accepted.
+            if id(record) not in validated_ids:
+                validate_ingest_record(record, rules=rules)
             parents = record.get("prior_record_digests", [])
             if not isinstance(parents, list) or len(parents) != len(set(parents)) or any(not isinstance(item, str) or not re.fullmatch(r"[0-9a-f]{64}", item) for item in parents):
                 raise ContractError("PROCESSING_PARENT_INVALID", "Record predecessors need distinct fixed fingerprints")
@@ -192,7 +196,7 @@ def validate_ingest_record(record, scan=None, view=None, rules=None, *, version_
     if view is not None:
         import base64
         from pathlib import PurePosixPath
-        from .knowledge import parse_card
+        from .knowledge import decode_card
         from .validation import load_yaml, safe_path
         if isinstance(view, dict) and "writes" in view:
             # A FinalView is an overlay, including for record-only batches.
@@ -219,7 +223,7 @@ def validate_ingest_record(record, scan=None, view=None, rules=None, *, version_
                         if relative in replaced or path.name in {"index.md", "AGENTS.md", "README.md"}:
                             continue
                         try:
-                            card = parse_card(read(safe_path(root, relative)), relative, rules)
+                            card = decode_card(read(safe_path(root, relative)), relative, rules)
                         except (ContractError, OSError, ValueError, KeyError, TypeError):
                             continue
                         cards[card["metadata"]["id"]] = card
@@ -232,7 +236,7 @@ def validate_ingest_record(record, scan=None, view=None, rules=None, *, version_
                 elif path.startswith("knowledge/") and path.endswith(".md") and PurePosixPath(path).name not in {"index.md", "AGENTS.md"}:
                     if rules is None:
                         raise ContractError("CARD_INPUT_UNAVAILABLE", "Card validation requires the pinned rules")
-                    card = parse_card(raw, path, rules)
+                    card = decode_card(raw, path, rules)
                     cards[card["metadata"]["id"]] = card
                     cards[path] = card
         else:
@@ -243,11 +247,50 @@ def validate_ingest_record(record, scan=None, view=None, rules=None, *, version_
                     cards[card["path"]] = card
     if scan is not None:
         validate_scan_manifest(scan, rules)
-        if record["scan_digest"] != scan["digest"] or record["operation_id"] != scan["operation_id"]:
+        if record["scan_digest"] != scan["digest"]:
             raise ContractError("SCAN_BINDING_MISMATCH", "Ingest record differs from its exact scan")
+        origin = record.get("origin_scan_operation_id")
+        if origin is not None and origin != scan["operation_id"]:
+            raise ContractError("SCAN_BINDING_MISMATCH", "Origin differs from the actual original inventory")
+        if record["operation_id"] != scan["operation_id"]:
+            links = ("semantic_plan_ref", "material_ref", "view_ref", "previous_view_ref", "revision_reason")
+            digests = ("semantic_plan_digest", "material_digest", "previous_view_digest", "content_view_digest")
+            if (origin != scan["operation_id"] or any(not isinstance(record.get(key), str) or not record[key].strip() for key in links)
+                    or record["view_ref"] == record["previous_view_ref"]
+                    or any(not isinstance(record.get(key), str) or len(record[key]) != 64
+                           or any(char not in "0123456789abcdef" for char in record[key]) for key in digests)):
+                raise ContractError("SCAN_ADOPTION_REQUIRED", "A new operation needs the exact semantic, material and previous-view adoption")
+            if view is not None:
+                verify(view)
+                expected = {"record_kind": "final_view", "operation_id": record["operation_id"], "digest": record["content_view_digest"],
+                            "scan_ref": record["scan_ref"],
+                            "origin_scan_operation_id": origin,
+                            **{key: record[key] for key in ("semantic_plan_ref", "semantic_plan_digest", "material_ref", "material_digest",
+                                                          "previous_view_ref", "previous_view_digest", "revision_reason")}}
+                if any(view.get(key) != value for key, value in expected.items()):
+                    raise ContractError("SCAN_ADOPTION_MISMATCH", "New operation record differs from the actual adopted candidate")
         units = {item["unit_id"]: item for item in scan["units"]}
         if set(ids) != set(units):
             raise ContractError("UNIT_COVERAGE_INVALID", "Disposition coverage must match the fixed scan units exactly")
+    record_cards = {}
+    record_card_versions = {}
+
+    def resolve_version(reference, item):
+        directed = getattr(version_resolver, "resolve_disposition", None)
+        return directed(reference, record, item) if callable(directed) else version_resolver(reference, record)
+
+    def remember(card):
+        metadata = card.get("metadata", card)
+        identity = metadata["id"]
+        version = (card.get("sha256"), card.get("path"))
+        if not all(version):
+            version += (digest_payload({"metadata": metadata}),)
+        previous = record_card_versions.get(identity)
+        if previous is not None and previous != version:
+            raise ContractError("CARD_VERSION_MISMATCH", "A record must use one exact card body for all its dispositions and Claims", str(identity))
+        record_card_versions[identity] = version
+        record_cards[identity] = card
+
     for item in record["dispositions"]:
         required_item = ("unit_id", "action", "reason", "observed_fingerprint", "adopted_fingerprint", "progress", "card_refs", "claim_refs")
         if any(key not in item for key in required_item) or not item.get("reason"):
@@ -275,11 +318,10 @@ def validate_ingest_record(record, scan=None, view=None, rules=None, *, version_
         if item.get("kind") == "scan_unchanged" and unit and unit.get("change") != "unchanged":
             raise ContractError("SKIP_SAMPLE_REQUIRED", "Only an unchanged observation can be a scan-only skip")
         resolved_cards = []
+        disposition_cards = {}
         for reference in item["card_refs"]:
             identity = reference.get("card_id", reference.get("path")) if isinstance(reference, dict) else reference
-            card = cards.get(identity)
-            if card is None and version_resolver is not None:
-                card = version_resolver(reference, record)
+            card = resolve_version(reference, item) if version_resolver is not None else cards.get(identity)
             if (view is not None or version_resolver is not None) and not card:
                 raise ContractError("DANGLING_CARD_RECORD", "Processing record references an unavailable card", str(identity))
             if card:
@@ -287,6 +329,10 @@ def validate_ingest_record(record, scan=None, view=None, rules=None, *, version_
                 if isinstance(reference, dict) and reference.get("sha256") and card.get("sha256") != reference["sha256"]:
                     raise ContractError("CARD_VERSION_MISMATCH", "Processing record card fingerprint differs", str(identity))
                 resolved_cards.append(card)
+                disposition_cards.setdefault(meta["id"], card)
+                if card.get("path"):
+                    disposition_cards.setdefault(card["path"], card)
+                remember(card)
                 cards.setdefault(meta["id"], card)
         for reference in item["claim_refs"]:
             if isinstance(reference, dict):
@@ -295,16 +341,19 @@ def validate_ingest_record(record, scan=None, view=None, rules=None, *, version_
                 card_id, claim_id = reference.rsplit("#", 1)
             else:
                 raise ContractError("INVALID_CLAIM_RECORD", "Claim reference needs card_id and claim_id")
-            card = cards.get(card_id)
-            if version_resolver is not None and (card is None or claim_id not in {claim["id"] for claim in card.get("metadata", card)["claims"]}):
-                card = version_resolver({"card_id": card_id, "claim_id": claim_id}, record)
+            card = disposition_cards.get(card_id, record_cards.get(card_id))
+            if card is None:
+                card = resolve_version({"card_id": card_id, "claim_id": claim_id}, item) if version_resolver is not None else cards.get(card_id)
             if (view is not None or version_resolver is not None) and (not card or claim_id not in {claim["id"] for claim in card.get("metadata", card)["claims"]}):
                 raise ContractError("DANGLING_CLAIM_RECORD", "Processing record Claim does not exist", str(claim_id))
+            if card:
+                remember(card)
         if progress == "completed" and unit and resolved_cards:
             matching = [source for card in resolved_cards for source in card.get("metadata", card)["sources"] if source["source_id"] == unit["source_id"]]
             if not matching:
                 raise ContractError("ADOPTION_SOURCE_MISMATCH", "Adopted source is not associated with the recorded cards")
-            if source_versions and not any(source_versions.get(source["snapshot_id"], {}).get("sha256") == item["adopted_fingerprint"] for source in matching):
+            if source_versions and not any(source_versions.get(source["snapshot_id"], {}).get("source_id") == unit["source_id"]
+                                           and source_versions.get(source["snapshot_id"], {}).get("sha256") == item["adopted_fingerprint"] for source in matching):
                 raise ContractError("ADOPTION_SOURCE_MISMATCH", "Adopted source version differs from the exact cards")
     expected_maintenance = {(item.get("card_id"), item.get("claim_id")) for item in (scan or {}).get("current_context", {}).get("affected_claims", [])}
     maintenance = record.get("maintenance_dispositions", [])
@@ -338,7 +387,7 @@ def validate_ingest_record(record, scan=None, view=None, rules=None, *, version_
             expected = "supported" if summary["review_mode"] in {"manual_document", "code_gate"} else None
             if summary["review_result"] not in {expected, "retired"} or expected is None or not summary["claim_ids"] or len(set(summary["claim_ids"])) != len(summary["claim_ids"]):
                 raise ContractError("INVALID_ACCEPTANCE", "Acceptance Claim identities or review result differ")
-            card = cards.get(summary["card_id"])
+            card = record_cards.get(summary["card_id"], cards.get(summary["card_id"]))
             if card and (card["sha256"] != summary["sha256"] or card["path"] != summary["path"] or set(summary["claim_ids"]) != {claim["id"] for claim in card["metadata"]["claims"]} or card["metadata"]["review_mode"] != summary["review_mode"]):
                 raise ContractError("ACCEPTANCE_CARD_MISMATCH", "Acceptance summary differs from exact card/Claim bytes")
     if rules:

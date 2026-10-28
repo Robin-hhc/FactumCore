@@ -14,9 +14,10 @@ def main():
     parser.add_argument("--input")
     parser.add_argument("--output", required=True)
     parser.add_argument("--catalog")  # transport compatibility; intentionally unused
-    parser.add_argument("--action", default="lint", choices=("lint", "run", "check"))
+    parser.add_argument("--action", default="lint", choices=("lint", "run", "check", "review", "record-review", "code-check", "code-recheck", "verify-evidence"))
     args = parser.parse_args()
     report = None
+    output_safe = False
     try:
         root = Path(args.knowledge_root).resolve(strict=True)
         if args.rules_digest is None:
@@ -28,9 +29,27 @@ def main():
             raise ValueError("Report cannot overwrite domain source or governed data")
         if output.is_symlink() or any(parent.is_symlink() for parent in output.parents):
             raise ValueError("Linked report paths are not permitted")
+        output_safe = True
         modules, rules = domain(root, args.rules_digest)
         v, checks = modules["validation"], modules["checks"]
         request = v.read_json(Path(args.input)) if args.input else {}
+        if args.action in {"review", "record-review", "code-check", "code-recheck", "verify-evidence"}:
+            from review import context, run, special_action
+            ctx = context(root, request, args, modules, rules)
+            if args.action == "review":
+                report = run(ctx)
+                report["data"] = {"report_ref": str(output), "check_status": report["status"],
+                                  "full_scope": True, **report["review"]}
+                report["digest"] = v.digest_payload(report)
+                code = checks.exit_code(report)
+            else:
+                report, code = special_action(ctx, args.action)
+            raw = v.canonical_bytes(report)
+            output.parent.mkdir(parents=True, exist_ok=True)
+            with output.open("xb") as stream:
+                stream.write(raw)
+            print(raw.decode("utf-8"))
+            return code
         mode = request.get("mode", "candidate" if request.get("view_ref") else "formal")
         if mode not in {"formal", "candidate"}:
             raise ValueError("Use formal or candidate mode")
@@ -53,6 +72,25 @@ def main():
         print(raw.decode("utf-8"))
         return checks.exit_code(report)
     except Exception as exc:
+        if args.action in {"review", "record-review", "code-check", "code-recheck", "verify-evidence"}:
+            from support import canonical, digest, tool_identity
+            blocked = getattr(exc, "blocked", False)
+            error = {"schema_version": "2.0", "record_kind": "result",
+                     "status": "blocked" if blocked else "error",
+                     "phase": "blocked" if blocked else "invalid",
+                     "data": dict(getattr(exc, "data", {}) or {}),
+                     "diagnostics": [{"code": getattr(exc, "code", "LINT_UNAVAILABLE"),
+                                      "message": getattr(exc, "message", str(exc)),
+                                      "path": str(getattr(exc, "path", ""))}],
+                     "rules_digest": args.rules_digest,
+                     "tool_identity": tool_identity(Path(__file__).resolve().parents[1])}
+            error["digest"] = digest(error)
+            if output_safe and not output.exists():
+                output.parent.mkdir(parents=True, exist_ok=True)
+                with output.open("xb") as stream:
+                    stream.write(canonical(error))
+            print(json.dumps(error, ensure_ascii=True))
+            return 2
         error = {"report_version": "1.0", "status": "incomplete", "phase": "incomplete", "exit_code": 2,
                  "complete": False, "rules_digest": args.rules_digest, "checks": [], "findings": [{"code": "LINT_UNAVAILABLE", "severity": "error", "reason": str(exc)}]}
         print(json.dumps(error, ensure_ascii=True))

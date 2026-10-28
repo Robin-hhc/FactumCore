@@ -15,76 +15,48 @@ import re
 import yaml
 
 
-SKILLS = ('hs-knowledge-explore',
- 'hs-knowledge-source-capture',
- 'hs-knowledge-change-plan',
- 'hs-knowledge-view-materialize',
- 'hs-knowledge-governance-handoff',
- 'hs-knowledge-candidate-inspect',
- 'hs-knowledge-local-check',
- 'hs-knowledge-candidate-revise',
- 'hs-knowledge-apply',
- 'hs-knowledge-recover',
- 'hs-knowledge-index-build',
- 'hs-knowledge-query-regression',
- 'hs-knowledge-publish-handoff',
- 'hs-knowledge-merge-check',
- 'hs-knowledge-maintain',
- 'hs-knowledge-query',
- 'hs-knowledge-source-scan',
- 'hs-knowledge-lint')
-ARTIFACT_SCOPE = {'hs-knowledge-explore': ([], []),
- 'hs-knowledge-source-capture': ([], []),
- 'hs-knowledge-change-plan': (['plan_change'], ['planned']),
- 'hs-knowledge-view-materialize': (['materialize_view'], ['ready']),
- 'hs-knowledge-governance-handoff': ([], []),
- 'hs-knowledge-candidate-inspect': (['inspect_candidate'],
-                                    ['manual_ready', 'mixed_ready', 'code_ready', 'recovery_required']),
- 'hs-knowledge-local-check': (['local_check'], ['code_passed', 'needs_revision']),
- 'hs-knowledge-candidate-revise': (['revise_candidate'], ['ready', 'deferred']),
- 'hs-knowledge-apply': (['apply_view'], ['applied', 'record_only']),
- 'hs-knowledge-recover': (['recover_transaction'], ['recovered', 'record_only']),
- 'hs-knowledge-index-build': (['rebuild_index'], ['built']),
- 'hs-knowledge-query-regression': (['query_regression'], ['checked']),
- 'hs-knowledge-publish-handoff': ([], []),
- 'hs-knowledge-merge-check': ([], []),
- 'hs-knowledge-maintain': ([], []),
- 'hs-knowledge-query': ([], []),
- 'hs-knowledge-source-scan': (['scan_sources'], ['scanned']),
- 'hs-knowledge-lint': (['lint_preflight', 'lint_view'], ['passed'])}
-EXTRA_ARTIFACT_SCOPE = {'hs-knowledge-source-scan': {'prepare-result.yaml': (['prepare_material'], ['prepared']),
-                              'record-result.yaml': (['record_ingest'], ['recorded'])},
- 'hs-knowledge-change-plan': {'review-result.yaml': (['review_plan', 'review_content'],
-                                                     ['reviewed'])},
- 'hs-knowledge-publish-handoff': {'submission-result.yaml': ([], [])},
- 'hs-knowledge-maintain': {'audit-result.yaml': (['audit_references'], ['reported'])}}
+SKILLS = (
+    'hs-knowledge-explore',
+    'hs-knowledge-source-scan',
+    'hs-knowledge-source-prepare',
+    'hs-knowledge-change-plan',
+    'hs-knowledge-view-materialize',
+    'hs-knowledge-lint',
+    'hs-knowledge-apply',
+    'hs-knowledge-query',
+    'hs-knowledge-maintain',
+)
+ARTIFACT_SCOPE = {
+    'hs-knowledge-explore': ([], []),
+    'hs-knowledge-source-scan': (['scan_sources'], ['scanned']),
+    'hs-knowledge-source-prepare': (['prepare_material'], ['prepared']),
+    'hs-knowledge-change-plan': (['plan_change'], ['content_planned']),
+    'hs-knowledge-view-materialize': (['materialize_view'], ['ready']),
+    'hs-knowledge-lint': (
+        ['lint_view', 'check_formal'],
+        ['passed', 'needs_material', 'needs_plan', 'needs_revision', 'checked'],
+    ),
+    'hs-knowledge-apply': (['apply_view'], ['completed', 'recorded']),
+    'hs-knowledge-query': ([], []),
+    'hs-knowledge-maintain': ([], []),
+}
+EXTRA_ARTIFACT_SCOPE = {
+    'hs-knowledge-source-scan': {'record-result.yaml': (['record_ingest'], ['recorded'])},
+    'hs-knowledge-maintain': {'audit-result.yaml': (['audit_references'], ['reported'])},
+}
 EXTRA_ARTIFACT_IDS = {
     ('hs-knowledge-maintain', 'audit-result.yaml'): 'hs-knowledge-code-reference-audit',
 }
-OWNERS = {'review_plan': 'reviewer',
- 'review_content': 'reviewer',
- 'lint_preflight': 'reviewer',
- 'local_check': 'reviewer',
- 'lint_view': 'reviewer',
- 'query_regression': 'reviewer',
+OWNERS = {'lint_view': 'reviewer',
  'check_formal': 'reviewer',
  'audit_references': 'reviewer'}
 NODE_SKILLS = {'scan_sources': 'hs-knowledge-source-scan',
- 'prepare_material': 'hs-knowledge-source-scan',
+ 'prepare_material': 'hs-knowledge-source-prepare',
  'plan_change': 'hs-knowledge-change-plan',
- 'review_plan': 'hs-knowledge-change-plan',
  'materialize_view': 'hs-knowledge-view-materialize',
- 'review_content': 'hs-knowledge-change-plan',
- 'lint_preflight': 'hs-knowledge-lint',
- 'inspect_candidate': 'hs-knowledge-candidate-inspect',
- 'local_check': 'hs-knowledge-local-check',
- 'revise_candidate': 'hs-knowledge-candidate-revise',
  'lint_view': 'hs-knowledge-lint',
  'record_ingest': 'hs-knowledge-source-scan',
  'apply_view': 'hs-knowledge-apply',
- 'recover_transaction': 'hs-knowledge-recover',
- 'rebuild_index': 'hs-knowledge-index-build',
- 'query_regression': 'hs-knowledge-query-regression',
  'check_formal': 'hs-knowledge-lint',
  'audit_references': 'hs-knowledge-maintain'}
 WORKFLOW_ENTRIES = {
@@ -96,32 +68,16 @@ WORKFLOW_ENTRIES = {
 EDGES = {
     'hs-knowledge-ingest': {
         'scan_sources': {'scanned': 'prepare_material', 'unchanged': '__end__',
-                         'resume': 'review_content', 'recover': 'recover_transaction',
-                         'resume_index': 'rebuild_index', 'resume_queries': 'query_regression'},
-        'prepare_material': {'prepared': 'plan_change'},
-        'plan_change': {'planned': 'review_plan', 'needs_material': 'prepare_material'},
-        'review_plan': {'reviewed': 'materialize_view', 'record_only': 'record_ingest',
-                        'needs_material': 'prepare_material', 'needs_revision': 'plan_change'},
-        'materialize_view': {'ready': 'review_content', 'stale': 'prepare_material'},
-        'review_content': {'reviewed': 'lint_preflight', 'needs_material': 'prepare_material',
-                           'needs_plan': 'plan_change', 'needs_revision': 'revise_candidate'},
-        'lint_preflight': {'passed': 'inspect_candidate', 'needs_material': 'prepare_material',
-                           'needs_plan': 'plan_change', 'needs_revision': 'revise_candidate'},
-        'inspect_candidate': {'manual_ready': 'lint_view', 'mixed_ready': 'local_check',
-                              'code_ready': 'local_check', 'recovery_required': 'recover_transaction',
-                              'needs_revision': 'revise_candidate'},
-        'local_check': {'code_passed': 'lint_view', 'needs_revision': 'revise_candidate'},
-        'revise_candidate': {'ready': 'review_content', 'needs_material': 'prepare_material',
-                             'needs_plan': 'plan_change', 'deferred': 'record_ingest'},
+                         'recover': 'apply_view', 'resume_index': 'apply_view',
+                         'resume_queries': 'apply_view'},
+        'prepare_material': {'prepared': 'plan_change', 'source_changed': 'scan_sources'},
+        'plan_change': {'content_planned': 'materialize_view', 'needs_material': 'prepare_material'},
+        'materialize_view': {'ready': 'lint_view', 'needs_material': 'prepare_material',
+                             'needs_plan': 'plan_change'},
         'lint_view': {'passed': 'record_ingest', 'needs_material': 'prepare_material',
-                      'needs_plan': 'plan_change', 'needs_revision': 'revise_candidate'},
-        'record_ingest': {'recorded': 'apply_view', 'needs_record': 'record_ingest'},
-        'apply_view': {'applied': 'rebuild_index', 'record_only': '__end__',
-                       'recovery_required': 'recover_transaction', 'stale': 'prepare_material'},
-        'recover_transaction': {'recovered': 'rebuild_index', 'record_only': '__end__',
-                                'rolled_back': 'prepare_material'},
-        'rebuild_index': {'built': 'query_regression', 'content_error': 'prepare_material'},
-        'query_regression': {'checked': '__end__', 'content_error': 'prepare_material'},
+                      'needs_plan': 'plan_change', 'needs_revision': 'materialize_view'},
+        'record_ingest': {'recorded': 'apply_view'},
+        'apply_view': {'completed': '__end__', 'recorded': '__end__'},
     },
     'hs-knowledge-lint': {
         'check_formal': {'checked': 'audit_references'},
@@ -158,9 +114,23 @@ def validate(root):
     root = Path(root).resolve(strict=True)
     errors = []
     artifacts = set()
+    package_root = root / "skills/common/knowledge"
+    # A leftover historical directory is not an installed Skill. A package with
+    # SKILL.md is active and must belong to the exact final public capability set.
+    active_skills = {path.name for path in package_root.glob("*")
+                     if path.is_dir() and (path / "SKILL.md").is_file()}
+    if active_skills != set(SKILLS):
+        errors.append(
+            "active Skill set mismatch: missing=" + repr(sorted(set(SKILLS) - active_skills))
+            + ", unexpected=" + repr(sorted(active_skills - set(SKILLS)))
+        )
     for skill in SKILLS:
-        package = root / "skills/common/knowledge" / skill
+        package = package_root / skill
         try:
+            expected_contracts = {"result.yaml", *EXTRA_ARTIFACT_SCOPE.get(skill, {})}
+            actual_contracts = {path.name for path in (package / "artifacts").glob("*.yaml")}
+            if actual_contracts != expected_contracts:
+                errors.append(f"{skill}: exact artifact contract set mismatch")
             text = (package / "SKILL.md").read_text(encoding="utf-8")
             frontmatter = re.match(r"\A---\r?\n(.*?)\r?\n---(?:\r?\n|$)", text, re.S)
             metadata = (
@@ -207,10 +177,10 @@ def validate(root):
             expected_nodes, expected_exits = ARTIFACT_SCOPE[skill]
             actual_nodes = contract.get("applies_to", {}).get("node_ids", [])
             actual_exits = contract.get("required_on", {}).get("exit_ids", [])
-            if expected_nodes and actual_nodes != expected_nodes:
+            if actual_nodes != expected_nodes:
                 errors.append(f"{skill}: artifact node scope mismatch")
-            if expected_exits and not set(expected_exits).issubset(actual_exits):
-                errors.append(f"{skill}: missing artifact exit obligations")
+            if actual_exits != expected_exits:
+                errors.append(f"{skill}: artifact exit obligations mismatch")
             legal_exits = {
                 exit_id
                 for edges in EDGES.values()
@@ -218,12 +188,13 @@ def validate(root):
                 if node_id in expected_nodes
                 for exit_id in transitions
             }
-            if expected_nodes and not set(actual_exits).issubset(legal_exits):
+            if not set(actual_exits).issubset(legal_exits):
                 errors.append(f"{skill}: artifact refers to nonexistent exit")
         except (OSError, ValueError, AttributeError, yaml.YAMLError) as exc:
             errors.append(f"{skill}: {exc}")
-    # Native OpenFlow contracts are scoped per node. A multi-node contract's
-    # required exits must exist on every node, not just in their union.
+    # Every native contract uses the real node IDs and exit names. The shared
+    # lint report covers P5 result exits and the separate formal audit's checked
+    # exit; its statuses remain distinct in the report itself.
     for skill, contracts in EXTRA_ARTIFACT_SCOPE.items():
         package = root / "skills/common/knowledge" / skill
         for name, (expected_nodes, expected_exits) in contracts.items():

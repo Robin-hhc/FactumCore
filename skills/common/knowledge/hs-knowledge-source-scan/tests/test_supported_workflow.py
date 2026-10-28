@@ -39,27 +39,25 @@ class SupportedDocumentFlow:
         return self.h.run(slug, {"operation_id": self.operation, **request}, action)
 
     def lint(self, node):
-        incoming = self.h.write(f".build/operations/{self.operation}/{node}-input.json",
-            json.dumps({"mode": "candidate", "view_ref": self.state["view_ref"]}).encode())
-        outgoing = f".build/operations/{self.operation}/{node}-report.json"
-        result = subprocess.run([sys.executable, str(self.h.packages / "hs-knowledge-lint/scripts/cli.py"),
-            "--knowledge-root", str(self.h.root), "--rules-digest", self.h.rules,
-            "--input", str(self.h.root / incoming), "--output", str(self.h.root / outgoing)],
-            capture_output=True, timeout=180)
-        assert result.returncode == 0, (result.stdout, result.stderr)
-        report = self.h.record(outgoing)
-        assert report["status"] == "passed" and report["complete"]
-        return outgoing
-
-    def review(self, view=False):
-        return self.call("change-plan", {
-            "semantic_plan_ref": self.state["semantic_plan_ref"],
-            **({"view_ref": self.state["view_ref"]} if view else {}),
-            "reviewer_id": "synthetic-reviewer", "independent_context": self.current + "-fixture",
+        request = {
+            "semantic_plan_ref": self.state["semantic_plan_ref"], "view_ref": self.state["view_ref"],
+            "operation_id": self.operation,
+            "reviewer_id": "synthetic-reviewer", "independent_context": "P5-synthetic-fixture",
             "sampled_unit_ids": [self.state["unit"]["unit_id"]], "unreviewed_unit_ids": [],
             "reason": "Synthetic declared review data; this does not establish real host isolation.",
             "findings": [],
-        }, "review")["data"]
+        }
+        incoming = self.h.write(f".build/operations/{self.operation}/{node}-input.json", json.dumps(request).encode())
+        outgoing = f".build/operations/{self.operation}/{node}-report.json"
+        completed = subprocess.run([sys.executable, str(self.h.packages / "hs-knowledge-lint/scripts/cli.py"),
+            "--knowledge-root", str(self.h.root), "--rules-digest", self.h.rules, "--action", "review",
+            "--input", str(self.h.root / incoming), "--output", str(self.h.root / outgoing)], capture_output=True, check=False)
+        assert completed.returncode == 0, (completed.stdout, completed.stderr, self.h.record(outgoing))
+        report = self.h.record(outgoing)
+        assert report["status"] == "passed" and report["complete"]
+        assert report["scope"]["kind"] == "full" and report["data"]["full_scope"] is True
+        self.state["content_review"] = {"content_review_ref": report["data"]["content_review_ref"]}
+        return outgoing
 
     def produce(self, stop="complete"):
         self.node("scan_sources")
@@ -70,7 +68,7 @@ class SupportedDocumentFlow:
         unit_id = self.state["unit"]["unit_id"]
         self.take("scanned")
         self.node("prepare_material")
-        self.state.update(self.call("source-scan", {"scan_ref": self.state["scan_ref"]}, "prepare")["data"])
+        self.state.update(self.call("source-prepare", {"scan_ref": self.state["scan_ref"]}, "prepare")["data"])
         material = self.h.record(self.state["material_ref"])
         bundle = self.h.record(material["bundle_ref"])
         self.take("prepared")
@@ -87,71 +85,58 @@ class SupportedDocumentFlow:
             "target_queries": [{"id": "rule-query", "query": "Synthetic", "purpose": "guidance",
                 "required": ["rule"], "expected_claim_ids": ["rule#rule-claim"]}],
         }, "plan")["data"])
-        self.take("planned")
-        self.node("review_plan")
-        self.state["plan_review"] = self.review()
-        self.take("reviewed")
+        self.take("content_planned")
         self.node("materialize_view")
-        # Authoring the draft and binding it are planned P4 work, not an edit to
-        # an existing card, frozen view, source lock, report, journal or index.
         candidate = self.h.write(f".build/operations/{self.operation}/authored-rule.md", self.h.card("rule", bundle))
-        self.state.update(self.call("change-plan", {
-            "v3_required": True, "semantic_plan_ref": self.state["semantic_plan_ref"], "bundle_ref": material["bundle_ref"],
+        self.state.update(self.call("view-materialize", {
+            "semantic_plan_ref": self.state["semantic_plan_ref"],
             "decisions": [{"candidate_id": unit_id, "decision": "create", "reason": "Planned P4 authoring",
                 "card_inputs": [candidate]}],
         })["data"])
-        self.state.update(self.call("view-materialize", {"plan_ref": self.state["plan_ref"]})["data"])
         self.take("ready")
-        self.node("review_content")
-        self.state["content_review"] = self.review(view=True)
-        self.take("reviewed")
-        self.node("lint_preflight")
-        self.lint("lint_preflight")
-        self.take("passed")
-        self.node("inspect_candidate")
-        inspected = self.call("candidate-inspect", {"view_ref": self.state["view_ref"]})
-        assert inspected["phase"] == "manual_ready", inspected
-        self.take("manual_ready")
+        if stop == "materialized":
+            return self.state
         self.node("lint_view")
         self.state["lint_ref"] = self.lint("lint_view")
         self.take("passed")
+        if stop == "reviewed":
+            return self.state
         self.node("record_ingest")
         self.state.update(self.call("source-scan", {
             "scan_ref": self.state["scan_ref"], "material_ref": self.state["material_ref"],
             "semantic_plan_ref": self.state["semantic_plan_ref"], "plan_ref": self.state["plan_ref"],
             "view_ref": self.state["view_ref"], "lint_ref": self.state["lint_ref"],
-            "skip_sample": self.state["plan_review"]["skip_sample"],
-            "dispositions": [{"unit_id": unit_id, "action": "create", "reason": "Planned source outcome",
-                "observed_fingerprint": self.state["unit"]["observed_fingerprint"],
-                "adopted_fingerprint": self.state["unit"]["observed_fingerprint"], "progress": "completed",
-                "card_refs": ["rule"], "claim_refs": ["rule#rule-claim"]}],
+            "disposition_preview_ref": self.state["disposition_preview_ref"],
         }, "record")["data"])
         self.take("recorded")
-        self.node("apply_view")
-        applied = self.call("apply", {"v3_required": True, "view_ref": self.state["view_ref"],
-            "ingest_record_ref": self.state["ingest_record_ref"], "lint_report_ref": self.state["lint_ref"],
-            "content_review_ref": self.state["content_review"]["content_review_ref"]})
-        assert applied["phase"] == "committed", applied
-        self.state.update(applied["data"])
-        self.take("applied")
-        if stop == "applied":
+        if stop == "recorded":
             return self.state
         return self.finish(stop)
 
     def finish(self, stop="complete"):
-        if self.current == "rebuild_index":
-            self.node("rebuild_index")
-            self.state.update(self.call("index-build", {}, "build")["data"])
-            self.take("built")
-        if stop == "built":
+        self.node("apply_view")
+        blocker = None
+        if stop in {"applied", "built"}:
+            blocker = "artifacts/indexes/local" if stop == "applied" else f".build/operations/{self.operation}/regression"
+            self.h.write(blocker, b"Synthetic IO blocker; no valid index or report is modified.")
+        request = {"operation_id": self.operation, "view_ref": self.state["view_ref"],
+                   "ingest_record_ref": self.state["ingest_record_ref"], "lint_report_ref": self.state["lint_ref"],
+                   "content_review_ref": self.state["content_review"]["content_review_ref"]}
+        response = self.h.run("apply", request, "batch", expected=2 if blocker else 0)
+        if blocker:
+            (self.h.root / blocker).unlink()
+            journal = self.h.record(f"logs/operations/{self.operation}/journal.json")
+            assert journal["status"] == "committed", response
+            self.state["apply_result_ref"] = journal["result_ref"]
+            if stop == "built":
+                built = self.h.record(f".build/operations/{self.operation}/batch-build.json")
+                self.state.update({"generation_ref": built["generation_ref"], "expected_active": built["expected_active"]})
             return self.state
-        self.node("query_regression")
-        result = self.call("query-regression", {"v3_required": True,
-            "apply_result_ref": self.state["apply_result_ref"], "generation_ref": self.state["generation_ref"],
-            "expected_active": self.state["expected_active"]})
-        assert result["phase"] == "checked" and result["data"]["passed"] and result["data"]["activated"], result
-        self.state["regression_ref"] = result["data"]["report_ref"]
-        self.take("checked")
+        assert response["phase"] == "completed" and response["data"]["batch_complete"] is True, response
+        assert response["data"]["passed"] and response["data"]["activated"], response
+        self.state.update(response["data"])
+        self.state["regression_ref"] = response["data"]["report_ref"]
+        self.take("completed")
         assert self.current == "__end__"
         return self.state
 
@@ -170,9 +155,8 @@ class SupportedDocumentFlow:
 
 
 PLANNED_DOCUMENT_NODES = [
-    "scan_sources", "prepare_material", "plan_change", "review_plan",
-    "materialize_view", "review_content", "lint_preflight", "inspect_candidate",
-    "lint_view", "record_ingest", "apply_view", "rebuild_index", "query_regression",
+    "scan_sources", "prepare_material", "plan_change", "materialize_view",
+    "lint_view", "record_ingest", "apply_view",
 ]
 
 
@@ -212,8 +196,8 @@ def test_complete_planned_document_nodes_then_three_noop_runs(planned_flow):
 
 
 @pytest.mark.parametrize(("stop", "resume_exit", "next_node", "prefix_count"), [
-    ("applied", "resume_index", "rebuild_index", 11),
-    ("built", "resume_queries", "query_regression", 12),
+    ("applied", "resume_index", "apply_view", 7),
+    ("built", "resume_queries", "apply_view", 7),
 ])
 def test_supported_p7_stop_resumes_existing_exit_without_reapplying(
         planned_flow, stop, resume_exit, next_node, prefix_count):
@@ -236,9 +220,8 @@ def test_supported_p7_stop_resumes_existing_exit_without_reapplying(
     flow.take(resume_exit)
     assert flow.current == next_node
     flow.finish()
-    assert flow.trace == PLANNED_DOCUMENT_NODES[:prefix_count] + ["scan_sources"] + PLANNED_DOCUMENT_NODES[prefix_count:]
-    assert flow.trace.count("apply_view") == flow.trace.count("record_ingest") == 1
-    assert flow.trace.count("rebuild_index") == 1
+    assert flow.trace == PLANNED_DOCUMENT_NODES[:prefix_count] + ["scan_sources", "apply_view"]
+    assert flow.trace.count("apply_view") == 2 and flow.trace.count("record_ingest") == 1
     assert flow.protected_bytes() == protected
     status = flow.h.run("source-scan", {"operation_id": "saved-stop-status", "target_operation_id": flow.operation}, "status")["data"]["operations"][0]
     assert status["completion"]["status"] == "complete"

@@ -13,10 +13,8 @@ import os
 import platform
 import re
 import stat
-import subprocess
 import sys
 import tempfile
-import uuid
 from pathlib import Path, PurePosixPath
 
 import yaml
@@ -31,15 +29,6 @@ class NodeError(ValueError):
             str(path),
             blocked,
         )
-
-
-def sibling_timeout_seconds(name, action=None):
-    """Keep ordinary calls short; reserve longer budgets for query workloads."""
-    if name == "hs-knowledge-query" and action in (None, "", "search", "receipt"):
-        return 300
-    if name == "hs-knowledge-query-regression":
-        return 1200
-    return 120
 
 
 def canonical(value):
@@ -338,6 +327,10 @@ def domain(root, expected):
             raise NodeError(
                 "UNPINNED_DOMAIN_CODE", "Domain program is not digest-locked", name
             )
+    contract_names = tuple(sorted(ref[len("governance/contracts/"):-3] for ref in verified
+                                  if ref.startswith("governance/contracts/") and ref.endswith(".py")
+                                  and "/" not in ref[len("governance/contracts/"):]
+                                  and not ref.endswith("/__init__.py")))
     namespace = "_hs_domain_" + expected
     if namespace not in sys.modules:
 
@@ -377,13 +370,13 @@ def domain(root, expected):
         sys.meta_path.insert(0, finder)
         try:
             importlib.import_module(namespace)
-            for name in ("validation", "knowledge", "source_resources", "records", "indexing", "checks"):
+            for name in contract_names:
                 importlib.import_module(namespace + "." + name)
         finally:
             sys.meta_path.remove(finder)
     modules = {
         name: sys.modules[namespace + "." + name]
-        for name in ("validation", "knowledge", "source_resources", "records", "indexing", "checks")
+        for name in contract_names
     }
     rules = modules["validation"].load_rules(root, expected)
     for ref, data in verified.items():
@@ -392,128 +385,14 @@ def domain(root, expected):
     return modules, rules
 
 
-class Context:
-    def __init__(self, args, request, package):
-        self.args, self.request, self.package = args, request, package
-        self.root = Path(args.knowledge_root).resolve(strict=True)
-        args.rules_digest = args.rules_digest or sha(safe(self.root, "governance/framework.lock.yaml").read_bytes())
-        self.modules, self.rules = domain(self.root, args.rules_digest)
-        validate_runtime(package)
-        self.tool = tool_identity(package)
-        self.operation = identifier(request.get("operation_id"))
-        self.base = ".build/operations/" + self.operation
-
-    def seal(self, value, kind):
-        record = {
-            "schema_version": "2.0",
-            "record_kind": kind,
-            "operation_id": self.operation,
-            "rules_digest": self.args.rules_digest,
-            "tool_identity": self.tool,
-            **value,
-        }
-        result = self.modules["records"].seal(record)
-        self.modules["validation"].validate_shape(kind, result, self.rules)
-        return result
-
-    def save(self, ref, record):
-        write_bytes(self.root, ref, canonical(record))
-        return ref
-
-    def record(self, ref, kind=None):
-        allowed = {
-            "index_manifest": ["artifacts/indexes"],
-            "generation": ["artifacts/indexes"],
-            "project_context": [".build/project-context", ".build/operations", "logs"],
-        }.get(
-            kind,
-            [".build/operations", "logs"]
-            if kind
-            else [
-                ".build/operations",
-                ".build/project-context",
-                "logs",
-                "artifacts/indexes",
-            ],
-        )
-        data = fixed_bytes(self.root, ref, allowed)
-        value = json.loads(data, object_pairs_hook=unique)
-        self.modules["records"].verify(value)
-        self.modules["validation"].validate_shape(
-            value.get("record_kind", "record"), value, self.rules
-        )
-        if value.get("rules_digest") != self.args.rules_digest:
-            raise NodeError(
-                "STALE_RULES", "Referenced record uses different rules", ref
-            )
-        if kind and value.get("record_kind") != kind:
-            raise NodeError(
-                "WRONG_RECORD_KIND", "Referenced record has wrong kind", ref
-            )
-        return value
-
-    def call(self, name, request, action=None):
-        identifier(name)
-        package = self.package.parent / name
-        if not (package / "scripts/cli.py").is_file() and self.args.catalog:
-            try:
-                entry = read_json(self.args.catalog).get("skills", {}).get(name, {})
-                package = Path(entry.get("root", package))
-            except (OSError, ValueError, TypeError, NodeError):
-                pass
-        if not (package / "scripts/cli.py").is_file():
-            raise NodeError("MISSING_CAPABILITY", "Installed sibling Skill is unavailable", name, blocked=True)
-        package = package.resolve(strict=True)
-        cli = safe(package, "scripts/cli.py")
-        call = self.base + "/calls/" + uuid.uuid4().hex
-        incoming, outgoing = call + "/request.json", call + "/response.json"
-        write_bytes(self.root, incoming, canonical(request))
-        argv = [
-            sys.executable,
-            str(cli),
-            "--input",
-            str(safe(self.root, incoming)),
-            "--output",
-            str(safe(self.root, outgoing)),
-            "--knowledge-root",
-            str(self.root),
-            "--rules-digest",
-            self.args.rules_digest,
-        ]
-        if self.args.catalog:
-            argv += ["--catalog", self.args.catalog]
-        if action:
-            argv += ["--action", action]
-        timeout = sibling_timeout_seconds(name, action)
-        try:
-            result = subprocess.run(argv, capture_output=True, timeout=timeout, check=False)
-        except subprocess.TimeoutExpired as exc:
-            raise NodeError(
-                "SIBLING_TIMEOUT",
-                f"{name} exceeded its {timeout}-second call budget; inspect the saved operation before retrying",
-                name,
-                blocked=True,
-            ) from exc
-        response = read_json(safe(self.root, outgoing))
-        if response.get("digest") != digest(
-            {key: value for key, value in response.items() if key != "digest"}
-        ):
-            raise NodeError(
-                "SIBLING_RESULT_CHANGED",
-                "Response envelope digest is missing or invalid",
-                name,
-            )
-        if response.get("schema_version") != "2.0" or response.get("record_kind") != "result":
-            raise NodeError("INVALID_SIBLING_RESULT", "Public Skill returned an invalid result", name)
-        if result.returncode or response.get("status") != "ok":
-            issue = next(iter(response.get("diagnostics", [])), {})
-            raise NodeError(
-                issue.get("code", "SIBLING_BLOCKED"),
-                issue.get("message", "Skill operation failed"),
-                name,
-                blocked=response.get("status") == "blocked",
-            )
-        return response
+def Context(args, request, package):
+    root = Path(args.knowledge_root).resolve(strict=True)
+    args.rules_digest = args.rules_digest or sha(safe(root, "governance/framework.lock.yaml").read_bytes())
+    modules, rules = domain(root, args.rules_digest)
+    validate_runtime(package)
+    return modules["runtime"].OperationContext(root, request, modules=modules, rules=rules,
+                                               tool=tool_identity(package), rules_digest=args.rules_digest,
+                                               action=args.action, package=package, catalog=args.catalog)
 
 
 def run(handler, package):
@@ -548,6 +427,7 @@ def run(handler, package):
         envelope.update(
             status="blocked" if blocked else "error",
             phase="blocked" if blocked else "invalid",
+            data=dict(getattr(exc, "data", {}) or {}),
             diagnostics=[
                 {
                     "code": getattr(exc, "code", "INVALID_INPUT"),

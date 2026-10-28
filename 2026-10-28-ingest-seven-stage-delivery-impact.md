@@ -1,24 +1,24 @@
 # ingest 七阶段收敛：能力分发、引用及迁移影响
 
-日期：2026-10-28。状态：SDD 计划，尚未实施。本文件记录当前源码盘点与拟定发布边界；本轮仅提交本次 SDD 文档，没有修改产品实现、执行新版测试或部署运行能力。历史记录保持原字节。路径均以开发仓 `repo/` 为相对基准；`S/`、`F/` 分别表示执行端已有 Skill、Workflow 安装根。
+日期：2026-10-28。状态：源码迁移与十包删除已落实，源码机制验收已完成。盘点的“当前18包”等数据均指改前基线 `ae02196`；最终交付清单及实际验收另列。历史记录保持原字节。路径以开发仓 `repo/` 为相对基准；`S/`、`F/` 表示实际执行端 Skill、Workflow 安装根。
 
-**文档位置：**本次六份 SDD 暂存项目根并纳入 Git；开发完成后按后续指示移入文档忽略目录。入口见[SDD 总览](ingest七阶段重构SDD计划.md)。
+**文档位置：**本次六份 SDD 继续保留项目根并纳入 Git；本次收尾不搬动或改为忽略。入口见[SDD 总览](ingest七阶段重构SDD计划.md)。
 
 ## 1. 目标与盘点口径
 
-目标是让 ingest 按 P1—P7 的业务职责组织执行，并将公开知识能力从当前 18 个 Skill 调整为最终 9 个：保留原方案的8包，新增P2独立备料包 `hs-knowledge-source-prepare`（暂定名），原18包中的10个旧包仍在功能迁移后删除。P1／P2拆分已接受。减少公开包、OpenFlow 节点、Agent 交棒与重复上下文读取；保留所需的取证、独立复核、固定检查、恢复、索引和激活机制。包数、节点数和内部模块数是三个不同指标，不能以删除包名代替迁移功能。
+本轮已让 ingest 按 P1—P7 的业务职责组织执行，并将公开知识能力从改前 18 个 Skill 调整为最终 9 个：保留原方案的8包，新增P2独立备料包 `hs-knowledge-source-prepare`，原18包中的10个旧包已在功能迁移及替代验证后删除，涉及 143 个 Git 纳管文件。P1／P2拆分已落实。减少公开包、OpenFlow 节点、Agent 交棒与重复上下文读取；保留所需的取证、独立复核、固定检查、恢复、索引和激活机制。包数、节点数和内部模块数是三个不同指标，不能以删除包名代替迁移功能。
 
-本次仅按存在 `SKILL.md` 的目录计 active Skill。当前有 18 个 active Skill、2 个 Workflow、23 份 `artifacts/*.yaml` 产物契约，以及 18 份运行锁和 18 份开发锁。证据是 `skills/common/knowledge/` 的实际文件及 `himate-knowledge-wifi-mp/evals/validate_design.py` 的 `SKILLS`、`ARTIFACT_SCOPE`、`EXTRA_ARTIFACT_SCOPE`。两个历史 confirmation 目录没有现行 `SKILL.md`，不计入 active Skill，也不把它们算成这次要迁移的业务能力。
+以下盘点仅按改前存在 `SKILL.md` 的目录计 active Skill。改前有 18 个 active Skill、2 个 Workflow、23 份 `artifacts/*.yaml` 产物契约，以及 18 份运行锁和 18 份开发锁。证据是改前 `skills/common/knowledge/` 的实际文件及 `himate-knowledge-wifi-mp/evals/validate_design.py` 的清单。两个历史 confirmation 目录没有现行 `SKILL.md`，不计入 active Skill，也不把它们算成这次要迁移的业务能力。最终交付为九包、七个 ingest 节点、两个只读 lint 节点及 22 个公共模块。
 
 当前 `himate-knowledge-wifi-mp/tools/deploy/` 与历史 `install_catalog.py` 已不存在。现行准备入口为 `skills/common/knowledge/hs-knowledge-explore/scripts/setup.py`；其 `SKILL.md`、`references/setup.md` 明确不创建 catalog、registry、binding、独立虚拟环境或另一套部署目录。不能把旧部署记录中的安装器、manifest 或绝对路径当作现行分发必需品。现有公开 CLI 仍有可选 `--catalog` 兼容读取，需与必需登记区分。
 
 ## 2. 最终公开能力与迁移归属
 
-最终公开 Skill 为：`hs-knowledge-source-scan`、`hs-knowledge-source-prepare`（新增，暂定名）、`hs-knowledge-change-plan`、`hs-knowledge-view-materialize`、`hs-knowledge-lint`、`hs-knowledge-apply`、`hs-knowledge-query`、`hs-knowledge-explore`、`hs-knowledge-maintain`。主线使用前六包，query／explore／maintain为另三包。
+最终公开 Skill 为：`hs-knowledge-source-scan`、`hs-knowledge-source-prepare`（新增）、`hs-knowledge-change-plan`、`hs-knowledge-view-materialize`、`hs-knowledge-lint`、`hs-knowledge-apply`、`hs-knowledge-query`、`hs-knowledge-explore`、`hs-knowledge-maintain`。主线使用前六包，query／explore／maintain为另三包。
 
-P1由source-scan扫描变化、待办及实际续办位置；P2由新source-prepare直接承接原prepare和source-capture的实际能力，不委派旧CLI。P2可消费实际扫描清单，也可按明确目标独立备料，不以上游通过状态为条件；公共来源函数由多个调用者直接复用。P5补材料只返回P2，不默认重扫P1；本次采用的来源／配置／规则等输入漂移时才按新扫描／新操作规则处理。P6暂沿source-scan.record，归属在T00另审，本次不扩大迁移决定。
+P1由source-scan扫描变化、待办及实际续办位置；P2由新source-prepare直接承接原prepare和source-capture的实际能力，不委派旧CLI。P2可消费实际扫描清单，也可按明确目标独立备料，不以上游通过状态为条件；公共来源函数由多个调用者直接复用。P5补材料只返回P2，不默认重扫P1；本次采用的来源／配置／规则等输入漂移时才按新扫描／新操作规则处理。P6保留source-scan.record，T00已确认该入口与来源处理账本衔接。
 
-| 拟删除公开包 | 功能迁往保留包 | 删除前必须保留的行为 |
+| 已删除公开包 | 功能迁往保留包 | 迁移时保留的行为 |
 |---|---|---|
 | `hs-knowledge-source-capture` | 新 `source-prepare`，并提取公共来源函数 | 与原prepare一起直接提供raw／代码捕获、提取、新旧材料及旧卡整理、确切来源解析、旧版恢复、内容指纹和范围校验；不转调旧CLI |
 | `hs-knowledge-candidate-inspect` | `view-materialize`／`lint`／`apply` 按职责分配 | 稿件类型及生产一致性归 P4；质量规则归 P5；事务停点和写入安全归 P7，不整体搬运旧检查链 |
@@ -41,11 +41,11 @@ CodeGraph 首次初始化已经折入 `hs-knowledge-explore/SKILL.md` 的“首�
 
 ### 3.1 不能只删 Workflow 中的 Skill 名
 
-当前跨包调用以安装目录中的 sibling 为先，可选 catalog 仅作兼容位置回退，例如 `hs-knowledge-source-scan/scripts/support.py`、`hs-knowledge-query/scripts/support.py` 的 `Context.call`。删目录前必须把调用端改到新公开动作或适用的内部函数，否则本地源码或旧安装副本可能掩盖缺包。
+下表追溯改前跨包调用：其以安装目录中的 sibling 为先，可选 catalog 仅作兼容位置回退，例如原 `hs-knowledge-source-scan/scripts/support.py`、`hs-knowledge-query/scripts/support.py` 的 `Context.call`。本轮已将调用端迁至公开动作或适用的公共函数，并以无旧十包的隔离分发验证；实际宿主副本仍需单列升级。
 
-| 当前调用或引用位置 | 所依赖的拟删除能力 | 迁移要求 |
+| 改前调用或引用位置 | 原依赖能力 | 已实施的迁移约束 |
 |---|---|---|
-| `source-scan/scripts/prepare.py` | `source-capture` 的捕获、resolve、resolve-source | 原prepare连同实际捕获／解析迁入新source-prepare，保留材料缺口和恢复边界；source-scan只保留P1扫描及暂定P6.record |
+| `source-scan/scripts/prepare.py` | `source-capture` 的捕获、resolve、resolve-source | 原prepare连同实际捕获／解析迁入新source-prepare，保留材料缺口和恢复边界；source-scan只保留P1扫描及已定P6.record |
 | `change-plan/scripts/planning.py` | `source-capture` | 确切来源恢复直接复用公共函数，不调用新source-prepare或旧source-capture CLI，也不能恢复为随意读路径 |
 | `maintain/scripts/maintain.py`、`scripts/audit.py` | `source-capture` | 巡检和日常维护直接复用公共来源函数，保持只读audit无副作用，不委派P2 CLI |
 | `query/scripts/node.py` | `source-capture`、`index-build` | source resolution、generation verify等直接复用公共函数，不依赖P2或其他兄弟CLI；无catalog、无旧十包仍可query／receipt／read |
@@ -54,12 +54,12 @@ CodeGraph 首次初始化已经折入 `hs-knowledge-explore/SKILL.md` 的“首�
 | `merge-check/scripts/merge.py` | 当前依赖 `local-check`，可选 catalog | 显式复查的 Agent 指引与确定性证据绑定校验一并改用 `lint` 的 P5 动作；不得依赖删除包 |
 | 多包 `scripts/support.py` | `hs-knowledge-query-regression` 专用超时分支、包路径和实现身份 | 随新 action 重新定义有限预算及 tool identity，不因改名放宽全部时限 |
 
-其他清理面包括各 Skill 的 `SKILL.md`、`references/`、writing/review guides、产物模板、测试夹具和 helper 中的旧能力名／旧 CLI 文件路径。原source-scan.prepare现行接口、模板和测试调用要迁往新包，不继续被新P2委派；P6.record暂保留，T00另审。对历史名称做检索时，只修改当前指令及实现引用；历史 SDD、原始报告、来源内容与真实旧输出不做批量替换。
+其他清理面包括各 Skill 的 `SKILL.md`、`references/`、writing/review guides、产物模板、测试夹具和 helper 中的旧能力名／旧 CLI 文件路径。原source-scan.prepare现行接口、模板和测试调用要迁往新包，不继续被新P2委派；P6.record保留，T00已确认机械转写边界。对历史名称做检索时，只修改当前指令及实现引用；历史 SDD、原始报告、来源内容与真实旧输出不做批量替换。
 
 ### 3.2 Workflow、固定检查和文档
 
 - 两条 Workflow 的 `workflow.yaml`、`layouts.yaml`，以及 `entry`、节点 owner、退出条件、恢复／退回出口与 artifact scope 必须一起核对。ingest 节点收敛不改只读巡检的职责。
-- `himate-knowledge-wifi-mp/evals/validate_design.py` 的固定18 Skill列表、节点映射、owner、完整边、产物scope、额外契约ID随最终9包和七节点图更新；P1绑定source-scan，P2绑定新source-prepare，P6暂沿source-scan.record。`evals/tests/test_workflows.py` 的合成模板和静态预期同步，不能只让计数等于9而漏检残余调用。
+- `himate-knowledge-wifi-mp/evals/validate_design.py` 的固定18 Skill列表、节点映射、owner、完整边、产物scope、额外契约ID随最终9包和七节点图更新；P1绑定source-scan，P2绑定新source-prepare，P6保留source-scan.record。`evals/tests/test_workflows.py` 的合成模板和静态预期同步，不能只让计数等于9而漏检残余调用。
 - `himate-knowledge-wifi-mp/evals/run_acceptance.py` 按现存 `SKILL.md` 自动发现测试组。新增source-prepare会多一组、删除十包会少十组，故必须先把原prepare及source-capture等行为测试迁入实际新归属包；不能以组数减少宣称验证更快或行为仍覆盖。
 - `evals/pipeline_harness.py`、`evals/tests/test_manual_skills.py`、`test_node_pipeline.py`、恢复／clean-clone／来源／索引／查询／超时相关测试中的公开动作和 helper 均需迁移。仅替换名称不足以证明行为等价。
 - `governance/specs/sources.md`、`cards.md` 当前仍直接说明 source-capture 公开恢复入口，需改为保留入口。若改动受锁规范／契约／Schema，按实际兼容性更新 `governance/framework.lock.yaml`，不能只换文件而保留错误摘要。
@@ -68,11 +68,11 @@ CodeGraph 首次初始化已经折入 `hs-knowledge-explore/SKILL.md` 的“首�
 
 ### 3.3 产物契约和环境锁
 
-当前23份产物契约来自18份 `result.yaml`，加source-scan的prepare／record两份、change-plan的review一份、publish-handoff的submission一份、maintain的audit一份。八个继续保留的旧包当前占12份，待删十包当前占11份；新增source-prepare尚没有现行文件，不将其目标产物提前计入现状。12不是最终契约数量目标：原prepare的材料产物要迁往P2，新包承接捕获／解析的必要输出、模板及错误契约；source-scan保留扫描和暂定record产物，不能把必要结果随旧包删除。
+本小节保留改前分发盘点及迁移约束，不描述最终文件数量。改前23份产物契约来自18份 `result.yaml`，加source-scan的prepare／record两份、change-plan的review一份、publish-handoff的submission一份、maintain的audit一份。八个继续保留的旧包改前占12份，删除十包改前占11份；新增source-prepare当时尚没有文件。12不是最终契约数量目标：原prepare的材料产物已迁往P2，新包承接捕获／解析的必要输出、模板及错误契约；source-scan保留扫描和record产物，必要结果未随旧包删除。
 
 OpenFlow 的 artifact ID、from-node scope、出口义务、模板及 guides 属于配套发布单元。旧 ID 如需兼容，限定在明确迁移期间；最终不得出现指向已删除节点／包的契约。当前静态校验对这些字段有精确预期，需与新图一致。
 
-当前18包各有运行及开发依赖锁，共36份，这是现状。十包迁出后的依赖必须进入实际新归属包的锁，尤其source-capture的PDF／DOCX／XML适配依赖迁入新source-prepare，P7的加密／发布回执兼容依赖随实际归属迁入，不能因删包而缺失。新包须具备运行锁、开发锁、SKILL、独立CLI/API说明、artifact／模板和测试；原prepare与source-capture的业务预期迁入新入口，覆盖独立明确目标、扫描清单、补料及输入漂移。
+改前18包各有运行及开发依赖锁，共36份，这是改前盘点。十包迁出后的依赖已进入实际新归属包的锁，尤其source-capture的PDF／DOCX／XML适配依赖迁入新source-prepare，P7的加密／发布回执兼容依赖随实际归属迁入。新包具备运行锁、开发锁、SKILL、独立CLI/API说明、artifact／模板和测试；原prepare与source-capture的业务预期迁入新入口，覆盖独立明确目标、扫描清单、补料及输入漂移。
 
 `explore/scripts/setup.py` 读取本包 `requirements.lock.txt` 检查／安装全局依赖，该锁当前承担分发运行依赖集合；目标9包的运行锁与此集合须配套，继续支持项目既有Python范围。新包复用现有explore.setup，不新增独立准备体系、runner或catalog。开发依赖锁和运行依赖锁分别维护，不把pytest等开发工具塞入运行准备。
 
@@ -93,11 +93,11 @@ OpenFlow 本地核对快照的 F115 设计已明确：完整存在的旧会话 S
 
 ## 5. expand—migrate—contract 发布顺序
 
-本轮仅规划下列顺序，不执行能力安装或运行发布；SDD 文档按本轮要求正常提交。
+本轮按以下顺序实施；源码发布、实际安装与宿主验证分别记录。
 
 ### E：先扩展新归属接口
 
-1. 冻结最终9包公开动作、七阶段输入输出、P1／P2边界、独立复核、节点／产物契约以及错误和恢复语义；明确每个旧动作的替代入口。P6暂沿source-scan.record，T00另审归属而不扩大本轮决定。
+1. 冻结最终9包公开动作、七阶段输入输出、P1／P2边界、独立复核、节点／产物契约以及错误和恢复语义；明确每个旧动作的替代入口。P6保留source-scan.record，T00已确认机械转写与处理账本边界。
 2. 先创建source-prepare并直接迁入原prepare和source-capture的实际能力，在其他保留包内实现相应迁入功能及公共函数，补齐包、API、artifact、测试和运行／开发锁。此时旧十包暂不物理删除，避免先断调用链。
 3. 兼容层只在迁移窗口保留，限定为旧 CLI 到新动作的薄转发，或将旧调用全部改完后再切换；不形成永久第二套实现和另一套 runner。
 4. 先搬迁必要的独立预期测试和公开行为覆盖，再更新新 Workflow／契约／文档。验证计划由主 SDD 指定，本记录不报告任何未执行成绩。
@@ -126,3 +126,9 @@ OpenFlow 本地核对快照的 F115 设计已明确：完整存在的旧会话 S
 - 合约／规则不兼容：使用归档的配套版本处理其原操作；若新版本不能解释旧停点，显式阻断并报告，不借旧 catalog 绕过现行范围、规则或来源检查。
 
 恢复成功、静态校验、隔离合成流程、实际 OpenFlow／SSH 接入及性能改善分别记录。删除十包完成不等于公司 API 提速或独立角色隔离已验收；后者需要真实运行的节点、模型调用、工具、SSH 与脚本分段耗时及宿主证据。
+
+## 7. 当前交付状态
+
+T00—T14 已实现。T15 的九包隔离分发及机制已验证，实际宿主旧会话、安装副本和配套 Workflow 的升级未操作；第 4、5 节的部署副本规则继续作为执行清单。T16 已通过 SSH 在服务器实测合成脚本链，OpenFlow、公司 API、模型等待和真实 reviewer 上下文未测。
+
+规则版本及最终 SHA-256 统一见[验证记录](2026-10-28-ingest-seven-stage-validation-plan.md#7-本次执行记录)。`b9` 完整验收及末次修复针对回归已完成，最终服务器性能见验证记录。本次八份根目录文档继续跟踪，不搬动，也不进入运行能力包。

@@ -25,14 +25,6 @@ def git(repository, *arguments):
     ], stderr=subprocess.STDOUT).decode().strip()
 
 
-def repin_fixture(p):
-    lock_path = p.root / "governance/framework.lock.yaml"
-    framework = yaml.safe_load(lock_path.read_bytes())
-    for entry in framework["files"].values():
-        entry["sha256"] = MANUAL.FIXTURE.sha((p.root / entry["path"]).read_bytes())
-    lock_path.write_text(yaml.safe_dump(framework, sort_keys=False), encoding="utf-8")
-
-
 def document_bytes(kind):
     text = "Capture marker is a documented rule."
     if kind == "md":
@@ -65,8 +57,7 @@ def document_bytes(kind):
 @pytest.mark.parametrize("kind", ["md", "pdf", "docx"])
 def test_document_ingest_survives_git_clone_without_private_runtime(tmp_path, committed_original, kind):
     p = MANUAL.ManualPipeline(tmp_path / "producer")
-    # The copy is an isolated test rule snapshot, including concurrent edits.
-    repin_fixture(p)
+    assert not any((p.skills / name).exists() for name in MANUAL.FIXTURE.RETIRED_SKILLS)
     p.catalog_path.unlink()
     (p.root / ".isolated-knowledge-fixture").unlink()
     workspace = p.root.parent
@@ -85,24 +76,23 @@ def test_document_ingest_survives_git_clone_without_private_runtime(tmp_path, co
     operation = "clone-ingest"
     scan_ref = p.call("knowledge-source-scan", {"operation_id": operation}, "scan")["data"]["scan_ref"]
     unit = p.record(scan_ref)["units"][0]
-    bundle_ref = p.call("knowledge-source-capture", {
-        "operation_id": operation, "source_path": source_path, "source_id": unit["source_id"],
-    })["data"]["bundle_ref"]
+    assert unit["path"] == source_path
+    material_ref = p.call("knowledge-source-prepare", {"operation_id": operation, "scan_ref": scan_ref},
+                          "prepare")["data"]["material_ref"]
+    bundle_ref = p.record(material_ref)["bundle_ref"]
     bundle = p.record(bundle_ref)
     _, front, body = p.card("clone-rule", bundle).decode().split("---", 2)
     metadata = yaml.safe_load(front)
     metadata["sources"][0]["locator"] = locator
     card = ("---\n" + yaml.safe_dump(metadata, sort_keys=False) + "---" + body).encode()
-    view_ref = p.view(operation, bundle_ref, "clone-rule", card)
+    view_ref = p.view(operation, bundle_ref, "clone-rule", card, scan_ref=scan_ref, material_ref=material_ref)
+    p.review(operation, view_ref)
     record_ref = p.call("knowledge-source-scan", {
         "operation_id": operation, "scan_ref": scan_ref, "view_ref": view_ref,
-        "dispositions": [{"unit_id": unit["unit_id"], "action": "create", "reason": "Clone fixture",
-                          "observed_fingerprint": unit["observed_fingerprint"],
-                          "adopted_fingerprint": unit["observed_fingerprint"], "progress": "completed",
-                          "card_refs": ["clone-rule"], "claim_refs": ["clone-rule#c1"]}],
+        "disposition_preview_ref": p.record(view_ref)["disposition_preview_ref"],
     }, "record")["data"]["ingest_record_ref"]
     assert p.call("knowledge-apply", {"operation_id": operation, "view_ref": view_ref,
-                                     "ingest_record_ref": record_ref})["phase"] == "committed"
+                                     "ingest_record_ref": record_ref}, "batch")["phase"] == "completed"
     # Publish exactly the shared assets; copied original objects and private logs
     # stay in the producer. An actual clone cannot see those untracked files.
     git(workspace, "add", ".gitignore", "config.yml", p.root.name + "/governance",
@@ -114,6 +104,7 @@ def test_document_ingest_survives_git_clone_without_private_runtime(tmp_path, co
     consumer.base = tmp_path / "consumer-io"
     consumer.base.mkdir()
     consumer.root, consumer.skills, consumer.sequence = cloned / p.root.name, p.skills, 0
+    assert not any((consumer.skills / name).exists() for name in MANUAL.FIXTURE.RETIRED_SKILLS)
     assert not (consumer.root / ".build").exists()
     assert not (consumer.root / "artifacts").exists()
     assert not (consumer.root / "logs/evidence").exists()
@@ -190,7 +181,6 @@ def test_document_ingest_survives_git_clone_without_private_runtime(tmp_path, co
 
 def test_static_code_card_survives_clean_clone_with_configured_module_bytes(tmp_path):
     p = MANUAL.ManualPipeline(tmp_path / "code-producer")
-    repin_fixture(p)
     p.catalog_path.unlink()
     (p.root / ".isolated-knowledge-fixture").unlink()
     workspace = p.root.parent
@@ -203,10 +193,10 @@ def test_static_code_card_survives_clean_clone_with_configured_module_bytes(tmp_
     raw = b"int capture_marker(void) { return 1; }\n"
     (module / "wifi.c").write_bytes(raw)
     repo_id = "repo-" + MANUAL.FIXTURE.sha(b"main/wifi")[:16]
-    bundle_ref = p.call("knowledge-source-capture", {
+    bundle_ref = p.call("knowledge-source-prepare", {
         "operation_id": "code-clone", "kind": "code", "repo_id": repo_id,
         "relative_path": "wifi.c", "source_id": "clone-code",
-    })["data"]["bundle_ref"]
+    }, "capture")["data"]["bundle_ref"]
     bundle = p.record(bundle_ref)
     _, front, body = p.card("clone-code-rule", bundle, "Capture marker returns the literal one.").decode().split("---", 2)
     metadata = yaml.safe_load(front)
@@ -219,7 +209,7 @@ def test_static_code_card_survives_clean_clone_with_configured_module_bytes(tmp_
                                  verification_requirements=["semantic-support"])
     metadata["sources"][0]["locator"] = {"kind": "lines", "start": 1, "end": 1, "repo_id": repo_id, "path": "wifi.c"}
     card = ("---\n" + yaml.safe_dump(metadata, sort_keys=False) + "---" + body).encode()
-    view_ref = p.view("code-clone", bundle_ref, "clone-code-rule", card)
+    view_ref = p.view("code-clone", bundle_ref, "clone-code-rule", card, semantic=False)
     assert p.call("knowledge-apply", {"operation_id": "code-clone", "view_ref": view_ref})["phase"] == "committed"
     (workspace / ".gitignore").write_bytes((MANUAL.FIXTURE.REPO / ".gitignore").read_bytes())
     git(workspace, "init", "-b", "main")

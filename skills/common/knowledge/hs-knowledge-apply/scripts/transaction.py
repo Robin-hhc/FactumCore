@@ -223,6 +223,10 @@ def finish_commit(ctx, journal):
         if current_digest(ctx, row["path"]) != row["new_digest"]:
             row["installed"] = False
             raise Blocked("final transaction verification failed: " + row["path"])
+    if journal.get("execution_checks") == "safety_only":
+        from transaction_v3 import check_execution_inputs
+        view, _ = validate_journal(ctx, journal, journal["operation_id"])
+        check_execution_inputs(ctx, view, journal)
     op = journal["operation_id"]
     result_ref = f"logs/operations/{op}/apply-result.json"
     result = ctx.record(
@@ -306,7 +310,7 @@ def mutate(ctx, journal, fault_after=None):
         raise Blocked("apply interrupted; inspect or recover the journal") from exc
 
 
-def execute(ctx, request, action="run"):
+def execute(ctx, request, action="run", *, safety_only=False):
     op = ctx.operation(request)
     if action == "run" and not request.get("view_ref") and request.get("ingest_record_ref"):
         from transaction_v3 import record_only_view
@@ -548,9 +552,14 @@ def execute(ctx, request, action="run"):
             view = checked_view(ctx, request)
             if view["digest"] != journal["view_digest"]:
                 raise Invalid("recovery inputs changed")
-            validate_final_cards(ctx, view)
-            from transaction_v3 import check_current_code
-            check_current_code(ctx, view, journal.get("check_inputs"))
+            if journal.get("execution_checks") == "safety_only":
+                from transaction_v3 import check_execution_inputs, check_execution_view
+                check_execution_inputs(ctx, view, journal)
+                check_execution_view(ctx, view)
+            else:
+                validate_final_cards(ctx, view)
+                from transaction_v3 import check_current_code
+                check_current_code(ctx, view, journal.get("check_inputs"))
             return mutate(ctx, journal)
         if journal:
             raise Blocked("interrupted operation requires explicit resume or rollback")
@@ -563,10 +572,15 @@ def execute(ctx, request, action="run"):
             validate_content_review(ctx, view, content_review)
         if view.get("baseline_digest", baseline(view)) != baseline(view):
             raise Invalid("complete write-set baseline digest mismatch")
-        validate_final_cards(ctx, view)
+        if safety_only:
+            from transaction_v3 import check_execution_inputs, check_execution_view
+            check_execution_inputs(ctx, view)
+            check_execution_view(ctx, view)
+        else:
+            validate_final_cards(ctx, view)
         rows = view["writes"] + view.get("deletes", [])
         ingest_record = None
-        if view.get("review_mode") != "record_only":
+        if view.get("review_mode") != "record_only" and not safety_only:
             from transaction_v3 import check_admission, check_current_code
             inputs = check_current_code(ctx, view, request.get("check_inputs"))
             if inputs:
@@ -623,7 +637,8 @@ def execute(ctx, request, action="run"):
             view_digest=view["digest"],
             **({"proof_ref": request["proof_ref"], "proof_digest": proof["digest"]}
                if proof else {}),
-            verification_tier="fixed_business_checks" if ctx.domain else "transaction_bytes_only",
+            verification_tier="fixed_business_checks" if ctx.domain and not safety_only else "transaction_bytes_only",
+            **({"execution_checks": "safety_only"} if safety_only else {}),
             entries=entries,
             **({"check_inputs": request["check_inputs"]} if request.get("check_inputs") else {}),
             **({"content_review_ref": request["content_review_ref"],

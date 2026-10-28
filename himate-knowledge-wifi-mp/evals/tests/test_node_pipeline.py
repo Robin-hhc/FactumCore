@@ -12,7 +12,7 @@ SPEC.loader.exec_module(FIXTURE)
 def test_document_apply_checks_business_data_without_requiring_upstream_review(tmp_path):
     p = FIXTURE.Pipeline(tmp_path)
     bundle_ref, bundle = p.capture("review-required", b"# Source\nIndependent review is required.\n")
-    view_ref = p.view("review-required", bundle_ref, "review-rule", p.card("review-rule", bundle))
+    view_ref = p.view("review-required", bundle_ref, "review-rule", p.card("review-rule", bundle), semantic=False)
     assert "review_trust" not in p.catalog
     result = p.call("knowledge-apply", {"operation_id": "review-required", "view_ref": view_ref})
     assert "proof_ref" not in p.record(result["data"]["apply_result_ref"])
@@ -24,25 +24,27 @@ def test_raw_to_reviewed_stable_generation_and_post_ingest_correction(tmp_path):
     p = FIXTURE.Pipeline(tmp_path)
     bundle_ref, bundle = p.capture("create-card", b"# Original\nCapture marker is a fixture rule.\n")
     view_ref = p.view("create-card", bundle_ref, "capture-rule", p.card("capture-rule", bundle))
-    handoff = p.call("knowledge-governance-handoff", {"operation_id": "create-card", "view_ref": view_ref})
-    assert handoff["phase"] == "handed_off"
+    handoff = p.call("knowledge-view-materialize", {"operation_id": "create-card", "view_ref": view_ref}, "describe")
+    assert handoff["phase"] == "described"
+    assert handoff["data"]["view_digest"] == p.record(view_ref)["digest"]
     assert not (p.root / "knowledge/rules/capture-rule.md").exists()
     applied_ref, review = p.apply("create-card", view_ref)
     assert review["view_digest"] == p.record(view_ref)["digest"]
     assert "review_trust" not in p.catalog
     card_path = p.root / "knowledge/rules/capture-rule.md"
     original_card = card_path.read_bytes()
-    built = p.call("knowledge-index-build", {"operation_id": "build-first"})["data"]
-    assert not (p.root / "artifacts/indexes/local/active.json").exists()
+    active_after_batch = (p.root / "artifacts/indexes/local/active.json").read_bytes()
+    built = p.call("knowledge-apply", {"operation_id": "build-first"}, "index-build")["data"]
+    assert (p.root / "artifacts/indexes/local/active.json").read_bytes() == active_after_batch
     checked = p.call(
-        "knowledge-query-regression",
+        "knowledge-apply",
         {
             "operation_id": "check-first",
             "workflow": {"attempt_id": "host-owned-metadata"},
             "generation_ref": built["generation_ref"],
             "expected_active": built["expected_active"],
             "cases": [{"id": "find-rule", "query": "capture", "required": ["capture-rule"]}],
-        },
+        }, "regression",
     )
     assert checked["data"]["activated"]
     search = {"operation_id": "consume-first", "query": "capture", "purpose": "current"}
@@ -71,15 +73,15 @@ def test_raw_to_reviewed_stable_generation_and_post_ingest_correction(tmp_path):
         decision="update",
     )
     updated_apply, _ = p.apply("update-source", updated_view)
-    next_generation = p.call("knowledge-index-build", {"operation_id": "build-updated"})["data"]
+    next_generation = p.call("knowledge-apply", {"operation_id": "build-updated"}, "index-build")["data"]
     p.call(
-        "knowledge-query-regression",
+        "knowledge-apply",
         {
             "operation_id": "check-updated",
             "generation_ref": next_generation["generation_ref"],
             "expected_active": next_generation["expected_active"],
             "cases": [{"id": "reviewed-source", "query": "capture", "required": ["capture-rule"]}],
-        },
+        }, "regression",
     )
     advanced = p.call(
         "knowledge-maintain",

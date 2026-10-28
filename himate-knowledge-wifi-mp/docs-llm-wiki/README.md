@@ -29,7 +29,7 @@ flowchart LR
 
 `config.yml` 维护代码根和模块相对路径，以及芯片、Host／Device、特性和用途；共享模块可关联多芯片、多端。无需逐项填写六 Target、三 pair 或重复代码根授权，取证按路径读取实际文件并固定内容指纹。配置文件职责与连接设置见[使用说明](使用说明.md#配置项目代码架构)，共享映射与核验逻辑见[知识库关键点](知识库关键点.md#1-工作区路径与部署边界)。
 
-能力共 18 个公开 CLI Skill；Workflow 设计包含 ingest 和只读 lint 巡检两条。`S/hs-knowledge-lint/` 是原检查 Skill，`F/hs-knowledge-lint/` 是同名巡检 Workflow，安装和宿主加载按实际环境核实。`hs-knowledge-explore` 负责全库能力路由及按需准备、发现，首次准备时由 Agent 按 `config.yml` 中配置的真实代码仓逐个初始化 CodeGraph；空模块列表不建图，MCP 由 harness 提供。卡头来源及查询结果提供模块、文件与定位，Agent 按实际 `config.yml` 匹配模块根后追查源码，不以正文可点击链接为前提；见[查询和追代码](使用说明.md#3-怎么查询和追代码)与[详细设计 §5.9](知识库详细设计.md#59-q1q6路由查询同代精读与回答)。
+能力共9个公开CLI Skill：explore、source-scan、source-prepare、change-plan、view-materialize、lint、apply、query、maintain（均以 `hs-knowledge-` 为前缀）；Workflow 设计包含 ingest 和只读 lint 巡检两条。`S/hs-knowledge-lint/` 是原检查 Skill，`F/hs-knowledge-lint/` 是同名巡检 Workflow，安装和宿主加载按实际环境核实。`hs-knowledge-explore` 负责全库能力路由及按需准备、发现，首次准备时由 Agent 按 `config.yml` 中配置的真实代码仓逐个初始化 CodeGraph；空模块列表不建图，MCP 由 harness 提供。卡头来源及查询结果提供模块、文件与定位，Agent 按实际 `config.yml` 匹配模块根后追查源码，不以正文可点击链接为前提；见[查询和追代码](使用说明.md#3-怎么查询和追代码)与[详细设计 §5.9](知识库详细设计.md#59-q1q6路由查询同代精读与回答)。
 
 设计文档描述职责、流程与边界，能力安装、实际宿主、六 Target、CI 合入和权限验证以各自环境的实际记录为准。本项目历史验证工件在本地 SDD 保存原始版本身份，不据此推断当前部署状态。
 
@@ -39,12 +39,14 @@ flowchart LR
 
 `knowledge ingest` 是逻辑入口名称，默认扫描六类允许 raw 并选择新增、变化及待处理来源；限定范围时，在 source-scan 的请求中填写可选 `source`。首次导入和日常增量使用同一套能力，不要求安装同名终端命令。
 
-开发测试可以由人工逐个调用 Skill，按实际业务文件传递输入输出；日常入库通过 OpenFlow 的 ingest Workflow 编排扫描、写稿、独立内容复核、适用代码核验、lint、记录及本地入库，并检查流程顺序和交棒。Skill 自身只检查本职数据，不要求前驱通过凭证。`hs-knowledge-lint` 独立只读检查，发现问题交回 ingest 修订；`hs-knowledge-query` 消费正式知识并支持检索分析。
+开发测试可以由人工逐个调用 Skill，按实际业务文件传递输入输出；日常入库由OpenFlow按7个节点编排：P1扫描、P2独立备料、P3语义计划、P4直接成稿／修订、P5独立审阅及一次完整质量检查、P6记录、P7安全事务与实际检索收尾。P5为reviewer，其余为coder；宿主安排角色与上下文隔离。Skill 自身只检查本职数据，不要求前驱通过凭证。`hs-knowledge-lint` 独立只读检查，发现问题交回 ingest 修订；`hs-knowledge-query` 消费正式知识并支持检索分析。
 
-独立内容复核由人工测试者或 OpenFlow 安排；Skill 核对逐 Claim 理由、实际材料和确切内容绑定，不以作者名字或上下文标签校验角色隔离。apply 自身执行固定业务检查并保护写入，不检查上游通过票据，也不因成功落位自动生成 supported 验收摘要。lint 与固定 CI 继续复用确定性检查。
+独立内容复核由人工测试者或 OpenFlow 安排；Skill 核对逐 Claim 理由、实际材料和确切内容绑定，不以作者名字或上下文标签校验角色隔离。P7使用apply.batch核对实际输入快照、路径、字节、CAS和记录，不重跑P5完整质量检查；写后重新固定索引基线。旧apply.run继续保留原完整固定检查，恢复遵守原journal语义；任何动作都不检查上游passed票据或自动颁发supported验收摘要。lint 与固定 CI 继续复用确定性检查。
 
-索引与查询直接核对卡片、来源、当前代码范围及采用材料；构建／运行结论使用随索引固定的 `code_contexts` 业务数据，不依赖 apply／merge-check 证明链。共享索引构建时指定 `knowledge_commit` 只确认实际仓库快照；显式签名发布回执另核发布身份真实性，不能据快照或入库成功推断 CI、合入或语义复核通过。
+索引与查询直接核对卡片、来源、当前代码范围及采用材料；构建／运行结论使用随索引固定的 `code_contexts` 业务数据，不依赖apply或代码复核通过票据。共享索引构建时指定 `knowledge_commit` 只确认实际仓库快照；显式签名发布回执另核发布身份真实性，不能据快照或入库成功推断 CI、合入或语义复核通过。
 
 用户可在执行中要求退回，也可在入库后要求修改已有卡；原件未变的明确修订仍走新操作，重新完成复核、检查与入库。
 
 本地入库、完整索引验证、本批目标查询通过，且该代次成功激活后 ingest 结束；之后由人提交并触发固定 CI，复用 lint 的格式、导航、引用和索引检查脚本，通过后人工合入；见[上库流程](知识库详细设计.md#32-上库固定-ci-检查后合入)。
+
+P1与P2独立：P2可直接接受明确来源目标，也可按固定扫描单元备料。P5缺料回P2定向补齐，只有实际采用输入漂移才回P1。公共算法在知识根受锁contracts中同进程复用；不启动兄弟Skill CLI。独立索引、查询回归、恢复和只读提交清单均从apply调用，动作及完成事实见[使用说明](使用说明.md)。

@@ -8,10 +8,12 @@
 
 纯文档经独立 Agent 内容复核和完整固定检查后 stable，免代码实现核验。用户可在执行中退回或入库后要求修订。代码卡本地只读检查通过后 stable，上库固定 CI 复用确定性的格式、索引及来源／代码引用检查。检查不改卡、来源锁、链接或源码。目录、Schema 与示例不证明业务接入、内容正确或权限隔离。
 
-设计由一条 `hs-knowledge-ingest` Workflow 编排生产、调用 lint、修订、独立内容复核、适用核验及本地入库；`hs-knowledge-lint` 为可独立调用的只读检查 Skill，不负责修稿、语义复核或入库。实际模板和 CLI 状态以使用说明核实。领域机器规则只在 `governance/contracts/` 实现；Skill 通过公开入口复用规则和其他节点，不复制契约。原件只读，来源内容不授予执行或发布权限；能力分发排除原件、正式卡、来源锁和运行记录。
+公开能力为9包：explore、source-scan、source-prepare、change-plan、view-materialize、lint、apply、query、maintain，统一使用 `hs-knowledge-` 前缀。一条 `hs-knowledge-ingest` Workflow 恰好编排7个节点：P1扫描、P2独立备料、P3语义计划、P4成稿／修订、P5独立审阅及完整质量检查、P6处理记录、P7安全入库及检索收尾。P5由 reviewer 使用 lint，其他节点由 coder 执行；作者与复核者的上下文隔离由宿主安排。lint 默认仍为只读正式库检查，`review` 承接P5；view-materialize不负责知识质量或代码语义复核。实际模板和 CLI 状态以使用说明核实。领域机器规则只在 `governance/contracts/` 实现；Skill通过同进程公共函数复用，不调用兄弟Skill CLI或导入其私有实现。原件只读，来源内容不授予执行或发布权限；能力分发排除原件、正式卡、来源锁和运行记录。
 
 同名 `hs-knowledge-lint` Workflow 另供手动或外部周期调度巡检：`check_formal` 沿用原 lint Skill 默认正式／全库检查，`audit_references` 显式调用 maintain 的只读 `audit-references`，汇总逐卡／Claim 的来源、代码、原定位、旧／当前指纹及历史用途，生成 JSON／Markdown 报告即结束。原 lint Skill、ingest 流程及 maintain 默认 `inspect-context` 保持原职责；巡检不写知识、来源锁、事件／维护水位或活动索引，不嵌套 Workflow、不自动修复。实际接入按部署验证，修订由人明确把报告交给 ingest。
 
 Git 操作在项目根 `repo/` 执行。保留其他任务本地文件，不读受限 gold，不提交本机配置、凭据、跨组资料或无关修改。目录与忽略规则不提供 ACL；业务接入、宿主触发及权限隔离各自记录真实证据。
 
 Skill 可人工逐个调用，只校验本职业务数据和固定检查；OpenFlow 负责流程顺序、角色隔离及交棒合法性。节点不要求 Workflow 身份、catalog 登记或上游通过凭证。
+
+P1只观察变化和真实续办事实；P2可按固定清单或显式目标独立准备材料，P5缺料仅回P2定向补齐，所用输入漂移才回P1。P3保存语义决定与冻结查询，P4直接生产完整字节视图及输入快照。P7的 `apply --action batch` 检查实际输入、路径、CAS和落盘字节，复验处理记录，再构建／完整验证真实索引、执行同代目标查询并按原活动指针基线激活；不重跑P5完整质量检查，也不以passed票据放行。仅记录批保留失败／暂缓事实，不建索引。旧apply `run` 仍保留完整固定检查；恢复沿原journal语义，不把旧事务改造成新batch。独立索引、回归、提交清单和恢复动作均由apply提供；提交核对只读真实Git对象，不执行提交、推送或合入。

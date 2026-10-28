@@ -1,7 +1,5 @@
-"""Freeze authored reasoning and review scope; never infer domain semantics."""
-
+"""Freeze authored P3 decisions; byte production and independent review live elsewhere."""
 from support import NodeError, digest
-
 
 def require(value, code, message):
     if not value:
@@ -26,15 +24,73 @@ def validate_queries(cases):
     return cases
 
 
+def freeze_dispositions(units, actions, claims):
+    """Freeze authored record data so P6 never chooses among mixed actions."""
+    frozen = []
+    for row in units:
+        identity = row["unit_id"]
+        linked_actions = [action for action in actions if identity in action["unit_ids"]]
+        decisions = {action["decision"] for action in linked_actions if action["decision"] != "defer"}
+        selected = row.get("record_action")
+        if row["outcome"] == "content":
+            require(decisions and (selected in decisions if selected is not None else len(decisions) == 1),
+                    "PLAN_RECORD_ACTION_REQUIRED", "A mixed content unit needs an explicit actual card action",)
+            selected = selected or next(iter(decisions))
+        else:
+            require(selected is None or selected == row["outcome"], "PLAN_RECORD_ACTION_REQUIRED",
+                    "A non-content record action must equal its source outcome")
+            selected = row["outcome"]
+        frozen.append({**row, "record_action": selected,
+                       "card_refs": sorted({action["card_id"] for action in linked_actions}),
+                       "claim_refs": sorted({claim["card_id"] + "#" + claim["claim_id"] for claim in claims
+                                             if identity in claim["unit_ids"]})})
+    return frozen
+
+
 def author_plan(ctx, request):
-    scan = ctx.record(request.get("scan_ref"), "source_inventory")
-    ctx.modules["records"].validate_scan_manifest(scan, ctx.rules)
     material = ctx.record(request.get("material_ref"))
-    require(material.get("purpose") == "source_materials"
-            and scan["operation_id"] == ctx.operation and material["operation_id"] == ctx.operation
-            and material.get("scan_digest") == scan["digest"], "MATERIAL_BINDING", "Materials must bind this fixed scan")
+    previous = ctx.modules["production"].revision_view(ctx, request)
+    scan_ref = request.get("scan_ref") or material.get("scan_ref")
+    scan = ctx.record(scan_ref, "source_inventory") if scan_ref else None
+    if scan:
+        ctx.modules["records"].validate_scan_manifest(scan, ctx.rules)
+    require(material.get("purpose") == "source_materials",
+            "MATERIAL_BINDING", "Use this operation's actual reading materials")
+    if material["operation_id"] != ctx.operation:
+        require(previous and previous.get("material_ref") == request["material_ref"],
+                "MATERIAL_BINDING", "Old materials require their exact previous candidate")
+    previous_plan = None
+    if material["operation_id"] != ctx.operation or (scan and scan["operation_id"] != ctx.operation):
+        require(previous and previous.get("semantic_plan_ref"), "REVISION_CONTEXT_REQUIRED",
+                "Adopting a previous round needs its actual authored plan")
+        previous_plan = ctx.record(previous["semantic_plan_ref"], "semantic_plan")
+        require(previous_plan["digest"] == previous.get("semantic_plan_digest")
+                and previous_plan["material_ref"] == previous.get("material_ref"),
+                "MATERIAL_BINDING", "The previous candidate must bind its exact authored material")
+        if material["operation_id"] != ctx.operation:
+            require(previous_plan["material_digest"] == material["digest"], "MATERIAL_BINDING",
+                    "Do not rebind altered material under its previous reference")
+    if scan:
+        require(material.get("scan_digest") == scan["digest"],
+                "MATERIAL_BINDING", "Materials must bind this fixed scan")
+        if scan["operation_id"] != ctx.operation:
+            require(previous and previous.get("scan_ref") == scan_ref,
+                    "MATERIAL_BINDING", "An old scan must remain the exact observation of the previous candidate")
+            require(previous_plan.get("scan_ref") == scan_ref and previous_plan.get("scan_digest") == scan["digest"],
+                    "MATERIAL_BINDING", "The previous authored plan must bind the unchanged original scan")
+            if material["operation_id"] == ctx.operation:
+                require(material.get("previous_view_ref") == request["previous_view_ref"]
+                        and material.get("previous_view_digest") == previous["digest"]
+                        and material.get("previous_material_ref") == previous.get("material_ref")
+                        and material.get("previous_material_digest") == previous_plan["material_digest"],
+                        "MATERIAL_BINDING", "New material rounds must bind the previous candidate and exact adopted material")
+    observations = scan["units"] if scan else material.get("units", [])
+    require(isinstance(observations, list) and all(isinstance(row, dict) and text(row.get("unit_id")) for row in observations),
+            "MATERIAL_UNITS_REQUIRED", "Materials need an explicit actual target inventory")
+    require(len({row["unit_id"] for row in observations}) == len(observations),
+            "MATERIAL_UNIT_CONFLICT", "Material observations have duplicate units")
     units = request.get("units")
-    fixed = {row["unit_id"] for row in scan["units"]}
+    fixed = {row["unit_id"] for row in observations}
     require(isinstance(units, list) and len(units) == len(fixed)
             and {row.get("unit_id") for row in units} == fixed,
             "PLAN_UNIT_COVERAGE", "Every frozen scan unit needs one source outcome")
@@ -44,7 +100,8 @@ def author_plan(ctx, request):
         require(row.get("outcome") in {"content", "skip", "defer", "failed", "uncovered"}
                 and text(row.get("reason")), "INVALID_SOURCE_OUTCOME", "Source outcome and reason are required")
     maintenance = request.get("maintenance_units", [])
-    affected = {(row["card_id"], row["claim_id"]) for row in scan.get("current_context", {}).get("affected_claims", [])}
+    observed_context = (scan or material).get("current_context", {})
+    affected = {(row["card_id"], row["claim_id"]) for row in observed_context.get("affected_claims", [])}
     require(isinstance(maintenance, list) and {(row.get("card_id"), row.get("claim_id")) for row in maintenance} == affected
             and len(maintenance) == len(affected), "MAINTENANCE_UNIT_COVERAGE", "Maintenance units must bind every affected context Claim without inventing raw files")
     for row in maintenance:
@@ -96,60 +153,22 @@ def author_plan(ctx, request):
     for case in cases:
         require(set(case.get("expected_claim_ids", []) + case.get("forbidden_claim_ids", [])) <= known_claims,
                 "TARGET_CLAIM_QUERY_INVALID", "Claim query expectations must refer to the authored Claim plan")
-    plan = ctx.seal({"v3_required": True, "scan_ref": request["scan_ref"], "scan_digest": scan["digest"],
+    units = freeze_dispositions(units, actions, claims)
+    maintenance = freeze_dispositions(maintenance, actions, claims)
+    plan = ctx.seal({"v3_required": True,
+                     **({"scan_ref": scan_ref, "scan_digest": scan["digest"],
+                         "origin_scan_operation_id": scan["operation_id"]} if scan else
+                        {"observation_digest": digest(observations), "observation_basis": "explicit_material_targets"}),
+                     **({"previous_view_ref": request["previous_view_ref"], "revision_reason": request["revision_reason"],
+                         "previous_view_digest": previous["digest"],
+                         "previous_semantic_plan_ref": previous.get("semantic_plan_ref"),
+                         "previous_semantic_plan_digest": previous.get("semantic_plan_digest")} if previous else {}),
                      "material_ref": request["material_ref"], "material_digest": material["digest"],
                      "author_id": author, "units": units, "claim_changes": claims, "card_actions": actions,
                      "maintenance_units": maintenance,
                      "target_queries": cases, "request_digest": digest(request)}, "semantic_plan")
     ref = ctx.save(ctx.base + "/semantic-plan.json", plan)
     return {"semantic_plan_ref": ref, "semantic_plan_digest": plan["digest"],
-            "target_queries": cases}, "content_planned"
-
-
-def content_review(ctx, request):
-    plan = ctx.record(request.get("semantic_plan_ref"), "semantic_plan")
-    require(plan["operation_id"] == ctx.operation, "PLAN_OPERATION_MISMATCH", "Review must describe this operation's plan")
-    identities = {key: request[key] for key in ("reviewer_id", "independent_context") if key in request}
-    if plan.get("author_id") is not None:
-        identities["author_id"] = plan["author_id"]
-    scan = ctx.record(plan["scan_ref"], "source_inventory")
-    applicable = {u["unit_id"] for u in plan["units"] + plan.get("maintenance_units", []) if u["outcome"] in {"skip", "content"}}
-    planned_skips = {u["unit_id"] for u in plan["units"] if u["outcome"] == "skip"}
-    scan_skip = {u["unit_id"] for u in scan["units"] if u["unit_id"] in planned_skips
-                 and u.get("change") == "unchanged"
-                 and u.get("progress") in {"completed", "skipped", "withdrawn"}}
-    applicable -= scan_skip
-    sampled, unreviewed = request.get("sampled_unit_ids", []), request.get("unreviewed_unit_ids", [])
-    require(isinstance(sampled, list) and isinstance(unreviewed, list)
-            and len(set(sampled + unreviewed)) == len(sampled + unreviewed)
-            and set(sampled + unreviewed) == applicable and (not applicable or sampled)
-            and text(request.get("reason")), "REVIEW_SCOPE_INVALID", "Record the risk sample and every unselected unit explicitly")
-    findings = request.get("findings")
-    require(isinstance(findings, list), "REVIEW_FINDINGS_REQUIRED", "Review must report findings, including an explicit empty list")
-    for row in findings:
-        require(row.get("unit_id") in sampled and row.get("return_to") in {"P2", "P3", "P4"}
-                and text(row.get("reason")) and row.get("evidence"), "INVALID_REVIEW_FINDING", "Findings need location, evidence and return node")
-    view_digest = None
-    if request.get("view_ref"):
-        view = ctx.record(request["view_ref"], "final_view")
-        require(view.get("semantic_plan_digest") == plan["digest"], "REVIEW_VIEW_MISMATCH", "Review view differs from plan")
-        view_digest = view["digest"]
-    record = ctx.seal({"semantic_plan_ref": request["semantic_plan_ref"], "plan_digest": plan["digest"],
-                       "scan_digest": scan["digest"], **identities, "sampled_unit_ids": sampled,
-                       "unreviewed_unit_ids": unreviewed, "reason": request["reason"], "findings": findings,
-                       "view_digest": view_digest, "status": "failed" if findings else "passed",
-                       "verification_tier": "declared_content_review"}, "content_review")
-    ref = ctx.save(ctx.base + "/content-review/" + record["digest"] + ".json", record)
-    return {"content_review_ref": ref, "review_status": record["status"],
-            "skip_sample": {**({"reviewer": identities["reviewer_id"]} if "reviewer_id" in identities else {}),
-                            "reason": request["reason"],
-                            "sampled_unit_ids": sampled, "unreviewed_unit_ids": unreviewed,
-                            "report_ref": ref, "report_digest": record["digest"]}}, ("needs_revision" if findings else "reviewed")
-
-
-def bind_plan(ctx, request):
-    plan = ctx.record(request.get("semantic_plan_ref"), "semantic_plan")
-    require(plan["operation_id"] == ctx.operation, "PLAN_OPERATION_MISMATCH", "Use this operation's authored plan")
-    for ref, expected in ((plan["scan_ref"], plan["scan_digest"]), (plan["material_ref"], plan["material_digest"])):
-        require(ctx.record(ref)["digest"] == expected, "STALE_PLAN_INPUT", "Plan material changed")
-    return plan
+            "target_queries": cases,
+            **({"previous_view_ref": request["previous_view_ref"], "revision_reason": request["revision_reason"]} if previous else {}),
+            **({"origin_scan_operation_id": scan["operation_id"]} if scan else {})}, "content_planned"

@@ -4,30 +4,29 @@ import base64
 import hashlib
 import json
 import subprocess
-import shutil
 import sys
+import importlib.util
+from pathlib import Path
 
 import pytest
 import yaml
 
 
 @pytest.fixture(autouse=True)
-def pin_fixture(harness):
+def install_target_packages(harness):
     package_hash = sys.modules[type(harness).__module__].package_hash
 
     frozen = harness.base / "frozen-skills"
-    shutil.copytree(harness.packages, frozen, ignore=shutil.ignore_patterns("tests", "__pycache__"))
+    spec = importlib.util.spec_from_file_location("plan_flow_packages", Path(__file__).resolve().parents[5] / "himate-knowledge-wifi-mp/evals/pipeline_harness.py")
+    packages = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(packages)
+    packages.install_packages(frozen)
     harness.packages = frozen
     catalog = json.loads(harness.catalog.read_bytes())
+    catalog["skills"] = {name: catalog["skills"][name] for name in packages.PUBLIC_SKILLS}
     for name, spec in catalog["skills"].items():
         spec.update(root=str(frozen / name), package_digest=package_hash(frozen / name))
     harness.catalog.write_text(json.dumps(catalog), encoding="utf-8")
-    path = harness.root / "governance/framework.lock.yaml"
-    lock = yaml.safe_load(path.read_bytes())
-    for row in lock["files"].values():
-        row["sha256"] = hashlib.sha256((harness.root / row["path"]).read_bytes()).hexdigest()
-    path.write_text(yaml.safe_dump(lock, sort_keys=False), encoding="utf-8")
-    harness.rules = hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 @pytest.mark.parametrize("unrelated_nav_changes", [False, True, "historical_fallback", "local_only", "uncommitted_raw", "nested"])
@@ -55,7 +54,7 @@ def test_current_ingest_review_lint_record_apply_query_without_human_confirmatio
     scan_ref = harness.run("source-scan", {"operation_id": "op"}, "scan")["data"]["scan_ref"]
     scan = harness.record(scan_ref)
     unit = scan["units"][0]
-    materials = harness.run("source-scan", {"operation_id": "op", "scan_ref": scan_ref}, "prepare")["data"]["material_ref"]
+    materials = harness.run("source-prepare", {"operation_id": "op", "scan_ref": scan_ref}, "prepare")["data"]["material_ref"]
     material = harness.record(materials)
     bundle = harness.record(material["bundle_ref"])
     if unrelated_nav_changes == "uncommitted_raw":
@@ -87,27 +86,26 @@ def test_current_ingest_review_lint_record_apply_query_without_human_confirmatio
                            "preserved": "No old knowledge", "reason": "New topic"}],
         "card_actions": [{"card_id": "new", "decision": "create", "author_id": "author", "unit_ids": [unit["unit_id"]], "reason": "Independent rule"}],
         "target_queries": [{"id": "new-rule", "query": "Synthetic", "purpose": "guidance", "required": ["new"], "expected_claim_ids": ["new#new-claim"]}]}, "plan")["data"]["semantic_plan_ref"]
+    if unrelated_nav_changes == "historical_fallback":
+        # This candidate actually adopts retained local originals with no
+        # current Git configuration. Removing an input after P5 is a different
+        # stale-input case, covered separately by the batch drift tests.
+        configuration = (harness.base / "config.yml").read_bytes()
+        (harness.base / "config.yml").unlink()
     candidate = harness.write(".build/candidates/new.md", harness.card("new", bundle))
-    plan = harness.run("change-plan", {"operation_id": "op", "v3_required": True, "semantic_plan_ref": semantic,
+    view_ref = harness.run("view-materialize", {"operation_id": "op", "v3_required": True, "semantic_plan_ref": semantic,
         "bundle_ref": material["bundle_ref"], "decisions": [{"candidate_id": unit["unit_id"], "decision": "create",
-        "reason": "Authored planned rule", "card_inputs": [candidate]}]})["data"]["plan_ref"]
-    view_ref = harness.run("view-materialize", {"operation_id": "op", "plan_ref": plan})["data"]["view_ref"]
-    review = harness.run("change-plan", {"operation_id": "op", "semantic_plan_ref": semantic, "view_ref": view_ref,
+        "reason": "Authored planned rule", "card_inputs": [candidate]}]})["data"]["view_ref"]
+    reviewed = harness.run("lint", {"operation_id": "op", "semantic_plan_ref": semantic, "view_ref": view_ref,
         "reviewer_id": "independent", "independent_context": "second-context", "sampled_unit_ids": [unit["unit_id"]],
-        "unreviewed_unit_ids": [], "reason": "New rule needs full risk sample", "findings": []}, "review")["data"]["content_review_ref"]
+        "unreviewed_unit_ids": [], "reason": "New rule needs full risk sample", "findings": []}, "review")
+    review = reviewed["data"]["content_review_ref"]
     assert "review_trust" not in json.loads(harness.catalog.read_bytes())
-    lint_ref = ".build/operations/op/final-lint.json"
-    lint_input = harness.write(".build/operations/op/lint-input.json", canonical({"view_ref": view_ref}))
-    lint = subprocess.run([sys.executable, str(harness.packages / "hs-knowledge-lint/scripts/cli.py"),
-        "--knowledge-root", str(harness.root), "--rules-digest", harness.rules,
-        "--input", str(harness.root / lint_input), "--output", str(harness.root / lint_ref)], capture_output=True)
-    assert lint.returncode == 0, lint.stdout
-    record_ref = harness.run("source-scan", {"operation_id": "op", "scan_ref": scan_ref, "view_ref": view_ref, "lint_ref": lint_ref,
-        "dispositions": [{"unit_id": unit["unit_id"], "action": "create", "reason": "New exact design rule",
-                          "observed_fingerprint": unit["observed_fingerprint"], "adopted_fingerprint": unit["observed_fingerprint"],
-                          "progress": "completed", "card_refs": ["new"], "claim_refs": ["new#new-claim"]}]}, "record")["data"]["ingest_record_ref"]
+    assert reviewed["status"] == "passed" and reviewed["data"]["fixed_checks_executed"] is True
+    record_ref = harness.run("source-scan", {"operation_id": "op", "scan_ref": scan_ref, "view_ref": view_ref,
+        "disposition_preview_ref": harness.record(view_ref)["disposition_preview_ref"]}, "record")["data"]["ingest_record_ref"]
     apply_request = {"operation_id": "op", "v3_required": True, "view_ref": view_ref,
-                     "ingest_record_ref": record_ref, "lint_report_ref": lint_ref, "content_review_ref": review}
+                     "ingest_record_ref": record_ref, "content_review_ref": review}
     if unrelated_nav_changes == "uncommitted_raw":
         original_path = harness.root / bundle["snapshots"][0]["recovery"]["path"]
         original_bytes = original_path.read_bytes()
@@ -116,17 +114,14 @@ def test_current_ingest_review_lint_record_apply_query_without_human_confirmatio
                 original_path.unlink()
             else:
                 original_path.write_bytes(b"!" + original_bytes[1:])
-            rejected = harness.run("apply", apply_request, expected=3)
+            rejected = harness.run("apply", apply_request, "batch", expected=3)
             assert rejected["phase"] == "awaiting"
             assert not (harness.root / "knowledge/rules/new.md").exists()
             assert not (harness.root / "logs/ingest/op.yaml").exists()
             original_path.write_bytes(original_bytes)
     if unrelated_nav_changes in {"historical_fallback", "local_only"}:
-        configuration = (harness.base / "config.yml").read_bytes()
-        if unrelated_nav_changes == "historical_fallback":
-            (harness.base / "config.yml").unlink()
         source = bundle["snapshots"][0]
-        readable = harness.run("source-capture", {"operation_id": "op", "bundle_ref": material["bundle_ref"],
+        readable = harness.run("source-prepare", {"operation_id": "op", "bundle_ref": material["bundle_ref"],
                                "source_ref": {"evidence_ref": "e1", "source_id": source["source_id"],
                                               "snapshot_id": source["snapshot_id"], "locator": {"kind": "lines", "start": 1, "end": 2}}}, "resolve-source")
         assert base64.b64decode(readable["data"]["bytes_b64"]) == b"# Source\nSynthetic fixture statement.\n"
@@ -134,8 +129,8 @@ def test_current_ingest_review_lint_record_apply_query_without_human_confirmatio
         # The immutable captured original remains available and hash checked.
     if unrelated_nav_changes is True:
         extra = harness.write("knowledge/unrelated/index.md", b"[Broken navigation](missing.md)\n")
-        blocked = harness.run("apply", apply_request, expected=3)
-        assert "fixed" in blocked["diagnostics"][0]["message"]
+        blocked = harness.run("apply", apply_request, "batch", expected=3)
+        assert "input" in blocked["diagnostics"][0]["message"].lower()
         assert not (harness.root / "knowledge/rules/new.md").exists()
         (harness.root / extra).unlink()
         changed = harness.record(review)
@@ -143,7 +138,7 @@ def test_current_ingest_review_lint_record_apply_query_without_human_confirmatio
         changed["view_digest"] = "0" * 64
         changed["digest"] = hashlib.sha256(canonical(changed)).hexdigest()
         ref = harness.write(".build/operations/op/foreign-view-review.json", canonical(changed))
-        rejected = harness.run("apply", {**apply_request, "content_review_ref": ref}, expected=2)
+        rejected = harness.run("apply", {**apply_request, "content_review_ref": ref}, "batch", expected=2)
         assert "exact final view" in rejected["diagnostics"][0]["message"]
         assert not (harness.root / "knowledge/rules/new.md").exists()
         # Role declarations and unresolved review findings are information for
@@ -155,16 +150,17 @@ def test_current_ingest_review_lint_record_apply_query_without_human_confirmatio
                                  "reason": "Caller must resolve this review finding", "evidence": ["L2"]}]
         material["digest"] = hashlib.sha256(canonical(material)).hexdigest()
         apply_request["content_review_ref"] = harness.write(".build/operations/op/review-material.json", canonical(material))
-    applied = harness.run("apply", apply_request)["data"]["apply_result_ref"]
+    completed = harness.run("apply", apply_request, "batch")
+    assert completed["phase"] == "completed" and completed["data"]["activated"] is True
+    applied = completed["data"]["apply_result_ref"]
     saved = harness.record("logs/ingest/op.yaml")
     assert "acceptance" not in saved
     assert saved["progress"]["apply"]["status"] == "applied"
     assert saved["content_view_digest"] == harness.record(view_ref)["digest"]
-    generation = harness.run("index-build", {"operation_id": "op"}, "build")["data"]["generation_ref"]
-    queries = harness.run("query-regression", {"operation_id": "op", "v3_required": True,
-        "apply_result_ref": applied, "generation_ref": generation})["data"]["report_ref"]
+    generation, queries = completed["data"]["generation_ref"], completed["data"]["report_ref"]
     query = harness.run("query", {"operation_id": "local-query", "query": "Synthetic", "purpose": "guidance"}, "search")
     assert query["data"]["matches"][0]["card_id"] == "new"
+    assert query["data"]["generation_ref"] == generation
     read = harness.run("query", {"operation_id": "local-read", "receipt_ref": query["data"]["receipt_ref"],
         "card_id": "new"}, "read")["data"]
     assert read["generation_ref"] == query["data"]["generation_ref"]
@@ -181,8 +177,8 @@ def test_current_ingest_review_lint_record_apply_query_without_human_confirmatio
         if unrelated_nav_changes == "historical_fallback":
             (harness.base / "config.yml").write_bytes(configuration)
         return
-    ready = harness.run("publish-handoff", {"operation_id": "op", "v3_required": True,
-        "apply_result_ref": applied, "query_report_ref": queries})
+    ready = harness.run("apply", {"operation_id": "op", "v3_required": True,
+        "apply_result_ref": applied, "query_report_ref": queries}, "prepare-submission")
     assert ready["phase"] == "ready_to_submit"
     handoff = harness.record(ready["data"]["publish_handoff_ref"])
     assert {"owner": "fixed_ci", "action": "reuse lint deterministic checks on submitted content",
@@ -191,7 +187,7 @@ def test_current_ingest_review_lint_record_apply_query_without_human_confirmatio
     git("add", "--", *[domain_path + "/" + ref for ref in ready["data"]["commit_files"]])
     git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "knowledge batch")
     commit = git("rev-parse", "HEAD")
-    submitted = harness.run("publish-handoff", {"operation_id": "op", "v3_required": True,
+    submitted = harness.run("apply", {"operation_id": "op", "v3_required": True,
         "apply_result_ref": applied, "query_report_ref": queries, "commit_sha": commit}, "verify-submission")
     assert submitted["phase"] == "submitted"
 
@@ -202,16 +198,16 @@ def test_local_source_recovery_still_rejects_unsafe_paths_and_locators(harness):
     reference = {"evidence_ref": "e1", "source_id": snapshot["source_id"],
                  "snapshot_id": snapshot["snapshot_id"], "locator": {"kind": "lines", "start": 1, "end": 2}}
     request = {"operation_id": "source-guards", "bundle_ref": bundle_ref, "source_ref": reference}
-    resolved = harness.run("source-capture", request, "resolve-source")
+    resolved = harness.run("source-prepare", request, "resolve-source")
     assert base64.b64decode(resolved["data"]["bytes_b64"]) == b"# Source\nExact captured source.\n"
     bad_locator = {**reference, "locator": {"kind": "lines", "start": 1, "end": 999}}
-    rejected = harness.run("source-capture", {**request, "source_ref": bad_locator}, "resolve-source", expected=2)
+    rejected = harness.run("source-prepare", {**request, "source_ref": bad_locator}, "resolve-source", expected=2)
     assert rejected["status"] == "error"
     snapshot["recovery"] = {"method": "evidence_object", "path": "logs/evidence/../../outside.bin"}
     bundle.pop("digest")
     raw = json.dumps(bundle, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
     bundle["digest"] = hashlib.sha256(raw).hexdigest()
     unsafe = harness.write(".build/operations/source-guards/unsafe-bundle.json", json.dumps(bundle).encode())
-    rejected = harness.run("source-capture", {**request, "bundle_ref": unsafe}, "resolve-source", expected=2)
+    rejected = harness.run("source-prepare", {**request, "bundle_ref": unsafe}, "resolve-source", expected=2)
     assert rejected["status"] == "error"
     assert not (harness.root / "knowledge/rules/new.md").exists()

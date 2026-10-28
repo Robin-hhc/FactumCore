@@ -46,7 +46,7 @@ Claim.context_ids 和关系的 context_ids 只能引用本卡 scope.contexts 中
 
 `parse_card(data, path, rules)` 解析卡内结构、Claim span 和条件组；`validate_card(card, view, rules)` 校验完整来源与关系。候选尚未正式落位时，调用者将当前锁与新捕获合并到 rules 的临时副本 `source_lock`，不改正式锁。其他未选快照具有相同逻辑 source_id 不能为当前 Claim 放行。
 
-这些函数只验证映射一致性，调用者仍要通过 source-capture 的公开恢复入口核验持久字节、定位与摘要。附件有独立来源与快照，引用附件事实时须显式选择。资料缺失、无法提取或仅链接时保留缺口，不能伪造“已完整读取”。
+这些函数只验证映射一致性，调用者仍要通过 source-prepare 的公开恢复入口或同一规则锁内的公共来源函数核验持久字节、定位与摘要。附件有独立来源与快照，引用附件事实时须显式选择。资料缺失、无法提取或仅链接时保留缺口，不能伪造“已完整读取”。
 
 ## 生命周期与修改入口
 

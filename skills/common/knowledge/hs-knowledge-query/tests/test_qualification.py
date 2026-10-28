@@ -1,32 +1,20 @@
 """Same-generation qualification and source/relationship rejection boundaries."""
 
+import importlib
 import importlib.util
 from pathlib import Path
-import sys
 from types import SimpleNamespace
 
 import pytest
 
 
 def load_node():
-    scripts = Path(__file__).parents[1] / "scripts"
-    previous = sys.modules.get("support")
-    spec = importlib.util.spec_from_file_location("support", scripts / "support.py")
-    support = importlib.util.module_from_spec(spec)
-    sys.modules["support"] = support
-    spec.loader.exec_module(support)
-    try:
-        spec = importlib.util.spec_from_file_location(
-            "query_under_test", scripts / "node.py"
-        )
-        node = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(node)
-    finally:
-        if previous is None:
-            sys.modules.pop("support", None)
-        else:
-            sys.modules["support"] = previous
-    return node, support
+    public = Path(__file__).resolve().parents[5] / "himate-knowledge-wifi-mp/evals/contract_test_support.py"
+    spec = importlib.util.spec_from_file_location("qualification_contract_fixture", public)
+    fixture = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fixture)
+    # Tests replace a real qualification collaborator; reload to isolate each case.
+    return importlib.reload(fixture.module("query_runtime")), fixture.module("runtime")
 
 
 def card(identity, dependency=None, *, review_mode="manual_document"):
@@ -125,41 +113,14 @@ def fixture_context(tmp_path, cards, *, stale=None, code_sources=()):
         ),
     }
 
-    def call(skill, request, action):
-        calls.append((skill, request, action))
-        if skill == "hs-knowledge-apply":
-            identity = request["card_path"].rsplit("/", 1)[1][:-3]
-            return {
-                "data": {
-                    "result_verified": True,
-                    "purpose": request.get("purpose"),
-                    "current_code_proof_ref": request.get("current_code_proof_ref"),
-                    "eligible_files": [
-                        {
-                            "path": cards[identity]["path"],
-                            "sha256": cards[identity]["sha256"],
-                        }
-                    ],
-                    "historical_files": [
-                        {
-                            "path": cards[identity]["path"],
-                            "sha256": cards[identity]["sha256"],
-                        }
-                    ],
-                }
-            }
-        source = request["source_ref"]
-        return {
-            "data": {
-                "source_ref": source,
-                "snapshot_digest": source["snapshot_id"],
-                "current_source_matches": source["source_id"] not in stale,
-            }
-        }
+    def resolve_source(context, source, bundle=None):
+        calls.append(("resolve_source", source))
+        return {"source_ref": source, "snapshot_digest": source["snapshot_id"],
+                "current_source_matches": source["source_id"] not in stale}
 
-    ctx = SimpleNamespace(
-        root=tmp_path, modules=modules, rules={}, operation="query", call=call
-    )
+    modules["source_operations"] = SimpleNamespace(resolve_source=resolve_source)
+    ctx = SimpleNamespace(root=tmp_path, modules=modules, rules={}, operation="query")
+
     return node, ctx, manifest, calls
 
 
@@ -222,17 +183,17 @@ def test_related_to_does_not_propagate_staleness(tmp_path):
 def test_dependency_source_timeout_keeps_the_original_runtime_diagnostic(tmp_path, relation):
     values = {"a": card("a", (relation, "b")), "b": card("b")}
     node, ctx, manifest, _ = fixture_context(tmp_path, values)
-    original_call = ctx.call
+    original_call = ctx.modules["source_operations"].resolve_source
     failure = node.NodeError(
         "SIBLING_TIMEOUT", "Source resolver exceeded its call budget", "source-resolver", blocked=True
     )
 
-    def resolve(skill, request, action):
-        if request["source_ref"]["source_id"] == "b":
+    def resolve(context, source, bundle=None):
+        if source["source_id"] == "b":
             raise failure
-        return original_call(skill, request, action)
+        return original_call(context, source, bundle)
 
-    ctx.call = resolve
+    ctx.modules["source_operations"].resolve_source = resolve
     evaluator = node.EligibilityEvaluator(
         ctx, manifest, {"purpose": "current", "context": {}}, {"blocked_claims": []}
     )
@@ -248,7 +209,7 @@ def test_source_absence_still_filters_claims_and_reports_a_gap(tmp_path, code):
     def unavailable(*args):
         raise node.NodeError(code, "Exact source is unavailable", blocked=True)
 
-    ctx.call = unavailable
+    ctx.modules["source_operations"].resolve_source = unavailable
     evaluated = node.EligibilityEvaluator(
         ctx, manifest, {"purpose": "current", "context": {}}, {"blocked_claims": []}
     ).evaluate("a")
@@ -295,12 +256,12 @@ def test_portable_current_claim_is_independent_of_an_old_historical_code_referen
     manifest["qualifications"]["a"].update(kind="accepted_repository", code_identity={}, config_digest="a" * 64)
     evaluator = node.EligibilityEvaluator(ctx, manifest, {"purpose": "current", "context": {}}, {"blocked_claims": []})
     assert evaluator.evaluate("a")[1] == {"c1"}
-    original_call = ctx.call
-    def changed_current_source(skill, request, action):
-        response = original_call(skill, request, action)
-        response["data"]["current_source_matches"] = False
+    original_call = ctx.modules["source_operations"].resolve_source
+    def changed_current_source(context, source, bundle=None):
+        response = original_call(context, source, bundle)
+        response["current_source_matches"] = False
         return response
-    ctx.call = changed_current_source
+    ctx.modules["source_operations"].resolve_source = changed_current_source
     changed = node.EligibilityEvaluator(ctx, manifest, {"purpose": "current", "context": {}}, {"blocked_claims": []})
     assert changed.evaluate("a")[1] == set()
 
@@ -367,7 +328,7 @@ def test_code_source_cas_rejects_change_after_current_proof_qualification(tmp_pa
         "current_source_matches": False,
     }
     fresh = {**source, "current_source_sha256": "b" * 64}
-    ctx = SimpleNamespace(operation="query", call=lambda *args: {"data": fresh})
+    ctx = SimpleNamespace(operation="query", modules={"source_operations": SimpleNamespace(resolve_source=lambda *args: fresh)})
     with pytest.raises(ValueError, match="changed"):
         node.refresh_sources(ctx, [source], "current", {"code"})
 

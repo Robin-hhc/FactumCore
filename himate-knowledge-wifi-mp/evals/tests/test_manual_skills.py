@@ -20,6 +20,7 @@ SPEC.loader.exec_module(FIXTURE)
 
 class ManualPipeline(FIXTURE.Pipeline):
     def call(self, slug, request, action=None, expected=0):
+        slug, request, action = FIXTURE.target_call(slug, request, action)
         self.sequence += 1
         incoming = self.base / f"manual-in-{self.sequence}.json"
         outgoing = self.base / f"manual-out-{self.sequence}.json"
@@ -49,36 +50,33 @@ def test_manual_document_scan_record_apply_index_query_keeps_business_checks(tmp
     p.write(source_path, original)
     scan_ref = p.call("knowledge-source-scan", {"operation_id": "manual"}, "scan")["data"]["scan_ref"]
     scan = p.record(scan_ref)
-    bundle_ref = p.call("knowledge-source-capture", {
-        "operation_id": "manual", "source_path": source_path,
-        "source_id": scan["units"][0]["source_id"],
-    })["data"]["bundle_ref"]
+    material_ref = p.call("knowledge-source-prepare", {
+        "operation_id": "manual", "scan_ref": scan_ref,
+    }, "prepare")["data"]["material_ref"]
+    bundle_ref = p.record(material_ref)["bundle_ref"]
     bundle = p.record(bundle_ref)
-    view_ref = p.view("manual", bundle_ref, "manual-rule", p.card("manual-rule", bundle))
+    view_ref = p.view("manual", bundle_ref, "manual-rule", p.card("manual-rule", bundle),
+        scan_ref=scan_ref, material_ref=material_ref,
+        queries=[{"id": "find-manual", "query": "capture", "required": ["manual-rule"]}])
+    p.review("manual", view_ref)
     unit = scan["units"][0]
     record_ref = p.call("knowledge-source-scan", {
         "operation_id": "manual", "scan_ref": scan_ref, "view_ref": view_ref,
-        "dispositions": [{
-            "unit_id": unit["unit_id"], "action": "create", "reason": "Manual test",
-            "observed_fingerprint": unit["observed_fingerprint"],
-            "adopted_fingerprint": unit["observed_fingerprint"],
-            "progress": "completed", "card_refs": ["manual-rule"],
-            "claim_refs": ["manual-rule#c1"],
-        }],
+        "disposition_preview_ref": p.record(view_ref)["disposition_preview_ref"],
     }, "record")["data"]["ingest_record_ref"]
     assert "lint_ref" not in p.record(record_ref)
     applied = p.call("knowledge-apply", {
         "operation_id": "manual", "view_ref": view_ref, "ingest_record_ref": record_ref,
-    })
-    assert applied["phase"] == "committed"
+    }, "batch")
+    assert applied["phase"] == "completed" and applied["data"]["activated"] is True
     assert "acceptance" not in p.record("logs/ingest/manual.yaml")
     assert "proof_ref" not in p.record(applied["data"]["apply_result_ref"])
-    built = p.call("knowledge-index-build", {"operation_id": "build-manual"})["data"]
-    checked = p.call("knowledge-query-regression", {
+    built = p.call("knowledge-apply", {"operation_id": "build-manual"}, "index-build")["data"]
+    checked = p.call("knowledge-apply", {
         "operation_id": "query-manual", "generation_ref": built["generation_ref"],
         "expected_active": built["expected_active"],
         "cases": [{"id": "find-manual", "query": "capture", "required": ["manual-rule"]}],
-    })
+    }, "regression")
     assert checked["data"]["activated"]
     result = p.call("knowledge-query", {"operation_id": "search-manual", "query": "capture"}, "search")["data"]
     assert [row["card_id"] for row in result["matches"]] == ["manual-rule"]
@@ -101,32 +99,32 @@ def test_manual_document_scan_record_apply_index_query_keeps_business_checks(tmp
         "operation_id": "manual-correction",
     }, "scan")["data"]["scan_ref"]
     correction_scan = p.record(correction_scan_ref)
-    corrected_bundle_ref = p.call("knowledge-source-capture", {
-        "operation_id": "manual-correction", "source_path": unit["path"], "source_id": unit["source_id"],
-    })["data"]["bundle_ref"]
+    correction_material_ref = p.call("knowledge-source-prepare", {
+        "operation_id": "manual-correction", "scan_ref": correction_scan_ref,
+        "unit_ids": [unit["unit_id"]], "candidate_card_ids": ["manual-rule"],
+    }, "prepare")["data"]["material_ref"]
+    corrected_bundle_ref = p.record(correction_material_ref)["bundle_ref"]
     correction_view = p.view("manual-correction", corrected_bundle_ref, "manual-rule", p.card(
         "manual-rule", p.record(corrected_bundle_ref), "Capture marker has an explicit user-requested correction.",
-    ), decision="update")
+    ), decision="update", scan_ref=correction_scan_ref, material_ref=correction_material_ref,
+        queries=[{"id": "find-correction", "query": "capture", "required": ["manual-rule"]}])
+    p.review("manual-correction", correction_view)
     corrected_unit = correction_scan["units"][0]
+    assert corrected_unit["change"] == "unchanged"
     correction_record = p.call("knowledge-source-scan", {
         "operation_id": "manual-correction", "scan_ref": correction_scan_ref, "view_ref": correction_view,
-        "dispositions": [{
-            "unit_id": corrected_unit["unit_id"], "action": "update", "reason": "User requested a content correction",
-            "observed_fingerprint": corrected_unit["observed_fingerprint"],
-            "adopted_fingerprint": corrected_unit["observed_fingerprint"],
-            "progress": "completed", "card_refs": ["manual-rule"], "claim_refs": ["manual-rule#c1"],
-        }],
+        "disposition_preview_ref": p.record(correction_view)["disposition_preview_ref"],
     }, "record")["data"]["ingest_record_ref"]
     corrected = p.call("knowledge-apply", {
         "operation_id": "manual-correction", "view_ref": correction_view, "ingest_record_ref": correction_record,
-    })
-    assert corrected["phase"] == "committed"
-    rebuilt = p.call("knowledge-index-build", {"operation_id": "manual-correction-index"})["data"]
-    assert p.call("knowledge-query-regression", {
+    }, "batch")
+    assert corrected["phase"] == "completed" and corrected["data"]["activated"] is True
+    rebuilt = p.call("knowledge-apply", {"operation_id": "manual-correction-index"}, "index-build")["data"]
+    assert p.call("knowledge-apply", {
         "operation_id": "manual-correction-query", "generation_ref": rebuilt["generation_ref"],
         "expected_active": rebuilt["expected_active"],
         "cases": [{"id": "find-correction", "query": "capture", "required": ["manual-rule"]}],
-    })["data"]["activated"]
+    }, "regression")["data"]["activated"]
     corrected_match = p.call("knowledge-query", {
         "operation_id": "manual-corrected-search", "query": "capture",
     }, "search")["data"]["matches"][0]
@@ -150,11 +148,12 @@ def test_manual_document_scan_record_apply_index_query_keeps_business_checks(tmp
 def test_manual_code_check_apply_material_index_and_query_without_registration(tmp_path, monkeypatch):
     spec = importlib.util.spec_from_file_location(
         "manual_code_fixture",
-        FIXTURE.REPO / "skills/common/knowledge/hs-knowledge-local-check/tests/test_public_code_gate.py",
+        FIXTURE.REPO / "skills/common/knowledge/hs-knowledge-lint/tests/test_public_code_gate.py",
     )
     fixture = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(fixture)
     monkeypatch.setenv("HIMATE_TEST_TMP", str(tmp_path))
+    monkeypatch.setattr(fixture, "SKILLS", FIXTURE.install_packages(tmp_path / "installed-skills"))
     environment = fixture.PublicCodeGateTests(methodName="test_signed_positive_support_then_apply_and_verify")
     environment.setUp()
     try:
@@ -192,10 +191,10 @@ def test_manual_code_check_apply_material_index_and_query_without_registration(t
         ]
         environment.evidence[0]["verification_evidence"] = material_evidence
         environment.sign_report("local")
-        checked = p.call("knowledge-local-check", {
+        checked = p.call("knowledge-lint", {
             "operation_id": "op", "view_ref": environment.view_ref,
             "context_ref": environment.context_ref, "semantic_report_ref": environment.report_ref,
-        })
+        }, "code-check")
         assert checked["data"]["check_status"] == "passed"
         proof = p.record(checked["data"]["local_check_ref"])
         inputs = {"code_checkout": {

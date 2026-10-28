@@ -85,7 +85,9 @@ def previous_units(records):
 
 
 def pending_units(context, records):
-    done = {r["operation_id"] for r in records if record_applied(r) and all(progress_status(d) in FINISHED for d in r["dispositions"])}
+    finished = [r for r in records if record_applied(r) and all(progress_status(d) in FINISHED for d in r["dispositions"])]
+    done = {r["operation_id"] for r in finished}
+    done.update(r["origin_scan_operation_id"] for r in finished if r.get("origin_scan_operation_id"))
     directory = safe(context.root, ".build/operations")
     pending = set()
     if directory.exists():
@@ -96,8 +98,8 @@ def pending_units(context, records):
             if safe(context.root, ref).is_file():
                 try:
                     scan = context.record(ref, "source_inventory")
-                except NodeError as exc:
-                    if exc.code != "STALE_RULES":
+                except ValueError as exc:
+                    if getattr(exc, "code", None) != "STALE_RULES":
                         raise
                     # An old operation can suggest unfinished paths only. Its
                     # rules and processing results never authorize this run.
@@ -108,8 +110,10 @@ def pending_units(context, records):
                 for scope in scan["scope"]:
                     safe(context.root, scope, RAW_DIRS)
                 from progress import observation_only
-                if observation_only(scan) and not any(safe(context.root, ".build/operations/" + operation.name + "/" + name).exists()
-                                                      for name in ("material.json", "semantic-plan.json", "plan.json", "final-view.json", "ingest-record.yaml")):
+                from progress import material_refs
+                if observation_only(scan) and not material_refs(context, operation.name) and not any(
+                        safe(context.root, ".build/operations/" + operation.name + "/" + name).exists()
+                        for name in ("semantic-plan.json", "plan.json", "final-view.json", "ingest-record.yaml", "batch-intent.json")):
                     continue
                 for unit in scan["units"]:
                     safe(context.root, unit["path"], RAW_DIRS)
@@ -164,7 +168,9 @@ def observe(context, scope):
 
 def scan(context):
     scope, full_scan = scopes(context.request)
-    current_context = context.call("hs-knowledge-maintain", {"operation_id": context.operation}, "inspect-context")["data"]
+    inspection = context.modules["runtime"].fork_context(
+        context, request={"operation_id": context.operation}, action="inspect-context")
+    current_context, _ = context.modules["maintenance"].inspect_context(inspection)
     records, leaves = histories(context)
     previous = previous_units(records)
     if context.request.get("source") is not None and not safe(context.root, scope[0]).exists() and not any(
@@ -177,8 +183,7 @@ def scan(context):
     affected_cards = {item["card_id"] for item in current_context.get("affected_claims", [])}
     affected_sources = set()
     if affected_cards:
-        from prepare import domain_cards
-        for card in domain_cards(context):
+        for card in context.modules["source_materials"].domain_cards(context):
             if card["metadata"]["id"] in affected_cards:
                 affected_sources.update(s["source_id"] for s in card["metadata"]["sources"])
     paths = set(found) | set(errors)
@@ -234,11 +239,19 @@ def scan(context):
     formal_operations = {r["operation_id"] for r in records}
     # Independent apply legitimately has no P6 record. Discover its actual
     # journal without resurrecting formal operations superseded by successors.
-    for journal_ref in paths(context, "logs/operations/*/journal.json"):
-        operation = PurePosixPath(journal_ref).parent.name
+    local_operations = {PurePosixPath(path).parent.name for path in
+                        paths(context, "logs/operations/*/journal.json") + paths(context, ".build/operations/*/batch-intent.json")}
+    for operation in sorted(local_operations):
         if operation in formal_operations:
             continue
-        journal = read_saved(context, journal_ref)
+        journal_ref = "logs/operations/" + operation + "/journal.json"
+        intent_ref = ".build/operations/" + operation + "/batch-intent.json"
+        try:
+            journal = read_saved(context, journal_ref) if safe(context.root, journal_ref).is_file() else read_saved(context, intent_ref)
+        except (OSError, ValueError, KeyError):
+            if full_scan:
+                relevant.add(operation)
+            continue
         if journal.get("batch_kind", "content") != "content" or journal.get("status") == "rolled_back":
             continue
         if full_scan:
@@ -252,7 +265,8 @@ def scan(context):
             relevant.add(operation)
     for operation in sorted(relevant):
         journal_ref = "logs/operations/" + operation + "/journal.json"
-        if not safe(context.root, journal_ref).is_file():
+        has_batch = safe(context.root, ".build/operations/" + operation + "/batch-intent.json").is_file()
+        if not safe(context.root, journal_ref).is_file() and not has_batch:
             continue
         details = operation_details(context, operation)
         journal = next((fact for fact in details["facts"] if fact["stage"] == "transaction"), None)
@@ -260,7 +274,7 @@ def scan(context):
             continue
         local_content = ((journal and journal.get("batch_kind") == "content")
                          or any(r["operation_id"] == operation and r.get("batch_kind") == "content" for r in records))
-        if local_content and details["completion"]["status"] != "complete":
+        if (local_content or has_batch or safe(context.root, journal_ref).is_file()) and details["completion"]["status"] != "complete":
             pending = {"operation_id": operation, **details["completion"], "gaps": details["gaps"]}
             if journal and journal.get("status") == "committed" and details["completion"].get("view_ref"):
                 view = read_saved(context, details["completion"]["view_ref"])
@@ -281,12 +295,11 @@ def execute(context):
     if action == "scan":
         return scan(context)
     if action == "prepare":
-        from prepare import prepare
-        return prepare(context)
+        raise NodeError("ACTION_RETIRED", "Material preparation moved to hs-knowledge-source-prepare; use its prepare action", action)
     if action == "record":
         from record import record
         return record(context)
     if action == "status":
         from status import status
         return status(context)
-    raise NodeError("UNKNOWN_ACTION", "Expected scan, prepare, record or status", action)
+    raise NodeError("UNKNOWN_ACTION", "Expected scan, record or status", action)

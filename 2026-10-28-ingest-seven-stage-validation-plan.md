@@ -1,27 +1,27 @@
-# ingest 七阶段重构验证计划
+# ingest 七阶段重构验证计划与执行记录
 
-2026-10-28。状态：SDD 规划稿，未实施、未执行本计划，也不表示现有测试通过。本文件是本次跟踪上库的开发规划，不修改现行 Workflow、Skill、规则或共享设计，不作为部署输入。
+2026-10-28。状态：实现已落实，源码机制验收已完成。V01—V44 是验收场景编号，实际测试、结果和验证范围在本文末尾记录，不能把 44 个场景直接当作已通过测试数。工件留在根目录跟踪，不作为能力安装输入。
 
-**文档位置：**本次六份 SDD 暂存项目根并纳入 Git；开发完成后按后续指示移入文档忽略目录。入口见[SDD 总览](ingest七阶段重构SDD计划.md)。
+**文档位置：**本次六份 SDD 继续保留项目根并纳入 Git；本次收尾不搬动或改为忽略。入口见[SDD 总览](ingest七阶段重构SDD计划.md)。
 
-依据[七阶段设计对齐稿](2026-10-28-ingest-seven-stage-design-proposal.md)及本轮已确认的职责：P5 集中知识质量审查，P7 只负责安全落位及实际检索收尾；不增加 passed 票据、角色身份认证或真人确认。需求编号 R01—R10 按本轮 SDD 分工暂定，后续需求正文沿用这些编号，变更须同步追溯表。
+依据[七阶段设计对齐稿](2026-10-28-ingest-seven-stage-design-proposal.md)及本轮已确认的职责：P5 集中知识质量审查，P7 只负责安全落位及实际检索收尾；不增加 passed 票据、角色身份认证或真人确认。需求编号 R01—R10 已按本轮 SDD 分工固定，后续需求正文沿用这些编号，变更须同步追溯表。
 
 ## 1. 验证对象和完成边界
 
 主线为七个 OpenFlow 节点：P1 扫描、P2 备料、P3 决策及处置清单、P4 完整批次预览、P5 独立审阅与一次固定 lint、P6 机械生成记录、P7 安全落位和检索收尾。P5 是唯一独立 reviewer 节点；其他阶段由作者／执行者负责。P1 可直接结束或按真实停点直达 P7；修订返回 P2/P3/P4；恢复、索引、查询及启用不增加第八个必走节点。
 
-最终公开能力按 **现有18包保留8包，另增1包，最终9包** 的目标设计验证，即 `18 - 10 + 1 = 9`。用户已接受 P1 扫描与 P2 备料拆为两个 Skill；新增备料包暂定名为 `hs-knowledge-source-prepare`，实际名称和接口在 T00 固定。保留及新增集合如下：
+最终公开能力按 **现有18包保留8包，另增1包，最终9包** 的目标设计验证，即 `18 - 10 + 1 = 9`。用户已接受 P1 扫描与 P2 备料拆为两个 Skill；新增备料包固定名为 `hs-knowledge-source-prepare`，实际名称和接口在 T00 固定。保留及新增集合如下：
 
 | 用途 | 最终保留的公开 Skill |
 |---|---|
-| 七阶段主线的六个入口 | P1 `hs-knowledge-source-scan`、P2 新增 `hs-knowledge-source-prepare`（暂定名）、P3 `hs-knowledge-change-plan`、P4 `hs-knowledge-view-materialize`、P5 `hs-knowledge-lint`、P7 `hs-knowledge-apply`；P6 的 record 动作暂沿 `source-scan`，T00 另审归属 |
+| 七阶段主线的六个入口 | P1 `hs-knowledge-source-scan`、P2 新增 `hs-knowledge-source-prepare`、P3 `hs-knowledge-change-plan`、P4 `hs-knowledge-view-materialize`、P5 `hs-knowledge-lint`、P7 `hs-knowledge-apply`；P6 保留 `source-scan.record`，与来源处理账本衔接 |
 | 日常入口及独立业务 | `hs-knowledge-explore`、`hs-knowledge-query`、`hs-knowledge-maintain` |
 
-迁移后删除的十个公开包为 `hs-knowledge-source-capture`、`hs-knowledge-candidate-inspect`、`hs-knowledge-candidate-revise`、`hs-knowledge-local-check`、`hs-knowledge-governance-handoff`、`hs-knowledge-index-build`、`hs-knowledge-query-regression`、`hs-knowledge-recover`、`hs-knowledge-publish-handoff`、`hs-knowledge-merge-check`。删除以业务替代入口和本计划相关用例实际验证为前提；本计划不执行删除。数量按有效公开 Skill 入口／分发清单计算，不按磁盘上残留目录数计算。
+迁移后删除的十个公开包为 `hs-knowledge-source-capture`、`hs-knowledge-candidate-inspect`、`hs-knowledge-candidate-revise`、`hs-knowledge-local-check`、`hs-knowledge-governance-handoff`、`hs-knowledge-index-build`、`hs-knowledge-query-regression`、`hs-knowledge-recover`、`hs-knowledge-publish-handoff`、`hs-knowledge-merge-check`。删除以业务替代入口和本计划相关用例实际验证为前提；实际删除须满足下面的替代行为与验证要求。数量按有效公开 Skill 入口／分发清单计算，不按磁盘上残留目录数计算。
 
 删除包不删除其必要业务能力：新 P2 备料 Skill 直接承接现行 `source-scan.prepare` 与待迁 `source-capture` 的真实备料／捕获／解析能力，并与消费入口复用公共来源函数；不做调用旧包的委派壳。写入清单、完整候选稿及修订集中 P4；逐 Claim 代码审阅及记录绑定集中 P5；安全恢复、独立索引操作和声明式回归保留于存续公开入口；只读查询、维护巡检及共享资产消费继续可用。旧名字无需永久可调用，但明确约定保留的接口及历史数据语义必须有验证。
 
-P1 只发现变化、欠账及续办线索，可独立无变化结束而不备料。P2 可接受 P1 固定清单，也可从授权的显式范围独立开始，不要求 P1 运行身份或通过票据；固定清单模式只处理所选单元及明确需要的关联材料，不重新做全库变化扫描。P5 缺材料退 P2 时复用仍有效的清单；采用来源漂移使清单失效时明确返回 P1 或要求新清单，不悄悄扩大范围或继续旧指纹。P6 暂沿 `source-scan.record` 不等于其长期归属已定，T00 需给出后续接口及相应测试。
+P1 只发现变化、欠账及续办线索，可独立无变化结束而不备料。P2 可接受 P1 固定清单，也可从授权的显式范围独立开始，不要求 P1 运行身份或通过票据；固定清单模式只处理所选单元及明确需要的关联材料，不重新做全库变化扫描。P5 缺材料退 P2 时复用仍有效的清单；采用来源漂移使清单失效时明确返回 P1 或要求新清单，不悄悄扩大范围或继续旧指纹。T00 已确认 P6 保留 `source-scan.record`，只转写冻结处置；与 P1 共用来源处理账本。
 
 本批完成须有实际事务结果、完整实际候选索引、原冻结目标查询及真实启用事实。仅记录批以记录安全落位结束，欠账保留。Git 提交、CI、合入和另一台机器的接受状态分别记录，不从本地 ingest 完成推断。
 
@@ -29,7 +29,7 @@ P1 只发现变化、欠账及续办线索，可独立无变化结束而不备�
 
 | 需求 | 本计划采用的含义 |
 |---|---|
-| R01 七节点职责 | 七阶段、明确角色和返回／续办路径；P1/P2 分属扫描与备料 Skill，多个内部动作不增加必走节点；P6 暂沿 record，归属由 T00 另审 |
+| R01 七节点职责 | 七阶段、明确角色和返回／续办路径；P1/P2 分属扫描与备料 Skill，多个内部动作不增加必走节点；P6 保留 record，T00 已确认处理账本边界 |
 | R02 P5 质量 | 计划／归卡／实质 skip／成稿／必要代码语义由独立 reviewer 审阅；一次固定 lint；脚本及 CI 不启动 LLM |
 | R03 P7 安全收尾 | 不重跑整库质量 lint；保留输入一致性、锁／CAS／备份／事务／回读及实际索引／回归／启用保护 |
 | R04 无 Skill 执行依赖 | 最终九包的生产路径不启动兄弟 Skill CLI，不导入兄弟私有脚本；P2 不以 P1 票据为前置，复用领域公共函数与业务数据 |
@@ -52,7 +52,7 @@ P1 只发现变化、欠账及续办线索，可独立无变化结束而不备�
 
 表中“现有基础”指第 4 节中读到的现有测试源码，可复用其业务预期；不是本轮执行结果。新入口名称未定时使用中文动作描述，不在本计划中虚构终端命令。
 
-本计划列出 V01—V44 共44组用例，保留原 V01—V43 编号，现有测试基础继续用 E01—E18 标识。用例均为待实施／待执行的验证要求，不是44项已通过测试；一组用例可展开多个正反场景。
+本计划列出 V01—V44 共44组用例，保留原 V01—V43 编号，现有测试基础继续用 E01—E18 标识。用例表保留验收要求，实际通过、失败及未执行范围以第 7 节记录为准；44 个场景编号不等于44项已通过测试，一组用例可展开多个正反场景。
 
 | ID | 需求／层次 | 场景与输入 | 必须观察的结果及负向预期 | 现有基础／新增重点 |
 |---|---|---|---|---|
@@ -99,7 +99,7 @@ P1 只发现变化、欠账及续办线索，可独立无变化结束而不备�
 | V41 | R02、R05／I | 六种卡动作create/update/merge/split/deprecate/defer；旧Claim保留、退役映射及多源融合 | P3/P4保留原卡身份／去向和显式保留范围；P5发现遗漏／错误归卡；不能因删旧规划／修订包丢失merge/split等能力，也不能默删旧Claim | E03、E05；保留手工可判定的具体正文／Claim映射oracle |
 | V42 | R05、R07、R09／I | 通过apply迁入的独立入口生成内容批／仅记录批的本批提交清单；隔离Git夹具准备真实提交，再给出正确或错误commit、非HEAD提交、blob字节不符、应删除文件仍在或夹带无关改动的提交 | 清单只含本批确切写删及适用正式记录；仅记录批不夹带知识文件。实际提交核对逐一读取真实HEAD／commit/blob、删除和提交变更范围，拒绝错误字节、旧HEAD及无关改动；不能凭摘要记录自称submitted。能力调用本身不执行Git写入／push／merge，不将readiness、submitted、本地入库、CI及远端接纳混同 | E18、E08、E14；已有清单／字节反例迁apply；真实提交成功、删除／越界范围、仅记录批及无Git写入的公开入口组合需新增，Git提交只由隔离夹具准备 |
 | V43 | R03、R04、R05、R09／I | 分别独立调用maintain的register-source-change／register-code-change，在限制和pending状态已落地、事件尚未发布处中断，再调用recover-events；另例删除或篡改pending payload／确切证据，并在事件未恢复、源码已修复但仍有语义／适用性限制时调用advance | 登记先持久限制／epoch再发布事件；恢复使用原event identity、快照和证据，完成后pending消除且重试不重复登记或增长epoch。payload缺失／错绑、证据缺失／指纹不符时明确阻断并保留已有pending及限制，不造新事件冒充恢复；未完成事件不得被advance绕过。advance仅在实际来源条件满足时清除机械freshness限制，显式语义／适用性限制仍保留，不宣称独立复核完成；全程无兄弟Skill CLI，不写知识、来源锁或活动索引 | E13、E11；复用现有raw事件发布中断及机械恢复断言，新增代码登记中断、payload／证据不足、advance语义限制与原状态保持的独立公开入口组合 |
-| V44 | R01、R04、R05、R08、R10／S、I | P1独立无变化；新P2分别接受授权显式范围、固定单元清单和P5补料返回；对照未选范围及所选源漂移，移除旧捕获包及旧prepare实现的执行依赖 | P1可no-op且不备料；P2无P1身份／passed票据也能直接备料；固定清单只备所选及明确关联材料，不再次全库扫描，范围外缺失不被推断；P5退P2复用有效清单，采用源漂移明确返回P1／要求新清单；新包直接复用公共函数完成真实捕获／恢复／材料组织，不是委派旧CLI或私有脚本的壳；P6暂沿record并由T00确认归属 | E02、E04、E11、E16；迁原prepare／capture业务oracle，新增扫描与备料边界、调用轨迹、范围隔离和漂移正反场景；均待实现／待执行 |
+| V44 | R01、R04、R05、R08、R10／S、I | P1独立无变化；新P2分别接受授权显式范围、固定单元清单和P5补料返回；对照未选范围及所选源漂移，移除旧捕获包及旧prepare实现的执行依赖 | P1可no-op且不备料；P2无P1身份／passed票据也能直接备料；固定清单只备所选及明确关联材料，不再次全库扫描，范围外缺失不被推断；P5退P2复用有效清单，采用源漂移明确返回P1／要求新清单；新包直接复用公共函数完成真实捕获／恢复／材料组织，不是委派旧CLI或私有脚本的壳；P6保留record并验证机械转写边界 | E02、E04、E11、E16；迁原prepare／capture业务oracle，新增扫描与备料边界、调用轨迹、范围隔离和漂移正反场景；执行证据见第7节 |
 
 V44 展开时至少区分以下场景，不另占用或重排 V01—V43：
 
@@ -118,7 +118,7 @@ V44 展开时至少区分以下场景，不另占用或重排 V01—V43：
 | E01 结构与分发 | `himate-knowledge-wifi-mp/evals/tests/test_workflows.py`、`himate-knowledge-wifi-mp/evals/validate_design.py` | 保留入口文档／CLI／artifact引用、角色和合法出口的负向预期；将旧节点数、旧包白名单及独立local-check路由改为七节点／九包，明确P1/P2分包。静态合法不能认证实际宿主隔离 |
 | E02 公开流程与续办 | `skills/common/knowledge/hs-knowledge-source-scan/tests/test_supported_workflow.py` | 现有 `test_complete_planned_document_nodes_then_three_noop_runs`、`test_supported_p7_stop_resumes_existing_exit_without_reapplying` 已按公开CLI和图顺序组织；迁为七节点调用，保留完成后no-op、不重放apply及精确原查询／CAS预期 |
 | E03 端到端与显式修订 | `himate-knowledge-wifi-mp/evals/tests/test_manual_skills.py`、`test_node_pipeline.py`、`test_post_ingest_correction.py` | 无catalog人工公开调用、文档／代码、原件未变修卡、旧字节保留可复用。替换旧capture／review／index等调用归属；旧“apply自身质量审查”断言迁到P5，P7保留安全行为断言 |
-| E04 扫描、处置与进度 | `skills/common/knowledge/hs-knowledge-source-scan/tests/test_cli.py`、`test_completion_status.py`、`test_historical_context.py` | 保留扫描、仅记录欠账、范围完整、原件／维护义务分离、formal-only历史、rolled_back终态、原CAS缺失为unknown等oracle；原prepare的全卡状态、实际采用旧版及明确依赖扩展用例迁到新增P2包，新增V44独立范围／固定清单／补料不重扫预期；P6 record暂留，T00另审；不继续要求旧审阅／lint票据 |
+| E04 扫描、处置与进度 | `skills/common/knowledge/hs-knowledge-source-scan/tests/test_cli.py`、`test_completion_status.py`、`test_historical_context.py` | 保留扫描、仅记录欠账、范围完整、原件／维护义务分离、formal-only历史、rolled_back终态、原CAS缺失为unknown等oracle；原prepare的全卡状态、实际采用旧版及明确依赖扩展用例迁到新增P2包，新增V44独立范围／固定清单／补料不重扫预期；P6 record保留，转写边界已确认；不继续要求旧审阅／lint票据 |
 | E05 计划与旧Claim | `skills/common/knowledge/hs-knowledge-change-plan/tests/test_v3_plan.py`、`test_v3_flow.py`、`test_review_preserved_claim.py`、`test_cli.py` | 保留逐单元覆盖、查询purpose、六动作、preserve与旧Claim去向；旧review动作不再充当主线独立节点，代码/成稿审阅绑定改由P5验证 |
 | E06 代码审阅与身份边界 | `skills/common/knowledge/hs-knowledge-local-check/tests/test_public_code_gate.py`、`test_module_mapping.py`；`himate-knowledge-wifi-mp/evals/tests/test_agent_review_contract.py`、`test_source_analysis_admission.py` | 复用实际源码／配置／逐Claim证据的公开用例及无注册密钥、无角色身份前置要求的预期；迁至P5或共用契约。旧用例名中的signed不自动成为新要求，兼容签名素材不证明真实语义或身份 |
 | E07 固定lint与CI | `skills/common/knowledge/hs-knowledge-lint/tests/test_cli.py`；`himate-knowledge-wifi-mp/evals/tests/test_governance_v3.py`、`test_document_source_checks.py`、`test_contracts.py` | 保留0/1/2、只读、规则锁、历史正文／locator、可信CI规则和不执行候选程序预期；扩展P5候选代码记录适用项，保证正式／CI模式无需生产者私有审阅 |
@@ -153,14 +153,128 @@ V44 展开时至少区分以下场景，不另占用或重排 V01—V43：
 
 本计划不设从90分钟必降到某分钟、某比例提速或固定API往返数的通过承诺。结构目标是七节点、固定候选正常只在P5调用一次完整lint、主线无兄弟Skill CLI、P7无全库质量lint；时间改善需实测后单独结论。必要时按样本规模报告逐次结果及中位数；样本不足不出稳定分位数。API服务条件改变、真实审阅轮数不同、输入库规模或缓存状态不同须写明，不能合并为同一baseline。
 
-H层最小执行记录应包含实际OpenFlow版本、安装九包摘要（含P2暂定名对应的最终公开身份）、调用端／执行端入口、工作区配置身份、SSH命令结果核对、真实reviewer任务及独立上下文证据，以及完整／中断续办的实际报告。先用获授权的小样本定位长耗时阶段，再扩到需要的业务样本。测试通过不授予发送消息、联网获取新原文、真实CI合入或发布权限。
+H层最小执行记录应包含实际OpenFlow版本、安装九包摘要（含P2实际公开身份）、调用端／执行端入口、工作区配置身份、SSH命令结果核对、真实reviewer任务及独立上下文证据，以及完整／中断续办的实际报告。先用获授权的小样本定位长耗时阶段，再扩到需要的业务样本。测试通过不授予发送消息、联网获取新原文、真实CI合入或发布权限。
 
 ## 6. 实施后的执行顺序和准入记录
 
-1. 先在T00完成接口／数据版本设计和能力归宿表，冻结新增备料包的实际名字、P1/P2独立输入输出、范围／漂移返回，以及P6 record后续归属；其余新公开动作一并固定，将R01—R10正文与V编号同步。当前尚未实现的行为保持“待实现”，不能以旧实现跑绿代替。
+1. T00 已完成接口／数据版本设计和能力归宿表，固定新增备料包名称、P1/P2独立输入输出、范围／漂移返回、P6 record归属及其余公开动作，R01—R10正文与V编号保持同步；未执行的真实环境组合继续明确标记，不以旧实现跑绿代替。
 2. 跑S层结构／引用／锁／分发检查；补齐并迁移与变化直接相关的I层公开入口用例，先保护来源、P5质量与P7安全边界。
 3. 验证文档／代码整链、返回和仅记录分支，再做故障、共享clone及查询维护回归；每组留独立报告，按需使用Python 3.10—3.12实际支持环境，未执行组合列明。
 4. 在隔离安装中物理移除原18包中的旧十包，安装原有8个保留包和新增P2备料包，验证最终九包的相关公开能力及安装／引用负向检查；重点观察V44不依赖旧prepare／capture实现。旧未完操作恢复准备未验证前不销毁唯一配套能力，不借兼容名永久隐藏旧依赖。
 5. 结构与业务用例达到对应准入条件后，另进行H层宿主／SSH／API测量。S/I结果与H结果分开签注；没有真实环境输入就记录“未执行及缺口”，不伪造验收。
 
 用例状态使用“待设计／待实现／待执行／通过／失败／未完成／不适用”，每个状态指向本次证据。没有按本计划执行前，所有计划用例都不应预标通过。测试数量、总退出码、历史成绩或合成reviewer标签均不能替代需求逐项覆盖和证据范围说明。
+
+## 7. 本次执行记录
+
+改前实现固定为 `ae02196a0b92b90add6757990a52b8ad3ba929bf`；新版工具版本 `0.4.0`，最终交付规则锁 SHA-256 为 `6f7d382fe71a8b1d41a50bb22d0e15f5d5d68d508f0ad2af0d14603441967cfc`；完整集与末次针对回归的版本范围分列于第7.3节。正式知识、原件及既有业务历史不改写。本次根目录 SDD 继续跟踪，未移入忽略目录。
+
+静态结构已验证：九个公开 Skill、ingest 七个节点、只读 lint 两个节点、节点 owner／全部返回边／产物作用域一致。旧十包的 143 个 Git 纳管文件已显式删除；隔离分发安装测试只复制九包，旧十包目录不存在。公共契约当前为 22 个模块，九包运行依赖的并集由 explore.setup 的锁完整覆盖。当前生产模块可按 Python 3.10 语法解析；实际运行测试使用 Windows Python 3.12.14 和服务器 Linux Python 3.12.15，未将语法检查写成 3.10／3.11 运行通过。
+
+独立 standards 与 spec 两轴审查分别完成。审查发现并修复了：欠账处置漏进审阅范围、独立激活可替换原 CAS、重试省略显式 CAS 后遗忘基线、JSON 启用观察／完成摘要可冒充实际执行、P7 构建后重复逻辑验库，以及 P1 状态未核精确回归绑定。相应反例保留于 lint、apply、source-scan 测试，实际执行由下述最终记录证明；不以审查文字代替测试。
+
+### 7.1 前一轮服务器脚本性能（V39，T16 的脚本部分）
+
+本节保留前一轮候选的实测，未将其改绑为最终冻结版本；最终复测见第7.4节。该轮未四舍五入的脚本链中位数为 **50.648 s → 13.887 s**。同一台已授权服务器，1 vCPU，Linux Python 3.12.15，配套固定依赖。每次新建隔离知识根及操作；一份 300 行合成 UTF-8 文档、一张卡、同一条明确的查询及 Claim 断言。原件 SHA-256：`7e957f059e92196023d59b4447a80f628bb869d0a09bee130dce343060833dd3`。新旧均实际安全落位、激活索引，再做正式搜索和同代精读，并断言原件未变。使用已有公开端到端 fixture 的真实 CLI；合成审阅数据替代模型审阅，不执行 OpenFlow 宿主。
+
+| 无插桩实跑 | 第1次 | 第2次 | 第3次 | 中位数 |
+|---|---:|---:|---:|---:|
+| 改前 | 51.06 s | 50.30 s | 50.65 s | 50.65 s |
+| 前一轮候选 | 13.89 s | 13.58 s | 14.19 s | 13.89 s |
+
+前一轮此样本的脚本链中位数减少 **72.58%**。每轮包含入库和额外的搜索／同代读取；旧 fixture 的入库顶层调用11次，前一轮候选7次，另外各有2次消费检查。不能把旧模板全部16个节点当作本基准都已执行，也不能据此推算真实模型调用减少了多少。常规解释器／文件系统缓存未人为清空，三个样本不用于报告稳定 P95。
+
+| 各段单独中位数 | 改前 | 前一轮候选 |
+|---|---:|---:|
+| P1 扫描 | 2.729 s | 1.480 s |
+| P2 备料 | 2.825 s | 1.468 s |
+| P3＋P4 决策与卡稿 | 13.673 s | 3.028 s |
+| P5 审阅数据与固定检查 | 2.076 s | 0.947 s |
+| P6 记录 | 1.317 s | 1.506 s |
+| P7 安全落位与检索收尾 | 17.793 s | 2.325 s |
+| 额外搜索及同代精读 | 10.270 s | 3.144 s |
+
+另做独立插桩运行，时间不混入上表；观察真实 Python 进程和公共函数调用，而非仅统计 YAML：
+
+| 实际调用 | 改前 | 前一轮候选 |
+|---|---:|---:|
+| Python 子进程（含嵌套 CLI） | 38 | 9 |
+| 顶层公开 CLI（含额外消费检查） | 13 | 9 |
+| 完整 `checks.run` | 2 | 1 |
+| 完整卡片质量解析 `parse_card` | 27 | 1 |
+| 全库 `validate_relations` | 7 | 1 |
+| `verify_database` | 7 | 2 |
+
+新版最后一行包含 **P5 临时索引1次＋P7实际索引1次**；独立 `index-verify` 和进程重启仍完整验库。真实测试还拒绝把 JSON `passed`／序列化对象作为内存核验结果。
+
+复现工具为 [benchmark_ingest.py](himate-knowledge-wifi-mp/evals/benchmark_ingest.py)：对改前／新版源码分别使用相同解释器、全新输出目录和 `--runs 3`；计数另用 `--instrument --runs 1`。改前源码从上述 Git 基线导出，仅使用能力、治理规则及合成 fixture，不接触业务原件或受限 gold。原始 JSON 保留在本机既有 `.build/ingest-seven-stage-dev/remote-*-summary.json` 和 `remote-*-probe.json`，不上库。
+
+### 7.2 真实宿主范围（V40）
+
+已通过 SSH 在真实服务器执行上述本地脚本链。测量边界在远端 Python 内部，**不含每个 Agent 工具调用的 SSH 往返、公司 API、模型等待、实际独立 reviewer 上下文、OpenFlow 会话副本升级、取消或硬件／SMB／ACL／CI合入**。约1.5小时仍是现场反馈，未取得该业务运行的逐节点记录。本次不声称真实 ingest 已从1.5小时降至某个值。T16 的脚本部分已取得证据，宿主／API部分保留为未执行项。
+
+### 7.3 完整验收与最终兼容修复
+
+T00—T14 的源码、九包分发和十包删除已完成。T15 的隔离安装／消费机制已验证；真实宿主旧会话和安装副本升级未操作。这里按运行版本保留证据，不把不同版本或重叠测试相加。
+
+完整 `b9` 在规则锁 `b78dbf1ebf9b51be75a3eb286c03e110573f50b58b86bbff3dd4d847bfa6c696` 下执行，**891项全部通过，失败0、错误0、跳过0**：
+
+| 分组 | 通过项数 |
+|---|---:|
+| apply | 118 |
+| change-plan | 37 |
+| explore | 13 |
+| lint | 106 |
+| maintain | 36 |
+| query | 56 |
+| source-prepare | 81 |
+| source-scan | 102 |
+| view-materialize | 36 |
+| 领域契约与集成 | 306 |
+
+原始分组XML、stdout/stderr及汇总保留在本机 `.scratch/b9/`；`validation-context.json`记录该轮冻结源码摘要。完整集已经包含旧Claim、实际来源更新、仅记录欠账、代码审阅、CAS、中断／响应丢失恢复、伪造完成拒绝、索引行值／正文与来源验证、查询purpose／回执和并发读取等机制。
+
+最后审查另发现旧可信Python两参回调可只返回metadata：此时两份同ID不同版本都缺正文摘要和路径，旧比较会把两个空值当同版。已补固定metadata摘要及不可变版本绑定，保留原回调ABI，并参数化现有混版反例。该轮锁为 `4f5daa703b2fef540e5048104af8b8b0ff8161a3514f53c7ab2142f461e6778f`，只改此契约、相关测试及一处测试未用变量；公共CLI与Workflow未再变化。
+
+最终独立候选在真实新锁下覆盖 **55个不同用例全部通过**：完整 `test_governance_v3.py` 51项、真实来源更新整链1项、P2／P3／P4退回后新轮完成3项。首轮54过、1例因隔离副本漏拷本地测试配置失败；原字节补齐配置后仅复跑该例通过。保留两份原始报告，不写成首轮55全绿，也不累加为56。证据在 `.scratch/final-meta-candidate-evidence/{related-55.xml,config-input-recheck.xml,verification-summary.json}`；本地配置未进入性能包或提交范围。
+
+候选267个源码输入、42个规则锁条目和266个性能包条目逐一核对。四个预期变更文件按摘要原样升入主源码；测试用本地配置单列，不属于交付物。Ruff、九包／七节点／两节点结构检查、Markdown本地链接和差异空白检查通过；57个生产模块可按Python3.10语法解析。实际运行环境仍只声明本次Windows3.12.14和服务器Linux3.12.15。
+
+提交检查又清理了6份新增文件末尾空行，其中两份是公共模块；所有改动Python的AST逐一相等，语义实现未改。随后按实际字节重封最终 `6f7d382f…` 规则锁，并用该锁补跑真实来源入库及后续修订整链，1项通过（36.56秒）。证据为本机 `.build/ingest-seven-stage-dev/{delivery-formatting.json,delivery-smoke.xml}`。这一轮不重新累计全套或55项成绩。
+
+另用真实公开CLI完成一次P5退P2后的新轮，并真正Git clone共享资产：消费端没有生产者的 `.build`、私有操作日志、证据缓存或索引，两次完整扫描均判定两份原件未变，无新增提炼和生产者收尾义务；跨轮记录的原扫描归属保持、共享原字节一致。该轮锁为 `b78dbf1e…`，证据为本机 `.build/ingest-seven-stage-dev/revision-clone-final-211115/report.json`。此例未产生维护事件，事件发布／恢复由maintain分组另行验证，不能据此声称真实事件跨机器迁移已验收。
+
+| 需求边界 | 对应实际证据／限制 |
+|---|---|
+| R01、R04、R10 职责和执行独立 | Workflow静态反例、真实七步公开调用、三种返工、九包安装及无兄弟CLI／私有脚本依赖验证 |
+| R02、R05 内容和原能力 | lint审阅范围、欠账／实质跳过、代码依据及旧Claim／六动作／merge-split等契约；迁移后的独立公开入口 |
+| R03、R09 安全与独立用途 | apply全组、实际CAS／查询／激活、故障恢复、独立建索引／回归／提交核对；query及maintain全组 |
+| R06、R07 共享和历史 | 干净clone、确切SHA／归属／路径历史恢复、旧规则和旧journal机制用例；真实宿主旧安装升级仍未操作 |
+| R08 去重与耗时 | 第7.1／7.4节真实脚本计时和独立调用计数；V39的API／模型／逐次SSH部分及V40宿主验收未执行 |
+
+因此不能把V01—V44整表一律标成通过：V37真实宿主注册／旧安装升级、V39宿主等待部分、V40仍有上述外部范围；六Target、CI接纳、SMB／ACL及真实reviewer上下文也未由合成用例证明。
+
+### 7.4 最终候选的服务器复测
+
+使用最终交付规则锁 `6f7d382fe71a8b1d41a50bb22d0e15f5d5d68d508f0ad2af0d14603441967cfc`，同一服务器、依赖、原件SHA和业务断言，测量方法同第7.1节。上传的是266文件的独立合成测试包，包SHA-256为 `01e3bbfb829e9facd549f83bd36549b64849deea636a1f8899b442be980fb039`；未更换真实业务运行副本。
+
+| 无插桩实跑 | 第1次 | 第2次 | 第3次 | 中位数 |
+|---|---:|---:|---:|---:|
+| 改前固定基线 | 51.056646 s | 50.303332 s | 50.648071 s | 50.648071 s |
+| 最终候选 | 15.238896 s | 15.336035 s | 15.746292 s | 15.336035 s |
+
+最终此样本的脚本链中位数减少 **69.72%**。前一轮13.887秒继续保留，未用它冒充最终版本数据；三个样本及不同轮次波动不用于承诺真实业务提速比。
+
+| 各段单独中位数 | 改前 | 最终候选 |
+|---|---:|---:|
+| P1 扫描 | 2.729 s | 1.591 s |
+| P2 备料 | 2.825 s | 1.719 s |
+| P3＋P4 决策与卡稿 | 13.673 s | 3.273 s |
+| P5 审阅数据与固定检查 | 2.076 s | 1.047 s |
+| P6 记录 | 1.317 s | 1.690 s |
+| P7 安全落位与检索收尾 | 17.793 s | 2.604 s |
+| 额外搜索及同代精读 | 10.270 s | 3.304 s |
+
+各段独立取中位数，不将表中分段相加当作实测总中位数；P6本次较慢也如实保留。另一次插桩确认Python子进程38→9、顶层CLI13→9、完整checks.run 2→1、parse_card 27→1、validate_relations 7→1、verify_database 7→2。新版两次验库仍分别为P5临时索引与P7真实索引；独立／重启全验未移除。插桩轮27.023秒包含统计开销，不混入普通计时。
+
+最终原始JSON保留在本机 `.build/ingest-seven-stage-dev/remote-delivery-summary.json` 和 `remote-delivery-probe.json`。第7.2节的真实宿主范围限制仍适用，尤其不能据此将现场约1.5小时换算为新的OpenFlow端到端时长。

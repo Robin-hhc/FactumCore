@@ -34,7 +34,7 @@ def test_formal_search_receipt_keeps_generation_and_rejects_changed_scope_or_eva
         {
             "operation_id": "receipt-first-activate",
             "generation_ref": first["generation_ref"],
-            "expected_active": None,
+            "expected_active": first["expected_active"],
         },
         "activate",
     )
@@ -202,6 +202,7 @@ def test_receipt_read_claim_subset_excludes_other_claim_source_text(tmp_path):
     bundle = p.record(bundle_ref)
     _, front, body = p.card("two-claims", bundle).decode().split("---", 2)
     metadata = yaml.safe_load(front)
+    metadata["lifecycle"] = "stable"
     snapshot = bundle["snapshots"][1]
     metadata["sources"].append(
         {
@@ -218,8 +219,12 @@ def test_receipt_read_claim_subset_excludes_other_claim_source_text(tmp_path):
     card_bytes = (
         "---\n" + yaml.safe_dump(metadata, sort_keys=False) + "---" + body
     ).encode()
-    view_ref = p.view("subset-create", bundle_ref, "two-claims", card_bytes)
-    p.apply("subset-create", view_ref)
+    # This case checks independent formal query consumption, including exact
+    # attachment identities. It needs no author's plan or private transaction.
+    p.write("knowledge/rules/two-claims.md", card_bytes)
+    p.write("governance/sources.lock.yaml", yaml.safe_dump({
+        "schema_version": "2.0", "resources": bundle["resources"],
+        "snapshots": bundle["snapshots"]}, sort_keys=False).encode())
     generation = p.call("knowledge-index-build", {"operation_id": "subset-build"})[
         "data"
     ]

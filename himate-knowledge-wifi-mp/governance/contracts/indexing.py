@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections import Counter
 from contextlib import closing
+from dataclasses import dataclass
 import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
 import re
@@ -19,6 +20,25 @@ from urllib.parse import quote
 from .validation import ContractError, canonical_bytes, sha256_bytes
 
 INDEX_SCHEMA_VERSION = "3.0"
+
+
+@dataclass(frozen=True)
+class VerifiedDatabase:
+    """In-process full-row observation bound to exact database bytes and inputs."""
+
+    rules_digest: str
+    database_digest: str
+    rows_digest: str
+    summary: tuple
+
+
+def reuse_database(cards, rules_digest, path, observed):
+    if (not isinstance(observed, VerifiedDatabase)
+            or observed.rules_digest != rules_digest
+            or observed.rows_digest != sha256_bytes(canonical_bytes(_rows(cards, rules_digest)))
+            or observed.database_digest != sha256_bytes(Path(_native(path)).read_bytes())):
+        raise ContractError("INDEX_OBSERVATION_CHANGED", "Verified database bytes or input rows changed", path)
+    return dict(observed.summary)
 TOKENIZER_VERSION = "2.0"
 _DDL = (
     "CREATE TABLE documents(card_id TEXT PRIMARY KEY,path TEXT,metadata TEXT);"
@@ -118,7 +138,7 @@ def _rows(cards, rules_digest):
     return {name: sorted(values) for name, values in rows.items()}
 
 
-def build_database(cards, rules_digest, path):
+def build_database(cards, rules_digest, path, *, verified=False):
     """Create a new database; never overwrite an existing generation."""
     rows = _rows(cards, rules_digest)
     path = Path(_native(path))
@@ -135,15 +155,17 @@ def build_database(cards, rules_digest, path):
     except (OSError, sqlite3.Error) as exc:
         path.unlink(missing_ok=True)
         raise ContractError("INDEX_BUILD_FAILED", exc, path) from exc
-    return verify_database(cards, rules_digest, path)
+    return (verify_database(cards, rules_digest, path, observed=True) if verified
+            else verify_database(cards, rules_digest, path))
 
 
-def verify_database(cards, rules_digest, path):
+def verify_database(cards, rules_digest, path, *, observed=False):
     """Compare full logical rows, schema and versions against the exact collection."""
     expected = _rows(cards, rules_digest)
     path = Path(_native(path))
     if not path.is_file():
         raise ContractError("INDEX_MISSING", "Database does not exist", path)
+    before = sha256_bytes(path.read_bytes()) if observed else None
     # Opening the existing file with mode=ro also prevents a missing input becoming an empty DB.
     uri = sqlite_readonly_uri(path)
     try:
@@ -162,10 +184,15 @@ def verify_database(cards, rules_digest, path):
                     raise ContractError("INDEX_ROWS_MISMATCH", f"Full {table} rows differ", path)
     except (OSError, sqlite3.Error) as exc:
         raise ContractError("INDEX_READ_FAILED", exc, path) from exc
-    return {"complete": True, "documents": len(expected["documents"]),
+    summary = {"complete": True, "documents": len(expected["documents"]),
             "claims": len(expected["claims"]), "postings": len(expected["postings"]),
             "schema_version": INDEX_SCHEMA_VERSION, "tokenizer_version": TOKENIZER_VERSION,
             "rules_digest": rules_digest, "rows_digest": sha256_bytes(canonical_bytes(expected))}
+    if observed:
+        if sha256_bytes(path.read_bytes()) != before:
+            raise ContractError("INDEX_CHANGED", "Database changed during full verification", path)
+        return VerifiedDatabase(rules_digest, before, summary["rows_digest"], tuple(sorted(summary.items())))
+    return summary
 
 
 def check(cards, rules, temp_dir):
@@ -175,11 +202,11 @@ def check(cards, rules, temp_dir):
 
 
 def read_document(raw, path, rules, *, card_id, sha256):
-    from .knowledge import parse_card
+    from .knowledge import decode_card
 
     if sha256_bytes(raw) != sha256:
         raise ContractError("INDEX_BODY_MISMATCH", "Frozen body fingerprint differs", path)
-    card = parse_card(raw, path, rules)
+    card = decode_card(raw, path, rules)
     if card["metadata"]["id"] != card_id:
         raise ContractError("INDEX_CARD_ID_MISMATCH", card_id, path)
     return card

@@ -7,6 +7,15 @@ import sys
 import pytest
 import yaml
 
+import importlib.util
+from pathlib import Path
+
+_fixture_spec = importlib.util.spec_from_file_location("maintain_fixture_helpers", Path(__file__).with_name("conftest.py"))
+_fixture = importlib.util.module_from_spec(_fixture_spec)
+_fixture_spec.loader.exec_module(_fixture)
+operation_context = _fixture.operation_context
+public_module = _fixture.public_module
+
 def canonical(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
 
@@ -25,8 +34,8 @@ def code_fixture(harness, usages=("current",), source_bytes=None):
     config_path = harness.base / "config.yml"
     config_path.write_bytes(canonical(config))
     repo_id = "repo-" + hashed(b"main/shared")[:16]
-    captured = harness.run("source-capture", {"operation_id": "captured", "kind": "code", "repo_id": repo_id,
-                                            "relative_path": "file.c", "source_id": "selected-code"})
+    captured = harness.run("source-prepare", {"operation_id": "captured", "kind": "code", "repo_id": repo_id,
+                                            "relative_path": "file.c", "source_id": "selected-code"}, action="capture")
     bundle = harness.record(captured["data"]["bundle_ref"])
     harness.write("governance/sources.lock.yaml", yaml.safe_dump({"schema_version": "2.0", "resources": bundle["resources"], "snapshots": bundle["snapshots"]}).encode())
     for usage in usages:
@@ -108,6 +117,33 @@ def test_empty_library_audit_is_complete_only_with_actual_fixed_report(harness):
     assert any(gap["code"] == "LINT_REPORT_NOT_PROVIDED" for gap in harness.record(missing["data"]["audit_ref"])["gaps"])
 
 
+@pytest.mark.parametrize("fixed_status", ["failed", "incomplete"])
+def test_audit_retains_actual_failed_or_incomplete_formal_report_status(harness, fixed_status):
+    _, _, _, checkout = code_fixture(harness)
+    harness.write("knowledge/rules/index.md", b"# Rules\n\n- [audit-current](audit-current.md)\n")
+    if fixed_status == "failed":
+        path = harness.root / "knowledge/rules/audit-current.md"
+        _, header, body = path.read_text(encoding="utf-8").split("---", 2)
+        metadata = yaml.safe_load(header)
+        metadata["summary"] = ""
+        path.write_text("---\n" + yaml.safe_dump(metadata, sort_keys=False) + "---" + body, encoding="utf-8")
+    else:
+        # An unreadable local writer journal is a real unavailable check input;
+        # preserve the actual incomplete report through the read-only audit.
+        harness.write("logs/operations/unreadable/journal.json", b'{"status":')
+    fixed = lint_report(harness, checkout)
+    original = harness.record(fixed)
+    assert original["status"] == fixed_status
+    before = protected_bytes(harness)
+    response = harness.run("maintain", {"operation_id": "summarize-" + fixed_status,
+        "lint_report_ref": fixed}, "audit-references")
+    assert response["phase"] == "reported"
+    report = harness.record(response["data"]["audit_ref"])
+    assert report["lint_report"] == original
+    assert report["status"] == "incomplete" and report["complete"] is False
+    assert protected_bytes(harness) == before
+
+
 @pytest.mark.parametrize("alter", ["wrong_root", "tampered", "local", "stale_files", "missing"])
 def test_audit_reports_unusable_or_stale_lint_input_as_gap(harness, alter):
     _, _, _, checkout = code_fixture(harness)
@@ -132,7 +168,7 @@ def test_audit_reports_unusable_or_stale_lint_input_as_gap(harness, alter):
 
 
 def test_default_inspect_context_result_stays_unchanged(harness):
-    before = harness.run("maintain", {"operation_id": "default-before"}, "inspect-context")["data"]
+    before = harness.run("maintain", {"operation_id": "default-before"})["data"]
     harness.run("maintain", {"operation_id": "separate-audit"}, "audit-references")
     after = harness.run("maintain", {"operation_id": "default-after"}, "inspect-context")["data"]
     assert before == after
@@ -207,44 +243,38 @@ def test_locator_path_override_uses_same_authorized_precedence_as_query(harness,
 
 
 @pytest.mark.parametrize("moment", ["during_read", "after_resolve"])
-def test_source_change_during_observation_is_not_accepted_as_matching(harness, moment):
+def test_source_change_during_observation_is_not_accepted_as_matching(harness, moment, monkeypatch):
     source, _, _, _ = code_fixture(harness)
-    script = harness.packages / "hs-knowledge-maintain/scripts"
-    incoming, outgoing = harness.base / "race-in.json", harness.base / "race-out.json"
-    incoming.write_bytes(canonical({"operation_id": "race"}))
-    code = """
-import sys
-from pathlib import Path
-sys.path.insert(0, sys.argv.pop(1))
-import audit, maintain, support
-source = Path(sys.argv.pop(1))
-moment = sys.argv.pop(1)
-original = audit.fixed_bytes
-def race(root, ref, prefixes=None):
-    data = original(root, ref, prefixes)
-    if ref == 'file.c':
-        source.write_bytes(data + b'// changed while observing\\n')
-    return data
-if moment == 'during_read':
-    audit.fixed_bytes = race
-else:
-    public_call = support.Context.call
-    def after_resolve(self, *args, **kwargs):
-        result = public_call(self, *args, **kwargs)
-        source.write_bytes(source.read_bytes() + b'// changed after resolution\\n')
-        return result
-    support.Context.call = after_resolve
-raise SystemExit(support.run(maintain.execute, Path(audit.__file__).resolve().parents[1]))
-"""
-    completed = subprocess.run([sys.executable, "-c", code, str(script), str(source), moment, "--input", str(incoming), "--output", str(outgoing),
-        "--knowledge-root", str(harness.root), "--action", "audit-references"], capture_output=True, text=True)
-    assert completed.returncode == 0, completed.stderr
-    result = json.loads(outgoing.read_bytes())
-    row = harness.record(result["data"]["audit_ref"])["references"][0]
+    audit = public_module("reference_audit")
+    context = operation_context(harness, {"operation_id": "race"}, "audit-references")
+    if moment == "during_read":
+        original = audit.fixed_bytes
+
+        def race(root, ref, prefixes=None):
+            data = original(root, ref, prefixes)
+            if ref == "file.c":
+                source.write_bytes(data + b"// changed while observing\n")
+            return data
+
+        monkeypatch.setattr(audit, "fixed_bytes", race)
+    else:
+        sources = public_module("source_operations")
+        resolve = sources.resolve_source
+
+        def after_resolve(*args, **kwargs):
+            result = resolve(*args, **kwargs)
+            source.write_bytes(source.read_bytes() + b"// changed after resolution\n")
+            return result
+
+        monkeypatch.setattr(sources, "resolve_source", after_resolve)
+    result, phase = audit.audit_references(context)
+    assert phase == "reported"
+    row = harness.record(result["audit_ref"])["references"][0]
     assert row["current_source_matches"] is None and row["observation"] == ("unavailable" if moment == "during_read" else "unstable")
     assert row["gaps"][0]["code"] == "CODE_CHANGED_DURING_AUDIT"
     if moment == "after_resolve":
         assert row["current_sha256"] is None and row["effect"] == "current_reference_needs_review"
+
 
 
 def test_large_current_file_reports_explicit_bounded_text_omission(harness):

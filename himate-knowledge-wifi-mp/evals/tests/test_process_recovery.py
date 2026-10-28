@@ -1,4 +1,4 @@
-"""Actual process hard-exit/recovery mechanism with synthetic signed approval.
+"""Actual process hard-exit/recovery mechanism with declared fixture review.
 
 This is not a power-loss, hardware durability, real-human or production WiFi
 acceptance test. The only fault injection lives in this test's apply subprocess.
@@ -26,6 +26,7 @@ def test_hard_exit_after_card_replace_preserves_journal_and_recovers_exact_view(
     bundle_ref, bundle = p.capture(operation, b"# Fixture\nCrash recovery is a synthetic rule.\n")
     view_ref = p.view(operation, bundle_ref, "crash-rule", p.card("crash-rule", bundle))
     proof_ref, review = p.review(operation, view_ref)
+    pending_ref = p.pending_record(operation, view_ref)
     view = p.record(view_ref)
     assert review["view_digest"] == view["digest"]
     expected = {row["path"]: base64.b64decode(row["bytes_b64"], validate=True) for row in view["writes"]}
@@ -34,7 +35,8 @@ def test_hard_exit_after_card_replace_preserves_journal_and_recovers_exact_view(
     source_before = (p.root / "docs-raw/specs/raw-source.md").read_bytes()
     incoming = tmp_path / "crash-input.json"
     outgoing = tmp_path / "crash-output.json"
-    incoming.write_bytes(FIXTURE.canonical({"operation_id": operation, "view_ref": view_ref, "proof_ref": proof_ref}))
+    incoming.write_bytes(FIXTURE.canonical({"operation_id": operation, "view_ref": view_ref,
+        "content_review_ref": proof_ref, "ingest_record_ref": pending_ref}))
     cli = p.skills / "hs-knowledge-apply/scripts/cli.py"
     target = p.root / target_ref
     # The test intercepts only the exact final target, after the genuine OS
@@ -153,7 +155,7 @@ runpy.run_path(cli,run_name='__main__')
     (tmp_path / "process-recovery-evidence.json").write_text(
         json.dumps(
             {
-                "level": "actual_subprocess_hard_exit_with_isolated_synthetic_signed_approval",
+                "level": "actual_subprocess_hard_exit_with_isolated_declared_fixture_review",
                 "injection": "os._exit(73) after real os.replace of one exact card target; test process only",
                 "exit_code": crashed.returncode,
                 "interrupted_journal_status": journal["status"],

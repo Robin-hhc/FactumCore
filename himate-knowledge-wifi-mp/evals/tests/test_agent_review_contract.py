@@ -8,7 +8,6 @@ import shutil
 import sys
 
 import pytest
-import yaml
 
 
 DOMAIN = Path(__file__).resolve().parents[2]
@@ -26,10 +25,6 @@ from agent_review_contract import validation  # noqa: E402
 def rules(tmp_path):
     shutil.copytree(DOMAIN / "governance", tmp_path / "governance")
     lock_path = tmp_path / "governance/framework.lock.yaml"
-    lock = yaml.safe_load(lock_path.read_bytes())
-    for row in lock["files"].values():
-        row["sha256"] = hashlib.sha256((tmp_path / row["path"]).read_bytes()).hexdigest()
-    lock_path.write_text(yaml.safe_dump(lock, sort_keys=False), encoding="utf-8")
     return validation.load_rules(tmp_path, hashlib.sha256(lock_path.read_bytes()).hexdigest())
 
 

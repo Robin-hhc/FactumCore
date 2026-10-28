@@ -1,0 +1,11 @@
+# Declared semantic review inputs
+
+The public `record-review` action records actual review declarations through the same pinned domain rules used by P5 `review`. It needs `operation_id`, `semantic_plan_ref`, exact `sampled_unit_ids/unreviewed_unit_ids`, a nonempty `reason`, and an explicit `findings` list (including an empty list when no finding exists). An optional `view_ref` binds the exact complete candidate. Reviewer/context labels are descriptive and never identity gates.
+
+Sampled and unreviewed IDs partition all authored dispositions, including content, skip, defer, failed, uncovered and maintenance units. Record-only batches review the actual missing-material facts, reasons and next steps; they cannot pass with an empty declared scope. At least one unit must be sampled when an applicable scope exists. A completed unchanged skip is exempt only when the semantic plan binds a real scan proving that state; explicit material targets never invent scan completion or receive that exemption.
+
+Each finding identifies a sampled unit, actual evidence and reason, and a return target P2/P3/P4. The result preserves `content_review_ref`, `review_status` and `skip_sample`; the record binds the exact semantic plan, real scan or explicit material observations, and optional view.
+
+`record-review` reports `reviewed` or `needs_revision` for this declaration only. It does not claim that full lint or the complete P5 quality stage passed. P5 `review` combines the actual semantic review inputs and one deterministic fixed check in the same invocation; formal/full and CI checks remain independent of these declarations.
+
+A new P4 revision can explicitly adopt its previous view's unchanged semantic plan. Review then requires the new `view_ref`, exact previous-view adoption and original scan identity; an old plan alone cannot be relabeled as a new round. The saved review always binds the new view's digest and actual operation, with the original scan operation retained separately.

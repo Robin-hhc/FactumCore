@@ -1,7 +1,7 @@
 """Read saved stages and derived recovery hints without advancing work."""
 
 from support import NodeError, identifier, safe
-from progress import catalog, catalog_gap, finalization, observation_only, paths, read_saved
+from progress import adopted_successor, batch_finalization, catalog, catalog_gap, finalization, material_refs, observation_only, paths, read_saved
 
 STAGES = (
     ("scan", ".build/operations/{op}/source-inventory.json"),
@@ -14,6 +14,9 @@ STAGES = (
     ("transaction", "logs/operations/{op}/journal.json"),
     ("apply", "logs/operations/{op}/apply-result.json"),
     ("submission_handoff", "logs/operations/{op}/publish-handoff.json"),
+    ("batch_intent", ".build/operations/{op}/batch-intent.json"),
+    ("batch_build", ".build/operations/{op}/batch-build.json"),
+    ("batch_complete", ".build/operations/{op}/batch-complete.json"),
 )
 ALL_STAGES = [stage for stage, _ in STAGES] + ["content_review", "local_check", "lint", "index", "regression", "activation"]
 
@@ -47,6 +50,8 @@ def operation_details(ctx, op):
 
     for stage, pattern in STAGES:
         add(stage, pattern.format(op=op))
+    for ref in material_refs(ctx, op):
+        add("materials", ref)
     if "record_formal" not in values:
         for pattern in ("logs/ingest/*.yaml", "logs/ingest/*.yml", "logs/ingest/*.json"):
             for ref in paths(ctx, pattern):
@@ -67,7 +72,21 @@ def operation_details(ctx, op):
             if value.get("operation_id") == op:
                 add(stage, ref)
     journal = values.get("transaction")
-    if journal:
+    if any(stage in values for stage in ("batch_intent", "batch_build", "batch_complete")):
+        if journal and journal.get("view_ref") and "view" not in values:
+            add("view", journal["view_ref"])
+        if any(gap["stage"] == "transaction" for gap in gaps):
+            completion = {"status": "unknown", "next_action": "recover_transaction", "verification": "saved_facts_only",
+                          "reason": "The actual local writer journal cannot be read; a saved summary cannot override it"}
+        else:
+            completion = batch_finalization(ctx, values)
+        for stage, key in (("index", "generation_ref"), ("regression", "report_ref"), ("activation", "activation_observation_ref")):
+            if completion.get(key):
+                add(stage, completion[key])
+    elif any(gap["stage"].startswith("batch_") for gap in gaps):
+        completion = {"status": "unknown", "next_action": "inspect_finalization", "verification": "saved_facts_only",
+                      "reason": "A durable local batch substep cannot be read; inspect it before resuming"}
+    elif journal:
         for stage, key in (("view", "view_ref"), ("lint", "lint_report_ref")):
             if journal.get(key) and stage not in values:
                 add(stage, journal[key])
@@ -92,6 +111,13 @@ def operation_details(ctx, op):
         completion = {"status": "not_applicable", "next_action": None, "scope": "observation_only"}
     else:
         completion = {"status": "unknown", "next_action": "prepare_material"}
+    if not journal:
+        old_view = values.get("view")
+        old_view_ref = next((fact["ref"] for fact in facts if fact["stage"] == "view"), None)
+        successor = adopted_successor(ctx, op, old_view_ref, (old_view or {}).get("digest"), values.get("scan", {}).get("digest"))
+        if successor:
+            completion = {"status": "not_applicable", "scope": "adopted_by_new_round", "next_action": None,
+                          "verification": "saved_facts_only", "adopted_by": successor}
     return {"operation_id": op, "facts": facts, "gaps": gaps, "stage_status": stage_status,
             "completion": completion, "git_submission": "not_verified", "ci": "not_verified", "merge": "not_verified"}
 

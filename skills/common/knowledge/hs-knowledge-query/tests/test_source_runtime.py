@@ -35,27 +35,31 @@ def timed_out_query(harness, request, action, *, resolve_attempt=1):
     incoming = harness.base / (request["operation_id"] + "-input.json")
     outgoing = harness.base / (request["operation_id"] + "-output.json")
     incoming.write_text(json.dumps(request), encoding="utf-8")
-    # Inject at the subprocess boundary; the public CLI and its source/error
-    # qualification logic execute unchanged. No source or index is modified.
+    # Inject a typed failure at the real shared-source boundary. The public CLI
+    # and qualification/recheck code execute unchanged; no asset is modified.
     program = """
 from pathlib import Path
 import runpy
-import subprocess
 import sys
 cli, attempt = sys.argv[1], int(sys.argv[2])
-run = subprocess.run
+sys.path.insert(0, str(Path(cli).parent))
+import support
+load_domain = support.domain
 resolutions = 0
-def timeout_source(command, *args, **kwargs):
-    global resolutions
-    if (isinstance(command, (list, tuple))
-            and any('hs-knowledge-source-capture' in str(part) for part in command)
-            and 'resolve-source' in command):
+
+def instrumented_domain(root, expected):
+    modules, rules = load_domain(root, expected)
+    resolve = modules['source_operations'].resolve_source
+    def resolve_source(ctx, reference, bundle=None):
+        global resolutions
         resolutions += 1
         if resolutions == attempt:
-            raise subprocess.TimeoutExpired(command, kwargs.get('timeout', 120))
-    return run(command, *args, **kwargs)
-subprocess.run = timeout_source
-sys.path.insert(0, str(Path(cli).parent))
+            raise modules['runtime'].NodeError('SOURCE_RESOLUTION_TIMEOUT',
+                'Shared source backend timed out', 'source-resolver', blocked=True)
+        return resolve(ctx, reference, bundle=bundle)
+    modules['source_operations'].resolve_source = resolve_source
+    return modules, rules
+support.domain = instrumented_domain
 sys.argv = [cli, *sys.argv[3:]]
 runpy.run_path(cli, run_name='__main__')
 """
@@ -106,8 +110,8 @@ def test_search_preserves_source_resolution_timeout(completed_document):
     )
     assert process.returncode == 3, response
     assert response["status"] == "blocked", response
-    assert response["diagnostics"][0]["code"] == "SIBLING_TIMEOUT", response
-    assert "120-second call budget" in response["diagnostics"][0]["message"]
+    assert response["diagnostics"][0]["code"] == "SOURCE_RESOLUTION_TIMEOUT", response
+    assert "Shared source backend timed out" in response["diagnostics"][0]["message"]
     assert response["data"] == {}
     assert all(path.read_bytes() == raw for path, raw in before.items())
     assert not (harness.root / ".build/operations/source-runtime-timeout/receipts").exists()
@@ -150,9 +154,9 @@ def test_query_timeout_stays_blocked_during_rechecks_and_reads(
     )
     assert process.returncode == 3, response
     assert response["status"] == "blocked", response
-    assert response["diagnostics"][0]["code"] == "SIBLING_TIMEOUT", response
-    assert response["diagnostics"][0]["path"] == "hs-knowledge-source-capture"
+    assert response["diagnostics"][0]["code"] == "SOURCE_RESOLUTION_TIMEOUT", response
+    assert response["diagnostics"][0]["path"] == "source-resolver"
     assert response["data"] == {}
     operation_path = harness.root / ".build/operations" / operation
-    assert list(operation_path.glob("calls/*/request.json"))
+    assert not list(operation_path.glob("calls/*/request.json"))
     assert not (operation_path / "receipts").exists()

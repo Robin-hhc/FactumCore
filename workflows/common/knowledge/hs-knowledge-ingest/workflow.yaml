@@ -1,329 +1,138 @@
 version: 1
 id: hs-knowledge-ingest
 name: WiFi 知识入库
-description: 编排原件扫描、阅读计划、独立复核、检查及本地入库；索引、目标查询和活动代验证完成后结束。
+description: 七阶段增量入库；P5独立审阅和质量检查，P7安全落位及实际检索收尾。
 kind: custom
 source: user_created
 entry:
   skill: hs-knowledge-source-scan
 entry_node: scan_sources
 nodes:
-  - id: scan_sources
-    title: P1 扫描原件与续办
-    type: skill
-    owner: coder
-    skill: hs-knowledge-source-scan
-    prompt: 扫描六类原件及实际停点，分别读actionable_unit_ids与finalization_pending；空原件待办仍须核收尾。用status核确切视图和代次，未知先检查，不重放入库或改CAS基线；无变化不写记录。先核宿主产物根，摘要用独立显式路径；阻断时保留停点，不交棒。
-    exits:
-      - id: scanned
-        label: 准备材料
-        condition: 有新增、变化、未完成事项或用户修订请求。
-        target: prepare_material
-      - id: unchanged
-        label: 无需更新
-        condition: 扫描完整且无变化、修订、维护或未完成事项，finalization_pending为空；不新增处理记录。
-        target: __end__
-      - id: resume
-        label: 续办内容复核
-        condition: 完整视图仍有效且尚未入库，先确认独立内容复核。
-        target: review_content
-      - id: recover
-        label: 恢复事务
-        condition: 存在未结束的写入事务。
-        target: recover_transaction
-      - id: resume_index
-        label: 续办索引
-        condition: 原事务已本地落位、文件仍有效，但候选索引尚未完整验证。
-        target: rebuild_index
-      - id: resume_queries
-        label: 续办查询
-        condition: 原事务已本地落位，已有确切候选代、冻结查询和活动指针基线。
-        target: query_regression
-  - id: prepare_material
-    title: P2 准备新旧材料
-    type: skill
-    owner: coder
-    skill: hs-knowledge-source-scan
-    prompt: 准备本次原文、采用旧版、关联旧卡及代码材料，保留旧卡确切字节。输入变化时新建操作并重扫；摘要用独立显式路径，材料缺失或异常时保存停点，不交棒。
-    exits:
-      - id: prepared
-        label: 材料就绪
-        condition: 新旧材料及明确缺口已保存。
-        target: plan_change
-  - id: plan_change
-    title: P3 阅读并制定计划
-    type: skill
-    owner: coder
-    skill: hs-knowledge-change-plan
-    prompt: 逐条对照事实、条件和证据，冻结六决策计划及查询预期，覆盖原件和维护单元。输入变化时先按新操作准备材料；摘要用独立显式路径，阻断时保留停点、不交棒。
-    exits:
-      - id: planned
-        label: 计划就绪
-        condition: 语义计划、来源处理判断和查询预期已固定。
-        target: review_plan
-      - id: needs_material
-        label: 补充材料
-        condition: 材料或定位需补充，且可在当前范围内继续处理。
-        target: prepare_material
-  - id: review_plan
-    title: P3 独立复核归卡与跳过
-    type: skill
-    owner: reviewer
-    skill: hs-knowledge-change-plan
-    prompt: 独立审查归卡和实质跳过，注明样本、问题与未审范围；未选项不冒称通过。摘要用独立显式路径；缺材料或异常时保存停点，不交棒。
-    exits:
-      - id: reviewed
-        label: 复核通过
-        condition: 本次范围的独立复核通过，没有未解决的阻断项。
-        target: materialize_view
-      - id: record_only
-        label: 仅处理记录
-        condition: 复核已记录，仅有跳过、暂缓、失败或未覆盖事项。
-        target: record_ingest
-      - id: needs_material
-        label: 补充材料
-        condition: 材料或定位需补充，且可在当前范围内继续处理。
-        target: prepare_material
-      - id: needs_revision
-        label: 修订计划
-        condition: 归卡、结论或计划决策需要重判。
-        target: plan_change
-  - id: materialize_view
-    title: P4 保存完整候选
-    type: skill
-    owner: coder
-    skill: hs-knowledge-view-materialize
-    prompt: 按计划撰写候选卡，固定导航、来源锁、基线和查询预期；显式传本次context_ref，代码上下文不继承旧视图。摘要用独立显式路径；阻断时保留停点、不交棒。
-    exits:
-      - id: ready
-        label: 候选就绪
-        condition: 新计划和完整视图已固定。
-        target: review_content
-      - id: stale
-        label: 重新准备材料
-        condition: 原件、规则、代码或基线变化，需按新操作准备材料。
-        target: prepare_material
-  - id: review_content
-    title: P4 独立内容复核
-    type: skill
-    owner: reviewer
-    skill: hs-knowledge-change-plan
-    prompt: 独立阅读完整候选、原文和计划，复核断言、条件及融合关系；续办须确认复核绑定确切视图。摘要用独立显式路径；阻断时保留停点、不交棒。
-    exits:
-      - id: reviewed
-        label: 复核通过
-        condition: 本次范围的独立复核通过，没有未解决的阻断项。
-        target: lint_preflight
-      - id: needs_material
-        label: 补充材料
-        condition: 材料或定位需补充，且可在当前范围内继续处理。
-        target: prepare_material
-      - id: needs_plan
-        label: 修订计划
-        condition: 结论、适用范围或归卡关系需要重判。
-        target: plan_change
-      - id: needs_revision
-        label: 修订候选
-        condition: 候选内容、结构或导航需要修订。
-        target: revise_candidate
-  - id: lint_preflight
-    title: P4 固定预检
-    type: skill
-    owner: reviewer
-    skill: hs-knowledge-lint
-    prompt: 对已独立复核的完整候选做固定预检，读取实际报告；材料、语义、格式问题分别返回补充材料、计划或修稿。摘要用独立显式路径；异常时保存停点、不交棒。
-    exits:
-      - id: passed
-        label: 检查通过
-        condition: 本次确切视图的必需检查已完整执行并通过。
-        target: inspect_candidate
-      - id: needs_material
-        label: 补充材料
-        condition: 材料或定位需补充，且可在当前范围内继续处理。
-        target: prepare_material
-      - id: needs_plan
-        label: 修订计划
-        condition: 结论、适用范围或归卡关系需要重判。
-        target: plan_change
-      - id: needs_revision
-        label: 修订候选
-        condition: 候选内容、结构或导航需要修订。
-        target: revise_candidate
-  - id: inspect_candidate
-    title: P4 分类与事务检查
-    type: skill
-    owner: coder
-    skill: hs-knowledge-candidate-inspect
-    prompt: 核对确切视图和事务，区分文档、代码及混合稿；分类不代表内容复核，已入库不得重查旧基线。摘要用独立显式路径；阻断时保留停点、不交棒。
-    exits:
-      - id: manual_ready
-        label: 文档稿就绪
-        condition: 确切文档稿已有独立内容复核，可进入最终检查。
-        target: lint_view
-      - id: mixed_ready
-        label: 混合稿就绪
-        condition: 确切混合稿已有独立内容复核，继续代码部分核验。
-        target: local_check
-      - id: code_ready
-        label: 代码稿就绪
-        condition: 确切代码稿已有独立内容复核，继续代码核验。
-        target: local_check
-      - id: recovery_required
-        label: 恢复事务
-        condition: 存在需恢复的未完成写入事务。
-        target: recover_transaction
-      - id: needs_revision
-        label: 修订候选
-        condition: 候选内容、结构或导航需要修订。
-        target: revise_candidate
-  - id: local_check
-    title: P4 独立代码核验
-    type: skill
-    owner: reviewer
-    skill: hs-knowledge-local-check
-    prompt: 独立逐Claim核对实际源码、配置、理由和引用，保存与本视图绑定的依据；角色和上下文隔离由宿主负责。摘要用独立显式路径；阻断时保存停点、不交棒。
-    exits:
-      - id: code_passed
-        label: 代码核验通过
-        condition: 逐Claim代码依据、条件及本次内容绑定核验通过。
-        target: lint_view
-      - id: needs_revision
-        label: 修订候选
-        condition: 候选内容、结构或导航需要修订。
-        target: revise_candidate
-  - id: revise_candidate
-    title: P4 修订候选
-    type: skill
-    owner: coder
-    skill: hs-knowledge-candidate-revise
-    prompt: 新建操作，依次扫描、准备材料、重作语义计划，再携新context_ref修订原视图并重新复核。最多三轮，无进展即停；摘要用独立显式路径，阻断时保留停点、不交棒。
-    exits:
-      - id: ready
-        label: 候选就绪
-        condition: 新计划和完整视图已固定。
-        target: review_content
-      - id: needs_material
-        label: 补充材料
-        condition: 材料或定位需补充，且可在当前范围内继续处理。
-        target: prepare_material
-      - id: needs_plan
-        label: 修订计划
-        condition: 结论、适用范围或归卡关系需要重判。
-        target: plan_change
-      - id: deferred
-        label: 登记暂缓
-        condition: 只剩明确暂缓、失败或未覆盖事项，不写失败稿件。
-        target: record_ingest
-  - id: lint_view
-    title: P5 最终完整检查
-    type: skill
-    owner: reviewer
-    skill: hs-knowledge-lint
-    prompt: 检查最终完整视图，带入材料阶段保留的旧卡正文；仅完整全库报告通过才登记，失败按问题返回。摘要用独立显式路径；运行故障保留停点、不交棒。
-    exits:
-      - id: passed
-        label: 检查通过
-        condition: 最终确切视图的完整全库报告通过。
-        target: record_ingest
-      - id: needs_material
-        label: 补充材料
-        condition: 材料或定位需补充，且可在当前范围内继续处理。
-        target: prepare_material
-      - id: needs_plan
-        label: 修订计划
-        condition: 结论、适用范围或归卡关系需要重判。
-        target: plan_change
-      - id: needs_revision
-        label: 修订候选
-        condition: 候选内容、结构或导航需要修订。
-        target: revise_candidate
-  - id: record_ingest
-    title: P6 登记处理记录
-    type: skill
-    owner: coder
-    skill: hs-knowledge-source-scan
-    prompt: 对账来源、维护单元、卡和真实处理结果，生成待入库记录；仅记录批不得夹带失败稿件。摘要用独立显式路径；阻断或重复错误无进展时保存停点，不交棒。
-    exits:
-      - id: recorded
-        label: 记录就绪
-        condition: 记录覆盖、结构和内容绑定已校验，可同批落位。
-        target: apply_view
-      - id: needs_record
-        label: 修正记录
-        condition: 记录自身可修正，仍有预算且未重复同错。
-        target: record_ingest
-  - id: apply_view
-    title: P7 本地入库
-    type: skill
-    owner: coder
-    skill: hs-knowledge-apply
-    prompt: 将卡、导航、来源锁和记录同批落位，重跑固定检查；保留历史卡输入，已落位事务不得重复写入。摘要用独立显式路径；异常先核事务，保存停点、不交棒。
-    exits:
-      - id: applied
-        label: 入库完成
-        condition: 内容与记录已同批提交到本地，继续检索收尾。
-        target: rebuild_index
-      - id: record_only
-        label: 仅处理记录
-        condition: 合法记录批已保存，未解决事项仍保留；无需索引。
-        target: __end__
-      - id: recovery_required
-        label: 恢复事务
-        condition: 存在需恢复的未完成写入事务。
-        target: recover_transaction
-      - id: stale
-        label: 重新准备材料
-        condition: 原件、规则、代码或基线变化，需按新操作准备材料。
-        target: prepare_material
-  - id: recover_transaction
-    title: P7 恢复原事务
-    type: skill
-    owner: coder
-    skill: hs-knowledge-recover
-    prompt: 核对原事务、备份和实际文件，恢复或回滚；内容批只继续检索收尾，记录批保存后结束。摘要用独立显式路径；恢复不明时保存停点、不交棒。
-    exits:
-      - id: recovered
-        label: 事务已恢复
-        condition: 原内容事务已恢复并核实，只继续检索收尾。
-        target: rebuild_index
-      - id: record_only
-        label: 仅处理记录
-        condition: 原记录批已恢复并保存，未解决事项仍保留。
-        target: __end__
-      - id: rolled_back
-        label: 事务已回滚
-        condition: 原事务已安全回滚，重新准备材料。
-        target: prepare_material
-  - id: rebuild_index
-    title: P7 构建并验证索引
-    type: skill
-    owner: coder
-    skill: hs-knowledge-index-build
-    prompt: 构建并完整验证本地索引，原样保存代次及活动指针基线；运行故障只重试收尾，内容错误新建修订。摘要用独立显式路径；异常时保存停点、不交棒。
-    exits:
-      - id: built
-        label: 索引已验证
-        condition: 实际候选索引已构建并完整验证。
-        target: query_regression
-      - id: content_error
-        label: 新建内容修订
-        condition: 确认内容有误，保留已入库事实并新建修订操作。
-        target: prepare_material
-  - id: query_regression
-    title: P7 查询回归与激活
-    type: skill
-    owner: reviewer
-    skill: hs-knowledge-query-regression
-    prompt: 传确切view_ref或apply_result_ref，沿用冻结查询、构建代次和原expected_active，验证后CAS激活；响应丢失先核报告及实际活动代，不重放或改基线。摘要用独立显式路径；异常保存停点、不交棒。
-    exits:
-      - id: checked
-        label: 查询与激活完成
-        condition: 冻结查询通过且确切代已激活；丢失响应须先复验报告和实际活动代。
-        target: __end__
-      - id: content_error
-        label: 新建内容修订
-        condition: 确认内容有误，保留已入库事实并新建修订操作。
-        target: prepare_material
+- id: scan_sources
+  title: P1 扫描变化与续办
+  type: skill
+  owner: coder
+  skill: hs-knowledge-source-scan
+  prompt: 调用scan观察六类原件、共享处理历史、必要维护状态和本机停点，分别读actionable_unit_ids与finalization_pending。无变化且无义务才结束，不捕获材料或制造记录。已落位或有未完事务时，用只读status定位原操作，直接交P7续办，不重新提炼或apply；索引健康未检查不能当通过。消费副本不继承他人的私有恢复义务。异常无法核实事实时保存停点并保留宿主等待。
+  exits:
+  - id: scanned
+    label: 准备材料
+    condition: 有新增、变化、欠账、维护单元或明确修订目标。
+    target: prepare_material
+  - id: unchanged
+    label: 无需更新
+    condition: 扫描完整且无变化、修订、欠账或本机续办；不新增记录。
+    target: __end__
+  - id: recover
+    label: 按原事务恢复
+    condition: 已定位真实未结束写入事务，保持原操作及确切输入。
+    target: apply_view
+  - id: resume_index
+    label: 续办索引
+    condition: 原内容已落位，实际索引尚未完成。
+    target: apply_view
+  - id: resume_queries
+    label: 续办查询和启用
+    condition: 原内容已落位，有确切候选代或收尾事实需要续办。
+    target: apply_view
+- id: prepare_material
+  title: P2 准备新旧材料
+  type: skill
+  owner: coder
+  skill: hs-knowledge-source-prepare
+  prompt: 调用独立prepare按固定扫描清单和所选单元准备真实原文、附件、采用旧版、关联旧卡和必要代码或配置。P5补料使用新operation_id，显式传previous_view_ref、revision_reason和旧稿绑定的existing_material_ref，只补明确缺口并保存新材料版本及前序摘要；保留原scan_ref和处理单元身份，不覆盖旧工件、不默认重扫全库。显式目标独立备料不冒称P1完整覆盖。只核所用输入；原观察范围或版本漂移时读取needs_scan和affected_scope，回P1更新真实清单。保留缺口，不代作者决定结论；纯环境故障保存停点。
+  exits:
+  - id: prepared
+    label: 材料已保存
+    condition: 实际材料、输入指纹及缺口已保存；不足可由P3决定记录欠账。
+    target: plan_change
+  - id: source_changed
+    label: 更新扫描清单
+    condition: 采用范围或观察版本已变，旧清单不能继续使用。
+    target: scan_sources
+- id: plan_change
+  title: P3 阅读并决定内容
+  type: skill
+  owner: coder
+  skill: hs-knowledge-change-plan
+  prompt: 调用plan固定作者判断。逐单元确定content、skip、defer、failed或uncovered及理由，覆盖明确维护事项。判断卡和旧Claim的新建、更新、合并、拆分、退役或暂缓，保留身份和全部去向；同单元多种卡动作时显式record_action并保全明细。冻结本批查询及明确预期。P5退回或P2补料后，用新operation_id、previous_view_ref及revision_reason保存新计划；原scan及单元身份不变，采用旧材料须与前序稿精确绑定，补料须引用新材料版本，旧工件不覆盖。这里不做提前独立复核，不生产字节写入清单；缺材料回P2，采用源变化回P1。
+  exits:
+  - id: content_planned
+    label: 作者判断已固定
+    condition: 本批单元、卡和旧Claim处置及适用查询预期已保存。
+    target: materialize_view
+  - id: needs_material
+    label: 补充材料
+    condition: 需要补充本批原文、旧版或定位才能判断。
+    target: prepare_material
+- id: materialize_view
+  title: P4 保存完整稿件
+  type: skill
+  owner: coder
+  skill: hs-knowledge-view-materialize
+  prompt: 调用run一次组织作者卡、导航、来源锁、写删集合、处置预览、展示字节及完整输入快照，读取实际输出，正式区不变。修订用新operation_id、previous_view_ref和revision_reason，通过同一入口保存新稿。仅退回P4时可明确采用前序稿精确绑定的未变semantic_plan和material；退回P2/P3时用它们的新版本。保留原scan及处理单元身份，核material_digest和previous_view_digest，新稿重新交P5；旧材料、计划、稿件和报告均不覆盖。相同操作重入读取已保存稿，不重新生成计划或导航，不跑整库质量lint。缺材料回P2，作者判断不清楚回P3，采用源变化回P1。
+  exits:
+  - id: ready
+    label: 完整稿件已保存
+    condition: 稿件、完整输入快照和处置预览已保存；记录批也有明确空写集。
+    target: lint_view
+  - id: needs_material
+    label: 补充材料
+    condition: 生成实际稿件所需原件、旧卡或必要材料缺失。
+    target: prepare_material
+  - id: needs_plan
+    label: 完善作者判断
+    condition: 卡动作、旧Claim去向或记录动作需要作者明确。
+    target: plan_change
+- id: lint_view
+  title: P5 独立审阅与质量检查
+  type: skill
+  owner: reviewer
+  skill: hs-knowledge-lint
+  prompt: 由宿主安排独立reviewer任务，实际读原文、旧卡、作者计划、全部处置和稿件，审结论、归卡、实质skip及必要代码依据。调用action review，传view_ref、实际semantic_plan_ref、sampled_unit_ids、unreviewed_unit_ids、reason及明确findings；代码稿另传code_review的真实context和逐Claim材料。角色标签不认证独立性。正常候选一次完整固定lint；语义已阻断时记录未执行项。记录批只查处置和适用项，不建临时索引。读实际报告，披露抽样和未审范围；缺材料回P2、判断错回P3、稿件错回P4，并携确切previous_view_ref和理由交新操作返工，保留有效原scan、不覆盖旧工件，新稿必须重审。纯运行故障留本节点等待。
+  exits:
+  - id: passed
+    label: 审阅和适用检查完成
+    condition: 独立审阅实际完成，适用固定检查passed且范围明确，无未解决阻断。
+    target: record_ingest
+  - id: needs_material
+    label: 补充审阅材料
+    condition: 内容批缺必要原文、旧版、代码、配置或定位。
+    target: prepare_material
+  - id: needs_plan
+    label: 重新判断内容
+    condition: 结论、条件、归卡、旧Claim去向、实质skip或查询预期需重判。
+    target: plan_change
+  - id: needs_revision
+    label: 修订稿件
+    condition: 作者判断可保留，但正文、字段、来源登记、导航或组稿需改。
+    target: materialize_view
+- id: record_ingest
+  title: P6 转写处理记录
+  type: skill
+  owner: coder
+  skill: hs-knowledge-source-scan
+  prompt: 调用record，消费实际view、disposition_preview与semantic_plan，机械转写已定单元决定、record_action、卡及Claim引用、理由、范围和欠账。返工记录使用新稿的operation_id，精确绑定原scan_ref、origin_scan_operation_id、材料和前序稿摘要，不伪造新扫描。不用dispositions覆盖既定判断，不重新决定新建或跳过。核新记录结构和确切绑定，保存待入库记录；正式记录及实际写入事实由P7落位。缺口原样保留，不提前声称Git提交、CI或合入。
+  exits:
+  - id: recorded
+    label: 待入库记录已保存
+    condition: 全部已定处置已完整转写，结构和确切业务输入绑定有效。
+    target: apply_view
+- id: apply_view
+  title: P7 安全落位和检索收尾
+  type: skill
+  owner: coder
+  skill: hs-knowledge-apply
+  prompt: 调用action batch，传确切view、待入库记录及原冻结查询。核输入快照、原版本、写锁、未完事务、备份和实际回读；新入口保证安全落位和实际收尾，不重跑整库质量lint，不要求P5通过票据。原journal已committed时只核事实并续办尾部，不再apply。按持久停点和原expected_active继续索引、回归、启用；响应丢失先核原进程、journal、batch停点和实际指针。记录批只落记录，不建索引。实际batch_complete和适用启用事实齐全才结束；运行故障保留原停点，内容问题另建明确修订。输出本批精确文件清单，Git提交、CI及合入另行处理。
+  exits:
+  - id: completed
+    label: 内容和检索收尾完成
+    condition: 实际batch_complete为true，内容事务、确切索引、原查询及启用回读均完成。
+    target: __end__
+  - id: recorded
+    label: 记录批已落位
+    condition: record_only批安全落记录且batch_complete为true，没有构建或启用索引。
+    target: __end__
 artifacts:
   primary: []
   optional: []

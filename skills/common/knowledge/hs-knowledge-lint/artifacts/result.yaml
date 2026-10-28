@@ -3,11 +3,15 @@ title: 只读 lint 检查报告
 required: true
 applies_to:
   node_ids:
-  - lint_preflight
   - lint_view
+  - check_formal
 required_on:
   exit_ids:
   - passed
+  - needs_material
+  - needs_plan
+  - needs_revision
+  - checked
 template: templates/result.md
 writing_guide: writing-guide.md
 review_guide: review-guide.md

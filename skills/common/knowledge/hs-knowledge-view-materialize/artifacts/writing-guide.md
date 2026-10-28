@@ -1,3 +1,5 @@
 # Writing guide
 
 Report the actual CLI status, phase, diagnostics and returned business file references. Use the output of this invocation; do not invent a passing result. OpenFlow owns run/node/attempt tracking and transition checks.
+
+For run/revise, include plan_ref, view_ref, disposition_preview_ref, summary_ref, batch_kind, review_mode and the exact input_snapshot digest. A record_only batch has no content write set. A revision names the old read-only view, new operation and reason. Describe only reports an existing exact view.

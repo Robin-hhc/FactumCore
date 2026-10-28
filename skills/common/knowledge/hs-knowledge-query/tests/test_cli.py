@@ -9,9 +9,10 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 
 
 def evaluate(cards, query, eligibility):
-    program = "import json,sys;from node import term_groups,score_card;v=json.load(sys.stdin);g=term_groups(v['query']);print(json.dumps([score_card(c,g,set(e)) for c,e in zip(v['cards'],v['eligible'])]))"
+    public = Path(__file__).resolve().parents[5] / "himate-knowledge-wifi-mp/evals/contract_test_support.py"
+    program = "import importlib.util,json,sys;s=importlib.util.spec_from_file_location('public_query',sys.argv[1]);m=importlib.util.module_from_spec(s);s.loader.exec_module(m);q=m.module('query_runtime');v=json.load(sys.stdin);g=q.term_groups(v['query']);print(json.dumps([q.score_card(c,g,set(e)) for c,e in zip(v['cards'],v['eligible'])]))"
     result = subprocess.run(
-        [sys.executable, "-c", program],
+        [sys.executable, "-c", program, str(public)],
         cwd=SCRIPTS,
         input=json.dumps({"cards": cards, "query": query, "eligible": eligibility}),
         text=True,

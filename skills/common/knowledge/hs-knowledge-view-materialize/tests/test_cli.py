@@ -55,9 +55,9 @@ def test_navigation_change_after_plan_requires_replan(harness):
     plan, _ = harness.plan()
     harness.write("knowledge/rules/index.md", b"Concurrent unrelated navigation edit\n")
     result = harness.run(
-        "view-materialize", {"operation_id": "op", "plan_ref": plan}, expected=2
+        "view-materialize", harness.record(plan)["request"], expected=2
     )
-    assert result["diagnostics"][0]["code"] == "BASELINE_CHANGED"
+    assert result["diagnostics"][0]["code"] == "INPUT_CHANGED"
 
 
 def test_view_source_identity_excludes_unrelated_registered_sources(harness):
@@ -101,8 +101,8 @@ def test_view_source_identity_excludes_unrelated_registered_sources(harness):
         == 2
     )
     assert (
-        harness.run("candidate-inspect", {"operation_id": "op", "view_ref": ref})[
+        harness.run("view-materialize", {"operation_id": "op", "view_ref": ref}, "describe")[
             "phase"
         ]
-        == "manual_ready"
+        == "described"
     )

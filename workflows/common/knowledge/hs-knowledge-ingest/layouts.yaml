@@ -10,42 +10,15 @@ canvas:
     plan_change:
       x: 680
       y: 0
-    review_plan:
-      x: 1020
-      y: 0
     materialize_view:
+      x: 1020
+      y: 0
+    lint_view:
       x: 1360
       y: 0
-    review_content:
-      x: 0
-      y: 240
-    lint_preflight:
-      x: 340
-      y: 240
-    inspect_candidate:
-      x: 680
-      y: 240
-    local_check:
-      x: 340
-      y: 480
-    revise_candidate:
-      x: 680
-      y: 480
-    lint_view:
-      x: 1020
-      y: 480
     record_ingest:
-      x: 1360
-      y: 480
+      x: 1700
+      y: 0
     apply_view:
-      x: 0
-      y: 720
-    recover_transaction:
-      x: 340
-      y: 720
-    rebuild_index:
-      x: 680
-      y: 720
-    query_regression:
-      x: 1020
-      y: 720
+      x: 2040
+      y: 0

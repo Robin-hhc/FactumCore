@@ -13,7 +13,7 @@ nodes:
     type: skill
     owner: reviewer
     skill: hs-knowledge-lint
-    prompt: 直接调用原 lint Skill，沿用默认 formal/full，不传 view_ref 或局部 scope。按实际 config.yml 准备输入；存在 current 代码卡时，由 Agent 提供真实 inputs.code_checkout 的配置路径、配置摘要与代码目录映射，原件使用确切源对象。为本次调用在知识根 .build 内选择全新报告路径，读取并核对实际 JSON 报告及其正式全库对象、规则和状态。完整保存的 failed/incomplete 报告也交给下一节点；规则或运行失败而未生成可用报告时保留 OpenFlow 原生等待，不交棒。记录本报告相对知识根的 lint_report_ref；摘要使用本节点独立路径，不覆盖原证据。
+    prompt: 显式调用 lint Skill 的 action lint，使用 mode formal 和 scope full。按实际 config.yml 准备输入；存在 current 代码卡时，由 Agent 提供真实 inputs.code_checkout 的配置路径、配置摘要与代码目录映射，原件使用确切源对象。为本次调用在知识根 .build 内选择全新报告路径，读取并核对实际 JSON 报告及其正式全库对象、规则和状态。完整保存的 failed/incomplete 报告也交给下一节点；规则或运行失败而未生成可用报告时保留 OpenFlow 原生等待，不交棒。记录本报告相对知识根的 lint_report_ref；摘要使用本节点独立路径，不覆盖原证据。
     exits:
       - id: checked
         label: 检查报告已保存

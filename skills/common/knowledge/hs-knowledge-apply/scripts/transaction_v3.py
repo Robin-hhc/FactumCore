@@ -4,6 +4,7 @@ import base64
 import importlib
 from pathlib import Path
 import re
+from types import SimpleNamespace
 
 from support import Blocked, Invalid, canonical, digest, seal
 
@@ -96,6 +97,44 @@ def check_admission(ctx, request, view):
             contracts(ctx, "source_resources").recover_snapshot(ctx.root, snapshot)
         except (ValueError, OSError) as exc:
             raise Blocked("exact source recovery is unavailable for local admission") from exc
+
+
+def check_execution_inputs(ctx, view, journal=None):
+    """Compare business inputs, admitting only this transaction's observed installations."""
+    snapshot = view.get("input_snapshot")
+    if snapshot is None and view.get("batch_kind") == "record_only":
+        return
+    if snapshot is None:
+        raise Invalid("the new batch action requires an exact input_snapshot")
+    shared = SimpleNamespace(root=ctx.root, args=SimpleNamespace(rules_digest=ctx.rules_digest),
+                             modules={"validation": ctx.domain,
+                                      "source_resources": contracts(ctx, "source_resources")})
+    try:
+        contracts(ctx, "ingest_execution").compare_view_inputs(shared, view, journal)
+    except (ValueError, OSError) as exc:
+        raise Blocked("batch input observation is unavailable: " + str(exc)) from exc
+
+
+def check_execution_view(ctx, view):
+    """Decode written objects and recover declared inputs, without whole-library quality rules."""
+    if ctx.domain is None:
+        return
+    knowledge = contracts(ctx, "knowledge")
+    sources = contracts(ctx, "source_resources")
+    for row in view.get("writes", []):
+        raw = base64.b64decode(row["bytes_b64"], validate=True)
+        path = row["path"]
+        if path == "governance/sources.lock.yaml":
+            ctx.domain.validate_shape("sources", ctx.domain.load_yaml(raw), ctx.rules)
+        elif path.startswith("knowledge/") and Path(path).name not in {"AGENTS.md", "README.md", "index.md"}:
+            if not path.endswith(".md"):
+                raise Invalid("knowledge cards must be Markdown")
+            knowledge.decode_card(raw, path, ctx.rules)
+    for snapshot in view.get("source_refs", []):
+        try:
+            sources.recover_snapshot(ctx.root, snapshot)
+        except (ValueError, OSError) as exc:
+            raise Blocked("exact source recovery is unavailable for batch execution") from exc
 
 
 def check_current_code(ctx, view, inputs):

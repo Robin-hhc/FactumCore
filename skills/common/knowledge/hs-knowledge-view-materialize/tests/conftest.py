@@ -122,12 +122,13 @@ class Harness:
     def capture(self, operation="op", text=b"# Source\nSynthetic evidence.\n"):
         self.write("docs-raw/specs/source.md", text)
         response = self.run(
-            "source-capture",
+            "source-prepare",
             {
                 "operation_id": operation,
                 "source_path": "docs-raw/specs/source.md",
                 "source_id": "synthetic",
             },
+            action="capture",
         )
         return response["data"]["bundle_ref"], self.record(
             response["data"]["bundle_ref"]
@@ -186,7 +187,7 @@ class Harness:
         ref, bundle = self.capture(operation)
         candidate = self.write(".build/candidates/new.md", self.card("new", bundle))
         planned = self.run(
-            "change-plan",
+            "view-materialize",
             {
                 "operation_id": operation,
                 "bundle_ref": ref,
@@ -204,10 +205,12 @@ class Harness:
 
     def view(self, operation="op"):
         plan, bundle = self.plan(operation)
-        response = self.run(
-            "view-materialize", {"operation_id": operation, "plan_ref": plan}
-        )
-        return response["data"]["view_ref"], bundle
+        return ".build/operations/" + operation + "/final-view.json", bundle
+
+    def lint(self, view_ref, expected=0, inputs=None):
+        return self.run("lint", {"operation_id": self.record(view_ref)["operation_id"],
+                                "mode": "candidate", "view_ref": view_ref,
+                                **({"inputs": inputs} if inputs is not None else {})}, expected=expected)
 
 
 @pytest.fixture

@@ -107,7 +107,9 @@ def _record_resolver(cards, rules, inputs, root, identity):
                 history["complete"] = False
         yield from git_cache
 
-    def resolve(reference, record):
+    snapshots = {row["snapshot_id"]: row for row in (rules.get("source_lock") or {}).get("snapshots", [])}
+
+    def resolve(reference, record, disposition=None):
         if "record_version_resolver" in inputs:
             raise v.ContractError("INVALID_RECORD_INPUT", "JSON callbacks are not supported; provide exact historical_card_objects")
         ref = reference if isinstance(reference, dict) else {"card_id": reference}
@@ -124,26 +126,112 @@ def _record_resolver(cards, rules, inputs, root, identity):
         if isinstance(explicit_id, str) and "/" in explicit_id:
             explicit_id = None
         logical_id = explicit_id or (accepted[0]["card_id"] if accepted else card["metadata"]["id"] if card else None)
+        aliases = {value for value in (target, path, logical_id) if value is not None}
+
+        def mentions(row):
+            refs = [item.get("card_id") or item.get("path") if isinstance(item, dict) else item
+                    for item in row.get("card_refs", [])]
+            refs += [item.get("card_id") if isinstance(item, dict) else item.rsplit("#", 1)[0]
+                     for item in row.get("claim_refs", []) if isinstance(item, dict) or isinstance(item, str)]
+            return any(item in aliases for item in refs)
+
+        related = [row for row in record.get("dispositions", []) if mentions(row)]
+        if disposition is not None and disposition not in related:
+            related.append(disposition)
+        pins = {item["sha256"] for row in related for item in row.get("card_refs", [])
+                if isinstance(item, dict) and (item.get("card_id") in aliases or item.get("path") in aliases)
+                and item.get("sha256") is not None}
+        if expected is not None:
+            pins.add(expected)
+        if any(not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value) for value in pins):
+            raise v.ContractError("INVALID_RECORD_REFERENCE", "A record card fingerprint must be SHA-256")
+        if len(pins) > 1:
+            raise v.ContractError("CARD_VERSION_MISMATCH", "A record must reference one exact version of each card", str(target))
+        expected = next(iter(pins), None)
+        required_claims = {claim} if claim is not None else set()
+        for row in related:
+            for item in row.get("claim_refs", []):
+                if isinstance(item, dict):
+                    card_id, claim_id = item.get("card_id"), item.get("claim_id")
+                elif isinstance(item, str) and "#" in item:
+                    card_id, claim_id = item.rsplit("#", 1)
+                else:
+                    continue
+                if card_id in aliases:
+                    required_claims.add(claim_id)
+        adopted_sources = {}
+        if expected is None:
+            units = {row["unit_id"]: row for row in record.get("inventory", {}).get("units", [])}
+            for row in related:
+                progress = row.get("progress")
+                progress = progress.get("status") if isinstance(progress, dict) else progress
+                if progress != "completed" or not row.get("adopted_fingerprint"):
+                    continue
+                unit = units.get(row["unit_id"])
+                if not unit or not unit.get("source_id"):
+                    raise v.ContractError("RECORD_HISTORY_UNAVAILABLE", "The adopted card version needs its fixed source inventory", str(target))
+                adopted_sources.setdefault(unit["source_id"], set()).add(row["adopted_fingerprint"])
+
         def matches(candidate, archive=False):
             if accepted and candidate["metadata"]["id"] != accepted[0]["card_id"]:
                 return False
             # An archive object has body/hash authority, not path authority.
             # Never manufacture an existing path by assigning the requested path.
             identity_matches = candidate["metadata"]["id"] == logical_id if archive else (candidate["metadata"]["id"] == target or candidate["path"] == target)
-            if identity_matches and expected is not None and candidate["sha256"] == expected and claim is not None and claim not in {item["id"] for item in candidate["metadata"]["claims"]}:
-                raise v.ContractError("DANGLING_CLAIM_RECORD", "The exact pinned card body has no referenced Claim", str(claim))
-            return identity_matches and (expected is None or candidate["sha256"] == expected) and (claim is None or claim in {item["id"] for item in candidate["metadata"]["claims"]})
-        if card and matches(card):
-            return card
+            missing_claims = required_claims - {item["id"] for item in candidate["metadata"]["claims"]}
+            if identity_matches and expected is not None and candidate["sha256"] == expected and missing_claims:
+                raise v.ContractError("DANGLING_CLAIM_RECORD", "The exact pinned card body has no referenced Claim", str(sorted(missing_claims)))
+            # One body must satisfy all this record's adopted versions for a
+            # source it contains. Other associated cards may have other sources;
+            # the validator still checks adoption over the complete card set.
+            source_matches = all(
+                all(any(source["source_id"] == source_id
+                        and snapshots.get(source["snapshot_id"], {}).get("source_id") == source_id
+                        and snapshots.get(source["snapshot_id"], {}).get("sha256") == fingerprint
+                        for source in candidate["metadata"]["sources"])
+                    for fingerprint in fingerprints)
+                for source_id, fingerprints in adopted_sources.items()
+                if any(source["source_id"] == source_id for source in candidate["metadata"]["sources"]))
+            return identity_matches and (expected is None or candidate["sha256"] == expected) and source_matches and not missing_claims
+        fallback = None
+
+        def prefer(candidate, archive=False):
+            nonlocal fallback
+            if not matches(candidate, archive):
+                return None
+            if adopted_sources and not any(source["source_id"] in adopted_sources for source in candidate["metadata"]["sources"]):
+                # This may be an unrelated associated card. First look for the
+                # actual adopted source version, then let collective coverage
+                # decide whether the unrelated association is sufficient.
+                if fallback is None:
+                    fallback = candidate
+                return None
+            return candidate
+
+        selected = prefer(card) if card else None
+        if selected is not None:
+            return selected
         for candidate in archive_objects(path):
-            if matches(candidate, archive=True):
-                return candidate
+            selected = prefer(candidate, archive=True)
+            if selected is not None:
+                return selected
+        # Unrelated associated cards do not create a new Git-history obligation.
+        # An already declared source-bound body wins over this fallback; the
+        # unchanged collective coverage check still rejects a missing adoption.
+        if fallback is not None:
+            return fallback
         for candidate in git_objects():
-            if matches(candidate):
-                return candidate
-        if expected is not None or not history["complete"]:
+            selected = prefer(candidate)
+            if selected is not None:
+                return selected
+        if fallback is not None:
+            return fallback
+        if expected is not None or adopted_sources or not history["complete"]:
             raise v.ContractError("RECORD_HISTORY_UNAVAILABLE", "Required exact historical card/Claim body could not be recovered", str(target))
         raise v.ContractError("DANGLING_CLAIM_RECORD" if claim else "DANGLING_CARD_RECORD", "No such card/Claim exists in the complete candidate or available Git knowledge history", str(target))
+    # The validator opts in to this internal, disposition-aware interface.
+    # Ordinary trusted Python resolvers retain their original two arguments.
+    resolve.resolve_disposition = resolve
     return resolve
 
 
@@ -221,6 +309,51 @@ def run(view, rules, inputs=None, scope=None):
         incomplete = isinstance(exc, OSError) or code.endswith("UNAVAILABLE")
         finding(group, code, str(exc), path or getattr(exc, "path", ""), incomplete=incomplete)
 
+    candidate = view.get("candidate")
+    candidate_context = None
+    if candidate and candidate.get("input_snapshot"):
+        from .runtime import OperationContext
+        from .input_snapshot import compare_inputs
+        candidate_context = OperationContext(
+            root, {"operation_id": candidate["operation_id"]},
+            modules={}, rules=rules, tool=candidate["tool_identity"],
+            rules_digest=rules["rules_digest"],
+        )
+        # These are already loaded, digest-pinned program modules. Neither the
+        # request nor the source document can supply a callback implementation.
+        import sys
+        candidate_context.modules = {
+            name.rsplit(".", 1)[-1]: module
+            for name, module in tuple(sys.modules.items())
+            if name.startswith(__package__ + ".") and name.count(".") == __package__.count(".") + 1
+        }
+        try:
+            observation = compare_inputs(candidate_context, candidate["input_snapshot"])
+            by_group["view"]["input_observation"] = observation
+            if not observation["unchanged"]:
+                finding("view", "INPUT_CHANGED", "Candidate inputs changed after production")
+            if candidate.get("production_request_digest"):
+                for row in candidate.get("writes", []):
+                    display = ".build/operations/" + candidate["operation_id"] + "/final-view/" + row["path"]
+                    raw = _read(v.safe_path(root, display, [".build/operations"]))
+                    if v.sha256_bytes(raw) != row["final_digest"]:
+                        raise v.ContractError("FINAL_BYTES_CHANGED", "Saved display differs from the actual candidate", row["path"])
+        except (v.ContractError, OSError, ValueError, KeyError, TypeError) as exc:
+            caught("view", exc)
+    if candidate_context is not None and candidate.get("batch_kind") == "record_only":
+        from .production import validate_candidate
+        for group in ("format", "source", "relation", "index"):
+            by_group[group]["status"] = "not_applicable"
+            by_group[group]["reason"] = "This batch records dispositions and writes no knowledge"
+        try:
+            by_group["records"]["disposition_check"] = validate_candidate(candidate_context, candidate, cards={})
+        except (v.ContractError, OSError, ValueError, KeyError, TypeError) as exc:
+            caught("records", exc)
+        report["object"]["files_digest"] = v.digest_payload({
+            ref: v.sha256_bytes(raw) for ref, raw in view.get("files", {}).items()
+        })
+        return _finish_report(report)
+
     files = dict(view.get("files", {}))
     baseline = dict(files)
     try:
@@ -279,9 +412,19 @@ def run(view, rules, inputs=None, scope=None):
             journal_root = v.safe_path(root, "logs/operations")
             if journal_root.exists():
                 for journal in journal_root.glob("*/journal.json"):
-                    item = json.loads(_read(v.safe_path(root, journal.relative_to(root).as_posix())))
-                    if item.get("status") not in {"committed", "rolled_back"}:
-                        finding("view", "RECOVERY_REQUIRED", "An unfinished transaction requires recovery before checking", str(journal.relative_to(root)), incomplete=True)
+                    relative = journal.relative_to(root).as_posix()
+                    try:
+                        item = json.loads(_read(v.safe_path(root, relative)))
+                        records.verify(item)
+                        v.validate_shape("transaction_journal", item, rules)
+                        if item.get("record_kind") != "transaction_journal" or item.get("operation_id") != journal.parent.name:
+                            raise v.ContractError("JOURNAL_BINDING_MISMATCH", "Journal kind or operation differs from its directory")
+                        if item.get("status") not in {"committed", "rolled_back"}:
+                            finding("view", "RECOVERY_REQUIRED", "An unfinished or unknown transaction needs inspection", relative, incomplete=True)
+                        elif candidate and item.get("operation_id") == candidate.get("operation_id"):
+                            finding("view", "RECOVERY_REQUIRED", "This operation already has transaction facts; inspect or resume it", relative, incomplete=True)
+                    except (v.ContractError, OSError, ValueError, KeyError, TypeError) as exc:
+                        finding("view", "TRANSACTION_CONTEXT_UNAVAILABLE", str(exc), relative, incomplete=True)
     except (v.ContractError, OSError, ValueError, KeyError, TypeError) as exc:
         caught("view", exc)
     report["object"]["files_digest"] = v.digest_payload({ref: v.sha256_bytes(raw) for ref, raw in files.items() if isinstance(raw, bytes)})
@@ -309,6 +452,12 @@ def run(view, rules, inputs=None, scope=None):
         except (v.ContractError, UnicodeError, ValueError, KeyError) as exc:
             if selected(ref):
                 caught("format", exc, ref)
+    if candidate_context is not None:
+        try:
+            from .production import validate_candidate
+            by_group["view"]["authored_candidate_check"] = validate_candidate(candidate_context, candidate, cards=cards)
+        except (v.ContractError, OSError, ValueError, KeyError, TypeError) as exc:
+            caught("view", exc)
     try:
         knowledge.validate_relations(cards)
     except v.ContractError as exc:
@@ -410,7 +559,7 @@ def run(view, rules, inputs=None, scope=None):
                 caught("source", exc, card["path"])
                 report["code_check_status"] = "incomplete" if getattr(exc, "code", "").endswith("UNAVAILABLE") else "failed"
 
-    record_resolver = _record_resolver(cards, rules, inputs, root, report["object"])
+    record_resolver = _record_resolver(cards, {**rules, "source_lock": lock}, inputs, root, report["object"])
     formal_records, record_paths = [], {}
     for ref, raw in files.items():
         if ref.startswith("logs/ingest/") and selected(ref):
@@ -422,7 +571,8 @@ def run(view, rules, inputs=None, scope=None):
             except (v.ContractError, ValueError, KeyError, TypeError) as exc:
                 caught("records", exc, ref)
     if formal_records:
-        reconstructed = records.rebuild_restrictions(formal_records, rules=rules, cards=cards)
+        reconstructed = records.rebuild_restrictions(formal_records, rules=rules, cards=cards,
+                                                     _validated_records=tuple(formal_records))
         by_group["records"]["processing_state"] = reconstructed
         for gap in reconstructed["gaps"]:
             finding("records", gap["code"], gap["reason"], record_paths.get(gap.get("record_digest"), ""), incomplete=gap["code"].endswith("UNAVAILABLE"))
@@ -437,6 +587,10 @@ def run(view, rules, inputs=None, scope=None):
                 by_group["index"]["summary"] = indexing.check(list(cards.values()), rules, temporary)
         except (v.ContractError, OSError, ValueError, ImportError) as exc:
             caught("index", exc)
+    return _finish_report(report)
+
+
+def _finish_report(report):
     states = {row["status"] for row in report["checks"]}
     report["status"] = "failed" if "failed" in states else "incomplete" if "incomplete" in states else "passed"
     report["complete"] = "incomplete" not in states

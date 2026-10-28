@@ -2,6 +2,17 @@
 
 import pytest
 
+import importlib.util
+from pathlib import Path
+
+
+_flow_spec = importlib.util.spec_from_file_location(
+    "source_scan_completion_flow_fixture", Path(__file__).with_name("test_supported_workflow.py"),
+)
+_flow_fixture = importlib.util.module_from_spec(_flow_spec)
+_flow_spec.loader.exec_module(_flow_fixture)
+planned_flow = _flow_fixture.planned_flow
+
 
 def applied_batch(harness, *, fault_after=None, with_record=True):
     operation = "batch"
@@ -9,13 +20,13 @@ def applied_batch(harness, *, fault_after=None, with_record=True):
     scanned = harness.run("source-scan", {"operation_id": operation}, "scan")["data"]
     scan = harness.record(scanned["scan_ref"])
     unit = scan["units"][0]
-    bundle_ref = harness.run("source-capture", {"operation_id": operation,
-        "source_path": unit["path"], "source_id": unit["source_id"]})["data"]["bundle_ref"]
+    bundle_ref = harness.run("source-prepare", {"operation_id": operation,
+        "source_path": unit["path"], "source_id": unit["source_id"]}, action="capture")["data"]["bundle_ref"]
     candidate = harness.write(".build/candidates/new.md", harness.card("new", harness.record(bundle_ref)))
-    plan = harness.run("change-plan", {"operation_id": operation, "bundle_ref": bundle_ref,
+    produced = harness.run("view-materialize", {"operation_id": operation, "bundle_ref": bundle_ref,
         "decisions": [{"candidate_id": "new", "decision": "create", "reason": "Synthetic recovery fixture",
-                       "card_inputs": [candidate]}]})["data"]["plan_ref"]
-    view = harness.run("view-materialize", {"operation_id": operation, "plan_ref": plan})["data"]["view_ref"]
+                       "card_inputs": [candidate]}]})["data"]
+    view = produced["view_ref"]
     record = harness.run("source-scan", {
         "operation_id": operation, "scan_ref": scanned["scan_ref"], "view_ref": view,
         "dispositions": [{"unit_id": unit["unit_id"], "action": "create", "reason": "Synthetic recovery fixture",
@@ -64,24 +75,25 @@ def test_independent_apply_without_processing_record_still_lists_local_tail(harn
 
 def test_cross_operation_regression_activation_and_repeated_noop_stay_complete(harness):
     view = applied_batch(harness)
-    built = harness.run("index-build", {"operation_id": "index-other"})["data"]
+    built = harness.run("apply", {"operation_id": "index-other"}, action='index-build')["data"]
     own_index = harness.run("source-scan", {"operation_id": "status", "target_operation_id": "index-other"}, "status")["data"]["operations"][0]
     assert "index" in {row["stage"] for row in own_index["facts"]}
     assert own_index["completion"]["status"] == "unknown"
     assert own_index["completion"]["next_action"] == "inspect_finalization"
     before_query = operation_status(harness)
     assert before_query["completion"]["next_action"] == "resume_queries"
-    checked = harness.run("query-regression", {
+    checked = harness.run("apply", {
         "operation_id": "query-other", "view_ref": view, "generation_ref": built["generation_ref"],
         "expected_active": built["expected_active"],
         "cases": [{"id": "find-new", "query": "Synthetic", "purpose": "guidance", "required": ["new"]}],
-    })["data"]
+    }, action='regression')["data"]
     assert checked["activated"]
     own_query = harness.run("source-scan", {"operation_id": "status", "target_operation_id": "query-other"}, "status")["data"]["operations"][0]
     assert {row["stage"] for row in own_query["facts"]} >= {"regression", "activation"}
     assert own_query["completion"]["status"] == "unknown"
     after_query = operation_status(harness)
     assert after_query["completion"]["status"] == "complete"
+    assert after_query["completion"]["index_health"] == "not_examined"
     assert {row["stage"] for row in after_query["facts"]} >= {"index", "regression", "activation"}
     records_before = sorted((harness.root / "logs/ingest").glob("*"))
     for attempt in range(3):
@@ -90,20 +102,150 @@ def test_cross_operation_regression_activation_and_repeated_noop_stay_complete(h
         assert scanned["finalization_pending"] == []
     assert sorted((harness.root / "logs/ingest").glob("*")) == records_before
     # A later active generation must not erase the earlier observed activation.
-    later = harness.run("index-build", {"operation_id": "later-generation"})["data"]
-    harness.run("index-build", {"operation_id": "later-activation", "generation_ref": later["generation_ref"],
-                                "expected_active": later["expected_active"]}, "activate")
+    later = harness.run("apply", {"operation_id": "later-generation"}, action='index-build')["data"]
+    harness.run("apply", {"operation_id": "later-activation", "generation_ref": later["generation_ref"],
+                                "expected_active": later["expected_active"]}, 'index-activate')
     assert operation_status(harness)["completion"]["status"] == "complete"
+
+
+@pytest.mark.parametrize("orphan_history", [False, True], ids=["no-control-plane", "unrooted-history"])
+def test_self_sealed_activation_observation_without_real_active_chain_is_not_complete(harness, orphan_history):
+    import hashlib
+    import json
+
+    def canonical(value):
+        return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+
+    view_ref = applied_batch(harness)
+    view = harness.record(view_ref)
+    built = harness.run("apply", {"operation_id": "real-build"}, "index-build")["data"]
+    manifest = harness.record(built["generation_ref"])
+
+    def sealed(kind, operation, payload):
+        value = {"schema_version": "2.0", "record_kind": kind, "operation_id": operation,
+                 "rules_digest": harness.rules, "tool_identity": manifest["tool_identity"], **payload}
+        value["digest"] = hashlib.sha256(canonical(value)).hexdigest()
+        return value
+
+    cases = [{"id": "find-new", "query": "Synthetic", "purpose": "guidance", "required": ["new"]}]
+    # Declare assertions, then use public regression-verify to execute actual
+    # queries/read-back without activation. This is not a synthetic passed report.
+    declared = sealed("query_regression", "declared-cases", {
+        "generation_ref": built["generation_ref"], "expected_active": built["expected_active"],
+        "view_ref": view_ref, "view_digest": view["digest"], "cases": cases,
+        "cases_digest": hashlib.sha256(canonical(cases)).hexdigest(), "outcomes": [],
+        "passed": False, "index_verified": False})
+    report_ref = harness.write(".build/operations/declared-cases/report.json", canonical(declared))
+    verified = harness.run("apply", {"operation_id": "actual-queries", "report_ref": report_ref}, "regression-verify")["data"]
+    assert verified["passed"] is True and verified["activated"] is False
+    assert harness.record(verified["report_ref"])["index_verified"] is True
+    control_plane = harness.root / "artifacts/indexes/local"
+    assert not (control_plane / "active.json").exists()
+    assert not any(control_plane.glob("activations/*.json"))
+    assert operation_status(harness)["completion"]["status"] == "pending"
+
+    pointer = sealed("index_manifest", "forged-pointer", {
+        "channel": "local", "generation_id": manifest["generation_id"],
+        "generation_ref": built["generation_ref"], "manifest_digest": manifest["digest"],
+        "previous_active_digest": built["expected_active"]})
+    observation = sealed("artifact_manifest", "forged-observation", {
+        "purpose": "index_activation_observation", "generation_ref": built["generation_ref"],
+        "manifest_digest": manifest["digest"], "expected_active": built["expected_active"],
+        "active_digest": pointer["digest"], "active_pointer": pointer})
+    harness.write(".build/operations/forged-observation/activation/" + observation["digest"] + ".json", canonical(observation))
+    if orphan_history:
+        # A prepared history object that is not reachable from active.json
+        # supplies no activation fact, even though every local digest is valid.
+        harness.write("artifacts/indexes/local/activations/" + pointer["digest"] + ".json", canonical(pointer))
+    completion = operation_status(harness)["completion"]
+    assert completion["status"] in {"pending", "unknown"}
+    scanned = harness.run("source-scan", {"operation_id": "after-forged-observation"}, "scan")["data"]
+    assert scanned["actionable_unit_ids"] == []
+    assert any(item["operation_id"] == "batch" and item["status"] != "complete" for item in scanned["finalization_pending"])
+    assert not (control_plane / "active.json").exists()
+
+
+@pytest.mark.parametrize("completion_kind", ["legacy", "batch"])
+def test_real_independent_activation_without_regression_binding_rejects_forged_completion(planned_flow, completion_kind):
+    import hashlib
+    import json
+
+    harness = planned_flow.h
+
+    def canonical(value):
+        return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+
+    if completion_kind == "batch":
+        # Stop before indexing/query execution with a real IO blocker. The
+        # independently built/activated generation below has no P7 regression.
+        planned_flow.produce("applied")
+        operation, view_ref = planned_flow.operation, planned_flow.state["view_ref"]
+    else:
+        operation, view_ref = "batch", applied_batch(harness)
+    view = harness.record(view_ref)
+    journal = harness.record(f"logs/operations/{operation}/journal.json")
+    applied = harness.record(journal["result_ref"])
+    built = harness.run("apply", {"operation_id": "independent-index"}, "index-build")["data"]
+    activated = harness.run("apply", {"operation_id": "independent-activation",
+        "generation_ref": built["generation_ref"], "expected_active": built["expected_active"]}, "index-activate")["data"]
+    manifest = harness.record(built["generation_ref"])
+    pointer = harness.record("artifacts/indexes/local/active.json")
+    assert activated["activated"] is True
+    assert "execution_binding" not in pointer
+    assert not list((harness.root / ".build/operations").glob("*/regression/*.json"))
+
+    def sealed(kind, payload):
+        value = {"schema_version": "2.0", "record_kind": kind, "operation_id": operation,
+                 "rules_digest": harness.rules, "tool_identity": manifest["tool_identity"], **payload}
+        value["digest"] = hashlib.sha256(canonical(value)).hexdigest()
+        return value
+
+    # These intentionally forged JSON claims are structurally valid and bind
+    # the exact view/cases/apply bytes. They cannot give an independent real
+    # activation a regression execution it never observed.
+    cases = view.get("target_queries") or [
+        {"id": "find-new", "query": "Synthetic", "purpose": "guidance", "required": ["new"]}]
+    report = sealed("query_regression", {
+        "generation_ref": built["generation_ref"], "expected_active": built["expected_active"],
+        "view_ref": view_ref, "view_digest": view["digest"],
+        "apply_result_ref": journal["result_ref"], "apply_result_digest": applied["digest"],
+        "cases": cases, "cases_digest": hashlib.sha256(canonical(cases)).hexdigest(),
+        "outcomes": [{"case_id": case["id"], "passed": True, "actual": case["required"],
+                      "same_generation_reads": []} for case in cases],
+        "passed": True, "index_verified": True})
+    report_ref = harness.write(f".build/operations/{operation}/regression/" + report["digest"] + ".json", canonical(report))
+    observation = sealed("artifact_manifest", {
+        "purpose": "index_activation_observation", "generation_ref": built["generation_ref"],
+        "manifest_digest": manifest["digest"], "expected_active": built["expected_active"],
+        "active_digest": pointer["digest"], "active_pointer": pointer})
+    observation_ref = harness.write(f".build/operations/{operation}/activation/" + observation["digest"] + ".json", canonical(observation))
+    if completion_kind == "batch":
+        stage = sealed("artifact_manifest", {"purpose": "batch_index", "view_digest": view["digest"],
+            "apply_result_ref": journal["result_ref"], "apply_result_digest": applied["digest"],
+            "generation_ref": built["generation_ref"], "expected_active": built["expected_active"]})
+        harness.write(f".build/operations/{operation}/batch-build.json", canonical(stage))
+        complete = sealed("artifact_manifest", {"purpose": "batch_completion", "view_digest": view["digest"],
+            "phase": "completed", "data": {"batch_complete": True, "transaction_status": "committed",
+                "apply_result_ref": journal["result_ref"], "apply_result_digest": applied["digest"],
+                "generation_ref": built["generation_ref"], "expected_active": built["expected_active"],
+                "activated": True, "report_ref": report_ref, "activation_observation_ref": observation_ref}})
+        harness.write(f".build/operations/{operation}/batch-complete.json", canonical(complete))
+    status = harness.run("source-scan", {"operation_id": "forgery-status", "target_operation_id": operation}, "status")["data"]["operations"][0]
+    assert status["completion"]["status"] in {"pending", "unknown"}
+    scanned = harness.run("source-scan", {"operation_id": "after-forged-regression"}, "scan")["data"]
+    assert scanned["actionable_unit_ids"] == []
+    assert any(row["operation_id"] == operation and row["status"] != "complete" for row in scanned["finalization_pending"])
+    assert harness.record("artifacts/indexes/local/active.json") == pointer
 
 
 def test_unbound_or_irrelevant_regression_is_not_batch_completion(harness):
     view = applied_batch(harness)
-    built = harness.run("index-build", {"operation_id": "unrelated-index"})["data"]
-    checked = harness.run("query-regression", {
+    built = harness.run("apply", {"operation_id": "unrelated-index"}, action='index-build')["data"]
+    checked = harness.run("apply", {
         "operation_id": "irrelevant-query", "view_ref": view, "generation_ref": built["generation_ref"],
         "expected_active": built["expected_active"],
         "cases": [{"id": "irrelevant", "query": "No such card", "forbidden": ["nonexistent-card"]}],
-    })["data"]
+    }, action='regression')["data"]
     assert checked["activated"]
     status = operation_status(harness)
     assert status["completion"]["status"] != "complete"
@@ -188,29 +330,33 @@ def test_empty_raw_inventory_with_maintenance_debt_is_not_a_noop(harness):
     assert status["completion"]["status"] != "not_applicable"
 
 
-def test_frozen_batch_status_binds_plan_review_lint_and_original_cases(tmp_path):
-    import importlib.util
-    from pathlib import Path
-
-    root = Path(__file__).resolve().parents[5]
-    spec = importlib.util.spec_from_file_location("scan_status_v3_fixture",
-        root / "himate-knowledge-wifi-mp/evals/tests/test_post_ingest_correction.py")
-    fixture = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(fixture)
-    harness = fixture.frozen_harness(tmp_path)
-    harness.write("docs-raw/specs/source.md", b"# Source\nSynthetic fixture statement for test readers.\n")
-    finished = fixture.complete_document_operation(harness, "first", "create", "Synthetic fixture statement.")
-    status = harness.run("source-scan", {"operation_id": "status", "target_operation_id": "first"}, "status")["data"]["operations"][0]
+def test_frozen_batch_status_binds_plan_review_lint_and_original_cases(planned_flow):
+    import hashlib
+    import json
+    flow = planned_flow
+    flow.produce()
+    harness, operation = flow.h, flow.operation
+    status = harness.run("source-scan", {"operation_id": "status", "target_operation_id": operation}, "status")["data"]["operations"][0]
     assert status["completion"]["status"] == "complete"
     assert {row["stage"] for row in status["facts"]} >= {"semantic_plan", "view", "content_review", "lint", "index", "regression", "activation"}
-    original_report = next((harness.root / ".build/operations/first/regression").glob("*.json"))
+    original_report = next((harness.root / ".build/operations" / operation / "regression").glob("*.json"))
     original_ref = original_report.relative_to(harness.root).as_posix()
     # A real successful alternate query still cannot replace frozen batch cases.
-    alternate = harness.run("query-regression", {"operation_id": "alternate-query", "report_ref": original_ref,
-        "view_ref": finished["view_ref"], "cases": [{"id": "other-query", "query": "fixture", "purpose": "guidance", "required": ["rule"]}]}, "verify")
+    original = harness.record(original_ref)
+    cases = [{"id": "other-query", "query": "fixture", "purpose": "guidance", "required": ["rule"]}]
+    # Re-execute a separate declared case set without trying to reactivate an
+    # already active generation under a replacement CAS baseline.
+    definition = {**original, "operation_id": "alternate-query", "cases": cases,
+                  "cases_digest": hashlib.sha256(json.dumps(cases, sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
+                  "outcomes": [], "passed": False, "index_verified": False}
+    definition.pop("digest")
+    definition["digest"] = hashlib.sha256(json.dumps(definition, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    ref = harness.write(".build/operations/alternate-query/declared-cases.json", json.dumps(definition).encode())
+    alternate = harness.run("apply", {"operation_id": "alternate-query", "report_ref": ref}, "regression-verify")
     assert alternate["data"]["passed"]
+    assert alternate["data"]["activated"] is False
     original_report.rename(original_report.with_suffix(".retained"))
-    rejected = harness.run("source-scan", {"operation_id": "status", "target_operation_id": "first"}, "status")["data"]["operations"][0]
+    rejected = harness.run("source-scan", {"operation_id": "status", "target_operation_id": operation}, "status")["data"]["operations"][0]
     assert rejected["completion"]["status"] != "complete"
     assert rejected["completion"]["next_action"] == "inspect_finalization"
 
@@ -233,7 +379,7 @@ def test_missing_original_cas_baseline_is_unknown_and_never_reconstructed(harnes
     import json
 
     applied_batch(harness)
-    built = harness.run("index-build", {"operation_id": "legacy-index"})["data"]
+    built = harness.run("apply", {"operation_id": "legacy-index"}, action='index-build')["data"]
     manifest = harness.record(built["generation_ref"])
     manifest.pop("expected_active")
     manifest.pop("digest")

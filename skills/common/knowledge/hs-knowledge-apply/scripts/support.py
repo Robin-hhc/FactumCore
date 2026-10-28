@@ -431,6 +431,10 @@ def load_context(args, package_root):
             validation_path = target
     if validation_path is None:
         raise Invalid("validation program is not pinned")
+    contract_names = tuple(sorted(ref[len("governance/contracts/"):-3] for ref in verified
+                                      if ref.startswith("governance/contracts/") and ref.endswith(".py")
+                                      and "/" not in ref[len("governance/contracts/"):]
+                                      and not ref.endswith("/__init__.py")))
     package_name = "_aiot_domain_" + args.rules_digest
     for name in ("__init__", "validation", "knowledge", "source_resources", "records", "indexing", "checks", "indexing", "checks"):
         if "governance/contracts/" + name + ".py" not in verified:
@@ -472,7 +476,7 @@ def load_context(args, package_root):
     sys.meta_path.insert(0, finder)
     try:
         importlib.import_module(package_name)
-        for name in ("validation", "knowledge", "source_resources", "records", "indexing", "checks"):
+        for name in contract_names:
             importlib.import_module(package_name + "." + name)
     finally:
         sys.meta_path.remove(finder)
@@ -492,6 +496,7 @@ def load_context(args, package_root):
     context = Context(
         root, args.rules_digest, identity(package_root), catalog, domain, rules
     )
+    context.modules = {name: sys.modules[package_name + "." + name] for name in contract_names}
     context.catalog_path = (
         str(pathlib.Path(args.catalog).resolve()) if args.catalog else None
     )

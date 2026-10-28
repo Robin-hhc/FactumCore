@@ -27,12 +27,12 @@ retains the original generation even after a new generation activates.
 Receipt hashes and active-pointer observations provide integrity and lineage
 under the existing local artifact trust model. They are not origin signatures,
 ACLs or independent content/code review. They retain data integrity, source and dependency checks. Skill calls do not
-require an apply/merge-check qualification chain. Current reads check actual
+require upstream passed reports or a Workflow qualification chain. Current reads check actual
 source/configuration bytes; historical reads keep the exact retained source. If no
 original record or eligible claim remains, the read is refused.
 
 If a public source-resolution call times out, search, receipt and read return
-`status: blocked` with the original `SIBLING_TIMEOUT` diagnostic and no answer
+`status: blocked` with the original backend timeout diagnostic and no answer
 data. The same applies while qualifying dependencies or rechecking a result
 before output. A timeout is not a stale-source finding or a valid zero-hit
 answer. Normal source absence and non-current source qualification retain
@@ -50,7 +50,7 @@ uncommitted local record does not establish a repository snapshot. Code/current 
 requires the current configuration fingerprint and actual referenced code
 bytes to match; unknown or changed context restricts those Claims.
 
-P2 maintenance candidate discovery is exposed by `source-scan prepare` and
+P2 maintenance candidate discovery is exposed by `hs-knowledge-source-prepare` and
 the shared knowledge relation functions. It includes non-answer states and
 does not relax this query API's answer eligibility. New-search index freshness
 checking is outside this change; generation integrity and same-generation

@@ -19,11 +19,15 @@
 
 架构设计解释分层与协作；详细设计分概要和节点设计两层，以流程图、分支条件和文件职责表达。设计正文不记开发轮次、票据状态、Agent 工作进度或历史测试成绩；这些进入 SDD 工件。系统设计不构成正式领域事实，Schema/Contract 机器规则归 `../governance/`，此处不另建执行契约。
 
-统一约定：一条 ingest 完整串起 P1 扫描／续办、P2 材料、P3 阅读计划、P4 写稿、独立内容复核和适用代码语义核验、P5 调用 lint Skill、P6 登记处理记录、P7 本地入库、索引全验、目标查询与活动代激活，通过后 ingest 结束；仅记录批保存记录后结束，不再分前后两段。详设 §3.1 展开 lint 的 L1—L5 只读检查；它可被 ingest、手动或定期调用，只检查和报告。输入未变且停点仍有效时续办原操作；退回改稿或输入变化后建立新操作和新视图，重新完成独立复核与固定检查。原件未变的用户修卡请求仍进入 P2，显式选取相关单元与已有卡，不按无变化跳过。Git 提交、触发 CI 和合入均是人工后续流程，不属于 ingest 的完成条件。C1 直接复用 lint 的已有固定脚本和确定性函数，通过后由人合入，不调用 Agent，不另开发业务构建任务。源码分析按确切源码和逐 Claim 条件核验，不统一强制编译产物；具体产品当前实现核对真实 Target 和条件；编译、运行或实测断言须对应证据。本地原件核对确切捕获对象，不要求先有 Git 提交；跨机恢复与 CI 输入由人工上库时准备。P2 保留的旧卡正文与指纹作为历史检查输入交给 lint 和 P7；索引回归沿用构建返回的代次及活动指针基线，激活成功才报告完成。索引构建不另拆维护、激活或发布交接主线；现有模板与实际调用边界仍按使用说明和源码核实。
+统一约定：公开能力为9个Skill，ingest恰好7个节点。P1 source-scan只观察变化及续办；P2 source-prepare按固定单元或显式目标备料，不要求先有P1记录，补料不默认全扫；P3 change-plan保存语义计划和冻结查询；P4 view-materialize直接成稿、修订、描述及固定实际输入；P5 lint由独立reviewer阅读计划、稿件、新旧证据并执行一次完整质量检查，材料／语义／字节问题分别回P2／P3／P4；P6 source-scan.record对账处理记录；P7 apply.batch安全落位、完整验证真实索引、执行同代目标查询并CAS激活。其他节点由coder执行；无变化且无义务则结束，不制造记录。保持详设L1—L5编号与独立lint默认formal/full，CI只复用固定规则，不调用Agent。
 
-独立内容复核的角色、上下文隔离与执行顺序由人工测试者或 OpenFlow 安排；Skill 只校验本次业务记录、逐 Claim 理由、引用和确切视图／源码绑定，不要求作者链、Workflow 身份或上游通过票据。apply 保留实际固定检查及安全写入，不自动生成 supported 验收摘要；索引和查询按实际来源、工作树源码、配置范围及采用的构建／运行材料核验，`code_contexts` 是生成的业务数据。显式签名发布回执仍核身份真实性，共享索引构建的 `knowledge_commit` 只核仓库快照，不代表 CI 或复核通过。用户修订以新视图记录，历史原字节保留。
+P4只负责生产一致性，不做知识质量或代码语义复核。P5同时承接文档、代码、归卡与实质skip的独立审阅，固定脚本只校验确定性证据、逐Claim理由及确切内容绑定；它们不认证作者身份或代替内容判断。角色、上下文隔离与执行顺序由宿主／人工测试者落实，Skill不要求Workflow身份、catalog或上游通过票据。未知Target、版本、构建条件保持unknown；静态源码结论不统一要求编译产物，编译／运行／实测断言须有实际材料。
 
-lint 的新增编排限定为只读巡检：`F/hs-knowledge-lint/` 只有 `check_formal`、`audit_references` 两个 `type: skill` 节点，前者沿用 `S/hs-knowledge-lint/` 默认 formal／full，后者显式调用 maintain 的只读 `audit-references`，汇总 JSON／Markdown 报告后结束。保留原 L1—L5 检查编号、lint Skill 默认行为、ingest YAML／布局与 maintain 默认 `inspect-context`；不自动修复，不嵌套 Workflow，不新增 runner。外部系统负责周期触发；巡检不写正式知识、来源锁、事件／水位或活动索引。描述新能力时区分设计、实现验证和真实宿主接入，报告完成不表示问题已修复；需要修订由人明确交 ingest。
+Skill内部通过受锁公共函数复用领域规则，不委派兄弟CLI或导入兄弟私有脚本。P7.batch重核真实输入快照、写删集合、旧基线、落盘字节及记录绑定，不重跑P5完整质量检查；写后重新捕获索引基线。旧apply.run仍执行原完整固定检查，恢复遵守原journal模式。独立index-build/index-verify/index-activate、regression/regression-verify、prepare-submission/verify-submission及inspect/resume/rollback均在apply，query共享同一查询算法。回归沿冻结用例、确切代次和原expected_active，不因重试重设CAS。仅记录批不夹带失败稿件或索引。
+
+用户可随时退回或入库后新建修订，输入变化须重新取得实际材料。Git提交、固定CI与合入仍是人工后续，提交清单核对只读真实HEAD、commit、blob、删除和变更范围；本地完成不表示CI、上库或语义全面通过。共享索引的knowledge_commit仅核仓库快照，显式签名回执另核发布身份。保留历史工件原字节和旧操作事实；原件未变的明确修卡仍进入P2。
+
+lint 的新增编排限定为只读巡检：`F/hs-knowledge-lint/` 只有 `check_formal`、`audit_references` 两个 `type: skill` 节点，前者沿用 `S/hs-knowledge-lint/` 默认 formal／full，后者显式调用 maintain 的只读 `audit-references`，汇总 JSON／Markdown 报告后结束。保留L1—L5检查编号、lint默认formal/full与maintain默认 `inspect-context`；不自动修复，不嵌套 Workflow，不新增 runner。外部系统负责周期触发；巡检不写正式知识、来源锁、事件／水位或活动索引。描述新能力时区分设计、实现验证和真实宿主接入，报告完成不表示问题已修复；需要修订由人明确交 ingest。
 
 实现修改前核对共享设计、源码与现有测试；本地有对应 SDD 需求、设计、任务和测试计划时一并参考，依据实际验证更新本地记录。保留历史工件原字节，不批量替换旧记录路径或状态，不把本地开发工件重新加入 Git。普通文档整理不读受限 gold。文档独立内容复核、本地代码只读核验与固定 CI、六类原件及未知业务上下文遵循上级 AGENTS。
 

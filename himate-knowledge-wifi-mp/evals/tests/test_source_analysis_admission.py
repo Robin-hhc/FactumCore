@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[3]
 DOMAIN = ROOT / "himate-knowledge-wifi-mp"
 fixture_spec = importlib.util.spec_from_file_location(
     "source_admission_fixture",
-    DOMAIN.parent / "skills/common/knowledge/hs-knowledge-local-check/tests/test_public_code_gate.py",
+    DOMAIN.parent / "skills/common/knowledge/hs-knowledge-lint/tests/test_public_code_gate.py",
 )
 fixture = importlib.util.module_from_spec(fixture_spec)
 fixture_spec.loader.exec_module(fixture)
@@ -28,15 +28,29 @@ sys.modules[contract_spec.name] = contract
 contract_spec.loader.exec_module(contract)
 from source_admission_contract import source_resources, validation  # noqa: E402
 
+pipeline_spec = importlib.util.spec_from_file_location("source_admission_packages", DOMAIN / "evals/pipeline_harness.py")
+pipeline = importlib.util.module_from_spec(pipeline_spec)
+pipeline_spec.loader.exec_module(pipeline)
+
+
+def setup_environment(tmp_path, monkeypatch, method):
+    monkeypatch.setenv("HIMATE_TEST_TMP", str(tmp_path))
+    monkeypatch.setattr(fixture, "SKILLS", pipeline.install_packages(tmp_path / "installed-skills"))
+    environment = fixture.PublicCodeGateTests(methodName=method)
+    environment.setUp()
+    environment.catalog["skills"] = {name: value for name, value in environment.catalog["skills"].items()
+                                     if name in pipeline.PUBLIC_SKILLS}
+    environment.catalog_path.write_bytes(fixture.canonical(environment.catalog))
+    assert not any((fixture.SKILLS / name).exists() for name in pipeline.RETIRED_SKILLS)
+    return environment
+
 
 @pytest.mark.parametrize("usage, with_target, nested", [
     ("historical", False, False), ("guidance", True, False), ("current", True, False),
     ("current", True, True),
 ])
 def test_source_identity_is_rechecked_without_build_artifacts(tmp_path, monkeypatch, usage, with_target, nested):
-    monkeypatch.setenv("HIMATE_TEST_TMP", str(tmp_path))
-    environment = fixture.PublicCodeGateTests(methodName="test_signed_positive_support_then_apply_and_verify")
-    environment.setUp()
+    environment = setup_environment(tmp_path, monkeypatch, "test_signed_positive_support_then_apply_and_verify")
     try:
         if nested:
             moved = environment.workspace / "himate" / environment.root.name
@@ -51,13 +65,6 @@ def test_source_identity_is_rechecked_without_build_artifacts(tmp_path, monkeypa
             context = json.loads((environment.root / environment.context_ref).read_bytes())
             context.update(knowledge_root=str(moved), config_digest=fixture.digest(config_path.read_bytes()))
             environment.save(environment.context_ref, fixture.seal(context))
-        # Re-pin this newly created synthetic copy during parallel development.
-        lock_path = environment.root / "governance/framework.lock.yaml"
-        framework = yaml.safe_load(lock_path.read_bytes())
-        for entry in framework["files"].values():
-            entry["sha256"] = fixture.digest((environment.root / entry["path"]).read_bytes())
-        lock_path.write_text(yaml.safe_dump(framework, sort_keys=False), encoding="utf-8")
-        environment.rules_digest = fixture.digest(lock_path.read_bytes())
         if usage == "current":
             context = json.loads((environment.root / environment.context_ref).read_bytes())
             context.pop("build_evidence")
@@ -94,7 +101,7 @@ def test_source_identity_is_rechecked_without_build_artifacts(tmp_path, monkeypa
                 }],
             },
         })
-        checked = environment.invoke()
+        checked = environment.invoke("hs-knowledge-lint", "code-check")
         proof = json.loads((environment.root / checked["data"]["local_check_ref"]).read_bytes())
         assert checked["data"]["check_status"] == "passed", proof
         assert proof["verification_tier"] == "agent_content_review"
@@ -106,8 +113,8 @@ def test_source_identity_is_rechecked_without_build_artifacts(tmp_path, monkeypa
             rules, environment.catalog["code_policy"],
         )
         assert source_resources.validate_current_code_identity(*arguments) == identity
-        for name in ("hs-knowledge-index-build", "hs-knowledge-query", "hs-knowledge-query-regression", "hs-knowledge-source-capture"):
-            package = DOMAIN.parent / "skills/common/knowledge" / name
+        for name in ("hs-knowledge-apply", "hs-knowledge-query", "hs-knowledge-source-prepare"):
+            package = fixture.SKILLS / name
             environment.catalog["skills"][name] = {
                 "root": str(package), "entry": "scripts/cli.py", "python": sys.executable,
                 "package_digest": fixture.package_digest(package),
@@ -129,8 +136,8 @@ def test_source_identity_is_rechecked_without_build_artifacts(tmp_path, monkeypa
         })
         assert verified["data"]["verification_scope"] == "verified_content_integrity"
         assert verified["data"]["verification_tier"] == "fixed_business_checks"
-        generation = environment.invoke("hs-knowledge-index-build", action="build", request={"operation_id": "op"})
-        regression = environment.invoke("hs-knowledge-query-regression", request={
+        generation = environment.invoke("hs-knowledge-apply", action="index-build", request={"operation_id": "op"})
+        regression = environment.invoke("hs-knowledge-apply", action="regression", request={
             "operation_id": "op", "generation_ref": generation["data"]["generation_ref"],
             "expected_active": None, "cases": [{
                 "id": "static-source", "query": "Fixture", "required": ["fixture-code-flow"],
@@ -178,9 +185,7 @@ def test_source_identity_is_rechecked_without_build_artifacts(tmp_path, monkeypa
 
 
 def test_unsigned_v3_review_remains_valid_for_query_and_maintenance(tmp_path, monkeypatch):
-    monkeypatch.setenv("HIMATE_TEST_TMP", str(tmp_path))
-    environment = fixture.PublicCodeGateTests(methodName="test_committed_code_capture_reaches_v3_apply_index_and_target_queries")
-    environment.setUp()
+    environment = setup_environment(tmp_path, monkeypatch, "test_committed_code_capture_reaches_v3_apply_index_and_target_queries")
     try:
         environment.catalog.pop("semantic_reviewers", None)
         environment.catalog_path.write_bytes(fixture.canonical(environment.catalog))
@@ -188,7 +193,7 @@ def test_unsigned_v3_review_remains_valid_for_query_and_maintenance(tmp_path, mo
         report = json.loads((environment.root / environment.report_ref).read_bytes())
         assert "signature_b64" not in report
         assert "semantic_reviewers" not in json.loads(environment.catalog_path.read_bytes())
-        package = DOMAIN.parent / "skills/common/knowledge/hs-knowledge-maintain"
+        package = fixture.SKILLS / "hs-knowledge-maintain"
         environment.catalog["skills"][package.name] = {
             "root": str(package), "entry": "scripts/cli.py", "python": sys.executable,
             "package_digest": fixture.package_digest(package),
@@ -205,9 +210,7 @@ def test_unsigned_v3_review_remains_valid_for_query_and_maintenance(tmp_path, mo
 
 
 def test_apply_retains_actual_build_fingerprints_without_review_or_context_files(tmp_path, monkeypatch):
-    monkeypatch.setenv("HIMATE_TEST_TMP", str(tmp_path))
-    environment = fixture.PublicCodeGateTests(methodName="test_signed_positive_support_then_apply_and_verify")
-    environment.setUp()
+    environment = setup_environment(tmp_path, monkeypatch, "test_signed_positive_support_then_apply_and_verify")
     try:
         applied = environment.invoke("hs-knowledge-apply", request={
             "operation_id": "op", "view_ref": environment.view_ref, "check_inputs": {},

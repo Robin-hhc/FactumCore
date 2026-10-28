@@ -51,10 +51,11 @@ def test_committed_apply_retry_accepts_its_same_exact_response(tmp_path):
     bundle_ref, bundle = pipeline.capture("apply-retry", b"# Source\nCapture marker is a documented rule.\n")
     view_ref = pipeline.view("apply-retry", bundle_ref, "retry-rule", pipeline.card("retry-rule", bundle))
     review_ref, _ = pipeline.review("apply-retry", view_ref)
+    pending_ref = pipeline.pending_record("apply-retry", view_ref)
     request = tmp_path / "apply-request.json"
     response = tmp_path / "apply-response.json"
     request.write_text(json.dumps({"operation_id": "apply-retry", "view_ref": view_ref,
-                                   "content_review_ref": review_ref}), encoding="utf-8")
+                                   "content_review_ref": review_ref, "ingest_record_ref": pending_ref}), encoding="utf-8")
 
     first = invoke(pipeline, "knowledge-apply", request, response)
     assert first.returncode == 0, first.stderr.decode(errors="replace")

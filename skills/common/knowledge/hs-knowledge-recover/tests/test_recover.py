@@ -30,6 +30,7 @@ class RecoverTests(unittest.TestCase):
             calls = []
 
             def execute(command, **kwargs):
+                self.assertEqual(kwargs["timeout"], 120)
                 calls.append(command)
                 output = pathlib.Path(command[command.index("--output") + 1])
                 result = ctx.record("result", operation, tool_identity={"skill": "hs-knowledge-apply"},
@@ -59,6 +60,24 @@ class RecoverTests(unittest.TestCase):
             with patch.object(module, "__file__", str(pathlib.Path(tmp) / "skills/hs-knowledge-recover/scripts/recover.py")):
                 with self.assertRaisesRegex(Blocked, "installed apply Skill is unavailable"):
                     module.recover(ctx, {"operation_id": "op"}, "inspect")
+
+    def test_public_apply_timeout_is_blocked_with_safe_diagnostic(self):
+        import recover as module
+        from support import Blocked, Context
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = pathlib.Path(tmp)
+            ctx = Context.synthetic(base / "knowledge", "hs-knowledge-recover")
+            package = base / "skills/hs-knowledge-apply/scripts"
+            package.mkdir(parents=True)
+            (package / "cli.py").write_text("# installed apply", encoding="utf-8")
+            with patch.object(module, "__file__", str(base / "skills/hs-knowledge-recover/scripts/recover.py")), \
+                    patch.object(module.subprocess, "run", side_effect=module.subprocess.TimeoutExpired(
+                        ["synthetic-command", "SYNTHETIC_PRIVATE_ARGUMENT"], 120)) as execute:
+                with self.assertRaisesRegex(Blocked, "timed out after 120 seconds") as raised:
+                    module.recover(ctx, {"operation_id": "op"}, "inspect")
+            self.assertEqual(execute.call_args.kwargs["timeout"], 120)
+            self.assertNotIn("SYNTHETIC_PRIVATE_ARGUMENT", str(raised.exception))
 
 
 if __name__ == "__main__":

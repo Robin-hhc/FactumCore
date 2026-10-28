@@ -55,6 +55,7 @@ class MergeCheckTests(unittest.TestCase):
             calls = []
 
             def execute(command, **kwargs):
+                self.assertEqual(kwargs["timeout"], 120)
                 calls.append(command)
                 view = ctx.read(request["view_ref"])
                 proof = ctx.record("merge_check", "op", mode="merge", status="failed", view_digest=view["digest"], claims=[], gaps=["business failure"])
@@ -71,6 +72,25 @@ class MergeCheckTests(unittest.TestCase):
             self.assertEqual(calls[0][0], sys.executable)
             self.assertNotIn("--catalog", calls[0])
             self.assertEqual(result["check_status"], "failed")
+
+    def test_public_checker_timeout_is_blocked_with_safe_diagnostic(self):
+        import merge as module
+        from support import Blocked, atomic_bytes
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = pathlib.Path(tmp)
+            ctx, request = self.fixture(base, "code_gate")
+            package = base / "skills/hs-knowledge-local-check/scripts"
+            package.mkdir(parents=True)
+            (package / "cli.py").write_text("# installed checker", encoding="utf-8")
+            atomic_bytes(ctx.path("governance/sources.lock.yaml"), b"resources: []\n")
+            with patch.object(module, "__file__", str(base / "skills/hs-knowledge-merge-check/scripts/merge.py")), \
+                    patch.object(module.subprocess, "run", side_effect=module.subprocess.TimeoutExpired(
+                        ["synthetic-command", "SYNTHETIC_PRIVATE_ARGUMENT"], 120)) as execute:
+                with self.assertRaisesRegex(Blocked, "timed out after 120 seconds") as raised:
+                    module.merge_check(ctx, request)
+            self.assertEqual(execute.call_args.kwargs["timeout"], 120)
+            self.assertNotIn("SYNTHETIC_PRIVATE_ARGUMENT", str(raised.exception))
 
     def test_document_view_is_exempt(self):
         from merge import merge_check

@@ -33,6 +33,15 @@ class NodeError(ValueError):
         )
 
 
+def sibling_timeout_seconds(name, action=None):
+    """Keep ordinary calls short; reserve longer budgets for query workloads."""
+    if name == "hs-knowledge-query" and action in (None, "", "search", "receipt"):
+        return 300
+    if name == "hs-knowledge-query-regression":
+        return 1200
+    return 120
+
+
 def canonical(value):
     return json.dumps(
         value,
@@ -475,7 +484,16 @@ class Context:
             argv += ["--catalog", self.args.catalog]
         if action:
             argv += ["--action", action]
-        result = subprocess.run(argv, capture_output=True, timeout=120, check=False)
+        timeout = sibling_timeout_seconds(name, action)
+        try:
+            result = subprocess.run(argv, capture_output=True, timeout=timeout, check=False)
+        except subprocess.TimeoutExpired as exc:
+            raise NodeError(
+                "SIBLING_TIMEOUT",
+                f"{name} exceeded its {timeout}-second call budget; inspect the saved operation before retrying",
+                name,
+                blocked=True,
+            ) from exc
         response = read_json(safe(self.root, outgoing))
         if response.get("digest") != digest(
             {key: value for key, value in response.items() if key != "digest"}

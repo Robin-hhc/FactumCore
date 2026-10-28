@@ -57,7 +57,11 @@ def recover(ctx, request, action):
             completed = subprocess.run(
                 command, check=False, capture_output=True, timeout=120
             )
-        except (OSError, subprocess.TimeoutExpired) as exc:
+        except subprocess.TimeoutExpired as exc:
+            raise Blocked(
+                "public apply recovery timed out after 120 seconds; inspect the saved operation before retrying"
+            ) from exc
+        except OSError as exc:
             raise Blocked("public apply recovery process unavailable") from exc
         if completed.returncode not in (0, 2, 3) or not native_response.is_file():
             raise Blocked("public apply recovery process produced no valid result")

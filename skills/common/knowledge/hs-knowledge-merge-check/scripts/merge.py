@@ -34,25 +34,30 @@ def merge_check(ctx, request):
     before_view = ctx.path(request["view_ref"]).read_bytes()
     source_lock = ctx.path("governance/sources.lock.yaml")
     before_lock = source_lock.read_bytes()
-    completed = subprocess.run(
-        [
-            sys.executable,
-            str(entry),
-            "--input",
-            str(ctx.path(request_ref)),
-            "--output",
-            str(ctx.path(response_ref)),
-            "--knowledge-root",
-            str(ctx.root),
-            "--rules-digest",
-            ctx.rules_digest,
-            "--action",
-            "merge",
-        ],
-        check=False,
-        capture_output=True,
-        timeout=120,
-    )
+    try:
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(entry),
+                "--input",
+                str(ctx.path(request_ref)),
+                "--output",
+                str(ctx.path(response_ref)),
+                "--knowledge-root",
+                str(ctx.root),
+                "--rules-digest",
+                ctx.rules_digest,
+                "--action",
+                "merge",
+            ],
+            check=False,
+            capture_output=True,
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise Blocked(
+            "public merge evidence check timed out after 120 seconds; inspect the saved operation before retrying"
+        ) from exc
     if completed.returncode != 0 or not ctx.path(response_ref).is_file():
         raise Blocked("public merge evidence check is unavailable or invalid")
     response = ctx.read(response_ref)

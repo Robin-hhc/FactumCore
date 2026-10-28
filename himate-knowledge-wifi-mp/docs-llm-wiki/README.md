@@ -21,7 +21,7 @@ flowchart LR
 
 文档用 `repo/` 表示项目根目录的示意名称。业务代码工作区、业务仓 `AGENTS.md`、`config.yml` 与知识库 `himate-knowledge-wifi-mp/` 位于该根目录；本开发仓的根 `AGENTS.md` 仅本地维护，共享分发 `AGENTS.md.example`。开发仓的 `skills/common/knowledge/` 和 `workflows/common/knowledge/` 是分发源码；实际能力装在 Agent 自己的目录，由 harness 调用；项目根不要求保留能力源码。业务代码可包含多个实际代码仓或模块目录，不另建嵌套 `.git`。本目录只存系统说明与开发工件，正式领域知识只进入 `../knowledge/`。
 
-项目配置全部由用户在根 `config.yml` 提供，包括知识根、代码根与模块映射。首次 setup 只检查实际全局依赖、读取这份配置并给出项目入口，不生成另一套 catalog、registry 或机器绑定。仓外知识库需要另行适配，增加连接字段不会扩展布局。路径见[工作区路径与部署边界](知识库关键点.md#1-工作区路径与部署边界)。
+项目配置全部由用户在根 `config.yml` 提供，包括知识根、代码根与模块映射。首次 setup 只检查实际全局依赖、读取这份配置并给出项目入口，不生成另一套 catalog、registry 或机器绑定。路径见[工作区路径与部署边界](知识库关键点.md#1-工作区路径与部署边界)。
 
 同一工作区内的知识根可按 `knowledge_roots.wifi` 嵌套，项目根以实际 `config.yml` 为准。跨机器 SSH 信息放已安装 `hs-knowledge-explore` 的 `config.env`；harness 负责连接，并确认实际执行端的能力入口可调用。`ssh_entry` 不上传脚本或证明远端就绪，调用端路径不能直接当作远端路径；缺执行能力先报告并讨论方案。本机直接调用，请求、稿件、记录和索引沿用 K 的 `.build/`、`logs/`、`artifacts/`。操作见[使用说明](使用说明.md#首次准备运行依赖)。
 

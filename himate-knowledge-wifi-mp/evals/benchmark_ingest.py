@@ -11,8 +11,10 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import math
 import os
 from pathlib import Path
+import platform
 import statistics
 import subprocess
 import sys
@@ -99,6 +101,71 @@ def symbol_worker(checkout):
                             "Timing is diagnostic and is not a correctness or speed threshold"]}
 
 
+def environment():
+    return {"python": platform.python_version(), "implementation": platform.python_implementation(),
+            "platform": platform.platform(), "processor": platform.processor(), "cpu_count": os.cpu_count()}
+
+
+def timing_stats(samples):
+    """Small samples are observations; avoid giving three runs a tail percentile."""
+    return {"samples": len(samples), "min_seconds": min(samples),
+            "median_seconds": statistics.median(samples), "max_seconds": max(samples)}
+
+
+def document_metrics(results):
+    actions = {}
+    for row in results:
+        for call in row["outer_cli_calls"]:
+            actions.setdefault(call["skill"] + "/" + call["action"], []).append(call["seconds"])
+    return {"flow": timing_stats([row["seconds"] for row in results]),
+            "outer_cli_calls_per_run": [len(row["outer_cli_calls"]) for row in results],
+            "actions": {key: timing_stats(values) for key, values in sorted(actions.items())}}
+
+
+def compare_baseline(report, baseline):
+    """A comparison is advisory even when the measured latency increases."""
+    reasons = []
+    if not isinstance(baseline, dict):
+        return {"advisory_only": True, "comparable": False, "reasons": ["Baseline is not an object"]}
+    for key in ("verification_tier", "instrumented", "environment", "workload"):
+        if key not in baseline or key not in report or baseline[key] != report[key]:
+            reasons.append(key + " missing or different")
+    if reasons:
+        return {"advisory_only": True, "comparable": False, "reasons": reasons}
+    keys = ("median_seconds",) if "median_seconds" in report else ("cold_seconds", "cached_lookup_seconds")
+    changes = {}
+    for key in keys:
+        old, new = baseline.get(key), report.get(key)
+        if (not isinstance(old, (int, float)) or not isinstance(new, (int, float))
+                or min(old, new) < 0 or max(old, new) > sys.float_info.max
+                or not math.isfinite(old) or not math.isfinite(new)):
+            return {"advisory_only": True, "comparable": False, "reasons": [key + " invalid or absent"]}
+        changes[key] = {"baseline": old, "current": new, "delta_seconds": new - old,
+                        "ratio": new / old if old else None}
+    return {"advisory_only": True, "comparable": True, "changes": changes,
+            "note": "Same declared workload and environment; machine load and cache state are uncontrolled"}
+
+
+def finish_report(report, checkout, baseline):
+    report["environment"] = environment()
+    report["commit"] = None
+    try:
+        commit = subprocess.run(["git", "-C", str(checkout), "rev-parse", "HEAD"],
+                                capture_output=True, timeout=15, env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"})
+        if commit.returncode == 0:
+            report["commit"] = commit.stdout.decode("ascii", errors="replace").strip()
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    report["rules_sha256"] = hashlib.sha256(
+        (checkout / "himate-knowledge-wifi-mp/governance/framework.lock.yaml").read_bytes()).hexdigest()
+    if baseline:
+        try:
+            report["comparison"] = compare_baseline(report, json.loads(Path(baseline).read_bytes()))
+        except (OSError, ValueError, UnicodeError) as exc:
+            report["comparison"] = {"advisory_only": True, "comparable": False, "reasons": [str(exc)]}
+    return report
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkout", required=True)
@@ -106,6 +173,7 @@ def main():
     parser.add_argument("--runs", type=int, default=3, choices=range(1, 6))
     parser.add_argument("--instrument", action="store_true", help="Separate call-count probe; includes profiling overhead")
     parser.add_argument("--symbols", action="store_true", help="Measure symbol parsing and same-file cached lookups only")
+    parser.add_argument("--baseline", help="Compare a prior summary as a soft observation; never a speed gate")
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
     checkout, output = Path(args.checkout).resolve(strict=True), Path(args.output_dir).absolute()
@@ -117,6 +185,9 @@ def main():
     output.mkdir(parents=True)
     if args.symbols:
         report = symbol_worker(checkout)
+        report.update(instrumented=False, workload={"id": "c-symbols-1000-v1", "symbols": report["symbols"],
+                      "lookups": report["lookups"], "source_sha256": report["source_sha256"]})
+        finish_report(report, checkout, args.baseline)
         (output / "summary.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
         print(json.dumps(report))
         return 0
@@ -154,6 +225,11 @@ def main():
               "limitations": ["Profiled call counts require a separate --instrument run; its overhead is not a normal latency measurement",
                               "No LLM, company API, SSH or OpenFlow host timing",
                               "One card from a 300-line synthetic source; no semantic quality benchmark"]}
+    report["metrics"] = document_metrics(results)
+    report["workload"] = {"id": "document-create-query-v1", "source_lines": results[0]["source_lines"],
+                          "source_sha256": results[0]["source_sha256"],
+                          "cli_sequence": [[row["skill"], row["action"]] for row in results[0]["outer_cli_calls"]]}
+    finish_report(report, checkout, args.baseline)
     (output / "summary.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report))
     return 0

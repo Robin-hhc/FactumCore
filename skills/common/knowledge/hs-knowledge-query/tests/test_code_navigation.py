@@ -83,6 +83,49 @@ def test_source_resolution_retains_old_evidence_and_returns_current_navigation(c
     assert resolved["code_navigation"]["range"]["start_line"] == 2
 
 
+@pytest.mark.parametrize("current, status", [
+    (b"// different navigation file\nint selected(void) { return 3; }\n", "resolved"),
+    (b"int selected(void) { return 2; }\nint selected(void) { return 3; }\n", "ambiguous"),
+    (None, "missing"),
+])
+def test_public_link_address_hash_and_match_follow_the_actual_navigation_file(code_context, current, status):
+    context, reference, old, resource_file = code_context
+    resource_file.write_bytes(old)
+    navigation_file = resource_file.with_name("redirected.c")
+    reference["locator"]["path"] = navigation_file.name
+    if current is not None:
+        navigation_file.write_bytes(current)
+    resolved = context.modules["source_operations"].resolve_source(context, reference)
+    assert resolved["current_source_matches"] is True
+    assert resolved["current_source_sha256"] == sha(old)
+    assert resolved["code_navigation"]["status"] == status
+    link = context.modules["query_runtime"].source_links(context, [resolved])[0]
+    assert link["evidence"]["sha256"] == sha(old)
+    if current is None:
+        assert link["current"] is None
+        assert link["current_source_matches"] is None
+    else:
+        assert link["current"] == {"base": "workspace", "path": "main/shared/redirected.c",
+            "locator": {"kind": "lines", "start": 2, "end": 2} if status == "resolved" else None,
+            "sha256": sha(current)}
+        assert link["current_source_matches"] is False
+    assert resolved["current_source_matches"] is True
+
+
+def test_public_link_uses_available_navigation_when_the_resource_file_is_missing(code_context):
+    context, reference, _, resource_file = code_context
+    navigation_file = resource_file.with_name("redirected.c")
+    navigation_file.write_bytes(resource_file.read_bytes())
+    resource_file.unlink()
+    reference["locator"]["path"] = navigation_file.name
+    resolved = context.modules["source_operations"].resolve_source(context, reference)
+    assert resolved["current_source_matches"] is None
+    link = context.modules["query_runtime"].source_links(context, [resolved])[0]
+    assert link["current"]["path"] == "main/shared/redirected.c"
+    assert link["current"]["sha256"] == sha(navigation_file.read_bytes())
+    assert link["current_source_matches"] is False
+
+
 @pytest.mark.parametrize("current", [None, b"int renamed(void) { return 2; }\n",
                                    b"int selected(void) { return 2; }\nint selected(void) { return 3; }\n"])
 def test_source_resolution_preserves_old_evidence_when_current_navigation_is_not_unique(code_context, current):
@@ -233,7 +276,7 @@ def public_code_navigation_case(tmp_path):
     return harness, source, old, selector, built
 
 
-def test_public_query_carries_symbol_metadata_through_index_and_resolves_current_position(tmp_path):
+def test_public_query_links_old_evidence_and_current_symbol_without_source_objects(tmp_path):
     harness, source, old, selector, built = public_code_navigation_case(tmp_path)
     source.write_bytes(b"// shifted navigation\n" + old.replace(b"1", b"2"))
     response = harness.run("query", {"operation_id": "symbol-search", "query": "Synthetic",
@@ -241,11 +284,19 @@ def test_public_query_carries_symbol_metadata_through_index_and_resolves_current
         "context": {"target_id": "chip12-host", "chip": "chip12", "side": "host"}}, "search")
     matches = response["data"]["matches"]
     assert [match["card_id"] for match in matches] == ["audit-guidance"]
-    result = matches[0]["sources"][0]
-    assert result["source_ref"]["code_ref"] == selector
-    assert result["source_ref"]["locator"] == {"kind": "lines", "start": 1, "end": 1}
-    assert result["code_navigation"]["range"]["start_line"] == 2
-    assert result["sha256"] == sha(old) and result["current_source_matches"] is False
+    assert "sources" not in matches[0]
+    result = matches[0]["source_links"][0]
+    assert result["evidence"]["locator"] == {"kind": "lines", "start": 1, "end": 1}
+    assert result["evidence"]["base"] == "knowledge_root"
+    assert (harness.root / result["evidence"]["path"]).read_bytes() == old
+    assert result["evidence"]["sha256"] == sha(old)
+    assert result["current"]["base"] == "workspace"
+    assert result["current"]["path"] == "main/shared/file.c"
+    assert result["current"]["locator"] == {"kind": "lines", "start": 2, "end": 2}
+    assert result["current"]["sha256"] == sha(source.read_bytes())
+    assert result["navigation_status"] == "resolved" and result["current_source_matches"] is False
+    assert not {"source_ref", "code_ref", "snapshot", "resource", "text", "bytes_b64"} & result.keys()
+    assert matches[0]["card_ref"] == harness.record(built["generation_ref"])["documents"]["audit-guidance"]["blob_ref"]
 
 
 def query_with_source_change(harness, source, request, action, *, change_after, new_source):

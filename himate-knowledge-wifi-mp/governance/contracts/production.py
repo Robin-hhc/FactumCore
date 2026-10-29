@@ -218,13 +218,28 @@ def _decisions(ctx, request, semantic, existing):
     return decisions
 
 
+def _navigation_intro(text):
+    replacements = (
+        ("当前正式业务卡为空。", "正式业务卡见各类型导航。"),
+        ("当前没有已落位的正式业务卡。", "本页维护已落位的正式业务卡导航。"),
+    )
+    lines = []
+    for line in text.splitlines(keepends=True):
+        for old, new in replacements:
+            if line.startswith(old):
+                line = new + line[len(old):]
+                break
+        lines.append(line)
+    return "".join(lines)
+
+
 def _navigation(ctx, writes, cards):
     navigation = {}
     for identity, card in cards.items():
         index_ref = str(PurePosixPath(card["path"]).parent / "index.md")
         if index_ref not in navigation:
             path = safe(ctx.root, index_ref)
-            navigation[index_ref] = path.read_text(encoding="utf-8") if path.exists() else "# Knowledge\n"
+            navigation[index_ref] = _navigation_intro(path.read_text(encoding="utf-8")) if path.exists() else "# Knowledge\n"
         marker = "<!-- card:" + sha(identity.encode()) + " -->"
         lines = navigation[index_ref].splitlines()
         matches = [i for i, line in enumerate(lines) if marker in line]
@@ -239,6 +254,14 @@ def _navigation(ctx, writes, cards):
         else:
             lines += ["", entry]
         navigation[index_ref] = "\n".join(lines) + "\n"
+    root_ref = "knowledge/index.md"
+    if cards and root_ref not in navigation:
+        root = safe(ctx.root, root_ref)
+        if root.is_file():
+            original = root.read_text(encoding="utf-8")
+            updated = _navigation_intro(original)
+            if updated != original:
+                navigation[root_ref] = updated
     return {ref: value.encode() for ref, value in navigation.items()}
 
 

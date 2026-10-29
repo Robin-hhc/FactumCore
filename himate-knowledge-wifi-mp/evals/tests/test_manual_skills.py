@@ -7,7 +7,6 @@ from pathlib import Path
 import subprocess
 import sys
 
-import pytest
 import yaml
 
 
@@ -40,14 +39,32 @@ class ManualPipeline(FIXTURE.Pipeline):
         return response
 
 
-@pytest.mark.parametrize("raw_class", ["specs", "troubleshooting"])
-def test_manual_document_scan_record_apply_index_query_keeps_business_checks(tmp_path, raw_class):
+def test_manual_document_scan_record_apply_index_query_keeps_business_checks(tmp_path):
     p = ManualPipeline(tmp_path)
     p.catalog_path.unlink()
     (p.root / ".isolated-knowledge-fixture").unlink()
     original = b"# Source\nCapture marker is a documented rule.\n"
-    source_path = "docs-raw/" + raw_class + "/wifi/raw-source.md"
+    source_path = "docs-raw/specs/wifi/raw-source.md"
     p.write(source_path, original)
+    p.write("knowledge/index.md", "# Knowledge\n\n当前正式业务卡为空。保留项目根说明。\n".encode())
+    p.write("knowledge/rules/index.md", "# Rules\n\n当前没有已落位的正式业务卡。保留类型说明。\n".encode())
+
+    def formal_state():
+        return {path.relative_to(p.root).as_posix(): FIXTURE.sha(path.read_bytes())
+                for path in p.root.rglob("*") if path.is_file()
+                and path.relative_to(p.root).parts[0] != ".build"}
+
+    baseline = formal_state()
+    public_call, staged_calls = p.call, []
+
+    def staged_call(slug, request, action=None, expected=0):
+        response = public_call(slug, request, action, expected)
+        assert formal_state() == baseline, (slug, action)
+        staged_calls.append((slug, action))
+        return response
+
+    # Each real P1-P6 public call may write only the disposable stage tree.
+    p.call = staged_call
     scan_ref = p.call("knowledge-source-scan", {"operation_id": "manual"}, "scan")["data"]["scan_ref"]
     scan = p.record(scan_ref)
     material_ref = p.call("knowledge-source-prepare", {
@@ -65,20 +82,33 @@ def test_manual_document_scan_record_apply_index_query_keeps_business_checks(tmp
         "disposition_preview_ref": p.record(view_ref)["disposition_preview_ref"],
     }, "record")["data"]["ingest_record_ref"]
     assert "lint_ref" not in p.record(record_ref)
+    assert {slug for slug, _ in staged_calls} >= {"knowledge-source-scan", "knowledge-source-prepare",
+        "knowledge-change-plan", "knowledge-view-materialize", "knowledge-lint"}
+    assert ("knowledge-source-scan", "record") in staged_calls
+    # A new operation cannot mistake the pending P6 record for published work.
+    fresh = p.call("knowledge-source-scan", {"operation_id": "fresh-before-p7"}, "scan")["data"]
+    fresh_unit = p.record(fresh["scan_ref"])["units"][0]
+    assert fresh_unit["path"] == source_path and fresh_unit["change"] == "new"
+    assert fresh["actionable_unit_ids"] == [fresh_unit["unit_id"]]
+    assert fresh["execution_history"] == {"status": "not_inspected"}
+    p.call = public_call
     applied = p.call("knowledge-apply", {
         "operation_id": "manual", "view_ref": view_ref, "ingest_record_ref": record_ref,
     }, "batch")
     assert applied["phase"] == "completed" and applied["data"]["activated"] is True
+    assert applied["data"]["published"] is True and applied["data"]["batch_complete"] is True
+    assert (p.root / "knowledge/rules/manual-rule.md").is_file()
+    root_nav = (p.root / "knowledge/index.md").read_text(encoding="utf-8")
+    rule_nav = (p.root / "knowledge/rules/index.md").read_text(encoding="utf-8")
+    assert "当前正式业务卡为空。" not in root_nav and "保留项目根说明。" in root_nav
+    assert "当前没有已落位的正式业务卡。" not in rule_nav and "保留类型说明。" in rule_nav
+    assert "manual-rule.md" in rule_nav
+    assert not (p.root / view_ref).exists()
     assert "acceptance" not in p.record("logs/ingest/manual.yaml")
     assert "proof_ref" not in p.record(applied["data"]["apply_result_ref"])
-    built = p.call("knowledge-apply", {"operation_id": "build-manual"}, "index-build")["data"]
-    checked = p.call("knowledge-apply", {
-        "operation_id": "query-manual", "generation_ref": built["generation_ref"],
-        "expected_active": built["expected_active"],
-        "cases": [{"id": "find-manual", "query": "capture", "required": ["manual-rule"]}],
-    }, "regression")
-    assert checked["data"]["activated"]
     result = p.call("knowledge-query", {"operation_id": "search-manual", "query": "capture"}, "search")["data"]
+    assert result["generation_ref"] == applied["data"]["generation_ref"]
+    assert p.record("artifacts/indexes/local/active.json")["generation_ref"] == result["generation_ref"]
     assert [row["card_id"] for row in result["matches"]] == ["manual-rule"]
     read = p.call("knowledge-query", {
         "operation_id": "read-manual", "receipt_ref": result["receipt_ref"], "card_id": "manual-rule",
@@ -127,15 +157,13 @@ def test_manual_document_scan_record_apply_index_query_keeps_business_checks(tmp
         "operation_id": "manual-correction", "view_ref": correction_view, "ingest_record_ref": correction_record,
     }, "batch")
     assert corrected["phase"] == "completed" and corrected["data"]["activated"] is True
-    rebuilt = p.call("knowledge-apply", {"operation_id": "manual-correction-index"}, "index-build")["data"]
-    assert p.call("knowledge-apply", {
-        "operation_id": "manual-correction-query", "generation_ref": rebuilt["generation_ref"],
-        "expected_active": rebuilt["expected_active"],
-        "cases": [{"id": "find-correction", "query": "capture", "required": ["manual-rule"]}],
-    }, "regression")["data"]["activated"]
-    corrected_match = p.call("knowledge-query", {
+    corrected_result = p.call("knowledge-query", {
         "operation_id": "manual-corrected-search", "query": "capture",
-    }, "search")["data"]["matches"][0]
+    }, "search")["data"]
+    assert corrected_result["generation_ref"] == corrected["data"]["generation_ref"]
+    assert p.record("artifacts/indexes/local/active.json")["generation_ref"] == corrected_result["generation_ref"]
+    assert [row["card_id"] for row in corrected_result["matches"]] == ["manual-rule"]
+    corrected_match = corrected_result["matches"][0]
     assert corrected_match["card_digest"] != read["card_digest"]
     assert (p.root / "logs/ingest/manual.yaml").read_bytes() == original_record
     assert (p.root / source_path).read_bytes() == original

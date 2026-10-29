@@ -480,7 +480,7 @@ flowchart TB
 
 查询用途与 stable 状态分开判断：current／implementation 直接核对实际来源、当前模块／Target 范围和工作树源码字节；涉及构建／运行断言时，还复查索引中 `code_contexts` 固定的实际材料和逐 Claim 引用指纹，不要求apply或代码复核通过票据。静态源码结论和纯文档不增加构建材料要求，guidance／historical 不把未知条件提升为产品当前事实。
 
-来源中声明的 code_ref 随完整 metadata 和 Claim.source_records 进入同代索引，查询另返回实际 code_navigation，不新增 SQLite 表。当前符号位置在查询中复查；missing、ambiguous、unavailable 保留真实状态和缺口，不伪装成唯一定位。新规则下重建派生索引，不改写旧 generation；普通代码变化不自动重写文档背景卡，导航也不代替 current／implementation 原有核验。
+来源中声明的 code_ref 随完整 metadata 和 Claim.source_records 进入同代索引，查询内部复核实际 code_navigation，不新增 SQLite 表。对外只提供合格卡片内容、确切代内 card_ref 及 source_links 地址和状态，来源原件按需读取；不在查询响应或新回执中展开来源全文、Base64 或完整来源解析对象。当前符号位置在查询中复查；missing、ambiguous、unavailable 保留真实状态和缺口，不伪装成唯一定位。新规则下重建派生索引，不改写旧 generation；普通代码变化不自动重写文档背景卡，导航也不代替 current／implementation 原有核验。
 
 作者在P3固定目标查询、用途及预期，P7沿用原计划；apply的独立regression动作也可直接执行明确输入的查询断言，启用仍绑定候选代原expected_active。query的search回执固定频道、索引代、用途、上下文及命中Claim，read沿原回执同代读取并核实际依据，不能因活动代变化偷换结果，也不能把回执当成永久授权。
 

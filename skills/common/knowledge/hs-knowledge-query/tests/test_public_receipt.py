@@ -49,6 +49,13 @@ def test_formal_search_receipt_keeps_generation_and_rejects_changed_scope_or_eva
         "search",
     )["data"]
     assert [row["card_id"] for row in search["matches"]] == ["receipt-rule"]
+    first_card = p.record(first["generation_ref"])["documents"]["receipt-rule"]
+    assert search["matches"][0]["card_ref"] == first_card["blob_ref"]
+    assert search["matches"][0]["path"] == first_card["path"]
+    saved_search = p.record(search["receipt_ref"])
+    assert "sources" not in saved_search["result"]["matches"][0]
+    assert saved_search["result"]["matches"][0]["source_links"]
+    assert not {"bytes_b64", "text", "snapshot", "resource", "source_ref"} & saved_search["result"]["matches"][0]["source_links"][0].keys()
     second = p.call("knowledge-index-build", {"operation_id": "receipt-second-build"})[
         "data"
     ]
@@ -71,9 +78,27 @@ def test_formal_search_receipt_keeps_generation_and_rejects_changed_scope_or_eva
     assert read["generation_ref"] == first["generation_ref"]
     assert read["evaluation"] is False
     assert read["card_digest"] == search["matches"][0]["card_digest"]
+    assert read["path"] == first_card["path"] and read["card_ref"] == first_card["blob_ref"]
+    assert "sources" not in read and read["source_links"]
     assert {row["id"] for row in read["claims"]} == set(
         search["matches"][0]["claim_ids"]
     )
+    # Model the old result shape under the same issued rules. Do not mutate
+    # the original receipt or relax any outer/inner digest and scope checks.
+    legacy = copy.deepcopy(saved_search)
+    legacy_hit = legacy["result"]["matches"][0]
+    legacy_hit.pop("source_links")
+    legacy_hit.pop("card_ref")
+    legacy_hit["sources"] = [{"bytes_b64": "OLD_WIRE_SOURCE_PAYLOAD"}]
+    legacy["result_digest"] = FIXTURE.sha(FIXTURE.canonical(legacy["result"]))
+    legacy["digest"] = FIXTURE.sha(FIXTURE.canonical({key: value for key, value in legacy.items() if key != "digest"}))
+    legacy_ref = p.write(".build/operations/legacy-format/receipt.json", FIXTURE.canonical(legacy))
+    legacy_bytes = (p.root / legacy_ref).read_bytes()
+    legacy_read = p.call("knowledge-query", {**read_request, "operation_id": "read-legacy-shape",
+        "receipt_ref": legacy_ref}, "read")["data"]
+    assert legacy_read["card_digest"] == read["card_digest"]
+    assert legacy_read["card_ref"] == first_card["blob_ref"] and "sources" not in legacy_read
+    assert (p.root / legacy_ref).read_bytes() == legacy_bytes
     for number, wrong in enumerate(
         (
             {"purpose": "historical"},
@@ -254,10 +279,9 @@ def test_receipt_read_claim_subset_excludes_other_claim_source_text(tmp_path):
         "read",
     )["data"]
     assert {claim["id"] for claim in read["claims"]} == {"c1"}
-    assert {source["source_ref"]["source_id"] for source in read["sources"]} == {
-        "first"
-    }
-    assert all(
-        "EXCLUDED_C2_SOURCE_ONLY" not in source.get("text", "")
-        for source in read["sources"]
-    )
+    assert {source["evidence_ref"] for source in read["source_links"]} == {metadata["sources"][0]["evidence_ref"]}
+    assert "sources" not in read
+    assert all("EXCLUDED_C2_SOURCE_ONLY" not in claim["text"] for claim in read["claims"])
+    assert not any("second.md" in (link["current"] or {}).get("path", "") for link in read["source_links"])
+    assert all(not {"text", "bytes_b64", "source_ref", "snapshot", "resource"} & link.keys()
+               for link in read["source_links"])

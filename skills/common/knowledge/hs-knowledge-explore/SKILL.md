@@ -10,7 +10,7 @@ description: HiMate 知识库任务入口。用于原件入库与更新、续办
 | 用户任务 | 使用能力与处理边界 |
 |---|---|
 | 入库、新增原件、增量更新、续办或修改已有卡 | 已安装的 `hs-knowledge-ingest` Workflow；P1 source-scan → P2 source-prepare → P3 change-plan → P4 view-materialize → P5 lint.review → P6 source-scan.record → P7 apply.batch。P5 集中独立内容、代码和完整固定检查；P1—P6只写本批暂存；P7发布、索引全验、冻结查询和激活后清本批可删暂存。实际batch_complete才报告本批完成；有缺口保存实际停点。原件未变的明确修卡请求也要处理。 |
-| 查询背景、机制或定位代码 | `hs-knowledge-query`；按实际回执精读同代卡片和来源，有 code_ref 时读取实际 code_navigation。背景用 guidance，具体实现继续读取所问版本的实际源码，追查调用、宏条件和早退，不用符号可定位或模块标签代替实现事实。 |
+| 查询背景、机制或定位代码 | `hs-knowledge-query`；按实际回执精读同代合格卡片内容，沿 card_ref 和 source_links 按需读取文档或源码；核对链接的 evidence/current 地址、导航状态和字节一致性。背景用 guidance，具体实现继续读取所问版本的实际源码，追查调用、宏条件和早退，不用符号可定位或模块标签代替实现事实。 |
 | 独立检查知识库或候选 | `hs-knowledge-lint`；只检查并报告。需要修订时转交 ingest，检查本身不改稿、不入库。 |
 | 周期巡检正式库、查找过时代码引用 | 启动已安装的 `F/hs-knowledge-lint` Workflow：先调用原 `S/hs-knowledge-lint` 做正式完整库固定检查，再显式调用 `hs-knowledge-maintain --action audit-references`，生成可定位卡片、Claim、来源、代码文件及旧定位的 JSON／Markdown 报告；只出报告，不修改知识或自动启动 ingest。由用户手动将报告和目标卡交给 ingest；独立 `knowledge lint` 仍调用原只读 Skill。 |
 | 查看进度、未完成事项、材料缺口 | `hs-knowledge-source-scan` 的 `status`；读取实际操作停点和待修订信息，不推进流程，不把本地状态推断为已提交、CI 通过或合入。 |

@@ -3,7 +3,7 @@
 | 位置 | 职责 |
 |---|---|
 | `framework.lock.yaml` | 固定 2.0 契约代码、Schema、模板及声明的确切字节摘要 |
-| `sources.lock.yaml` | 来源资源和快照登记，当前为空 |
+| `sources.lock.yaml` | 来源资源和固定快照登记，以实际内容为准 |
 | `schemas/` | 字段形状、Profile 与公共受控值 |
 | `contracts/` | 五个纯领域 API，统一解析、路径、来源、Claim、范围、关系与记录契约；节点程序通过受信摘要加载 |
 | `templates/` | 七类卡、导航与处理记录模板 |

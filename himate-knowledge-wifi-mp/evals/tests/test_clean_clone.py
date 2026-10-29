@@ -128,11 +128,28 @@ def test_document_ingest_survives_git_clone_without_private_runtime(tmp_path, co
     })["data"]["activated"]
     found = consumer.call("knowledge-query", {"operation_id": "consumer-search", "query": "capture"}, "search")["data"]
     assert [row["card_id"] for row in found["matches"]] == ["clone-rule"]
-    assert "Capture marker is a documented rule." in found["matches"][0]["sources"][0]["text"]
+    hit = found["matches"][0]
+    assert "sources" not in hit
+    link = hit["source_links"][0]
+    assert link["kind"] == "raw" and link["current"]["base"] == "knowledge_root"
+    assert link["current"]["path"] == source_path and link["current"]["locator"] == locator
+    assert (consumer.root / hit["card_ref"]).is_file()
+    linked = consumer.call("knowledge-source-capture", {
+        "operation_id": "consumer-linked-source", "source_ref": metadata["sources"][0],
+    }, "resolve-source")["data"]
+    assert "Capture marker is a documented rule." in linked["text"]
+    assert link["evidence"]["sha256"] == linked["sha256"]
+    assert link["evidence"]["locator"] == linked["locator"]
+    if link["evidence"]["base"] == "git":
+        assert linked["original_ref"] == "git:" + link["evidence"]["commit"] + ":" + link["evidence"]["path"]
+    else:
+        assert link["evidence"]["base"] == "knowledge_root"
+        assert link["evidence"]["path"] == linked["original_ref"]
     read = consumer.call("knowledge-query", {"operation_id": "consumer-read", "card_id": "clone-rule",
                                            "receipt_ref": found["receipt_ref"]}, "read")["data"]
     assert read["card_digest"] == found["matches"][0]["card_digest"]
-    assert read["sources"][0]["current_source_matches"] is True
+    assert read["source_links"][0]["current_source_matches"] is True
+    assert read["card_ref"] == hit["card_ref"] and read["path"] == hit["path"]
     scan = consumer.call("knowledge-source-scan", {"operation_id": "consumer-scan"}, "scan")["data"]
     assert consumer.record(scan["scan_ref"])["units"][0]["change"] == "unchanged"
     # Formal published objects remain; private source/extraction caches are not
@@ -180,7 +197,11 @@ def test_document_ingest_survives_git_clone_without_private_runtime(tmp_path, co
         "operation_id": "consumer-historical", "query": "capture", "purpose": "historical",
     }, "search")["data"]
     assert historical["matches"][0]["card_id"] == "clone-rule"
-    assert "Capture marker is a documented rule." in historical["matches"][0]["sources"][0]["text"]
+    historical_link = historical["matches"][0]["source_links"][0]
+    assert historical_link["evidence"]["sha256"] == recovered["data"]["sha256"]
+    assert historical_link["evidence"]["locator"] == metadata["sources"][0]["locator"]
+    assert historical_link["current_source_matches"] is False
+    assert historical_link["current"]["locator"] is None
     if kind == "md" and not committed_original:
         shallow_root = tmp_path / "shallow-consumer-workspace"
         git(tmp_path, "clone", "--depth=1", "--no-local", str(cloned), str(shallow_root))
@@ -268,8 +289,12 @@ def test_static_code_card_survives_clean_clone_with_configured_module_bytes(tmp_
     })["data"]["activated"]
     found = consumer.call("knowledge-query", {"operation_id": "consumer-code-search", "query": "Capture",
         "purpose": "current", "context": target}, "search")["data"]
-    assert found["matches"][0]["sources"][0]["text"] == raw.decode()
-    assert found["matches"][0]["sources"][0]["original_ref"] == "code:" + repo_id + ":wifi.c"
+    code_link = found["matches"][0]["source_links"][0]
+    assert code_link["evidence"] == {"base": "workspace", "path": "main/wifi/wifi.c",
+        "locator": {"kind": "lines", "start": 1, "end": 1}, "sha256": MANUAL.FIXTURE.sha(raw)}
+    assert code_link["current"]["path"] == "main/wifi/wifi.c"
+    assert (cloned / code_link["evidence"]["path"]).read_bytes() == raw
+    assert code_link["navigation_status"] == "resolved" and code_link["current_source_matches"] is True
     read = consumer.call("knowledge-query", {"operation_id": "consumer-code-read", "card_id": "clone-code-rule",
         "receipt_ref": found["receipt_ref"]}, "read")["data"]
     assert read["card_digest"] == found["matches"][0]["card_digest"]

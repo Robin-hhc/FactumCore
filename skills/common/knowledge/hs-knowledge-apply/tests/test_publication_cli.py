@@ -322,15 +322,30 @@ def run_transport(trial, request, output, *, incoming=None):
         capture_output=True, timeout=120)
 
 
+def tree_bytes(root):
+    return {path.relative_to(root).as_posix(): path.read_bytes() for path in root.rglob("*") if path.is_file()}
+
+
+def assert_transport_denied(result, message):
+    """Missing business inputs must never become the reason this test passes."""
+    assert result.returncode == 2, result.stderr.decode(errors="replace")
+    response = json.loads(result.stdout)
+    assert response["status"] == "error"
+    assert response["diagnostics"] == [{"code": "invalid_input", "message": message}]
+
+
 @pytest.mark.parametrize("destination", ["logs/events/response.json", ".build/operations/another/response.json", "artifacts/response.json"])
 def test_batch_transport_rejects_other_knowledge_paths_before_business_write(tmp_path, destination):
     trial = P7.PublicP7(tmp_path)
-    request = publication_content(trial)
+    # The guard precedes the business handler. No capture/view is needed to
+    # exercise its real CLI boundary; all business-path tests above retain it.
+    request = {"operation_id": "batch"}
     output = trial.root / destination
+    before = tree_bytes(trial.root)
     result = run_transport(trial, request, output)
-    assert result.returncode == 2
+    assert_transport_denied(result, "path is outside its prescribed subtree")
     assert not output.exists()
-    assert not (trial.root / "knowledge/rules/batch-card.md").exists()
+    assert tree_bytes(trial.root) == before
 
 
 def test_batch_own_transport_request_is_cleaned_but_final_envelope_does_not_recreate_ledger(tmp_path):
@@ -350,13 +365,14 @@ def test_batch_own_transport_request_is_cleaned_but_final_envelope_does_not_recr
     "final-view.json", "plan.json", "disposition-preview.json", "view-summary.json", "revision.json"])
 def test_batch_response_cannot_recreate_reserved_protocol_slots(tmp_path, slot):
     trial = P7.PublicP7(tmp_path)
-    request = publication_content(trial)
+    request = {"operation_id": "batch"}
     output = trial.root / ".build/operations/batch" / slot
-    previous = output.read_bytes() if output.exists() else None
+    if slot in {"owned-files.json", "view.json"}:
+        trial.write(output.relative_to(trial.root).as_posix(), b"existing protocol bytes\n")
+    before = tree_bytes(trial.root)
     result = run_transport(trial, request, output)
-    assert result.returncode == 2
-    assert (output.read_bytes() if output.exists() else None) == previous
-    assert not (trial.root / "knowledge/rules/batch-card.md").exists()
+    assert_transport_denied(result, "batch response cannot overwrite a reserved operation protocol slot")
+    assert tree_bytes(trial.root) == before
 
 
 def test_actual_source_defer_state_is_submitted_and_survives_git_clone(tmp_path):

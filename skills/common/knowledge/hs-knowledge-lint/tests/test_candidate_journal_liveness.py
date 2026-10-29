@@ -2,8 +2,6 @@
 import hashlib
 import json
 
-import pytest
-
 
 def canonical(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
@@ -25,38 +23,20 @@ def check(harness, view, expected=0):
     return harness.run("lint", {"operation_id": "op", "mode": "candidate", "view_ref": view}, expected=expected)
 
 
-@pytest.mark.parametrize("status", ["committed", "rolled_back"])
-def test_old_foreign_terminal_allows_current_candidate_checks(harness, status):
+def test_unreferenced_execution_history_does_not_change_candidate_quality(harness):
+    """CLI wiring sentinel; all ten journal variants have guarded contract coverage."""
     view, _ = harness.view()
-    old = journal(harness, status=status)
-    before = old.read_bytes()
-    result = check(harness, view)
-    assert result["status"] == "passed"
-    assert old.read_bytes() == before
-    assert not (harness.root / "knowledge").exists()
-
-
-@pytest.mark.parametrize("kind", ["prepared", "bad-seal", "bad-op", "bad-schema", "bad-kind", "same-operation", "bad-json", "unknown-state"])
-def test_unreferenced_old_journal_does_not_change_candidate_quality(harness, kind):
-    view, _ = harness.view()
-    changes = {"status": "prepared"} if kind == "prepared" else {}
-    changes.update({"operation_id": "wrong"} if kind == "bad-op" else {})
-    changes.update({"schema_version": "3.0"} if kind == "bad-schema" else {})
-    changes.update({"record_kind": "apply_result"} if kind == "bad-kind" else {})
-    changes.update({"status": "unrecognized"} if kind == "unknown-state" else {})
-    old = journal(harness, operation="op" if kind == "same-operation" else "legacy", **changes)
-    if kind == "bad-seal":
-        value = json.loads(old.read_bytes())
-        value["digest"] = "0" * 64
-        old.write_bytes(canonical(value))
-    if kind == "bad-json":
-        old.write_bytes(b"{unfinished")
-    before = old.read_bytes()
+    old = journal(harness)
+    unfinished = journal(harness, operation="op", status="prepared")
+    unfinished.write_bytes(b"{unfinished")
+    private = ".build/operations/abandoned/transaction/journal.json"
+    harness.write(private, b"{unfinished")
+    files = {path: path.read_bytes() for path in (old, unfinished, harness.root / private)}
     result = check(harness, view)
     assert result["status"] == "passed" and result["complete"] is True
     findings = [finding for row in result["checks"] if row["group"] == "view" for finding in row["findings"]]
     assert not findings
-    assert old.read_bytes() == before
+    assert all(path.read_bytes() == before for path, before in files.items())
     assert not (harness.root / "knowledge").exists()
 
 

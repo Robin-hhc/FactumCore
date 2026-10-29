@@ -652,6 +652,99 @@ def refresh_sources(ctx, sources, purpose, code_sources=()):
     return result
 
 
+def source_links(ctx, sources):
+    """Project verified internal sources to addresses without expanding originals."""
+    validation = ctx.modules["validation"]
+    workspace = configuration = config_digest = None
+
+    def code_address(repo_id, relative, expected_config=None):
+        nonlocal workspace, configuration, config_digest
+        try:
+            if configuration is None:
+                config = validation.workspace_config_path(ctx.root)
+                raw = config.read_bytes()
+                workspace = config.parent.resolve()
+                configuration = validation.normalize_workspace(validation.load_yaml(raw), workspace)
+                config_digest = sha(raw)
+                if config.read_bytes() != raw:
+                    raise ValueError("Workspace configuration changed while making source links")
+            if expected_config is not None and expected_config != config_digest:
+                raise ValueError("Workspace configuration differs from the checked symbol")
+            mappings = [row for row in configuration.get("repos", []) if row["repo_id"] == repo_id]
+            if len(mappings) != 1 or not validation.workspace_file_allowed(configuration, repo_id, relative):
+                raise ValueError("Code address is outside its configured repository scope")
+            declared = Path(mappings[0]["root"])
+            repository = (declared if declared.is_absolute() else workspace / declared).resolve(strict=True)
+            target = safe(repository, relative)
+            if target.is_relative_to(workspace):
+                return {"base": "workspace", "path": target.relative_to(workspace).as_posix()}
+            return {"base": "repository", "repo_id": repo_id, "path": relative}
+        except (OSError, ValueError, KeyError) as exc:
+            raise NodeError("SOURCE_CHANGED_DURING_QUERY", str(exc), blocked=True) from exc
+
+    links = []
+    for source in sources:
+        reference, resource = source["source_ref"], source["resource"]
+        locator = {key: value for key, value in source["locator"].items()
+                   if key in {"kind", "start", "end", "number", "page", "paragraph", "table", "row", "id"}
+                   and isinstance(value, (str, int)) and not isinstance(value, bool)}
+        original = source.get("original_ref")
+        navigation = source.get("code_navigation") or {}
+        if not isinstance(original, str) or not original:
+            raise NodeError("SOURCE_LINK_UNAVAILABLE", "Resolved source has no exact original address", blocked=True)
+        if original.startswith("git:"):
+            _, commit, relative = original.split(":", 2)
+            evidence = {"base": "git", "path": relative, "commit": commit}
+            if resource.get("kind") == "code":
+                evidence["repo_id"] = source.get("snapshot", {}).get("recovery", {}).get("repo_id") or resource["repo_id"]
+        elif original.startswith("code:"):
+            _, repo_id, relative = original.split(":", 2)
+            evidence = code_address(repo_id, relative, navigation.get("config_digest"))
+        else:
+            safe(ctx.root, original)
+            evidence = {"base": "knowledge_root", "path": original}
+        evidence.update(locator=locator, sha256=source["sha256"])
+        current = None
+        current_locator = None
+        if source["source_kind"] == "code" and "code_ref" in reference:
+            if navigation.get("sha256") is not None:
+                current = code_address(navigation["repo_id"], navigation["path"], navigation["config_digest"])
+                current_sha256 = navigation["sha256"]
+                if navigation.get("status") == "resolved":
+                    position = navigation["range"]
+                    current_locator = {"kind": "lines", "start": position["start_line"], "end": position["end_line"]}
+        elif source.get("current_source_matches") is not None:
+            current_sha256 = source["current_source_sha256"]
+            if source["source_kind"] == "code":
+                current = code_address(resource["repo_id"], resource["path"])
+            else:
+                safe(ctx.root, resource["path"], ["docs-raw"])
+                current = {"base": "knowledge_root", "path": resource["path"]}
+            if current_sha256 == evidence["sha256"]:
+                current_locator = dict(locator)
+        if current is not None:
+            current.update(locator=current_locator, sha256=current_sha256)
+        matches = current["sha256"] == evidence["sha256"] if current is not None else None
+        links.append({"evidence_ref": reference["evidence_ref"], "kind": source["source_kind"],
+                      "evidence": evidence, "current": current,
+                      "navigation_status": navigation.get("status", "not_applicable"),
+                      "current_source_matches": matches})
+    return links
+
+
+def public_gaps(gaps):
+    """Keep useful diagnostics without embedding the complete source reference."""
+    result = []
+    for gap in gaps:
+        if not isinstance(gap, dict) or "source_ref" not in gap:
+            result.append(gap)
+            continue
+        reference = gap["source_ref"]
+        result.append({**{key: value for key, value in gap.items() if key != "source_ref"},
+                       **{key: reference[key] for key in ("source_id", "evidence_ref") if key in reference}})
+    return result
+
+
 class EligibilityEvaluator:
     """One immutable generation, context and live epoch; dependencies are not lexical candidates."""
 
@@ -837,6 +930,7 @@ def execute(ctx, *, verified_generation=None):
                         "title": card["metadata"]["title"] if complete else card_id,
                         "summary": card["metadata"]["summary"] if complete else None,
                         "path": manifest["documents"][card_id]["path"],
+                        "card_ref": manifest["documents"][card_id]["blob_ref"],
                         "card_digest": manifest["documents"][card_id]["sha256"],
                     }
                 )
@@ -859,9 +953,9 @@ def execute(ctx, *, verified_generation=None):
                 evaluator.evaluate(match["card_id"])[2], sources,
                 request.get("purpose", "current"), fresh.code_sources,
             )
-            match["sources"] = refresh_sources(
+            match["source_links"] = source_links(ctx, refresh_sources(
                 ctx, sources, request.get("purpose", "current"), fresh.code_sources
-            )
+            ))
         data = {
             "matches": matches,
             "candidate_scan_truncated": truncated,
@@ -906,8 +1000,13 @@ def execute(ctx, *, verified_generation=None):
             or not gap.get("claim_id")
             or gap["claim_id"] in eligible
         ]
+        read_sources = refresh_sources(
+            ctx, sources, request.get("purpose", "current"), evaluator.code_sources
+        )
         data = {
             "card_id": card["metadata"]["id"],
+            "path": manifest["documents"][card["metadata"]["id"]]["path"],
+            "card_ref": manifest["documents"][card["metadata"]["id"]]["blob_ref"],
             "claims": [
                 {
                     "id": c["id"],
@@ -918,9 +1017,6 @@ def execute(ctx, *, verified_generation=None):
                 for c in card["claims"]
                 if c["id"] in eligible
             ],
-            "sources": refresh_sources(
-                ctx, sources, request.get("purpose", "current"), evaluator.code_sources
-            ),
             "gaps": gaps,
             "card_digest": card["sha256"],
         }
@@ -935,8 +1031,9 @@ def execute(ctx, *, verified_generation=None):
                 blocked=True,
             )
         _validate_navigation_observations(
-            data["sources"], fresh_sources, request.get("purpose", "current"), fresh.code_sources,
+            read_sources, fresh_sources, request.get("purpose", "current"), fresh.code_sources,
         )
+        data["source_links"] = source_links(ctx, read_sources)
         if search_receipt is not None:
             data["source_search_receipt_ref"] = request["receipt_ref"]
     else:
@@ -945,6 +1042,7 @@ def execute(ctx, *, verified_generation=None):
         raise NodeError(
             "VALIDITY_CHANGED", "Validity changed before output", blocked=True
         )
+    data["gaps"] = public_gaps(data.get("gaps", []))
     data["verification_tier"] = ctx.generation_verification_tier
     receipt = ctx.seal(
         {

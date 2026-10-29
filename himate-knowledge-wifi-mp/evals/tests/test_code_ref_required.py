@@ -57,14 +57,6 @@ def library(tmp_path, *, lifecycle="stable", review_mode="manual_document", kind
     return root, raw, source, lock, rules
 
 
-def test_active_document_mode_code_source_requires_symbol(tmp_path):
-    root, raw, _, _, rules = library(tmp_path)
-    report = checks.run(checks.prepare_view(root), rules, inputs={"source_objects": {"v1": raw}}, scope="full")
-    assert report["status"] == "failed"
-    assert any(row["code"] == "CODE_REF_REQUIRED" and row["path"] == "knowledge/ready.md"
-               for row in report["findings"])
-
-
 @pytest.mark.parametrize("mode", ["formal", "candidate", "ci"])
 @pytest.mark.parametrize("review_mode", ["manual_document", "code_gate"])
 @pytest.mark.parametrize("lifecycle", ["draft", "stable"])
@@ -85,6 +77,7 @@ def test_all_active_code_sources_require_symbols_at_each_fixed_check_entry(tmp_p
                         inputs={"source_objects": {"v1": raw}}, scope="full")
     assert report["status"] == "failed"
     assert [row["code"] for row in report["findings"]] == ["CODE_REF_REQUIRED"]
+    assert report["findings"][0]["path"] == "knowledge/ready.md"
     assert next(row for row in report["checks"] if row["check_id"] == "source.references")["status"] == "failed"
 
 

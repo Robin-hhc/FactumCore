@@ -3,7 +3,9 @@
 import pytest
 
 import importlib.util
+import os
 from pathlib import Path
+import shutil
 
 
 _flow_spec = importlib.util.spec_from_file_location(
@@ -12,6 +14,17 @@ _flow_spec = importlib.util.spec_from_file_location(
 _flow_fixture = importlib.util.module_from_spec(_flow_spec)
 _flow_spec.loader.exec_module(_flow_fixture)
 planned_flow = _flow_fixture.planned_flow
+
+
+def _remove_private_tree(harness_root, relative):
+    assert relative in {".build", "artifacts", "logs/operations"}
+    root = harness_root.resolve(strict=True)
+    target = (root / relative).resolve(strict=True)
+    assert target.is_relative_to(root) and target == root / relative
+    text = str(target)
+    if os.name == "nt" and not text.startswith("\\\\?\\"):
+        text = "\\\\?\\UNC\\" + text[2:] if text.startswith("\\\\") else "\\\\?\\" + text
+    shutil.rmtree(text)
 
 
 def applied_batch(harness, *, fault_after=None, with_record=True):
@@ -292,10 +305,9 @@ def test_portable_formal_only_history_is_visible_without_private_tail_requiremen
     # does not assert the new P7 publication/retrieval/cleanup completion.
     applied_batch(harness)
     # Model a consuming clone that retains shared records and current knowledge.
-    import shutil
-    shutil.rmtree(harness.root / ".build")
+    _remove_private_tree(harness.root, ".build")
     if (harness.root / "logs/operations").exists():
-        shutil.rmtree(harness.root / "logs/operations")
+        _remove_private_tree(harness.root, "logs/operations")
     scanned = harness.run("source-scan", {"operation_id": "consumer"}, "scan")["data"]
     assert scanned["actionable_unit_ids"] == [] and scanned["finalization_pending"] == []
     statuses = harness.run("source-scan", {"operation_id": "status"}, "status")["data"]["operations"]
@@ -306,8 +318,6 @@ def test_portable_formal_only_history_is_visible_without_private_tail_requiremen
 
 
 def test_published_history_needs_no_producer_stage_or_local_index(planned_flow):
-    import shutil
-
     flow = planned_flow
     flow.produce()
     harness = flow.h
@@ -317,7 +327,7 @@ def test_published_history_needs_no_producer_stage_or_local_index(planned_flow):
         target = harness.root / name
         if target.exists():
             assert target.resolve(strict=True).parent == root
-            shutil.rmtree(target)
+            _remove_private_tree(harness.root, name)
     status = harness.run("source-scan", {"operation_id": "portable-status",
         "target_operation_id": flow.operation}, "status")["data"]["operations"][0]
     assert status["completion"]["status"] == "complete"

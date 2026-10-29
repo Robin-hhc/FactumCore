@@ -237,7 +237,7 @@ class PublicGovernanceTests(unittest.TestCase):
             "schema_version": "2.0", "skills": {}, "test_fixture_root": str(self.root.resolve()),
         }
         for name in (
-            "hs-knowledge-source-prepare",
+            "hs-knowledge-source",
             "hs-knowledge-apply",
         ):
             package = SKILLS / name

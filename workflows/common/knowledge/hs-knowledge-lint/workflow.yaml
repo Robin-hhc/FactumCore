@@ -24,7 +24,7 @@ nodes:
     type: skill
     owner: reviewer
     skill: hs-knowledge-maintain
-    prompt: 目标代码仓在远端时，通过宿主已有 SSH MCP 在实际执行端运行本节点脚本并读取结果，使用该端项目根、全局 Python 和已安装 Skill 路径；本地路径不能直接用于远端。显式调用 maintain 的 action audit-references，传入本次独立 operation_id 与相对知识根的 lint_report_ref，沿正式卡、Claim、来源锁和当前配置读取实际引用。保存并读取返回的 audit_ref JSON 与 report_ref Markdown，核对 phase reported、complete、status、counts 及未检查范围。原 lint 为 failed/incomplete 时仍汇总可执行项和真实缺口；完成报告不代表检查通过或已修复。只输出报告，不调用 source-scan、ingest、apply、register、advance、recover 或索引激活，不写知识、来源锁、事件或水位。规则或运行失败而无法保存有效巡检报告时保留 OpenFlow 原生等待，不交棒。按 audit-result 产物契约，用实际返回 report_ref 在执行端解析的真实路径提交产物实例 location.path，不能依赖默认模板位置，不覆盖旧报告。
+    prompt: 目标代码仓在远端时，通过宿主已有 SSH MCP 在实际执行端运行本节点脚本并读取结果，使用该端项目根、全局 Python 和已安装 Skill 路径；本地路径不能直接用于远端。显式调用 maintain 的 action audit-references，传入本次独立 operation_id 与相对知识根的 lint_report_ref，沿正式卡、Claim、来源锁和当前配置读取实际引用。保存并读取返回的 audit_ref JSON 与 report_ref Markdown，核对 phase reported、complete、status、counts 及未检查范围。原 lint 为 failed/incomplete 时仍汇总可执行项和真实缺口；完成报告不代表检查通过或已修复。只输出报告，不调用 source、ingest、apply、register、advance、recover 或索引激活，不写知识、来源锁、事件或水位。规则或运行失败而无法保存有效巡检报告时保留 OpenFlow 原生等待，不交棒。按 audit-result 产物契约，用实际返回 report_ref 在执行端解析的真实路径提交产物实例 location.path，不能依赖默认模板位置，不覆盖旧报告。
     exits:
       - id: reported
         label: 巡检报告已生成

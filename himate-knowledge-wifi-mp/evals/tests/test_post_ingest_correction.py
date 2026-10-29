@@ -53,7 +53,7 @@ def test_unchanged_source_is_exempt_only_when_the_plan_actually_skips_it(outcome
 
 
 def frozen_harness(tmp_path):
-    fixture_path = ROOT / "skills/common/knowledge/hs-knowledge-source-scan/tests/conftest.py"
+    fixture_path = ROOT / "skills/common/knowledge/hs-knowledge-source/tests/conftest.py"
     spec = importlib.util.spec_from_file_location("post_ingest_source_fixture", fixture_path)
     fixture = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(fixture)
@@ -75,7 +75,12 @@ def frozen_harness(tmp_path):
 
 
 def complete_document_operation(harness, operation, decision, statement, *, expected_change="unchanged"):
-    scan_ref = harness.run("source-scan", {"operation_id": operation}, "scan")["data"]["scan_ref"]
+    prepare_request = {"operation_id": operation, "source": "docs-raw/specs/source.md"}
+    if decision == "update":
+        prepare_request["candidate_card_ids"] = ["rule"]
+    prepared = harness.run("source", prepare_request, "run")
+    assert prepared["phase"] == "prepared"
+    scan_ref, material_ref = prepared["data"]["scan_ref"], prepared["data"]["material_ref"]
     scan = harness.record(scan_ref)
     assert len(scan["units"]) == 1
     unit = scan["units"][0]
@@ -86,11 +91,8 @@ def complete_document_operation(harness, operation, decision, statement, *, expe
                     "reason": "Revalidate the affected Claim under the current rules"}
                    for row in scan.get("current_context", {}).get("affected_claims", [])]
     input_units = [unit["unit_id"]] + [row["unit_id"] for row in maintenance]
-    material_request = {"operation_id": operation, "scan_ref": scan_ref}
     if decision == "update":
         assert unit["change"] == expected_change
-        material_request.update(unit_ids=[unit["unit_id"]], candidate_card_ids=["rule"])
-    material_ref = harness.run("source-prepare", material_request, "prepare")["data"]["material_ref"]
     material = harness.record(material_ref)
     check_inputs = {}
     if decision == "update":
@@ -131,7 +133,7 @@ def complete_document_operation(harness, operation, decision, statement, *, expe
         "reason": "Read the exact candidate and unchanged original under current rules", "findings": [],
         "inputs": check_inputs,
     }, "review")["data"]["content_review_ref"]
-    record_ref = harness.run("source-scan", {
+    record_ref = harness.run("source", {
         "operation_id": operation, "scan_ref": scan_ref, "view_ref": view_ref,
         "semantic_plan_ref": semantic,
         "disposition_preview_ref": harness.record(view_ref)["disposition_preview_ref"],

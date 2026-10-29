@@ -59,22 +59,23 @@ def fixture_packages(root):
     return root
 
 
-def test_final_public_capability_set_is_exactly_nine_skills():
+def test_final_public_capability_set_is_exactly_eight_skills():
     assert set(validator_module().SKILLS) == {
-        "hs-knowledge-explore", "hs-knowledge-source-scan", "hs-knowledge-source-prepare",
+        "hs-knowledge-explore", "hs-knowledge-source",
         "hs-knowledge-change-plan", "hs-knowledge-view-materialize", "hs-knowledge-lint",
         "hs-knowledge-apply", "hs-knowledge-query", "hs-knowledge-maintain",
     }
 
 
-def test_active_old_skill_is_rejected_but_empty_historical_directory_is_not(tmp_path):
+@pytest.mark.parametrize("name", ["hs-knowledge-candidate-revise", "hs-knowledge-source-scan", "hs-knowledge-source-prepare"])
+def test_active_old_skill_is_rejected_but_empty_historical_directory_is_not(tmp_path, name):
     module = validator_module()
     source = fixture_packages(tmp_path / "fixture")
-    package = source / "skills/common/knowledge/hs-knowledge-candidate-revise"
+    package = source / "skills/common/knowledge" / name
     package.mkdir()
     assert module.validate(source) == []
     (package / "SKILL.md").write_text("# Active legacy package\n", encoding="utf-8")
-    assert any("active Skill set mismatch" in error and "hs-knowledge-candidate-revise" in error
+    assert any("active Skill set mismatch" in error and name in error
                for error in module.validate(source))
 
 
@@ -85,25 +86,31 @@ def test_ingest_stays_complete_beside_the_read_only_lint_template():
         ).read_bytes()
     )
     nodes = {n["id"]: n for n in ingest["nodes"]}
-    assert ingest["entry_node"] == "scan_sources"
+    assert ingest["entry_node"] == "prepare_sources"
     assert "bind_project" not in nodes and "governance_handoff" not in nodes
     assert (ROOT / "workflows/common/knowledge/hs-knowledge-lint/workflow.yaml").is_file()
     assert not any(node["type"] == "gate" for node in nodes.values())
     assert not {"prepare_confirmation", "final_view_user_gate", "record_confirmation"} & nodes.keys()
-    assert list(nodes) == ["scan_sources", "prepare_material", "plan_change",
+    assert list(nodes) == ["prepare_sources", "plan_change",
                            "materialize_view", "lint_view", "record_ingest", "apply_view"]
     assert [(key, node["owner"]) for key, node in nodes.items()] == [
-        ("scan_sources", "coder"), ("prepare_material", "coder"),
+        ("prepare_sources", "coder"),
         ("plan_change", "coder"), ("materialize_view", "coder"),
         ("lint_view", "reviewer"), ("record_ingest", "coder"), ("apply_view", "coder"),
     ]
     assert "verify_merge" not in nodes and "maintain_knowledge" not in nodes
     assert nodes["lint_view"]["skill"] == "hs-knowledge-lint"
-    assert nodes["prepare_material"]["skill"] == "hs-knowledge-source-prepare"
-    assert nodes["record_ingest"]["skill"] == "hs-knowledge-source-scan"
+    assert nodes["prepare_sources"]["skill"] == "hs-knowledge-source"
+    assert nodes["record_ingest"]["skill"] == "hs-knowledge-source"
     assert {e["id"]: e["target"] for e in nodes["record_ingest"]["exits"]}["recorded"] == "apply_view"
-    routes = {edge["id"]: edge["target"] for edge in nodes["scan_sources"]["exits"]}
-    assert routes == {"scanned": "prepare_material", "unchanged": "__end__"}
+    routes = {edge["id"]: edge["target"] for edge in nodes["prepare_sources"]["exits"]}
+    assert routes == {"prepared": "plan_change", "unchanged": "__end__"}
+    assert "默认run" in nodes["prepare_sources"]["prompt"]
+    assert "直接调用prepare" in nodes["prepare_sources"]["prompt"]
+    assert "不先调用run或scan" in nodes["prepare_sources"]["prompt"]
+    assert "不自动无限重扫" in nodes["prepare_sources"]["prompt"]
+    for identity in ("plan_change", "materialize_view", "lint_view"):
+        assert {edge["id"]: edge["target"] for edge in nodes[identity]["exits"]}["needs_material"] == "prepare_sources"
     assert "proof_set" not in nodes["apply_view"]["prompt"]
 
 
@@ -160,7 +167,7 @@ def test_ingest_finishes_locally_without_repository_submission():
 
 
 def test_public_mixed_candidate_keeps_classification_and_routes_to_independent_p5(tmp_path):
-    fixture_path = ROOT / "skills/common/knowledge/hs-knowledge-source-scan/tests/conftest.py"
+    fixture_path = ROOT / "skills/common/knowledge/hs-knowledge-source/tests/conftest.py"
     spec = importlib.util.spec_from_file_location("workflow_mixed_public_fixture", fixture_path)
     fixture = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(fixture)
@@ -193,7 +200,7 @@ def test_design_validation_checks_package_contracts_and_owners(tmp_path):
     assert module.validate(source) == []
     contract_path = (
         source
-        / "skills/common/knowledge/hs-knowledge-source-prepare/artifacts/result.yaml"
+        / "skills/common/knowledge/hs-knowledge-source/artifacts/result.yaml"
     )
     contract = yaml.safe_load(contract_path.read_bytes())
     contract["default_location"]["path"] = "node-result.md"
@@ -253,7 +260,7 @@ def test_artifact_contracts_reject_retired_scope_and_missing_real_obligations(tm
     module = validator_module()
     source = fixture_packages(tmp_path / "fixture")
     if mutation == "stale_prepare":
-        package = source / "skills/common/knowledge/hs-knowledge-source-scan/artifacts"
+        package = source / "skills/common/knowledge/hs-knowledge-source/artifacts"
         shutil.copyfile(package / "record-result.yaml", package / "prepare-result.yaml")
         assert any("exact artifact contract set mismatch" in error for error in module.validate(source))
         return
@@ -271,14 +278,14 @@ def test_artifact_contracts_reject_retired_scope_and_missing_real_obligations(tm
 
 
 @pytest.mark.parametrize("node_id,exit_id,target", [
-    ("prepare_material", "source_changed", "plan_change"),
-    ("plan_change", "needs_material", "scan_sources"),
+    ("prepare_sources", "prepared", "lint_view"),
+    ("plan_change", "needs_material", "prepare_material"),
     ("materialize_view", "ready", "record_ingest"),
     ("lint_view", "needs_material", "scan_sources"),
     ("lint_view", "needs_revision", "plan_change"),
     ("record_ingest", "recorded", "__end__"),
 ])
-def test_seven_stage_graph_rejects_skipped_review_wrong_reentry_and_full_rescan(tmp_path, node_id, exit_id, target):
+def test_six_node_graph_rejects_skipped_review_wrong_reentry_and_retired_nodes(tmp_path, node_id, exit_id, target):
     module = validator_module()
     source = fixture_packages(tmp_path / "fixture")
     path = source / "workflows/common/knowledge/hs-knowledge-ingest/workflow.yaml"
@@ -312,7 +319,7 @@ def test_read_only_lint_workflow_rejects_writers_shortcuts_and_external_calls(tm
     elif mutation == "skip_audit":
         check["exits"][0]["target"] = "__end__"
     elif mutation == "cross_template":
-        check["exits"][0]["target"] = "hs-knowledge-ingest:scan_sources"
+        check["exits"][0]["target"] = "hs-knowledge-ingest:prepare_sources"
     elif mutation == "extra_writer":
         workflow["nodes"].append({"id": "apply", "type": "skill", "owner": "coder",
                                   "skill": "hs-knowledge-apply", "prompt": "write", "exits": []})
@@ -353,12 +360,12 @@ def test_apply_cannot_restart_materialization_after_its_completion_exit(tmp_path
 
 
 @pytest.mark.parametrize("exit_id", ["recover", "resume_index", "resume_queries"])
-def test_ingest_rejects_implicit_history_resume_from_p1(tmp_path, exit_id):
+def test_ingest_rejects_implicit_history_resume_from_preparation(tmp_path, exit_id):
     module = validator_module()
     source = fixture_packages(tmp_path / "fixture")
     path = source / "workflows/common/knowledge/hs-knowledge-ingest/workflow.yaml"
     workflow = yaml.safe_load(path.read_bytes())
-    node = next(item for item in workflow["nodes"] if item["id"] == "scan_sources")
+    node = next(item for item in workflow["nodes"] if item["id"] == "prepare_sources")
     node["exits"].append({"id": exit_id, "label": "old history", "condition": "old fact", "target": "apply_view"})
     path.write_text(yaml.safe_dump(workflow), encoding="utf-8")
-    assert any(".scan_sources: unsafe or missing transition" in error for error in module.validate(source))
+    assert any(".prepare_sources: unsafe or missing transition" in error for error in module.validate(source))

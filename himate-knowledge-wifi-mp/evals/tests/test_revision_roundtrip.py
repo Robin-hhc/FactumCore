@@ -21,6 +21,13 @@ def replan(pipeline, operation, old_plan, material_ref, previous):
 @pytest.mark.parametrize("return_to", ["P2", "P3", "P4"])
 def test_review_backedge_creates_a_new_frozen_round_without_rescanning_original(tmp_path, return_to):
     pipeline = fixture.Pipeline(tmp_path)
+    calls, actual_call = [], pipeline.call
+
+    def call(skill, request, action=None, expected=0):
+        calls.append((skill, action))
+        return actual_call(skill, request, action, expected)
+
+    pipeline.call = call
     if return_to == "P2":
         seed_bundle_ref, seed_bundle = pipeline.capture("seed", b"# Older topic\nEarlier related protocol.\n", "seed-source")
         seed_view = pipeline.view("seed", seed_bundle_ref, "seed-rule", pipeline.card("seed-rule", seed_bundle))
@@ -43,9 +50,10 @@ def test_review_backedge_creates_a_new_frozen_round_without_rescanning_original(
     assert failure["data"]["fixed_checks_executed"] is False
     assert not (pipeline.root / "knowledge/rules/roundtrip-rule.md").exists()
     previous = {"previous_view_ref": first_view_ref, "revision_reason": "P5 returned this exact candidate to " + return_to}
+    return_call_index = len(calls)
     if return_to == "P2":
         assert "seed-rule" not in {row["card_id"] for row in pipeline.record(material_ref)["candidates"]}
-        supplemented = pipeline.call("knowledge-source-prepare", {"operation_id": "round-b",
+        supplemented = pipeline.call("knowledge-source", {"operation_id": "round-b",
             "existing_material_ref": material_ref, "scan_ref": scan_ref, "candidate_card_ids": ["seed-rule"],
             **previous}, "prepare")["data"]["material_ref"]
         materials = pipeline.record(supplemented)
@@ -83,6 +91,10 @@ def test_review_backedge_creates_a_new_frozen_round_without_rescanning_original(
     assert second_view_ref != first_view_ref and second_view["previous_view_ref"] == first_view_ref
     assert second_view["scan_ref"] == scan_ref and second_view["origin_scan_operation_id"] == "round-a"
     assert [row["unit_id"] for row in pipeline.record(semantic_ref)["units"]] == unit_ids
+    # The material-return route invokes only the independent prepare action;
+    # grouping P1/P2 into one node must not restart a scan or default run.
+    source_calls = [action for skill, action in calls[return_call_index:] if skill == "knowledge-source"]
+    assert source_calls == (["prepare"] if return_to == "P2" else [])
     pipeline.review("round-b", second_view_ref)
     pending_ref = pipeline.pending_record("round-b", second_view_ref)
     pending = pipeline.record(pending_ref)
@@ -95,6 +107,6 @@ def test_review_backedge_creates_a_new_frozen_round_without_rescanning_original(
     for ref, original in frozen.items():
         assert (pipeline.root / ref).read_bytes() == original
     for operation in ("after-round-one", "after-round-two"):
-        scan = pipeline.call("knowledge-source-scan", {"operation_id": operation}, "scan")["data"]
+        scan = pipeline.call("knowledge-source", {"operation_id": operation}, "scan")["data"]
         assert scan["complete"] is True and scan["actionable_unit_ids"] == []
         assert scan["finalization_pending"] == []

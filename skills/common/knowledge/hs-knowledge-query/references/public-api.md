@@ -127,7 +127,7 @@ A source declaring `code_ref` is checked through the common resolver's internal 
 
 The same code_ref is stored in card metadata and compiled Claim.source_records, so no new query index table, card-level symbol registry or CodeGraph node ID is needed. Rebuild derived indexes after adopting new locked rules; do not modify old generations. CodeGraph may assist the Agent with candidates and call relationships, but public fixed checks do not call MCP or install/build a graph.
 
-P2 maintenance candidate discovery is exposed by `hs-knowledge-source-prepare` and
+P2 maintenance candidate discovery is exposed by `hs-knowledge-source` and
 the shared knowledge relation functions. It includes non-answer states and
 does not relax this query API's answer eligibility. New-search index freshness
 checking is outside this change; generation integrity and same-generation

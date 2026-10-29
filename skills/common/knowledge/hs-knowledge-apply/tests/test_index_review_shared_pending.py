@@ -68,11 +68,11 @@ def test_processing_status_does_not_gate_query_of_unchanged_actual_sources(tmp_p
     publish("baseline")
     baseline = p.call("knowledge-query", {"operation_id": "before-pending", "channel": "shared", "purpose": "current", "query": "capture"})["data"]
     assert [row["card_id"] for row in baseline["matches"]] == ["pending-rule"]
-    scan_ref = p.call("knowledge-source-scan", {"operation_id": "pending"}, "scan")["data"]["scan_ref"]
+    scan_ref = p.call("knowledge-source", {"operation_id": "pending"}, "scan")["data"]["scan_ref"]
     scan = p.record(scan_ref)
     assert scan["units"][0]["change"] == "unchanged"
     unit = scan["units"][0]
-    deferred = p.call("knowledge-source-scan", {"operation_id": "pending", "scan_ref": scan_ref,
+    deferred = p.call("knowledge-source", {"operation_id": "pending", "scan_ref": scan_ref,
         "dispositions": [{"unit_id": unit["unit_id"], "action": "defer", "reason": "Independent review found a missing assumption; investigation pending", "observed_fingerprint": unit["observed_fingerprint"], "adopted_fingerprint": None, "progress": "blocked", "card_refs": ["pending-rule"] if include_raw_refs else [], "claim_refs": [{"card_id": "pending-rule", "claim_id": "c1"}] if include_raw_refs else []}],
         "pending": [{"card_id": "pending-rule", "claim_id": "c1", "outcome": "defer", "reason": "Missing assumption remains unresolved"}]}, "record")["data"]["ingest_record_ref"]
     applied = p.call("knowledge-apply", {"operation_id": "pending", "ingest_record_ref": deferred})

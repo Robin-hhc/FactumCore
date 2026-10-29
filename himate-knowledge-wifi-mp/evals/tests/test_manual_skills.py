@@ -65,11 +65,10 @@ def test_manual_document_scan_record_apply_index_query_keeps_business_checks(tmp
 
     # Each real P1-P6 public call may write only the disposable stage tree.
     p.call = staged_call
-    scan_ref = p.call("knowledge-source-scan", {"operation_id": "manual"}, "scan")["data"]["scan_ref"]
+    prepared = p.call("knowledge-source", {"operation_id": "manual"}, "run")
+    assert prepared["phase"] == "prepared"
+    scan_ref, material_ref = prepared["data"]["scan_ref"], prepared["data"]["material_ref"]
     scan = p.record(scan_ref)
-    material_ref = p.call("knowledge-source-prepare", {
-        "operation_id": "manual", "scan_ref": scan_ref,
-    }, "prepare")["data"]["material_ref"]
     bundle_ref = p.record(material_ref)["bundle_ref"]
     bundle = p.record(bundle_ref)
     view_ref = p.view("manual", bundle_ref, "manual-rule", p.card("manual-rule", bundle),
@@ -77,16 +76,16 @@ def test_manual_document_scan_record_apply_index_query_keeps_business_checks(tmp
         queries=[{"id": "find-manual", "query": "capture", "required": ["manual-rule"]}])
     p.review("manual", view_ref)
     unit = scan["units"][0]
-    record_ref = p.call("knowledge-source-scan", {
+    record_ref = p.call("knowledge-source", {
         "operation_id": "manual", "scan_ref": scan_ref, "view_ref": view_ref,
         "disposition_preview_ref": p.record(view_ref)["disposition_preview_ref"],
     }, "record")["data"]["ingest_record_ref"]
     assert "lint_ref" not in p.record(record_ref)
-    assert {slug for slug, _ in staged_calls} >= {"knowledge-source-scan", "knowledge-source-prepare",
+    assert {slug for slug, _ in staged_calls} >= {"knowledge-source",
         "knowledge-change-plan", "knowledge-view-materialize", "knowledge-lint"}
-    assert ("knowledge-source-scan", "record") in staged_calls
+    assert ("knowledge-source", "record") in staged_calls
     # A new operation cannot mistake the pending P6 record for published work.
-    fresh = p.call("knowledge-source-scan", {"operation_id": "fresh-before-p7"}, "scan")["data"]
+    fresh = p.call("knowledge-source", {"operation_id": "fresh-before-p7"}, "scan")["data"]
     fresh_unit = p.record(fresh["scan_ref"])["units"][0]
     assert fresh_unit["path"] == source_path and fresh_unit["change"] == "new"
     assert fresh["actionable_unit_ids"] == [fresh_unit["unit_id"]]
@@ -117,7 +116,7 @@ def test_manual_document_scan_record_apply_index_query_keeps_business_checks(tmp
     assert (p.root / source_path).read_bytes() == original
     assert not (p.root / "logs/workflows").exists()
     assert p.call("knowledge-lint", {})["status"] == "passed"
-    status = p.call("knowledge-source-scan", {
+    status = p.call("knowledge-source", {
         "operation_id": "manual-status", "target_operation_id": "manual",
     }, "status")["data"]["operations"]
     assert len(status) == 1 and status[0]["gaps"] == []
@@ -130,14 +129,14 @@ def test_manual_document_scan_record_apply_index_query_keeps_business_checks(tmp
     assert manifest["apply_result"]["status"] == "committed"
     assert any(row["path"] == "knowledge/rules/manual-rule.md" for row in manifest["files"])
     assert p.record("logs/ingest/manual.yaml")["status"] == "applied"
-    repeated = p.call("knowledge-source-scan", {"operation_id": "manual-repeat"}, "scan")
+    repeated = p.call("knowledge-source", {"operation_id": "manual-repeat"}, "scan")
     assert p.record(repeated["data"]["scan_ref"])["units"][0]["change"] == "unchanged"
     original_record = (p.root / "logs/ingest/manual.yaml").read_bytes()
-    correction_scan_ref = p.call("knowledge-source-scan", {
+    correction_scan_ref = p.call("knowledge-source", {
         "operation_id": "manual-correction",
     }, "scan")["data"]["scan_ref"]
     correction_scan = p.record(correction_scan_ref)
-    correction_material_ref = p.call("knowledge-source-prepare", {
+    correction_material_ref = p.call("knowledge-source", {
         "operation_id": "manual-correction", "scan_ref": correction_scan_ref,
         "unit_ids": [unit["unit_id"]], "candidate_card_ids": ["manual-rule"],
     }, "prepare")["data"]["material_ref"]
@@ -149,7 +148,7 @@ def test_manual_document_scan_record_apply_index_query_keeps_business_checks(tmp
     p.review("manual-correction", correction_view)
     corrected_unit = correction_scan["units"][0]
     assert corrected_unit["change"] == "unchanged"
-    correction_record = p.call("knowledge-source-scan", {
+    correction_record = p.call("knowledge-source", {
         "operation_id": "manual-correction", "scan_ref": correction_scan_ref, "view_ref": correction_view,
         "disposition_preview_ref": p.record(correction_view)["disposition_preview_ref"],
     }, "record")["data"]["ingest_record_ref"]

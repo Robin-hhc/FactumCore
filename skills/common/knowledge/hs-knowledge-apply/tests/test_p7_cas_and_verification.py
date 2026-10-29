@@ -4,6 +4,8 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import subprocess
+import sys
 import pytest
 
 _actions_spec = importlib.util.spec_from_file_location("p7_cas_public_actions", Path(__file__).with_name("test_p7_actions.py"))
@@ -12,7 +14,7 @@ _actions_spec.loader.exec_module(_actions)
 HELPER, PublicP7, ROOT = _actions.HELPER, _actions.PublicP7, _actions.ROOT
 
 
-PROBE = r'''import atexit, json, os, sys
+PROBE = r'''import atexit, json, os, sys, tempfile
 calls = []
 def profile(frame, event, arg):
     if event != "call":
@@ -30,8 +32,9 @@ def profile(frame, event, arg):
         or (stop == "before_activation" and filename == "ingest_execution.py" and name == "_activation_observation")):
         raise RuntimeError("SYNTHETIC_" + stop)
 def save():
-    target = os.path.join(os.environ["HIMATE_P7_TRACE"], str(os.getpid()) + ".json")
-    with open(target, "x", encoding="utf-8") as stream:
+    descriptor, _ = tempfile.mkstemp(prefix=str(os.getpid()) + "-", suffix=".json",
+                                     dir=os.environ["HIMATE_P7_TRACE"])
+    with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
         json.dump({"argv": sys.argv, "calls": calls}, stream)
 atexit.register(save)
 sys.setprofile(profile)
@@ -47,6 +50,28 @@ def probe_environment(base, stop=None):
     if stop:
         environment["HIMATE_P7_STOP"] = stop
     return environment, trace
+
+
+def test_probe_preserves_distinct_trace_files_when_process_id_is_reused(tmp_path):
+    environment, trace = probe_environment(tmp_path)
+    environment.pop("HIMATE_P7_STOP", None)
+    command = "import os; os.getpid = lambda: 71384"
+    saved = {}
+    for marker in ("first", "second"):
+        process = subprocess.run([sys.executable, "-c", command, marker], env=environment,
+                                 capture_output=True, text=True, check=False)
+        assert process.returncode == 0, process.stderr
+        assert "Traceback" not in process.stderr, process.stderr
+        if marker == "first":
+            saved = {path: path.read_bytes() for path in trace.glob("*.json")}
+            assert len(saved) == 1
+    files = list(trace.glob("*.json"))
+    assert len(files) == 2
+    assert all(path.name.startswith("71384-") for path in files)
+    assert all(path.read_bytes() == raw for path, raw in saved.items())
+    runs = [json.loads(path.read_bytes()) for path in files]
+    assert {tuple(run["argv"]) for run in runs} == {("-c", "first"), ("-c", "second")}
+    assert all(run["calls"] == [] for run in runs)
 
 
 def active(trial):

@@ -4,7 +4,7 @@
 
 使用 Python 3.10–3.12 和显式锁定测试环境，在项目根 `repo/` 执行 `python himate-knowledge-wifi-mp/evals/run_acceptance.py --output-dir .scratch/acceptance-new`；结果目录须全新，相对路径以项目根为基准。保留每组 JUnit、stdout/stderr 和汇总 JSON；退出码不能替代逐项报告。当前验证人工逐个调用 Skill 的业务链路，不依赖 OpenFlow 安装、源码或宿主接入；Workflow 仅检查仓内静态结构，留待后续对接。验收运行器不自动安装依赖或修改全局宿主配置。
 
-场景、责任层及本轮去重说明见 [SCENARIOS.md](SCENARIOS.md)。默认全量收集，新增测试不会因为未进入快验清单而遗漏。日常快验使用 `python himate-knowledge-wifi-mp/evals/run_acceptance.py --profile quick --output-dir .scratch/quick-new`，覆盖显式选定的契约、安全边界和公开 CLI 冒烟；交付前仍运行默认 full。可用 `--groups hs-knowledge-apply` 定向某组，九个 Skill 和领域测试继续分别在独立进程运行。quick 选择不全、单组空收集、收集失败或超时均不能作为全量通过；超时/启动失败会保留局部输出并写入最终失败汇总，其余分组继续。
+场景、责任层及本轮去重说明见 [SCENARIOS.md](SCENARIOS.md)。默认全量收集，新增测试不会因为未进入快验清单而遗漏。日常快验使用 `python himate-knowledge-wifi-mp/evals/run_acceptance.py --profile quick --output-dir .scratch/quick-new`，覆盖显式选定的契约、安全边界和公开 CLI 冒烟；交付前仍运行默认 full。可用 `--groups hs-knowledge-apply` 定向某组，八个 Skill 和领域测试继续分别在独立进程运行。quick 选择不全、单组空收集、收集失败或超时均不能作为全量通过；超时/启动失败会保留局部输出并写入最终失败汇总，其余分组继续。
 
 每次 `summary.json` 同时保存 profile、jobs、实际选择、Python/平台、提交及规则摘要，统计整套墙时、组墙时、用例总时长和慢用例/文件。并行组耗时之和不是整套墙时；JUnit 单例总时长不能拆成 setup/call/teardown，也没有采样 CLI 次数。添加 `--baseline .scratch/earlier/summary.json` 可观察变化：环境、profile、jobs 相同且完整选择相同才比较总墙时，选择变化时只列共同通过用例并报告增删。旧报告缺元数据明确不可比较。统计始终为软提示，性能变化不影响正确性 pass/fail，机器负载和缓存差异仍须人工判断。
 
@@ -17,7 +17,7 @@
 `test_clean_clone.py` 使用隔离合成资料完成 ingest，只提交共享资产，再执行真实 Git clone；消费副本没有生产端的 `.build/`、`artifacts/`、事务日志及旧原件／提取缓存，保留正式 `logs/evidence/published/` 和 `logs/publications/` 闭包，须重新通过正式库检查、索引验证与激活、query／read 和增量扫描。`test_git_asset_boundary.py` 另用 Git 自身检查忽略规则，区分本机缓存与必须可提交的处理记录、使用限制和显式材料。该场景验证跨工作区数据闭包，不证明另一账号权限、实际宿主或部署机文件系统的持久化行为。
 
 
-当前公开集合为9个Skill，ingest的7个节点为scan_sources、prepare_material、plan_change、materialize_view、lint_view、record_ingest、apply_view；P5唯一reviewer，其他coder。validate_design.py逐项核对最终能力集合、节点／owner／转移、布局及真实产物node/exit范围；历史空目录不视为active Skill，旧有SKILL.md的包必须迁移删除后才能通过。
+当前公开集合为8个Skill，按包隔离加领域测试共9组。七个业务步骤由6个节点调度：prepare_sources、plan_change、materialize_view、lint_view、record_ingest、apply_view；P1/P2在来源节点正常调用一次run，返工直接prepare。P5唯一reviewer，其他coder。validate_design.py逐项核对能力集合、节点／owner／转移、布局及真实产物node/exit范围；历史空目录不视为active Skill，旧有SKILL.md的来源包必须迁移删除后才能通过。
 
 P1/P2独立测试分别验证观察不备料、固定清单／显式目标备料、定向补料及漂移回P1。P3保留语义／六决策oracle，P4验证实际字节和旧Claim去向，P5独立审阅与完整质量检查及代码证据绑定。apply/tests承接安全事务、恢复、独立index/regression/submission及真实公开batch，lint/tests承接原local/merge代码业务oracle，maintain/tests保事件pending／恢复／advance及只读audit。旧兄弟CLI的缺安装和子调用超时包装随架构消除，保留其业务失败不冒称通过、停点和原字节保护断言。
 

@@ -1,6 +1,6 @@
 schema_version: '2.0'
 contract_family: aiot-wifi
-tool_version: 0.7.0
+tool_version: 0.7.1
 files:
   contracts/__init__.py:
     path: governance/contracts/__init__.py
@@ -61,7 +61,7 @@ files:
     sha256: 45e465c2b5725c85addad44b17c44ea70db2515a5d21fbe976fa54a7b0ec7fdf
   specs/cards.md:
     path: governance/specs/cards.md
-    sha256: ac2a2affc08ac08427aca7bf912ba1aace6e607b139fa3f63189a15b3dcab3fe
+    sha256: 4e4523b75357bb74143483690e3cc44ecc9559ed07f48a7cdcc2bd3f1810f9d5
   specs/lifecycle.md:
     path: governance/specs/lifecycle.md
     sha256: 8a825806ec5c918ec561968190daf571aac706af8798be47e6f9a42f4d7fab5c
@@ -70,7 +70,7 @@ files:
     sha256: bd52f1af69e94c3694e30616d00290517b4dd98b7f754fde61de18e6ad528060
   specs/sources.md:
     path: governance/specs/sources.md
-    sha256: f4c835d4367949507705d34a45b10bcca427f4fea8bc6fb66120122fa237a3b1
+    sha256: 6fbc1aadf30df839c64f2b8eb0d19b1533ab8fbbee7f589cc2b86ab6b0b9c30f
   contracts/checks.py:
     path: governance/contracts/checks.py
     sha256: 93e9db9aaba62b43bbf1d7572223c6024bea6959a1dfaa821d5049292759686a

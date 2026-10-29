@@ -23,7 +23,7 @@ flowchart LR
 
 ## 能力与任务入口
 
-当前有9个公开 Skill，名称均以 `hs-knowledge-` 开头：explore、source-scan、source-prepare、change-plan、view-materialize、lint、apply、query、maintain。开发分发源码在项目根的 `skills/common/knowledge/`；实际运行使用 Agent 已安装的能力。两个 Workflow 的源码在 `workflows/common/knowledge/`，由 OpenFlow 加载和编排。
+当前有8个公开 Skill，名称均以 `hs-knowledge-` 开头：explore、source、change-plan、view-materialize、lint、apply、query、maintain。开发分发源码在项目根的 `skills/common/knowledge/`；实际运行使用 Agent 已安装的能力。两个 Workflow 的源码在 `workflows/common/knowledge/`，由 OpenFlow 加载和编排。
 
 | 任务 | 使用哪个入口 | 做到哪里结束 |
 |---|---|---|
@@ -31,13 +31,13 @@ flowchart LR
 | 单独检查正式库或候选稿 | `hs-knowledge-lint` **Skill** | 默认只读检查正式完整库；按请求也可检查候选，保存检查报告后结束 |
 | 巡检正式库及来源／代码引用 | `hs-knowledge-lint` **Workflow** | `check_formal` 调用 lint 默认正式全库检查，`audit_references` 调用 maintain 的只读引用巡检；保存 JSON／Markdown 报告后结束 |
 | 检索知识并分析问题 | `hs-knowledge-query` **Skill** | 按用途、范围和实际依据检索，使用回执精读同一代索引中的正文，再给出结论与缺口 |
-| 独立备料、进度观察、恢复或索引维护 | 对应 **Skill 的公开动作** | source-prepare准备材料，source-scan观察进度，apply提供事务恢复／索引／回归／提交核对，maintain负责维护状态；见[独立动作](使用说明.md#独立备料恢复索引与提交核对) |
+| 独立扫描、备料、进度观察、恢复或索引维护 | 对应 **Skill 的公开动作** | source提供扫描、备料、捕获、来源恢复、记录与进度，apply提供事务恢复／索引／回归／提交核对，maintain负责维护状态；见[独立动作](使用说明.md#独立备料恢复索引与提交核对) |
 
 同名 lint Skill 与 Workflow 分属能力目录和工作流目录；ingest 的 P5 调用的是 lint **Skill** 的 `review` 动作，不嵌套 lint Workflow。独立 lint 默认仍为正式全库固定检查，周期巡检由外部系统触发；发现问题后，由人明确将修订要求交给 ingest，巡检不自动修稿。
 
 内容批在P5完成独立审阅和一次完整质量检查，P6只保存待发布的处理记录。P7调用 `apply --action batch`，核对输入、原版本、写锁和实际落盘字节；已审内容与必要依据发布并核验后，才保存正式成功记录。随后构建并完整验证索引，执行本批预定查询和同代精读，按原活动指针基线启用，最后清理本批可删暂存。内容已发布与整批已完成是两件事：检索或清理未完成时，保留已发布事实并报告停点。仅记录批保存处理结果及欠账，不新建或启用索引。旧 `apply --action run` 沿用原完整检查和事务语义。
 
-每次新启动ingest都从当前输入、正式处理记录和维护限制开始，不搜索旧草稿、事务日志或未完索引；P1只进入备料或在确实无事可做时结束。原件未变但用户明确要求修卡时，仍可按目标备料。P5缺材料回P2、内容判断有误回P3、稿件问题回P4；返工明确引用前序稿，保存新版本。只有明确继续某次执行时，才按该操作及其确切引用检查停点，已发布内容只补缺失的检索收尾或清理。指定操作的 `status` 观察历史事实，不证明当前索引或内容仍然有效；用法见[使用说明](使用说明.md#进度续办和完成判断)。
+ingest保留P1—P7七个业务步骤，由六个OpenFlow节点调度。首个coder节点`prepare_sources`使用source默认`run`，先由脚本生成真实扫描清单，再按待办准备材料；完整且没有待办、维护限制、缺口或明确修订目标才返回`unchanged`结束，否则交实际`scan_ref/material_ref`给P3。新流程不搜索旧私有操作，Agent不重写扫描事实。P3／P4／P5缺材料返回首节点，但明确调用`prepare`定向补齐，不先重跑默认`run`；判断有误回P3，稿件问题回P4。输入漂移按变化对象刷新有效材料，运行故障保留原停点。只有明确继续某次执行时，才按其确切引用核对停点；指定操作的`status`只观察历史事实，不证明当前索引健康。用法见[使用说明](使用说明.md#进度续办和完成判断)。
 
 Workflow负责顺序、角色与交棒：P5由独立reviewer执行，其余节点由coder执行。Skill只核对本职业务数据，不认证角色、Workflow身份或上游通过票据；内部通过知识根的受锁公共函数复用规则，不调用兄弟Skill CLI。人工验证可逐个调用同一组Skill，真实宿主的角色隔离、出口选择和等待恢复仍需按部署环境核实。
 

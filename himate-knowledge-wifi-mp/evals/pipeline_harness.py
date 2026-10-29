@@ -16,10 +16,11 @@ import yaml
 REPO = Path(__file__).resolve().parents[2]
 PUBLIC_SKILLS = tuple("hs-knowledge-" + name for name in (
     "apply", "change-plan", "explore", "lint", "maintain", "query",
-    "source-prepare", "source-scan", "view-materialize"))
+    "source", "view-materialize"))
 RETIRED_SKILLS = tuple("hs-knowledge-" + name for name in (
     "candidate-inspect", "candidate-revise", "governance-handoff", "index-build", "local-check",
-    "merge-check", "publish-handoff", "query-regression", "recover", "source-capture"))
+    "merge-check", "publish-handoff", "query-regression", "recover", "source-capture",
+    "source-scan", "source-prepare"))
 
 
 def install_packages(destination):
@@ -41,9 +42,11 @@ def target_call(slug, request, action=None):
     This adapter is test infrastructure, not a runtime compatibility capability.
     """
     if slug in {"knowledge-source-capture", "source-capture"}:
-        return "knowledge-source-prepare", request, "capture" if action in (None, "run") else action
-    if slug in {"knowledge-source-scan", "source-scan"} and action == "prepare":
-        return "knowledge-source-prepare", request, "prepare"
+        return "knowledge-source", request, "capture" if action in (None, "run") else action
+    if slug in {"knowledge-source-scan", "source-scan"}:
+        return "knowledge-source", request, action or "scan"
+    if slug in {"knowledge-source-prepare", "source-prepare"}:
+        return "knowledge-source", request, action or "prepare"
     if slug in {"knowledge-index-build", "index-build"}:
         return "knowledge-apply", request, "index-" + ("build" if action in (None, "run") else action)
     if slug in {"knowledge-query-regression", "query-regression"}:
@@ -154,9 +157,9 @@ class Pipeline:
 
     def capture(self, op, text, source_id="raw-source"):
         ref = self.write("docs-raw/specs/" + source_id + ".md", text)
-        scan_ref = self.call("knowledge-source-scan", {"operation_id": op, "source": ref}, "scan")["data"]["scan_ref"]
-        material_ref = self.call("knowledge-source-prepare", {"operation_id": op, "scan_ref": scan_ref},
-                                 "prepare")["data"]["material_ref"]
+        result = self.call("knowledge-source", {"operation_id": op, "source": ref}, "run")
+        assert result["phase"] == "prepared", result
+        scan_ref, material_ref = result["data"]["scan_ref"], result["data"]["material_ref"]
         material = self.record(material_ref)
         if not hasattr(self, "prepared"):
             self.prepared = {}
@@ -206,11 +209,11 @@ class Pipeline:
             if not sources:
                 raise ValueError("Code-only independent byte fixtures must explicitly use semantic=False")
             if scan_ref is None:
-                scan_ref = self.call("knowledge-source-scan", {"operation_id": op,
+                scan_ref = self.call("knowledge-source", {"operation_id": op,
                     "source": sources[0]["path"]}, "scan")["data"]["scan_ref"]
             scan = self.record(scan_ref)
             if material_ref is None:
-                material_ref = self.call("knowledge-source-prepare", {"operation_id": op,
+                material_ref = self.call("knowledge-source", {"operation_id": op,
                     "scan_ref": scan_ref, "unit_ids": [row["unit_id"] for row in scan["units"]],
                     "candidate_card_ids": [card_id] if decision == "update" else []}, "prepare")["data"]["material_ref"]
             material = self.record(material_ref)
@@ -269,6 +272,6 @@ class Pipeline:
 
     def pending_record(self, op, view_ref):
         view = self.record(view_ref)
-        pending = self.call("knowledge-source-scan", {"operation_id": op, "scan_ref": view["scan_ref"],
+        pending = self.call("knowledge-source", {"operation_id": op, "scan_ref": view["scan_ref"],
             "view_ref": view_ref, "disposition_preview_ref": view["disposition_preview_ref"]}, "record")
         return pending["data"]["ingest_record_ref"]

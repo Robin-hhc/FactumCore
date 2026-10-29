@@ -34,7 +34,7 @@ def code_fixture(harness, usages=("current",), source_bytes=None):
     config_path = harness.base / "config.yml"
     config_path.write_bytes(canonical(config))
     repo_id = "repo-" + hashed(b"main/shared")[:16]
-    captured = harness.run("source-prepare", {"operation_id": "captured", "kind": "code", "repo_id": repo_id,
+    captured = harness.run("source", {"operation_id": "captured", "kind": "code", "repo_id": repo_id,
                                             "relative_path": "file.c", "source_id": "selected-code"}, action="capture")
     bundle = harness.record(captured["data"]["bundle_ref"])
     # Establish an explicitly published old-source fixture before registering

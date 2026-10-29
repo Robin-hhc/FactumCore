@@ -17,8 +17,7 @@ import yaml
 
 SKILLS = (
     'hs-knowledge-explore',
-    'hs-knowledge-source-scan',
-    'hs-knowledge-source-prepare',
+    'hs-knowledge-source',
     'hs-knowledge-change-plan',
     'hs-knowledge-view-materialize',
     'hs-knowledge-lint',
@@ -28,8 +27,7 @@ SKILLS = (
 )
 ARTIFACT_SCOPE = {
     'hs-knowledge-explore': ([], []),
-    'hs-knowledge-source-scan': (['scan_sources'], ['scanned']),
-    'hs-knowledge-source-prepare': (['prepare_material'], ['prepared']),
+    'hs-knowledge-source': (['prepare_sources'], ['prepared', 'unchanged']),
     'hs-knowledge-change-plan': (['plan_change'], ['content_planned']),
     'hs-knowledge-view-materialize': (['materialize_view'], ['ready']),
     'hs-knowledge-lint': (
@@ -41,7 +39,7 @@ ARTIFACT_SCOPE = {
     'hs-knowledge-maintain': ([], []),
 }
 EXTRA_ARTIFACT_SCOPE = {
-    'hs-knowledge-source-scan': {'record-result.yaml': (['record_ingest'], ['recorded'])},
+    'hs-knowledge-source': {'record-result.yaml': (['record_ingest'], ['recorded'])},
     'hs-knowledge-maintain': {'audit-result.yaml': (['audit_references'], ['reported'])},
 }
 EXTRA_ARTIFACT_IDS = {
@@ -50,29 +48,27 @@ EXTRA_ARTIFACT_IDS = {
 OWNERS = {'lint_view': 'reviewer',
  'check_formal': 'reviewer',
  'audit_references': 'reviewer'}
-NODE_SKILLS = {'scan_sources': 'hs-knowledge-source-scan',
- 'prepare_material': 'hs-knowledge-source-prepare',
+NODE_SKILLS = {'prepare_sources': 'hs-knowledge-source',
  'plan_change': 'hs-knowledge-change-plan',
  'materialize_view': 'hs-knowledge-view-materialize',
  'lint_view': 'hs-knowledge-lint',
- 'record_ingest': 'hs-knowledge-source-scan',
+ 'record_ingest': 'hs-knowledge-source',
  'apply_view': 'hs-knowledge-apply',
  'check_formal': 'hs-knowledge-lint',
  'audit_references': 'hs-knowledge-maintain'}
 WORKFLOW_ENTRIES = {
-    'hs-knowledge-ingest': ('scan_sources', 'hs-knowledge-source-scan'),
+    'hs-knowledge-ingest': ('prepare_sources', 'hs-knowledge-source'),
     'hs-knowledge-lint': ('check_formal', 'hs-knowledge-lint'),
 }
 # Exact contracts for the existing ingest graph and the separate read-only graph.
 # Template identity is independent of Skill identity, even when names match.
 EDGES = {
     'hs-knowledge-ingest': {
-        'scan_sources': {'scanned': 'prepare_material', 'unchanged': '__end__'},
-        'prepare_material': {'prepared': 'plan_change', 'source_changed': 'scan_sources'},
-        'plan_change': {'content_planned': 'materialize_view', 'needs_material': 'prepare_material'},
-        'materialize_view': {'ready': 'lint_view', 'needs_material': 'prepare_material',
+        'prepare_sources': {'prepared': 'plan_change', 'unchanged': '__end__'},
+        'plan_change': {'content_planned': 'materialize_view', 'needs_material': 'prepare_sources'},
+        'materialize_view': {'ready': 'lint_view', 'needs_material': 'prepare_sources',
                              'needs_plan': 'plan_change'},
-        'lint_view': {'passed': 'record_ingest', 'needs_material': 'prepare_material',
+        'lint_view': {'passed': 'record_ingest', 'needs_material': 'prepare_sources',
                       'needs_plan': 'plan_change', 'needs_revision': 'materialize_view'},
         'record_ingest': {'recorded': 'apply_view'},
         'apply_view': {'completed': '__end__', 'recorded': '__end__'},

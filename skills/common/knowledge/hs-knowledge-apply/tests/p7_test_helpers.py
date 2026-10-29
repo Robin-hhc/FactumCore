@@ -23,15 +23,19 @@ def map_call(slug, action):
         name = "knowledge-apply"
         action = "regression-verify" if action == "verify" else "regression"
     elif name == "knowledge-source-capture":
-        name = "knowledge-source-prepare"
+        name = "knowledge-source"
         action = "capture" if action in {None, "run"} else action
     elif name == "knowledge-publish-handoff":
         name = "knowledge-apply"
         action = "verify-submission" if action == "verify-submission" else "prepare-submission"
     elif name == "knowledge-recover":
         name = "knowledge-apply"
-    elif name == "knowledge-source-scan" and action == "prepare":
-        name = "knowledge-source-prepare"
+    elif name == "knowledge-source-scan":
+        name = "knowledge-source"
+        action = action or "scan"
+    elif name == "knowledge-source-prepare":
+        name = "knowledge-source"
+        action = action or "prepare"
     return ("hs-" if full else "") + name, action
 
 
@@ -41,9 +45,9 @@ class Pipeline(original.Pipeline):
         return super().call(slug, request, action, expected)
 
     def capture(self, op, text, source_id="raw-source"):
-        """Independent source data; do not inherit the seven-stage scan fixture."""
+        """Independent source data; do not run the normal merged preparation."""
         path = self.write("docs-raw/specs/" + source_id + ".md", text)
-        result = self.call("knowledge-source-prepare", {"operation_id": op,
+        result = self.call("knowledge-source", {"operation_id": op,
             "source_path": path, "source_id": source_id}, "capture")
         ref = result["data"]["bundle_ref"]
         return ref, self.record(ref)

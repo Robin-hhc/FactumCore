@@ -122,7 +122,7 @@ class Harness:
     def capture(self, operation="op", text=b"# Source\nSynthetic evidence.\n"):
         self.write("docs-raw/specs/source.md", text)
         response = self.run(
-            "source-prepare",
+            "source",
             {
                 "operation_id": operation,
                 "source_path": "docs-raw/specs/source.md",

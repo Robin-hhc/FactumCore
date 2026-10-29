@@ -39,11 +39,11 @@ QUICK_FILES = {
     "hs-knowledge-lint": ("test_cli.py", "test_local_check.py", "test_module_mapping.py"),
     "hs-knowledge-maintain": ("test_code_navigation.py",),
     "hs-knowledge-query": ("test_cli.py", "test_qualification.py"),
-    "hs-knowledge-source-prepare": (
-        "test_cli.py::test_missing_request_returns_structured_error_without_creating_knowledge",
-        "test_cli.py::test_source_capture_returns_business_artifact_without_handoff_manifest",
+    "hs-knowledge-source": (
+        "test_capture_cli.py::test_missing_request_returns_structured_error_without_creating_knowledge",
+        "test_capture_cli.py::test_source_capture_returns_business_artifact_without_handoff_manifest",
+        "test_manual_entry.py", "test_execution_history_boundary.py",
     ),
-    "hs-knowledge-source-scan": ("test_manual_entry.py", "test_execution_history_boundary.py"),
     "hs-knowledge-view-materialize": (
         "test_cli.py::test_missing_request_returns_structured_error_without_creating_knowledge",
         "test_cli.py::test_complete_stable_view_contains_card_navigation_and_lock",

@@ -106,13 +106,13 @@ class PublicCodeGateTests(unittest.TestCase):
         self.assertEqual(snapshot["recovery"], {"kind": "git", "method": "git", "repo_id": "wifi-code",
                                               "commit": self.head, "path": "src/wifi.c", "status": "available"})
         self.assertFalse(snapshot["code_identity"]["checked_file_dirty"])
-        scanned = self.invoke("hs-knowledge-source-scan", "scan", {"operation_id": "op"})
+        scanned = self.invoke("hs-knowledge-source", "scan", {"operation_id": "op"})
         scan_ref = scanned["data"]["scan_ref"]
         scan = json.loads((self.root / scan_ref).read_bytes())
         self.assertEqual(scan["units"], [])
         affected = scan["current_context"]["affected_claims"]
         self.assertTrue(any(row["card_id"] == "fixture-code-flow" and row["claim_id"] == "c1" for row in affected))
-        prepared = self.invoke("hs-knowledge-source-scan", "prepare", {"operation_id": "op", "scan_ref": scan_ref,
+        prepared = self.invoke("hs-knowledge-source", "prepare", {"operation_id": "op", "scan_ref": scan_ref,
             "code_bundle_refs": [{"bundle_ref": code_bundle_ref, "bundle_digest": code_bundle["digest"]}]})
         material_ref = prepared["data"]["material_ref"]
         material = json.loads((self.root / material_ref).read_bytes())
@@ -177,7 +177,7 @@ class PublicCodeGateTests(unittest.TestCase):
         self.assertEqual(linted["status"], "passed")
         self.assertEqual(linted["code_review"]["check_status"], "passed")
         lint_ref = str(pathlib.Path(linted["data"]["report_ref"]).relative_to(self.root)).replace("\\", "/")
-        recorded = self.invoke("hs-knowledge-source-scan", "record", {"operation_id": "op", "scan_ref": scan_ref,
+        recorded = self.invoke("hs-knowledge-source", "record", {"operation_id": "op", "scan_ref": scan_ref,
             "semantic_plan_ref": semantic_ref, "view_ref": self.view_ref, "lint_ref": lint_ref,
             "disposition_preview_ref": self.view["disposition_preview_ref"]})
         applied = self.invoke("hs-knowledge-apply", request={"operation_id": "op", "v3_required": True, "view_ref": self.view_ref,
@@ -361,8 +361,8 @@ class PublicCodeGateTests(unittest.TestCase):
         for name in (
             "hs-knowledge-lint",
             "hs-knowledge-apply",
-            "hs-knowledge-source-prepare",
-            "hs-knowledge-source-scan",
+            "hs-knowledge-source",
+            "hs-knowledge-source",
             "hs-knowledge-change-plan",
             "hs-knowledge-view-materialize",
             "hs-knowledge-query",

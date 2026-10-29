@@ -35,11 +35,11 @@ def test_status_retry_can_reuse_its_ordinary_response_path(tmp_path):
     request.write_text('{"operation_id":"status-retry"}', encoding="utf-8")
     before = business_files(pipeline.root)
 
-    first = invoke(pipeline, "knowledge-source-scan", request, response, "status")
+    first = invoke(pipeline, "knowledge-source", request, response, "status")
     assert first.returncode == 0, first.stderr.decode(errors="replace")
     original_response = response.read_bytes()
     assert json.loads(original_response)["status"] == "ok"
-    second = invoke(pipeline, "knowledge-source-scan", request, response, "status")
+    second = invoke(pipeline, "knowledge-source", request, response, "status")
 
     assert second.returncode == 0, second.stderr.decode(errors="replace")
     assert response.read_bytes() == original_response

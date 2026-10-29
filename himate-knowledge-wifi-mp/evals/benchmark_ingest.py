@@ -68,6 +68,10 @@ def worker(checkout, output):
     started = time.perf_counter()
     fixture.complete_document_operation(harness, "measured", "create", "Synthetic fixture statement.")
     elapsed = time.perf_counter() - started
+    if (checkout / "skills/common/knowledge/hs-knowledge-source/SKILL.md").is_file():
+        # The candidate's normal workflow must measure the combined public run,
+        # not two independent actions or rewritten historical fixture results.
+        assert [row["action"] for row in calls if row["skill"] == "hs-knowledge-source"] == ["run", "record"]
     assert (harness.root / "docs-raw/specs/source.md").read_bytes() == original
     return {"seconds": round(elapsed, 6), "outer_cli_calls": calls,
             "source_sha256": hashlib.sha256(original).hexdigest(), "source_lines": 300,

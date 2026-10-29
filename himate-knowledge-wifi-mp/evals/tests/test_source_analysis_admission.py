@@ -113,7 +113,7 @@ def test_source_identity_is_rechecked_without_build_artifacts(tmp_path, monkeypa
             rules, environment.catalog["code_policy"],
         )
         assert source_resources.validate_current_code_identity(*arguments) == identity
-        for name in ("hs-knowledge-apply", "hs-knowledge-query", "hs-knowledge-source-prepare"):
+        for name in ("hs-knowledge-apply", "hs-knowledge-query", "hs-knowledge-source"):
             package = fixture.SKILLS / name
             environment.catalog["skills"][name] = {
                 "root": str(package), "entry": "scripts/cli.py", "python": sys.executable,

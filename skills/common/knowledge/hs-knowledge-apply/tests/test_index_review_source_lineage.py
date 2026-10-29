@@ -26,7 +26,7 @@ def test_published_reference_rejects_retargeted_local_snapshot(tmp_path):
     view = p.record(view_ref)
     card_path = "knowledge/rules/lineage-rule.md"
     card_sha = fixture.sha((p.root / card_path).read_bytes())
-    scan_ref = p.call("knowledge-source-scan", {"operation_id": "summary-scan"}, "scan")["data"]["scan_ref"]
+    scan_ref = p.call("knowledge-source", {"operation_id": "summary-scan"}, "scan")["data"]["scan_ref"]
     scan = p.record(scan_ref)
     unit = scan["units"][0]
     record = {"schema_version": "2.0", "record_kind": "ingest_record", "operation_id": "summary-scan", "rules_digest": p.rules, "tool_identity": view["tool_identity"],

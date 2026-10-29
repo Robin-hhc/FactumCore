@@ -59,10 +59,11 @@ def test_current_ingest_review_lint_record_apply_query_without_human_confirmatio
         git("add", "--", domain_path + "/docs-raw/specs/source.md")
         git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "original")
         initial_commit = git("rev-parse", "HEAD")
-    scan_ref = harness.run("source-scan", {"operation_id": "op"}, "scan")["data"]["scan_ref"]
+    prepared = harness.run("source", {"operation_id": "op"}, "run")
+    assert prepared["phase"] == "prepared"
+    scan_ref, materials = prepared["data"]["scan_ref"], prepared["data"]["material_ref"]
     scan = harness.record(scan_ref)
     unit = scan["units"][0]
-    materials = harness.run("source-prepare", {"operation_id": "op", "scan_ref": scan_ref}, "prepare")["data"]["material_ref"]
     material = harness.record(materials)
     bundle = harness.record(material["bundle_ref"])
     if unrelated_nav_changes == "uncommitted_raw":
@@ -111,7 +112,7 @@ def test_current_ingest_review_lint_record_apply_query_without_human_confirmatio
     review = reviewed["data"]["content_review_ref"]
     assert "review_trust" not in json.loads(harness.catalog.read_bytes())
     assert reviewed["status"] == "passed" and reviewed["data"]["fixed_checks_executed"] is True
-    record_ref = harness.run("source-scan", {"operation_id": "op", "scan_ref": scan_ref, "view_ref": view_ref,
+    record_ref = harness.run("source", {"operation_id": "op", "scan_ref": scan_ref, "view_ref": view_ref,
         "disposition_preview_ref": harness.record(view_ref)["disposition_preview_ref"]}, "record")["data"]["ingest_record_ref"]
     apply_request = {"operation_id": "op", "v3_required": True, "view_ref": view_ref,
                      "ingest_record_ref": record_ref, "content_review_ref": review}
@@ -134,7 +135,7 @@ def test_current_ingest_review_lint_record_apply_query_without_human_confirmatio
             original_path.write_bytes(original_bytes)
     if unrelated_nav_changes in {"historical_fallback", "local_only"}:
         source = bundle["snapshots"][0]
-        readable = harness.run("source-prepare", {"operation_id": "op", "bundle_ref": material["bundle_ref"],
+        readable = harness.run("source", {"operation_id": "op", "bundle_ref": material["bundle_ref"],
                                "source_ref": {"evidence_ref": "e1", "source_id": source["source_id"],
                                               "snapshot_id": source["snapshot_id"], "locator": {"kind": "lines", "start": 1, "end": 2}}}, "resolve-source")
         assert base64.b64decode(readable["data"]["bytes_b64"]) == b"# Source\nSynthetic fixture statement.\n"
@@ -213,16 +214,16 @@ def test_local_source_recovery_still_rejects_unsafe_paths_and_locators(harness):
     reference = {"evidence_ref": "e1", "source_id": snapshot["source_id"],
                  "snapshot_id": snapshot["snapshot_id"], "locator": {"kind": "lines", "start": 1, "end": 2}}
     request = {"operation_id": "source-guards", "bundle_ref": bundle_ref, "source_ref": reference}
-    resolved = harness.run("source-prepare", request, "resolve-source")
+    resolved = harness.run("source", request, "resolve-source")
     assert base64.b64decode(resolved["data"]["bytes_b64"]) == b"# Source\nExact captured source.\n"
     bad_locator = {**reference, "locator": {"kind": "lines", "start": 1, "end": 999}}
-    rejected = harness.run("source-prepare", {**request, "source_ref": bad_locator}, "resolve-source", expected=2)
+    rejected = harness.run("source", {**request, "source_ref": bad_locator}, "resolve-source", expected=2)
     assert rejected["status"] == "error"
     snapshot["recovery"] = {"method": "evidence_object", "path": "logs/evidence/../../outside.bin"}
     bundle.pop("digest")
     raw = json.dumps(bundle, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
     bundle["digest"] = hashlib.sha256(raw).hexdigest()
     unsafe = harness.write(".build/operations/source-guards/unsafe-bundle.json", json.dumps(bundle).encode())
-    rejected = harness.run("source-prepare", {**request, "bundle_ref": unsafe}, "resolve-source", expected=2)
+    rejected = harness.run("source", {**request, "bundle_ref": unsafe}, "resolve-source", expected=2)
     assert rejected["status"] == "error"
     assert not (harness.root / "knowledge/rules/new.md").exists()

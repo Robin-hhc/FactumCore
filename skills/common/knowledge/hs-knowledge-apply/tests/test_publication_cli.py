@@ -26,13 +26,14 @@ def manual_pending(tmp_path):
     pipeline = MANUAL.ManualPipeline(tmp_path)
     operation = "manual-publication"
     pipeline.write("docs-raw/specs/manual.md", b"# Source\nCapture marker is a documented rule.\n")
-    scan = pipeline.call("knowledge-source-scan", {"operation_id": operation}, "scan")["data"]["scan_ref"]
-    material = pipeline.call("knowledge-source-prepare", {"operation_id": operation, "scan_ref": scan}, "prepare")["data"]["material_ref"]
+    prepared = pipeline.call("knowledge-source", {"operation_id": operation}, "run")
+    assert prepared["phase"] == "prepared"
+    scan, material = prepared["data"]["scan_ref"], prepared["data"]["material_ref"]
     bundle_ref = pipeline.record(material)["bundle_ref"]
     view = pipeline.view(operation, bundle_ref, "manual-rule", pipeline.card("manual-rule", pipeline.record(bundle_ref)),
                          scan_ref=scan, material_ref=material)
     pipeline.review(operation, view)
-    record = pipeline.call("knowledge-source-scan", {"operation_id": operation, "scan_ref": scan, "view_ref": view,
+    record = pipeline.call("knowledge-source", {"operation_id": operation, "scan_ref": scan, "view_ref": view,
         "disposition_preview_ref": pipeline.record(view)["disposition_preview_ref"]}, "record")["data"]["ingest_record_ref"]
     return pipeline, {"operation_id": operation, "view_ref": view, "ingest_record_ref": record}
 
@@ -391,7 +392,7 @@ def test_actual_source_defer_state_is_submitted_and_survives_git_clone(tmp_path)
     trial.git("add", "docs-raw/specs/raw.md")
     trial.git("commit", "-m", "Actual source update before deferred processing")
     captured = trial.call("capture", {"operation_id": "deferred-source", "source_id": "raw",
-        "source_path": "docs-raw/specs/raw.md"}, skill="hs-knowledge-source-prepare")["data"]
+        "source_path": "docs-raw/specs/raw.md"}, skill="hs-knowledge-source")["data"]
     bundle = trial.record(captured["bundle_ref"])
     assert bundle["event_proposals"]
     lock = yaml.safe_load((trial.root / "governance/sources.lock.yaml").read_bytes())

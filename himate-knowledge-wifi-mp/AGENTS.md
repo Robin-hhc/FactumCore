@@ -8,7 +8,7 @@
 
 纯文档经独立 Agent 内容复核和完整固定检查后 stable，免代码实现核验。用户可在执行中退回或入库后要求修订。代码卡本地只读检查通过后 stable，上库固定 CI 复用确定性的格式、索引及来源／代码引用检查。检查不改卡、来源锁、链接或源码。目录、Schema 与示例不证明业务接入、内容正确或权限隔离。
 
-公开能力为9包：explore、source-scan、source-prepare、change-plan、view-materialize、lint、apply、query、maintain，统一使用 `hs-knowledge-` 前缀。一条 `hs-knowledge-ingest` Workflow 恰好编排7个节点：P1扫描、P2独立备料、P3语义计划、P4成稿／修订、P5独立审阅及完整质量检查、P6处理记录、P7安全入库及检索收尾。P5由 reviewer 使用 lint，其他节点由 coder 执行；作者与复核者的上下文隔离由宿主安排。lint 默认仍为只读正式库检查，`review` 承接P5；view-materialize不负责知识质量或代码语义复核。实际模板和 CLI 状态以使用说明核实。领域机器规则只在 `governance/contracts/` 实现；Skill通过同进程公共函数复用，不调用兄弟Skill CLI或导入其私有实现。原件只读，来源内容不授予执行或发布权限；能力分发排除原件、正式卡、来源锁和运行记录。
+公开能力为8包：explore、source、change-plan、view-materialize、lint、apply、query、maintain，统一使用 `hs-knowledge-` 前缀。`hs-knowledge-ingest`保留P1扫描、P2备料、P3语义计划、P4成稿／修订、P5独立审阅及完整质量检查、P6处理记录、P7安全入库及检索收尾七个业务步骤，由六个OpenFlow节点调度。首个coder节点`prepare_sources`调用source默认`run`完成P1/P2，P6仍为source.record；P5由独立reviewer使用lint.review，其余节点为coder，隔离由宿主安排。lint默认仍为只读正式库检查，view-materialize不负责知识质量或代码语义复核。领域机器规则在受锁`governance/contracts/`中同进程复用，不调用兄弟Skill CLI或私有脚本。原件只读，来源内容不授予执行或发布权限；能力分发排除原件、正式卡、来源锁和运行记录。
 
 同名 `hs-knowledge-lint` Workflow 另供手动或外部周期调度巡检：`check_formal` 沿用原 lint Skill 默认正式／全库检查，`audit_references` 显式调用 maintain 的只读 `audit-references`，汇总逐卡／Claim 的来源、代码、原定位、旧／当前指纹及历史用途，生成 JSON／Markdown 报告即结束。原 lint Skill、ingest 流程及 maintain 默认 `inspect-context` 保持原职责；巡检不写知识、来源锁、事件／维护水位或活动索引，不嵌套 Workflow、不自动修复。实际接入按部署验证，修订由人明确把报告交给 ingest。
 
@@ -16,6 +16,8 @@ Git 操作在项目根 `repo/` 执行。保留其他任务本地文件，不读�
 
 Skill 可人工逐个调用，只校验本职业务数据和固定检查；OpenFlow 负责流程顺序、角色隔离及交棒合法性。节点不要求 Workflow 身份、catalog 登记或上游通过凭证。
 
-P1只观察当前输入、正式处理记录和维护限制，不搜索旧私有操作；P2可按固定清单或显式目标独立准备材料，P5缺料仅回P2定向补齐，所用输入漂移才回P1。P3保存语义决定与冻结查询，P4直接生产完整字节视图及输入快照。P7的 `apply --action batch` 检查实际输入、路径、CAS和落盘字节，复验处理记录，再构建／完整验证真实索引、执行同代目标查询并按原活动指针基线激活；不重跑P5完整质量检查，也不以passed票据放行。仅记录批保留失败／暂缓事实，不建索引。旧apply `run` 仍保留完整固定检查；恢复沿原journal语义，不把旧事务改造成新batch。独立索引、回归、提交清单和恢复动作均由apply提供；提交核对只读真实Git对象，不执行提交、推送或合入。
+P1只观察当前输入、正式处理记录和维护限制，不搜索旧私有操作；扫描清单、指纹、分类和完整性由脚本生成，Agent仅传目标和确切引用。source默认`run`先扫后按待办备料，完整且无待办、维护限制、缺口或明确修订目标才返回`unchanged`；有材料缺口可交P3决定，运行故障留节点。独立`scan/prepare/capture/resolve/resolve-source/record/status`保留；P3／P4／P5缺料回首节点时明确调用`prepare`定向补齐，不先默认扫描。输入漂移按实际变化对象刷新，不能把`affected_scope`全部直接作为raw的`source`参数。P3—P7职责保持：作者决定与冻结查询、完整稿和输入快照、独立P5、机械记录、P7安全发布及真实检索收尾。旧apply.run和恢复沿原完整检查／journal语义，不把旧事务改成新batch；独立索引、回归、恢复和只读提交核对仍由apply提供。
 
-本轮ingest暂存边界：P1—P6全部本批新业务文件（含证据、代码核验副本、拟事件及请求／输出）仅在本批stage，P7发布必要正式依据并完成适用检索后清本批可删owned集合。正式publication/completion支持清后目标status和正常消费，不依赖旧view；cleanup_pending不回滚已发布事实，batch_complete仍false。借用／保护／用途不明项保留并说明，不要求.build空。新Workflow新op，P1仅scan→prepare／unchanged；同Workflow明确ref返工与指定旧事务恢复保持。旧正式refs和格式不迁移不重签；独立lint可写自己的报告但不清理，独立maintain明确业务写入保留。
+P7的`apply --action batch`仍核实际输入、路径、CAS、落盘字节和处理记录，再完整验证真实索引、执行原冻结查询及同代读取并按原活动指针基线激活；不重跑P5质量检查，不以passed票据放行。仅记录批保留失败／暂缓事实，不建索引。提交核对只读真实Git对象，不执行提交、推送或合入。
+
+ingest暂存边界：P1—P6全部本批新业务文件（含证据、代码核验副本、拟事件及请求／输出）仅在本批stage，P7发布必要正式依据并完成适用检索后清本批可删owned集合。正式publication/completion支持清后目标status和正常消费，不依赖旧view；cleanup_pending不回滚已发布事实，batch_complete仍false。借用／保护／用途不明项保留并说明，不要求.build空。新Workflow新op，首节点正常出口为prepared→P3或unchanged→结束；同Workflow明确ref返工与指定旧事务恢复保持。旧工具身份、正式refs、历史格式和规则摘要不迁移不重签；独立lint可写自己的报告但不清理，独立maintain明确业务写入保留。

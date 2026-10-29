@@ -70,7 +70,7 @@ class PublicP7:
         original = b"Capture marker is an explicit synthetic rule.\nSecond line.\n"
         self.write("docs-raw/specs/raw.md", original)
         captured = self.call("capture", {"operation_id": operation + "-raw", "source_id": "raw",
-                             "source_path": "docs-raw/specs/raw.md"}, skill="hs-knowledge-source-prepare")
+                             "source_path": "docs-raw/specs/raw.md"}, skill="hs-knowledge-source")
         bundle = self.record(captured["data"]["bundle_ref"])
         if legacy_objects:
             # These cases deliberately exercise the legacy, already-formal

@@ -74,11 +74,11 @@ def test_document_ingest_survives_git_clone_without_private_runtime(tmp_path, co
         git(workspace, "add", "config.yml", p.root.name + "/docs-raw")
         git(workspace, "commit", "-m", "Isolated original")
     operation = "clone-ingest"
-    scan_ref = p.call("knowledge-source-scan", {"operation_id": operation}, "scan")["data"]["scan_ref"]
+    prepared = p.call("knowledge-source", {"operation_id": operation}, "run")
+    assert prepared["phase"] == "prepared"
+    scan_ref, material_ref = prepared["data"]["scan_ref"], prepared["data"]["material_ref"]
     unit = p.record(scan_ref)["units"][0]
     assert unit["path"] == source_path
-    material_ref = p.call("knowledge-source-prepare", {"operation_id": operation, "scan_ref": scan_ref},
-                          "prepare")["data"]["material_ref"]
     bundle_ref = p.record(material_ref)["bundle_ref"]
     bundle = p.record(bundle_ref)
     _, front, body = p.card("clone-rule", bundle).decode().split("---", 2)
@@ -87,7 +87,7 @@ def test_document_ingest_survives_git_clone_without_private_runtime(tmp_path, co
     card = ("---\n" + yaml.safe_dump(metadata, sort_keys=False) + "---" + body).encode()
     view_ref = p.view(operation, bundle_ref, "clone-rule", card, scan_ref=scan_ref, material_ref=material_ref)
     p.review(operation, view_ref)
-    record_ref = p.call("knowledge-source-scan", {
+    record_ref = p.call("knowledge-source", {
         "operation_id": operation, "scan_ref": scan_ref, "view_ref": view_ref,
         "disposition_preview_ref": p.record(view_ref)["disposition_preview_ref"],
     }, "record")["data"]["ingest_record_ref"]
@@ -150,13 +150,13 @@ def test_document_ingest_survives_git_clone_without_private_runtime(tmp_path, co
     assert read["card_digest"] == found["matches"][0]["card_digest"]
     assert read["source_links"][0]["current_source_matches"] is True
     assert read["card_ref"] == hit["card_ref"] and read["path"] == hit["path"]
-    scan = consumer.call("knowledge-source-scan", {"operation_id": "consumer-scan"}, "scan")["data"]
+    scan = consumer.call("knowledge-source", {"operation_id": "consumer-scan"}, "scan")["data"]
     assert consumer.record(scan["scan_ref"])["units"][0]["change"] == "unchanged"
     # Formal published objects remain; private source/extraction caches are not
     # silently recreated by ordinary consumption.
     for cache in ("objects", "checked-code", "extractions", "locators"):
         assert not (consumer.root / "logs/evidence" / cache).exists()
-    target = consumer.call("knowledge-source-scan", {"operation_id": "consumer-status",
+    target = consumer.call("knowledge-source", {"operation_id": "consumer-status",
         "target_operation_id": operation}, "status")["data"]["operations"][0]
     assert target["completion"]["status"] == "complete"
     if kind == "md" and not committed_original:
@@ -242,7 +242,7 @@ def test_static_code_card_survives_clean_clone_with_configured_module_bytes(tmp_
     raw = b"int capture_marker(void) { return 1; }\n"
     (module / "wifi.c").write_bytes(raw)
     repo_id = "repo-" + MANUAL.FIXTURE.sha(b"main/wifi")[:16]
-    bundle_ref = p.call("knowledge-source-prepare", {
+    bundle_ref = p.call("knowledge-source", {
         "operation_id": "code-clone", "kind": "code", "repo_id": repo_id,
         "relative_path": "wifi.c", "source_id": "clone-code",
     }, "capture")["data"]["bundle_ref"]

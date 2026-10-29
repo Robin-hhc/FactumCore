@@ -30,8 +30,7 @@ repo/
 ├── main/                          # 业务代码工作区，可包含多个模块
 ├── skills/common/knowledge/             # 开发分发源码，部署时放入Agent Skills
 │   ├── hs-knowledge-explore/             # 能力入口、setup、发现与CodeGraph准备
-│   ├── hs-knowledge-source-scan/         # P1观察、P6记录与实际进度
-│   ├── hs-knowledge-source-prepare/      # P2备料、捕获及固定来源恢复
+│   ├── hs-knowledge-source/              # P1扫描＋P2备料；独立来源动作、P6记录与进度
 │   ├── hs-knowledge-change-plan/         # P3语义计划及冻结查询
 │   ├── hs-knowledge-view-materialize/    # P4直接成稿、修订与描述
 │   ├── hs-knowledge-lint/                # P5独立审阅；默认只读固定检查
@@ -155,7 +154,7 @@ flowchart TB
     subgraph S4["④ 治理与工具层"]
         direction LR
         D1["governance/<br />templates · schemas · contracts · specs · sources.lock.yaml"]
-        D2["Agent Skills · S<br />主线六包＋query · explore · maintain"]
+        D2["Agent Skills · S<br />主线五包＋query · explore · maintain"]
         D3["OpenFlow · Agent Workflows · F<br />ingest：完整 P1—P7<br />lint：正式检查与引用报告"]
     end
 
@@ -234,13 +233,12 @@ flowchart LR
 
 该路径是开发分发源码；实际能力位于 Agent 的 `S` 目录，由 harness 使用，不依赖项目根同名目录。Skill 保存操作指引与所需脚本；`hs-knowledge-explore` 承担全库能力路由，并提供按需首次 setup 和只读项目发现，领域事实仍只放知识库：
 
-公开集合恰好9包；主线使用6包，query、explore、maintain独立保留。
+公开集合恰好8包；主线使用5包，query、explore、maintain独立保留。
 
 | 技能 | 职责 | 公开动作 |
 |---|---|---|
 | `hs-knowledge-explore/` | 能力路由、按需setup／发现和CodeGraph准备 | setup及只读发现；已有上下文复用 |
-| `hs-knowledge-source-scan/` | P1正式状态与当前输入、P6暂存冻结处置、明确target进度及显式全局总览 | scan / record / status |
-| `hs-knowledge-source-prepare/` | P2按固定单元或显式目标备料，恢复确切新旧来源 | prepare（默认）/ capture / resolve / resolve-source |
+| `hs-knowledge-source/` | 默认同进程执行P1扫描和P2备料；独立来源处理、P6暂存冻结处置及只读进度 | run（默认）；scan / prepare / capture / resolve / resolve-source / record / status |
 | `hs-knowledge-change-plan/` | P3记录作者语义决定、保留范围和目标查询 | plan；不生产字节或复核 |
 | `hs-knowledge-view-materialize/` | P4直接生产卡、导航、来源锁及完整视图，修订与描述 | run / revise / describe |
 | `hs-knowledge-lint/` | P5独立审阅及完整质量检查；独立只读固定检查 | 默认formal/full；review / record-review / code-check / code-recheck / verify-evidence |
@@ -256,10 +254,10 @@ flowchart LR
 
 | 工作流 | 职责 | 一句话 |
 |------|------|--------|
-| `hs-knowledge-ingest/` | P1 正式输入扫描→P2 独立备料→P3 作者计划→P4成稿／修订→P5独立审阅与完整检查→P6 转写记录→P7 安全落位、索引、冻结查询、激活与本批清理 | 内容批完成正式发布和本地检索闭环；仅记录批只落记录 |
+| `hs-knowledge-ingest/` | 首节点prepare_sources完成P1扫描和P2备料→P3 作者计划→P4成稿／修订→P5独立审阅与完整检查→P6 转写记录→P7 安全落位、索引、冻结查询、激活与本批清理 | 七个业务步骤、六个调度节点；内容批完成正式发布和本地检索闭环，仅记录批只落记录 |
 | `hs-knowledge-lint/` | `check_formal` 调用原 lint 默认 formal／full → `audit_references` 显式调用 maintain 的只读 audit-references | 汇总固定检查及逐卡／Claim 的来源、代码差异，生成 JSON／Markdown 报告即结束 |
 
-ingest 不另分独立的生产和治理流程；P5 由 reviewer 使用 `S/hs-knowledge-lint/` 的 `review`，其余节点由 coder 执行。材料、作者判断和稿件问题分别返回 P2、P3、P4；运行故障保留原停点等待，不增加重试节点。`F/hs-knowledge-lint/` 与同名 Skill 分目录保存，恰有 `check_formal`、`audit_references` 两个 `type: skill` 节点，不改变 lint Skill 默认 formal／full 或 ingest 主线。外部调度仅负责触发，不另建 runner 或嵌套 Workflow。
+ingest不另分独立的生产和治理流程；P5由reviewer使用`S/hs-knowledge-lint/`的`review`，其余节点由coder执行。材料问题返回首节点的P2备料动作，作者判断和稿件问题分别回P3、P4；运行故障保留原停点等待，不增加重试节点。`F/hs-knowledge-lint/`与同名Skill分目录保存，恰有`check_formal`、`audit_references`两个节点，不改变lint默认formal／full或ingest主线。外部调度仅负责触发，不另建runner或嵌套Workflow。
 
 #### himate-knowledge-wifi-mp/ —— WiFi 领域知识库
 
@@ -391,34 +389,34 @@ flowchart LR
 
 目录共同支撑完整 ingest、只读 lint 和 query。下述先后关系由 OpenFlow 的 Workflow 编排和校验，人工测试时由人掌握；独立 Skill 仍核对本次所需业务文件和内容一致性。先看各自的输入、动作与输出，再对应资产位置；提交后的固定 CI 是独立作业。
 
-### 流程一：ingest —— 七个节点完成本地入库
+<a id="流程一ingest--七个节点完成本地入库"></a>
 
-Agent已具备业务仓约定及知识根，缺上下文才由explore前置发现。主线恰好7个 `type: skill` 节点；P5是独立reviewer，其余为coder，角色与上下文隔离由宿主落实。
+### 流程一：ingest —— 七个业务步骤、六个调度节点
+
+Agent已具备业务仓约定及知识根，缺上下文才由explore前置发现。主线恰好6个`type: skill`节点，首节点`prepare_sources`用同一source包执行P1扫描、P2备料两个业务步骤；P3—P7职责不变。P5仍是独立reviewer，其余为coder，角色与上下文隔离由宿主落实。
 
 ```mermaid
 flowchart TD
-    P1["P1 source-scan<br/>当前输入与正式欠账"] -->|scanned| P2["P2 source-prepare<br/>固定范围备料"]
-    P1 -->|unchanged| END["结束"]
-    P2 -->|prepared| P3["P3 change-plan<br/>语义计划与冻结查询"]
-    P2 -->|source_changed| P1
+    SOURCE["prepare_sources · source<br/>P1脚本扫描 → P2按待办备料"] -->|prepared| P3["P3 change-plan<br/>语义计划与冻结查询"]
+    SOURCE -->|unchanged| END["结束"]
     P3 -->|content_planned| P4["P4 view-materialize<br/>直接成稿与修订"]
-    P3 -->|needs_material| P2
+    P3 -->|needs_material：仅prepare| SOURCE
     P4 -->|ready| P5["P5 lint · reviewer<br/>独立审阅与一次完整质量检查"]
-    P4 -->|needs_material| P2
+    P4 -->|needs_material：仅prepare| SOURCE
     P4 -->|needs_plan| P3
-    P5 -->|needs_material| P2
+    P5 -->|needs_material：仅prepare| SOURCE
     P5 -->|needs_plan| P3
     P5 -->|needs_revision| P4
-    P5 -->|passed| P6["P6 source-scan.record<br/>转写冻结处置记录"]
+    P5 -->|passed| P6["P6 source.record<br/>转写冻结处置记录"]
     P6 -->|recorded| P7["P7 apply.batch<br/>正式发布、真实检索、CAS激活及本批清理"]
     P7 -->|completed / recorded| END
 ```
 
-P1只观察，不捕获或制造记录。P2可以独立接受显式来源目标，P5缺料回P2定向补齐，不默认重扫全库；实际采用输入漂移时才回P1取得新清单。P3保存逐Claim的计划、理由、保留范围和查询预期，P4直接生产完整字节与输入快照，不安排质量或代码语义复核。
+首节点默认`run`先执行P1：脚本按当前输入和正式欠账保存扫描清单、指纹、变化分类与完整性，Agent只传目标并消费确切引用。有待办再执行P2，返回`prepared`及`scan_ref/material_ref`；完整且没有待办、维护限制、缺口或明确修订目标才`unchanged`结束，不生成材料或记录。P1/P2职责和两份产物保持分开，独立`scan`、`prepare`也继续可用。P3保存逐Claim的计划、理由、保留范围和查询预期，P4直接生产完整字节与输入快照，不安排质量或代码语义复核。
 
 P5独立阅读原文、旧卡、计划和完整稿件，审查知识结论、归卡、全部来源／维护处置及实质skip，并对代码Claim核对实际条件和证据，披露抽样和未审范围；仅记录欠账也要审理由、缺口和下一步。内容无阻断时，同次调用执行一次完整固定检查；已有内容阻断时注明固定项未执行。记录不认证身份，流程不要求上游passed票据。
 
-P5退回P2／P3／P4时，以新operation、确切前序稿和实际理由保存新材料／计划／稿件；仅改表达可明确采用原稿绑定且未变的计划和材料。保留仍有效的原扫描与单元身份，旧工件不覆盖、不重签，新稿重新进P5。纯环境故障留在原节点；响应丢失先核执行端进程和已保存事实，不盲目重启入口。
+P3／P4／P5缺料返回首节点时，明确调用`prepare`，携确切旧材料、前序稿和实际理由定向补齐，不先执行默认`run`或重扫；材料缺口可交P3决定处置。采用的原文、旧卡、代码、配置或规则漂移时，留在该节点说明停点，按变化对象刷新有效输入；`affected_scope`是诊断路径，不能全部直接作为raw扫描`source`。返工以新operation保存新材料／计划／稿件，保留仍有效的原扫描及单元身份，不覆盖或重签旧工件，新稿重新进P5。纯环境故障原地等待，响应丢失先核真实执行事实，不盲目重启入口。
 
 P6机械转写P3/P4已冻结的处置、理由、卡／Claim引用和欠账，不重作内容决定。P7.batch重核输入快照、路径、旧基线、写删字节和记录，复用原事务引擎安全落位，不重跑P5完整质量检查。写后固定实际索引输入，完整验证真实代，执行原冻结查询和同代read，按原expected_active完成CAS激活并回读。正常连续执行只复用同进程、确切字节绑定的核验对象，重启重新全验；重试省略参数也不能重设原CAS基线。完成事实须绑定本批写入、原查询及真实活动指针或其历史链，不能仅凭JSON通过摘要宣称完成。仅记录批不带失败稿件、不建索引，保留暂缓／失败欠账。中断按原journal模式和真实停点续办，不重复已落位写入；旧apply.run仍保留原完整固定检查，旧规则事务使用原配套版本恢复。
 

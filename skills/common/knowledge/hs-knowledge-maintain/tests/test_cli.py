@@ -260,7 +260,7 @@ def test_code_event_publish_recovers_original_identity_without_repeating_epoch_o
               for path in ("knowledge/rules/audit-current.md", "governance/sources.lock.yaml")}
     source.write_bytes(raw.replace(b"1", b"2"))
     repo_id = old["resources"][0]["repo_id"]
-    captured = harness.run("source-prepare", {"operation_id": "new-code", "kind": "code", "repo_id": repo_id,
+    captured = harness.run("source", {"operation_id": "new-code", "kind": "code", "repo_id": repo_id,
         "relative_path": "file.c", "source_id": "selected-code"}, "capture")
     request = {"operation_id": "new-code", "bundle_ref": captured["data"]["bundle_ref"]}
     pending = interrupt_publish(harness, request, "register-code-change")

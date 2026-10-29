@@ -11,12 +11,12 @@ description: HiMate 知识库任务入口。用于原件入库与更新、续办
 
 | 用户任务 | 使用能力与处理边界 |
 |---|---|
-| 入库、新增原件、增量更新、续办或修改已有卡 | 已安装的 `hs-knowledge-ingest` Workflow；P1 source-scan → P2 source-prepare → P3 change-plan → P4 view-materialize → P5 lint.review → P6 source-scan.record → P7 apply.batch。P5 集中独立内容、代码和完整固定检查；P1—P6只写本批暂存；P7发布、索引全验、冻结查询和激活后清本批可删暂存。实际batch_complete才报告本批完成；有缺口保存实际停点。原件未变的明确修卡请求也要处理。 |
+| 入库、新增原件、增量更新、续办或修改已有卡 | 已安装的 `hs-knowledge-ingest` Workflow；prepare_sources使用source默认run同进程完成P1观察和P2备料，再交P3 change-plan → P4 view-materialize → P5 lint.review → P6 source.record → P7 apply.batch，共6个调度节点。真正无变化在来源节点结束；退回补料只用source.prepare，不先重扫。P5独立审阅及完整检查；P1—P6只写本批暂存，P7发布、检索收尾并清本批可删暂存。实际batch_complete才报告完成，原件未变的明确修卡同样处理。 |
 | 查询背景、机制或定位代码 | `hs-knowledge-query`；按实际回执精读同代合格卡片内容，沿 card_ref 和 source_links 按需读取文档或源码；核对链接的 evidence/current 地址、导航状态和字节一致性。背景用 guidance，具体实现继续读取所问版本的实际源码，追查调用、宏条件和早退，不用符号可定位或模块标签代替实现事实。 |
 | 独立检查知识库或候选 | `hs-knowledge-lint`；只检查并报告。需要修订时转交 ingest，检查本身不改稿、不入库。 |
 | 周期巡检正式库、查找过时代码引用 | 启动已安装的 `F/hs-knowledge-lint` Workflow：先调用原 `S/hs-knowledge-lint` 做正式完整库固定检查，再显式调用 `hs-knowledge-maintain --action audit-references`，生成可定位卡片、Claim、来源、代码文件及旧定位的 JSON／Markdown 报告；只出报告，不修改知识或自动启动 ingest。由用户手动将报告和目标卡交给 ingest；独立 `knowledge lint` 仍调用原只读 Skill。 |
-| 查看进度、未完成事项、材料缺口 | `hs-knowledge-source-scan` 的 `status`；读取实际操作停点和待修订信息，不推进流程，不把本地状态推断为已提交、CI 通过或合入。 |
-| 明确目标的独立备料、捕获或历史来源恢复 | `hs-knowledge-source-prepare`；按扫描清单或明确目标准备原文、旧卡、代码及差异，不强制先做全库扫描。查询内部直接用公共来源函数。 |
+| 查看进度、未完成事项、材料缺口 | `hs-knowledge-source` 的 `status`；读取实际操作停点和待修订信息，不推进流程，不把本地状态推断为已提交、CI 通过或合入。 |
+| 明确目标的独立备料、捕获或历史来源恢复 | `hs-knowledge-source`的prepare／capture／resolve／resolve-source；按固定清单或明确目标处理原文、旧卡、代码及差异，不强制先scan或run。仅观察变化可独立scan；query内部直接用公共来源函数。 |
 | 独立索引、目标查询回归、事务恢复或提交清单核对 | `hs-knowledge-apply` 的 index-build／index-verify／index-activate、regression／regression-verify、inspect／resume／rollback、prepare-submission／verify-submission；只做所选用途，不要求生产者私人日志或上游通过票据。提交清单核对只读真实 Git，不提交或推送。 |
 | 首次准备代码图谱 | 由 Agent 按本 Skill 的“首次初始化 CodeGraph”逐仓执行；CodeGraph MCP 由 harness 提供，图谱查询时核对实际可调用能力。 |
 | 首次准备运行依赖，或找不到项目入口 | 本 Skill 的 `scripts/setup.py` 或只读发现 CLI，按下面的前置条件使用。 |
@@ -29,7 +29,7 @@ description: HiMate 知识库任务入口。用于原件入库与更新、续办
 
 按路由读取目标 Skill 或 Workflow 的实际说明并继续执行。人工可以逐个调用节点 Skill；OpenFlow 负责 Workflow 顺序、角色隔离和交棒合法性。节点只校验自身业务输入与固定检查，不要求 Workflow 身份、catalog 登记或上游通过票据。ingest 和只读巡检使用各自已安装的 Workflow；路由不新增统一业务 wrapper 或发现前置节点，也不把路由本身当成业务完成。巡检只读动作不加入 ingest 的默认调用链。
 
-当前分发九个 Skill：source-scan、source-prepare、change-plan、view-materialize、lint、apply、query、explore、maintain（均带 `hs-knowledge-` 前缀）。公共算法随知识根 `governance/contracts/` 和规则锁提供；节点不通过其他 Skill 的 CLI 或私有脚本串联。升级时安装完整九包及配套规则，移除已迁移的十个旧包；旧版本未完成事务按原配套规则和工具恢复，历史记录不改写。
+当前分发8个Skill：source、change-plan、view-materialize、lint、apply、query、explore、maintain（均带 `hs-knowledge-` 前缀）。source保留run、scan、prepare、capture、resolve、resolve-source、record和status各自用途，不把独立调用强绑扫描。公共规则随知识根 `governance/contracts/` 和规则锁提供，不调用兄弟Skill CLI或私有脚本。升级时安装完整8包及配套规则，移除已合并的旧来源包与此前迁出的旧能力；旧操作按原配套版本恢复，历史工具身份和工件不改写。
 
 ## 按需首次准备运行依赖
 

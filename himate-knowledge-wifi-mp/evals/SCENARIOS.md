@@ -22,15 +22,16 @@ Skill 测试目录均相对 `repo/skills/common/knowledge/`。本目录的 `test
 | 来源改动、旧 Claim 阻断、更新与旧指针保护 | [test_node_pipeline.py](tests/test_node_pipeline.py)、[test_post_ingest_correction.py](tests/test_post_ingest_correction.py) | 修改真实夹具字节，拒绝旧内容冒充当前；独立 build 不改变活动指针，恢复及修订后真实查询结果正确 |
 | 代码证据链与补充符号引用 | [test_manual_skills.py](tests/test_manual_skills.py)、lint `test_public_code_gate.py` | 本地代码检查、实际材料绑定、入库及查询；缺证据或漂移必须拒绝 |
 | code_ref 必填及符号导航 | [test_code_ref_required.py](tests/test_code_ref_required.py)、[test_code_symbols.py](tests/test_code_symbols.py)、[test_code_ref_contracts.py](tests/test_code_ref_contracts.py) | formal/candidate/ci × draft/stable × review_mode；插行、改体、删除、歧义、作用域、参数、宏/枚举；旧快照与当前导航分开判定 |
-| 原件类别、附件与定位 | source-prepare `test_cli.py`、[test_document_source_checks.py](tests/test_document_source_checks.py) | troubleshooting 与附件真实字节、PDF 页、DOCX 段落/表格、无法提取拒绝；定位不能越出原件 |
-| 新扫描与旧私有记录隔离 | [test_staging_history.py](tests/test_staging_history.py)、lint `test_candidate_journal_liveness.py`、source-scan `test_execution_history_boundary.py` | 未显式引用的执行历史禁止读取/遍历；正式与候选检查均不依赖它；公共入口保留垃圾历史哨兵与当前稿篡改拒绝 |
+| 原件类别、附件与定位 | source `test_capture_cli.py`、[test_document_source_checks.py](tests/test_document_source_checks.py) | troubleshooting 与附件真实字节、PDF 页、DOCX 段落/表格、无法提取拒绝；定位不能越出原件 |
+| 合并来源节点与独立动作 | source `test_run.py`、[test_source_node_pipeline.py](tests/test_source_node_pipeline.py)、[test_revision_roundtrip.py](tests/test_revision_roundtrip.py) | 八包安装下正常链真实调用一次source.run，再走P3—P7；无变化早停，独立scan/prepare等动作保留，P5补料只prepare且原scan字节不变 |
+| 新扫描与旧私有记录隔离 | [test_staging_history.py](tests/test_staging_history.py)、lint `test_candidate_journal_liveness.py`、source `test_execution_history_boundary.py` | 未显式引用的执行历史禁止读取/遍历；正式与候选检查均不依赖它；公共入口保留垃圾历史哨兵与当前稿篡改拒绝 |
 | P2 实际中断后另开工作流 | [test_ingest_stage_interrupt.py](tests/test_ingest_stage_interrupt.py) | 实际停止准备进程；正式库不变；新 operation 仍根据正式状态扫描，不能自动接管旧半成品 |
 | P7 安全写入与保留输出槽 | apply `test_publication_cli.py`、`test_apply.py` | 真实 CLI 路径/保留槽矩阵；断言指定 guard 报错与全树原字节不变；成功自有 transport 另走真实发布与清理链 |
 | P7 故障停点、清理失败重试及硬退出 | apply `test_p7_actions.py`、`test_publication_cli.py`、[test_process_recovery.py](tests/test_process_recovery.py) | 发布事实与整批完成分开；只补缺失收尾/清理；实际停止进程后的 journal 和确切视图恢复；原指针保护 |
 | 索引完整性、冻结查询与首次 CAS | apply `test_p7_cas_and_verification.py`、[test_indexing_contract.py](tests/test_indexing_contract.py)、[test_publication_regression_binding.py](tests/test_publication_regression_binding.py) | 数据库全量内容校验；不能用自签 passed、替换查询或新指针重建旧基线；P5/P7 各自实际校验对象 |
 | P5冻结查询前置与P3返工 | [test_p5_frozen_queries.py](tests/test_p5_frozen_queries.py) | 用途不兼容在P5阻断，正式区不变；修正用途的新轮可发布；已有活动代不能替代最终候选；P7保留实际回归 |
-| 正式库巡检、只读与待维护限制 | lint `test_cli.py`、maintain `test_reference_audit.py`、source-scan `test_completion_status.py` | 失败逐卡/Claim 可定位；读取不改正式内容；限制与待办不能误当 noop 或成功 |
-| 来源/代码引用的当前与历史用途 | source-scan `test_historical_context.py`、query `test_purpose.py`、`test_code_navigation.py` | current/guidance/history 的使用资格；来源顺序不能改变结果；改体与符号变动各自覆盖 |
+| 正式库巡检、只读与待维护限制 | lint `test_cli.py`、maintain `test_reference_audit.py`、source `test_completion_status.py` | 失败逐卡/Claim 可定位；读取不改正式内容；限制与待办不能误当 noop 或成功 |
+| 来源/代码引用的当前与历史用途 | source `test_historical_context.py`、query `test_purpose.py`、`test_code_navigation.py` | current/guidance/history 的使用资格；来源顺序不能改变结果；改体与符号变动各自覆盖 |
 | 查询内容和简洁地址、同代回执 | [test_query_output_contract.py](tests/test_query_output_contract.py)、query `test_public_receipt.py`、`test_code_navigation.py` | 外部响应及新回执不嵌入原件／展开引用；内部资格保持；Claim子集、旧格式及确切代内卡地址；不同文件的地址／摘要不得混配，缺失与歧义不伪造当前行段 |
 | 导航旧空库说明修复 | [test_navigation_generation.py](tests/test_navigation_generation.py)、[test_manual_skills.py](tests/test_manual_skills.py) | 标准旧句在P4候选替换，自写说明与引用文本保留；P1—P6正式字节不变，P7发布已审导航；分发模板不固定断言当前为空 |
 | 无生产端缓存的真实 Git clone | [test_clean_clone.py](tests/test_clean_clone.py)、[test_snapshot_checkout_recovery.py](tests/test_snapshot_checkout_recovery.py) | md/pdf/docx × 原件已提交/正式归档两条恢复路；静态代码 clone；无旧 `.build`/本地索引仍检查、重建、激活、查询与扫描；缺失/损坏正式依据拒绝 |

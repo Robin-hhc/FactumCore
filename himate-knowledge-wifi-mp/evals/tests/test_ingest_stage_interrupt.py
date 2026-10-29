@@ -31,7 +31,7 @@ def test_stopped_public_prepare_leaves_formal_state_and_fresh_scan_unaffected(tm
     before = formal(p.root)
     incoming, outgoing = p.base / "interrupted-input.json", p.base / "interrupted-output.json"
     incoming.write_text(json.dumps({"operation_id": "stopped", "targets": targets}), encoding="utf-8")
-    command = [sys.executable, str(p.skills / "hs-knowledge-source-prepare/scripts/cli.py"),
+    command = [sys.executable, str(p.skills / "hs-knowledge-source/scripts/cli.py"),
                "--action", "prepare", "--knowledge-root", str(p.root),
                "--input", str(incoming), "--output", str(outgoing)]
     with (p.base / "interrupted-stdout.txt").open("wb") as stdout, (p.base / "interrupted-stderr.txt").open("wb") as stderr:
@@ -54,7 +54,7 @@ def test_stopped_public_prepare_leaves_formal_state_and_fresh_scan_unaffected(tm
             process.wait(timeout=15)
     assert process.returncode != 0
     assert formal(p.root) == before
-    response = p.call("knowledge-source-scan", {"operation_id": "fresh-after-stop"}, "scan")
+    response = p.call("knowledge-source", {"operation_id": "fresh-after-stop"}, "scan")
     scan = p.record(response["data"]["scan_ref"])
     assert len(scan["units"]) == len(targets)
     assert {row["change"] for row in scan["units"]} == {"new"}

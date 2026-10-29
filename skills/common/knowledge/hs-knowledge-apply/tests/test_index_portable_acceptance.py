@@ -45,7 +45,7 @@ def test_accepted_repository_works_without_machine_private_review_files(tmp_path
     view = pipeline.record(view_ref)
     path = "knowledge/rules/portable-rule.md"
     card_sha = fixture.sha((pipeline.root / path).read_bytes())
-    scan_ref = pipeline.call("knowledge-source-scan", {"operation_id": "create"}, "scan")["data"]["scan_ref"]
+    scan_ref = pipeline.call("knowledge-source", {"operation_id": "create"}, "scan")["data"]["scan_ref"]
     scan = pipeline.record(scan_ref)
     inventory = scan["units"][0]
     record = {

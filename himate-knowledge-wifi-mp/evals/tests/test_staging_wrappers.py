@@ -12,7 +12,7 @@ import pytest
 SKILLS = Path(__file__).parents[3] / "skills/common/knowledge"
 
 
-@pytest.mark.parametrize("skill", ["source-scan", "source-prepare", "change-plan", "view-materialize"])
+@pytest.mark.parametrize("skill", ["source", "change-plan", "view-materialize"])
 @pytest.mark.parametrize("request_owner", ["current", "borrowed", "external"])
 def test_only_current_operation_request_and_output_are_owned(tmp_path, monkeypatch, skill, request_owner):
     package = SKILLS / ("hs-knowledge-" + skill)
@@ -38,7 +38,7 @@ def test_only_current_operation_request_and_output_are_owned(tmp_path, monkeypat
     assert json.loads(outgoing.read_bytes())["data"]["real_action"] == "observed"
 
 
-@pytest.mark.parametrize("skill", ["source-scan", "source-prepare", "change-plan", "view-materialize"])
+@pytest.mark.parametrize("skill", ["source", "change-plan", "view-materialize"])
 @pytest.mark.parametrize("output", ["logs/error.json", "artifacts/error.json", ".build/operations/other/result.json"])
 def test_invalid_internal_output_never_runs_business_or_writes_error(tmp_path, monkeypatch, skill, output):
     package = SKILLS / ("hs-knowledge-" + skill)

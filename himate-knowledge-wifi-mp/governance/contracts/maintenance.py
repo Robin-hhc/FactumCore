@@ -84,6 +84,115 @@ def state(context):
     }
 
 
+def project_state(view, source_lock, cards, previous, *, current_source_matches):
+    """Project query restrictions for an already checked candidate without I/O.
+
+    ``current_source_matches`` contains read-only observations keyed by
+    ``(source_id, snapshot_id)``. Missing observations never clear a restriction.
+    The caller has validated the view, cards, lock and exact source objects;
+    this function cannot publish events, seal records or advance durable state.
+    Only query-visible fields are returned, without a maintenance-record digest
+    or a predicted durable watermark. P7 remains the publication authority.
+    """
+    proposals = view.get("event_proposals", [])
+    if (not isinstance(proposals, list)
+            or view.get("publication_plan", {}).get("event_proposals") != proposals):
+        raise NodeError("EVENT_PROPOSALS_CHANGED", "Event proposals differ from the frozen publication view")
+    updated = copy.deepcopy(previous)
+    updated.setdefault("validity_epoch", 0)
+    updated.setdefault("blocked_claims", [])
+
+    def observation():
+        blocks = updated["blocked_claims"]
+        return {"validity_epoch": updated["validity_epoch"], "blocked_claims": blocks,
+                "processing_digest": digest(blocks)}
+
+    if view.get("batch_kind") == "record_only":
+        if proposals:
+            raise NodeError("UNPUBLISHED_SOURCE_TRANSITION", "Record-only batches cannot publish unadopted snapshots")
+        return observation()
+    if updated.get("pending_event_ids") or updated.get("pending_events"):
+        raise NodeError("EVENT_RECOVERY_REQUIRED", "Pending source events require explicit recovery before candidate evaluation", blocked=True)
+    values = list(cards.values() if isinstance(cards, dict) else cards)
+    by_id = {card["metadata"]["id"]: card for card in values}
+    lock_rows = [row for row in view.get("writes", []) if row.get("path") == "governance/sources.lock.yaml"]
+    processed = set(updated.get("processed_event_ids", []))
+    observed = updated.setdefault("observed_sources", {})
+    seen = set()
+    for proposal in proposals:
+        if (not isinstance(proposal, dict) or set(proposal) != {
+                "source_id", "old_snapshot_ids", "new_snapshot_id", "source_lock_digest"}
+                or len(lock_rows) != 1 or proposal["source_lock_digest"] != lock_rows[0].get("expected_old_digest")):
+            raise NodeError("EVENT_BASELINE_CHANGED", "Frozen event transition lacks the original source-lock CAS binding")
+        source_id, new_id, old_ids = proposal["source_id"], proposal["new_snapshot_id"], proposal["old_snapshot_ids"]
+        snapshots = [row for row in source_lock["snapshots"] if row["source_id"] == source_id]
+        resources = [row for row in source_lock["resources"] if row["source_id"] == source_id]
+        selected = [row for row in snapshots if row["snapshot_id"] == new_id]
+        if (not isinstance(old_ids, list) or not old_ids or any(not isinstance(item, str) for item in old_ids)
+                or len(old_ids) != len(set(old_ids)) or new_id in old_ids
+                or sorted(old_ids) != sorted(row["snapshot_id"] for row in snapshots if row["snapshot_id"] != new_id)
+                or len(resources) != 1 or len(selected) != 1 or source_id in seen):
+            raise NodeError("UNPUBLISHED_SOURCE_TRANSITION", "Frozen source transition does not match candidate snapshots")
+        seen.add(source_id)
+        snapshot, resource = selected[0], resources[0]
+        kind = resource.get("kind")
+        if kind not in {"raw", "attachment", "code"}:
+            raise NodeError("INVALID_SOURCE_KIND", "Unsupported candidate source transition")
+        if current_source_matches.get((source_id, new_id)) is not True:
+            raise NodeError("SOURCE_CHANGED", "Candidate event source is not verified current", blocked=True)
+        change = {"source_id": source_id, "old_snapshot_ids": sorted(old_ids), "new_snapshot_id": new_id,
+                  "new_sha256": snapshot["sha256"],
+                  **({"source_kind": "code", "repo_id": resource["repo_id"], "path": resource["path"]} if kind == "code" else {})}
+        event_id = digest(change)
+        if event_id in processed:
+            continue
+        for card in values:
+            metadata = card["metadata"]
+            if metadata["lifecycle"] != "stable":
+                continue
+            sources = {source["evidence_ref"]: source for source in metadata["sources"]}
+            for claim in metadata["claims"]:
+                if any(sources[ref]["source_id"] == source_id and sources[ref]["snapshot_id"] in old_ids
+                       for ref in claim["source_refs"]):
+                    block = {"card_id": metadata["id"], "claim_id": claim["id"],
+                             "reason": "code_changed" if kind == "code" else "source_changed",
+                             "event_id": event_id, "source_id": source_id, "old_snapshot_ids": sorted(old_ids),
+                             "new_snapshot_id": new_id, "conditions": metadata["scope"]}
+                    if block not in updated["blocked_claims"]:
+                        updated["blocked_claims"].append(block)
+        updated["validity_epoch"] += 1
+        processed.add(event_id)
+        observed[source_id] = {"snapshot_id": new_id, "event_id": event_id}
+
+    remaining, cleared = [], False
+    for block in updated["blocked_claims"]:
+        if (block.get("reason") not in {"source_changed", "code_changed", "code_source_changed"}
+                or block["card_id"] == "*"):
+            remaining.append(block)
+            continue
+        card = by_id.get(block["card_id"])
+        if card is None or card["metadata"]["lifecycle"] == "deprecated":
+            cleared = True
+            continue
+        claim = next((row for row in card["claims"] if row["id"] == block["claim_id"]), None)
+        if claim is None and block["claim_id"] != "*":
+            cleared = True
+            continue
+        claims = [claim] if claim is not None else card["claims"]
+        refs = [source for row in claims for source in row["source_records"]
+                if not block.get("source_id") or source["source_id"] == block["source_id"]]
+        latest = observed.get(block.get("source_id"), {}).get("snapshot_id")
+        if (not refs or (latest and any(source["snapshot_id"] != latest for source in refs))
+                or any(current_source_matches.get((source["source_id"], source["snapshot_id"])) is not True for source in refs)):
+            remaining.append(block)
+        else:
+            cleared = True
+    updated["blocked_claims"] = remaining
+    if cleared:
+        updated["validity_epoch"] += 1
+    return observation()
+
+
 def save_state(context, previous, payload):
     path = safe(context.root, "logs/events/state.json")
     if (

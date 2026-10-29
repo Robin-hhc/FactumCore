@@ -70,6 +70,9 @@ def score_card(card, groups, eligible, tokenizer=tokens):
 
 
 def event_state(ctx):
+    candidate = getattr(ctx, "_candidate_query", None)
+    if candidate is not None:
+        return candidate.event_state(ctx)
     path = safe(ctx.root, "logs/events/state.json")
     value = {"validity_epoch": 0, "blocked_claims": []}
     if path.exists():
@@ -253,6 +256,9 @@ def request_binding(request, action, generation_ref):
 
 
 def load_generation(ctx, request, search_receipt=None, *, verified_generation=None):
+    candidate = getattr(ctx, "_candidate_query", None)
+    if candidate is not None:
+        return candidate.load_generation(ctx, request, search_receipt)
     channel = request.get("channel", "local")
     ctx.generation_verification_tier = "content_index"
     if channel not in ("local", "shared"):
@@ -327,7 +333,9 @@ def load_card(ctx, manifest, card_id, purpose="current"):
     row = manifest["documents"].get(card_id)
     if not row:
         raise NodeError("CARD_NOT_IN_GENERATION", card_id)
-    raw = fixed_bytes(ctx.root, row["blob_ref"], ["artifacts/indexes"])
+    candidate = getattr(ctx, "_candidate_query", None)
+    raw = (candidate.card_bytes(ctx, card_id) if candidate is not None
+           else fixed_bytes(ctx.root, row["blob_ref"], ["artifacts/indexes"]))
     if sha(raw) != row["sha256"]:
         raise NodeError("CARD_BLOB_CHANGED", card_id)
     card = ctx.modules["indexing"].read_document(
@@ -392,11 +400,31 @@ def qualified_claims(ctx, card, request, state, code_sources=()):
     }
 
 
+def source_lock(ctx):
+    candidate = getattr(ctx, "_candidate_query", None)
+    return candidate.bundle if candidate is not None else ctx.modules["source_resources"].read_source_lock(ctx.root)
+
+
+def resolve_query_source(ctx, reference):
+    candidate = getattr(ctx, "_candidate_query", None)
+    if candidate is None:
+        return ctx.modules["source_operations"].resolve_source(ctx, reference)
+    try:
+        result = ctx.modules["source_operations"].resolve_source(ctx, reference, candidate.bundle)
+    except (ValueError, OSError):
+        ctx._candidate_input_unavailable = True
+        raise
+    if (ctx.request.get("purpose", "current") in {"current", "implementation"}
+            and result.get("current_source_matches") is None):
+        ctx._candidate_input_unavailable = True
+    return result
+
+
 def validate_live_code_claim(ctx, card, claim, query_context=None):
     """Check a Claim's exact code references against the current config scope."""
     resources = ctx.modules["source_resources"]
     validation = ctx.modules["validation"]
-    lock = resources.read_source_lock(ctx.root)
+    lock = source_lock(ctx)
     kinds = {row["source_id"]: row for row in lock["resources"]}
     refs = [source for source in claim["source_records"]
             if kinds.get(source["source_id"], {}).get("kind") == "code"]
@@ -472,7 +500,7 @@ def validate_claim_materials(ctx, card, claim, query_context=None, code_sources=
         identity, configuration, context.get("config_digest"), ctx.rules, declaration.get("code_policy")
     )
     resources = ctx.modules["source_resources"]
-    lock = resources.read_source_lock(ctx.root)
+    lock = source_lock(ctx)
     registered = {row["source_id"]: row for row in lock["resources"]}
     for reference in claim["source_records"]:
         resource = registered.get(reference["source_id"], {})
@@ -510,6 +538,8 @@ def qualify_sources(ctx, card, eligible, purpose, cache, code_sources=(), query_
                 validate_claim_materials(ctx, card, claim, query_context, code_sources)
             except (ValueError, OSError, KeyError) as exc:
                 usable = False
+                if getattr(ctx, "_candidate_query", None) is not None:
+                    ctx._candidate_input_unavailable = True
                 gaps.append({"code": "CURRENT_CODE_MATERIALS_CHANGED_OR_UNKNOWN",
                              "card_id": card["metadata"]["id"], "claim_id": claim["id"], "reason": str(exc)})
         if purpose in {"current", "implementation"} and any(
@@ -525,7 +555,7 @@ def qualify_sources(ctx, card, eligible, purpose, cache, code_sources=(), query_
             key = digest(source)
             if key not in cache:
                 try:
-                    cache[key] = ctx.modules["source_operations"].resolve_source(ctx, ({'operation_id': ctx.operation, 'source_ref': source})["source_ref"])
+                    cache[key] = resolve_query_source(ctx, source)
                 except (ValueError, OSError) as exc:
                     if isinstance(exc, NodeError) and exc.code.endswith("_TIMEOUT"):
                         raise
@@ -622,7 +652,7 @@ def _validate_navigation_observations(previous, current, purpose, code_sources):
 def refresh_sources(ctx, sources, purpose, code_sources=()):
     result = []
     for source in sources:
-        fresh = ctx.modules["source_operations"].resolve_source(ctx, ({'operation_id': ctx.operation, 'source_ref': source['source_ref']})["source_ref"])
+        fresh = resolve_query_source(ctx, source["source_ref"])
         navigation_only = (purpose == "guidance"
                            and "code_ref" in source["source_ref"]
                            and source["source_ref"]["source_id"] in code_sources)
@@ -757,7 +787,7 @@ class EligibilityEvaluator:
         )
         self.purpose = request.get("purpose", "current")
         self.context = request.get("context", {})
-        lock = ctx.modules["source_resources"].read_source_lock(ctx.root)
+        lock = source_lock(ctx)
         self.code_sources = {
             row["source_id"] for row in lock["resources"] if row["kind"] == "code"
         }
@@ -864,7 +894,12 @@ class EligibilityEvaluator:
         return result
 
 
-def execute(ctx, *, verified_generation=None):
+def execute(ctx, *, verified_generation=None, candidate=None):
+    if candidate is not None:
+        from .candidate_queries import CandidateQuery
+        if not isinstance(candidate, CandidateQuery):
+            raise NodeError("INVALID_CANDIDATE_QUERY", "Candidate evaluation needs an in-process checked observation")
+        ctx._candidate_query = candidate
     request = ctx.request
     action = ctx.args.action or "search"
     search_receipt, original_hit = None, None
@@ -996,7 +1031,8 @@ def execute(ctx, *, verified_generation=None):
         gaps = [
             gap
             for gap in gaps
-            if not isinstance(gap, dict)
+            if candidate is not None
+            or not isinstance(gap, dict)
             or not gap.get("claim_id")
             or gap["claim_id"] in eligible
         ]
@@ -1043,6 +1079,8 @@ def execute(ctx, *, verified_generation=None):
             "VALIDITY_CHANGED", "Validity changed before output", blocked=True
         )
     data["gaps"] = public_gaps(data.get("gaps", []))
+    if candidate is not None:
+        data["candidate_inputs_complete"] = not getattr(ctx, "_candidate_input_unavailable", False)
     data["verification_tier"] = ctx.generation_verification_tier
     receipt = ctx.seal(
         {
@@ -1076,13 +1114,13 @@ def execute(ctx, *, verified_generation=None):
 
 
 
-def search(ctx, request, *, verified_generation=None):
+def search(ctx, request, *, verified_generation=None, candidate=None):
     from .runtime import fork_context
     return execute(fork_context(ctx, request, action="search"),
-                   verified_generation=verified_generation)[0]
+                   verified_generation=verified_generation, candidate=candidate)[0]
 
 
-def read(ctx, request, *, verified_generation=None):
+def read(ctx, request, *, verified_generation=None, candidate=None):
     from .runtime import fork_context
     return execute(fork_context(ctx, request, action="read"),
-                   verified_generation=verified_generation)[0]
+                   verified_generation=verified_generation, candidate=candidate)[0]

@@ -20,6 +20,8 @@ python scripts/cli.py --knowledge-root K --rules-digest SHA --input REQUEST --ou
 
 ingest 的 P5 显式使用 `--action review`。宿主安排独立 reviewer 读取 P2 材料、P3 逐单元决定、P4 完整卡稿及保留部分，按 [内容复核指南](references/review-guide.md) 记录风险抽查、未审范围和问题。请求包含 `operation_id`、`semantic_plan_ref`、`view_ref`、`sampled_unit_ids`、`unreviewed_unit_ids`、`reason` 和显式 `findings`；具体绑定见 [审阅输入](references/content-review.md)。存在内容阻断时，固定项注明未执行；内容审阅无阻断后，同次调用执行一次完整固定检查。代码／混合稿另提供本轮 `code_review` 对象，见 [代码依据核验](references/code-evidence.md)。脚本检查实际材料与绑定，技术判断仍由阅读材料的 reviewer 完成。
 
+内容批还在同次已构建并全验的临时索引上执行 P3 原冻结查询，使用最终候选卡、来源锁和暂存证据，按同一查询算法核资格、命中／排除、顺序、Claim 预期及同候选精读。检查的不是旧活动库，也不创建或启用正式索引。读取逐例实际结果；预期不满足是阻断，回 P3 重判并保存新计划／稿件，必需材料或运行条件不可用则保留未完成与原诊断。普通正式 lint／CI 不要求私人 P3 查询；仅记录批不建索引、不运行这项内容查询。
+
 缺材料返回 P2，归卡、范围或作者决定错误返回 P3，卡稿、格式或导航错误返回 P4；每项问题保留单元、位置、依据与理由。返回后保留旧工件，新版本重新审阅，不能沿用已变内容的通过结果。输入漂移先保存诊断，再按原件变化规则重新扫描。P5 不驱动其他 Skill 或 Workflow。
 
 独立数据用途也保留在本包：`record-review` 仅登记本次内容审阅；`code-check` 核对代码依据；`code-recheck` 复查当前代码材料；`verify-evidence` 按明确的 current／historical 用途复验已有证据。它们不代表完整 P5 已通过，不执行编译、Git 提交或合入。

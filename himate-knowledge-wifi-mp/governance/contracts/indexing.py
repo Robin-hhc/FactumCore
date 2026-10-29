@@ -7,7 +7,7 @@ These functions neither qualify knowledge nor publish an active generation.
 from __future__ import annotations
 
 from collections import Counter
-from contextlib import closing
+from contextlib import closing, contextmanager
 from dataclasses import dataclass
 import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
@@ -195,10 +195,19 @@ def verify_database(cards, rules_digest, path, *, observed=False):
     return summary
 
 
+@contextmanager
+def checked_database(cards, rules, temp_dir):
+    """Keep one fully checked private database alive for the caller's inspection."""
+    with tempfile.TemporaryDirectory(prefix="index-check-", dir=_native(temp_dir)) as temporary:
+        path = Path(temporary) / "index.sqlite"
+        observed = build_database(cards, rules["rules_digest"], path, verified=True)
+        yield path, observed
+
+
 def check(cards, rules, temp_dir):
     """Build and verify a temporary index without leaving artifacts or switching active."""
-    with tempfile.TemporaryDirectory(prefix="index-check-", dir=_native(temp_dir)) as temporary:
-        return build_database(cards, rules["rules_digest"], Path(temporary) / "index.sqlite")
+    with checked_database(cards, rules, temp_dir) as (_, observed):
+        return dict(observed.summary)
 
 
 def read_document(raw, path, rules, *, card_id, sha256):

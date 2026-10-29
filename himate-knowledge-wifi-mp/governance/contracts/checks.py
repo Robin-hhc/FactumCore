@@ -290,7 +290,7 @@ def _scope(scope):
     return {"kind": scope["kind"], "paths": list(scope.get("paths", []))}
 
 
-def run(view, rules, inputs=None, scope=None):
+def run(view, rules, inputs=None, scope=None, *, query_context=None):
     """Return a complete protocol report. No repair, confirmation or activation."""
     inputs = inputs or {}
     scope = _scope(scope)
@@ -371,6 +371,8 @@ def run(view, rules, inputs=None, scope=None):
         for group in ("format", "source", "relation", "index"):
             by_group[group]["status"] = "not_applicable"
             by_group[group]["reason"] = "This batch records dispositions and writes no knowledge"
+        if query_context is not None:
+            by_group["index"]["candidate_queries"] = {"status": "not_applicable", "outcomes": []}
         try:
             by_group["records"]["disposition_check"] = validate_candidate(candidate_context, candidate, cards={})
         except (v.ContractError, OSError, ValueError, KeyError, TypeError) as exc:
@@ -610,6 +612,8 @@ def run(view, rules, inputs=None, scope=None):
     if any(by_group[group]["status"] not in {"passed", "not_applicable"} for group in prerequisites):
         by_group["index"]["status"] = "incomplete"
         by_group["index"]["reason"] = "Index check was not run because prerequisite checks did not pass"
+        if query_context is not None:
+            by_group["index"]["candidate_queries"] = {"status": "not_run", "outcomes": []}
     else:
         try:
             from . import indexing
@@ -619,16 +623,72 @@ def run(view, rules, inputs=None, scope=None):
                 temporary_parent = safe(root, ".build/operations/" + identifier(candidate["operation_id"]) + "/lint-index")
                 temporary_parent.mkdir(parents=True, exist_ok=True)
             with tempfile.TemporaryDirectory(prefix="knowledge-lint-", dir=temporary_parent) as temporary:
-                by_group["index"]["summary"] = indexing.check(list(cards.values()), rules, temporary)
+                if query_context is None:
+                    by_group["index"]["summary"] = indexing.check(list(cards.values()), rules, temporary)
+                else:
+                    from . import candidate_queries
+                    from .runtime import OperationContext
+                    if (not isinstance(query_context, OperationContext) or candidate is None
+                            or query_context.root != root or query_context.operation != candidate["operation_id"]
+                            or query_context.args.rules_digest != rules["rules_digest"]):
+                        raise v.ContractError("INVALID_CANDIDATE_QUERY", "Candidate query context differs from the checked view")
+                    if ("code_contexts" in inputs and "code_evidence" in inputs
+                            and inputs["code_contexts"] != inputs["code_evidence"]):
+                        raise v.ContractError("CODE_CONTEXT_CONFLICT", "Code material aliases differ")
+                    with indexing.checked_database(list(cards.values()), rules, temporary) as (database, observed):
+                        by_group["index"]["summary"] = dict(observed.summary)
+                        try:
+                            result = candidate_queries.run(query_context, candidate, cards, lock, files,
+                                database, observed, candidate.get("target_queries"),
+                                code_contexts=inputs.get("code_contexts", inputs.get("code_evidence")))
+                        except (v.ContractError, OSError, ValueError, KeyError, TypeError) as exc:
+                            result = {"status": "incomplete", "passed": False, "outcomes": [],
+                                      "error": {"code": getattr(exc, "code", "QUERY_INPUT_UNAVAILABLE"), "reason": str(exc)}}
+                        by_group["index"]["candidate_queries"] = result
+                        incomplete_cases = [outcome for outcome in result["outcomes"] if outcome["status"] == "incomplete"]
+                        if result["status"] == "incomplete" and (result.get("error") or not incomplete_cases):
+                            finding("index", "TARGET_QUERY_INPUT_UNAVAILABLE",
+                                    "Candidate query inputs are unavailable: " + str(result), incomplete=True)
+                        for outcome in result["outcomes"]:
+                            if outcome["status"] == "incomplete":
+                                finding("index", "TARGET_QUERY_INPUT_UNAVAILABLE",
+                                        "Frozen query " + outcome["case_id"] + " (" + outcome["purpose"]
+                                        + ") inputs are unavailable: " + str(outcome), incomplete=True)
+                                by_group["index"]["findings"][-1].update(
+                                    case_id=outcome["case_id"], purpose=outcome["purpose"], expected=outcome["expected"],
+                                    actual=outcome["actual"], actual_claim_ids=outcome["actual_claim_ids"],
+                                    gaps=outcome.get("gaps", []))
+                                continue
+                            if outcome["status"] != "failed":
+                                continue
+                            finding("index", "TARGET_QUERY_EXPECTATION_FAILED",
+                                    "Frozen query " + outcome["case_id"] + " (" + outcome["purpose"] + ") expected "
+                                    + str(outcome["expected"]) + "; actual cards=" + str(outcome["actual"])
+                                    + ", Claims=" + str(outcome["actual_claim_ids"]), candidate.get("semantic_plan_ref", ""))
+                            by_group["index"]["findings"][-1].update(
+                                case_id=outcome["case_id"], purpose=outcome["purpose"], expected=outcome["expected"],
+                                actual=outcome["actual"], actual_claim_ids=outcome["actual_claim_ids"], return_to="P3")
         except (v.ContractError, OSError, ValueError, ImportError) as exc:
             caught("index", exc)
     return _finish_report(report)
 
 
+def report_complete(report):
+    """Keep P5 input gaps visible even when a semantic failure wins status."""
+    if any(row["status"] == "incomplete" for row in report["checks"]):
+        return False
+    for row in report["checks"]:
+        candidate = row.get("candidate_queries") if row["check_id"] == "index.build" else None
+        if candidate is not None and (candidate.get("status") == "incomplete"
+                or any(outcome["status"] == "incomplete" for outcome in candidate.get("outcomes", []))):
+            return False
+    return True
+
+
 def _finish_report(report):
     states = {row["status"] for row in report["checks"]}
     report["status"] = "failed" if "failed" in states else "incomplete" if "incomplete" in states else "passed"
-    report["complete"] = "incomplete" not in states
+    report["complete"] = report_complete(report)
     report["exit_code"] = {"passed": 0, "failed": 1, "incomplete": 2}[report["status"]]
     report["phase"] = report["status"]
     report["digest"] = v.digest_payload(report)
@@ -659,7 +719,7 @@ def validate_report(report, expected_object=None, expected_rules=None, required_
                 raise v.ContractError("INVALID_CHECK_REPORT", "Report errors cannot be marked passed")
     states = {row["status"] for row in report["checks"]}
     status = "failed" if "failed" in states else "incomplete" if "incomplete" in states else "passed"
-    if report.get("status") != status or report.get("exit_code") != {"passed": 0, "failed": 1, "incomplete": 2}[status] or report.get("complete") != ("incomplete" not in states):
+    if report.get("status") != status or report.get("exit_code") != {"passed": 0, "failed": 1, "incomplete": 2}[status] or report.get("complete") != report_complete(report):
         raise v.ContractError("INVALID_CHECK_REPORT", "Report status and exit code disagree")
     if expected_rules is not None and report.get("rules_digest") != expected_rules:
         raise v.ContractError("INVALID_CHECK_REPORT", "Report rules differ")

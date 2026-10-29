@@ -43,7 +43,7 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-change-plan
-  prompt: 调用plan固定作者判断。逐单元确定content、skip、defer、failed或uncovered及理由，覆盖明确维护事项。判断卡和旧Claim的新建、更新、合并、拆分、退役或暂缓，保留身份和全部去向；同单元多种卡动作时显式record_action并保全明细。冻结本批查询及明确预期。P5退回或P2补料后，用新operation_id、previous_view_ref及revision_reason保存新计划；原scan及单元身份不变，采用旧材料须与前序稿精确绑定，补料须引用新材料版本，旧工件不覆盖。这里不做提前独立复核，不生产字节写入清单；缺材料回P2，采用源变化回P1。
+  prompt: 调用plan固定作者判断。逐单元确定content、skip、defer、failed或uncovered及理由，覆盖明确维护事项。判断卡和旧Claim的新建、更新、合并、拆分、退役或暂缓，保留身份和全部去向；同单元多种卡动作时显式record_action并保全明细。冻结本批查询及明确预期，按实际Claim的usage、evidence_kind和scope选择purpose，存在代码链接不等于implementation依据；正向用例推荐expected_claim_ids，负向保留排除或明确空结果断言。P5退回或P2补料后，用新operation_id、previous_view_ref及revision_reason保存新计划；原scan及单元身份不变，采用旧材料须与前序稿精确绑定，补料须引用新材料版本，旧工件不覆盖。这里不做提前独立复核，不生产字节写入清单；缺材料回P2，采用源变化回P1。
   exits:
   - id: content_planned
     label: 作者判断已固定
@@ -77,11 +77,11 @@ nodes:
   type: skill
   owner: reviewer
   skill: hs-knowledge-lint
-  prompt: 由宿主安排独立reviewer任务，实际读原文、旧卡、作者计划、全部处置和稿件，审结论、归卡、实质skip及必要代码依据。调用action review，传view_ref、实际semantic_plan_ref、sampled_unit_ids、unreviewed_unit_ids、reason及明确findings；代码稿另传code_review的真实context和逐Claim材料。角色标签不认证独立性。正常候选一次完整固定lint；语义已阻断时记录未执行项。记录批只查处置和适用项，不建临时索引。读实际报告，披露抽样和未审范围；缺材料回P2、判断错回P3、稿件错回P4，并携确切previous_view_ref和理由交新操作返工，保留有效原scan、不覆盖旧工件，新稿必须重审。纯运行故障留本节点等待。
+  prompt: 由宿主安排独立reviewer任务，实际读原文、旧卡、作者计划、全部处置和稿件，审结论、归卡、实质skip及必要代码依据。调用action review，传view_ref、实际semantic_plan_ref、sampled_unit_ids、unreviewed_unit_ids、reason及明确findings；代码稿另传code_review的真实context和逐Claim材料。角色标签不认证独立性。正常候选一次完整固定lint，并在同次已全验临时索引上执行最终候选的原冻结查询及同代精读；读取index.build的candidate_queries逐例预期与实际结果，TARGET_QUERY_EXPECTATION_FAILED阻断并回P3，必需输入不可用保持incomplete按实际缺口处理。语义已阻断时记录未执行项。记录批只查处置和适用项，不建临时索引。读实际报告，披露抽样和未审范围；缺材料回P2、判断错回P3、稿件错回P4，并携确切previous_view_ref和理由交新操作返工，保留有效原scan、不覆盖旧工件，新稿必须重审。纯运行故障留本节点等待。
   exits:
   - id: passed
     label: 审阅和适用检查完成
-    condition: 独立审阅实际完成，适用固定检查passed且范围明确，无未解决阻断。
+    condition: 独立审阅实际完成，适用固定检查passed且范围明确，内容批冻结查询及同代精读通过，无未解决阻断。
     target: record_ingest
   - id: needs_material
     label: 补充审阅材料

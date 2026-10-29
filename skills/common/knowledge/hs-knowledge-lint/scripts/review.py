@@ -27,7 +27,7 @@ def add_finding(report, check_id, code, reason, *, incomplete=False, path=""):
 def finish(report, modules):
     states = {row["status"] for row in report["checks"]}
     report["status"] = "failed" if "failed" in states else "incomplete" if "incomplete" in states else "passed"
-    report["complete"] = "incomplete" not in states
+    report["complete"] = modules["checks"].report_complete(report)
     report["exit_code"] = {"passed": 0, "failed": 1, "incomplete": 2}[report["status"]]
     report["phase"] = report["status"]
     report["digest"] = modules["validation"].digest_payload(report)
@@ -60,6 +60,24 @@ def special_action(ctx, action):
     return result, code
 
 
+def query_code_contexts(ctx, details):
+    """Expose this check's actual material inputs, never its passing status."""
+    reference = details.get("local_check_ref")
+    if not reference:
+        return {}
+    record = ctx.record(reference)
+    if not record.get("code_identity"):
+        return {}
+    context_record = ctx.record(record["context_ref"])
+    result = {}
+    for claim in record.get("claims", []):
+        context = result.setdefault(claim["card_id"], {
+            "code_identity": record["code_identity"], "config_digest": context_record.get("config_digest"),
+            "claim_evidence": {}})
+        context["claim_evidence"][claim["claim_id"]] = claim.get("verification_evidence", [])
+    return result
+
+
 def run(ctx):
     """Record this review and run fixed checks once against this actual view."""
     request, modules = ctx.request, ctx.modules
@@ -85,9 +103,20 @@ def run(ctx):
             add_finding(report, "view.inputs", "CONTENT_REVIEW_FINDING", finding["reason"])
         fixed_executed = False
     else:
+        details, code_error = None, None
+        check_inputs = dict(request.get("inputs", request.get("check_inputs")) or {})
+        if view.get("review_mode") in {"code_gate", "mixed"} and isinstance(request.get("code_review"), dict):
+            try:
+                details = code_check(ctx, {**request["code_review"], "operation_id": ctx.operation,
+                                          "view_ref": request["view_ref"]})
+                direct_contexts = query_code_contexts(ctx, details)
+                if direct_contexts and "code_contexts" not in check_inputs and "code_evidence" not in check_inputs:
+                    check_inputs["code_contexts"] = direct_contexts
+            except (ValueError, OSError, KeyError) as exc:
+                code_error = exc
         report = modules["checks"].run(candidate, ctx.rules,
-                                       inputs=request.get("inputs", request.get("check_inputs")),
-                                       scope="full")
+                                       inputs=check_inputs,
+                                       scope="full", query_context=ctx)
         fixed_executed = True
         if view.get("review_mode") in {"code_gate", "mixed"}:
             code_request = request.get("code_review")
@@ -95,22 +124,21 @@ def run(ctx):
                 add_finding(report, "source.references", "CODE_REVIEW_MATERIAL_REQUIRED",
                             "Provide this review's exact code/context/Claim evidence", incomplete=True)
             else:
-                try:
-                    details = code_check(ctx, {**code_request, "operation_id": ctx.operation,
-                                              "view_ref": request["view_ref"]})
+                if code_error is None:
                     report["code_review"] = details
                     if details["check_status"] != "passed":
                         add_finding(report, "source.references", "CODE_REVIEW_" + details["check_status"].upper(),
                                     "Code review evidence did not pass; inspect the exact saved report",
                                     incomplete=details["check_status"] == "incomplete")
-                except (ValueError, OSError, KeyError) as exc:
-                    add_finding(report, "source.references", getattr(exc, "code", "CODE_REVIEW_UNAVAILABLE"),
-                                str(exc), incomplete=True)
+                else:
+                    add_finding(report, "source.references", getattr(code_error, "code", "CODE_REVIEW_UNAVAILABLE"),
+                                str(code_error), incomplete=True)
+    query_returns = {"P3" for row in report["findings"] if row.get("code") == "TARGET_QUERY_EXPECTATION_FAILED"}
     report["review"] = {**review_data, "fixed_checks_executed": fixed_executed,
                         "sampled_unit_ids": review_record["sampled_unit_ids"],
                         "unreviewed_unit_ids": review_record["unreviewed_unit_ids"],
                         "findings": review_record["findings"],
-                        "return_to": sorted({row["return_to"] for row in review_record["findings"]})}
+                        "return_to": sorted({row["return_to"] for row in review_record["findings"]} | query_returns)}
     finish(report, modules)
     modules["checks"].validate_report(report, expected_rules=ctx.args.rules_digest)
     return report

@@ -11,6 +11,19 @@ Request: `material_ref`, optional real `scan_ref`, descriptive `author_id`, `uni
 - `maintenance_units` separately cover the exact affected `card_id/claim_id` with canonical `maintenance:<card>#<claim>` IDs. They do not invent raw sources.
 - Content plans require representative `target_queries` with unique IDs/questions and explicit required/forbidden/order expectations. Purposes are `current/implementation/guidance/historical`; omitted purpose retains current. Deprecation tests current exclusion or historical behavior. Claim expectations identify authored `CardID#ClaimID` pairs.
 
+Choose the purpose from the intended Claim, not from the presence of a code link:
+
+| Purpose | Expected qualification |
+|---|---|
+| `current` | The Claim has `usage: current`, matching scope/context and valid current evidence. A `design` Claim is not excluded merely by its evidence kind. |
+| `implementation` | The current requirements above, plus `evidence_kind: implementation` or `measurement`. A code navigation link does not satisfy this evidence requirement. |
+| `guidance` | Background or guidance within its declared conditions, including unknown applicability; it does not prove current product behavior. |
+| `historical` | The selected historical Claim and recoverable exact evidence; it does not assert current applicability. |
+
+For a positive case about a new or changed conclusion, prefer `expected_claim_ids` so another eligible Claim on the same card cannot satisfy the intended test by accident. For example, a design-background case can be `{"id":"design-flow","query":"flow background","purpose":"guidance","required":["flow-card"],"expected_claim_ids":["flow-card#design-flow"]}` when those IDs and words belong to the actual authored content. Negative cases keep their explicit forbidden/order expectations and need no positive Claim assertion. Mixed-Claim cards are judged against each case's expected Claims, not rejected merely because some other Claim has design evidence.
+
+P3 checks the plan structure and coverage; P5 runs these unchanged cases against the final candidate, including scope/source qualification, retrieval and same-candidate reads. An unmet expectation returns to P3 before formal publication. Do not automatically weaken the purpose or replace a frozen expectation to obtain a pass.
+
 Result: `semantic_plan_ref/semantic_plan_digest`, unchanged query cases and `phase: content_planned`. This is authored business data, not approval or an executable byte plan.
 
 After P5 returns a candidate, use a new operation and explicitly supply `previous_view_ref/revision_reason`. Unchanged old materials may be adopted only from that exact view. P2 supplementation returns a new material version linking the same view/digest and previous material/digest. The original scan remains immutable: its unit IDs and scan digest are reused as business observations, while the new semantic plan records `origin_scan_operation_id`, `previous_view_ref/previous_view_digest` and the previous semantic reference/digest. Changed source/range observations need P1; do not fabricate a new scan for an unchanged observation.

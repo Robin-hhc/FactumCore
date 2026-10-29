@@ -28,6 +28,7 @@ Skill 测试目录均相对 `repo/skills/common/knowledge/`。本目录的 `test
 | P7 安全写入与保留输出槽 | apply `test_publication_cli.py`、`test_apply.py` | 真实 CLI 路径/保留槽矩阵；断言指定 guard 报错与全树原字节不变；成功自有 transport 另走真实发布与清理链 |
 | P7 故障停点、清理失败重试及硬退出 | apply `test_p7_actions.py`、`test_publication_cli.py`、[test_process_recovery.py](tests/test_process_recovery.py) | 发布事实与整批完成分开；只补缺失收尾/清理；实际停止进程后的 journal 和确切视图恢复；原指针保护 |
 | 索引完整性、冻结查询与首次 CAS | apply `test_p7_cas_and_verification.py`、[test_indexing_contract.py](tests/test_indexing_contract.py)、[test_publication_regression_binding.py](tests/test_publication_regression_binding.py) | 数据库全量内容校验；不能用自签 passed、替换查询或新指针重建旧基线；P5/P7 各自实际校验对象 |
+| P5冻结查询前置与P3返工 | [test_p5_frozen_queries.py](tests/test_p5_frozen_queries.py) | 用途不兼容在P5阻断，正式区不变；修正用途的新轮可发布；已有活动代不能替代最终候选；P7保留实际回归 |
 | 正式库巡检、只读与待维护限制 | lint `test_cli.py`、maintain `test_reference_audit.py`、source-scan `test_completion_status.py` | 失败逐卡/Claim 可定位；读取不改正式内容；限制与待办不能误当 noop 或成功 |
 | 来源/代码引用的当前与历史用途 | source-scan `test_historical_context.py`、query `test_purpose.py`、`test_code_navigation.py` | current/guidance/history 的使用资格；来源顺序不能改变结果；改体与符号变动各自覆盖 |
 | 查询内容和简洁地址、同代回执 | [test_query_output_contract.py](tests/test_query_output_contract.py)、query `test_public_receipt.py`、`test_code_navigation.py` | 外部响应及新回执不嵌入原件／展开引用；内部资格保持；Claim子集、旧格式及确切代内卡地址；不同文件的地址／摘要不得混配，缺失与歧义不伪造当前行段 |

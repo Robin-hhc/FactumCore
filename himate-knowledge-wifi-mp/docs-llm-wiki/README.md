@@ -19,6 +19,8 @@ flowchart LR
 
 本目录下的 `task.md`、`sdd/` 用于本机开发任务、需求、测试计划和验收记录，由 Git 忽略，部署无需准备。本目录的共享正文说明系统设计与使用方式；正式领域知识进入 `../knowledge/`。
 
+待评审的[Skill 边界与状态记录重构方案](Skill边界与状态记录重构方案.md)汇总本轮设计取舍，尚未实施，不替代当前使用说明、Workflow 或机器契约。
+
 ## 能力与任务入口
 
 当前有9个公开 Skill，名称均以 `hs-knowledge-` 开头：explore、source-scan、source-prepare、change-plan、view-materialize、lint、apply、query、maintain。开发分发源码在项目根的 `skills/common/knowledge/`；实际运行使用 Agent 已安装的能力。两个 Workflow 的源码在 `workflows/common/knowledge/`，由 OpenFlow 加载和编排。

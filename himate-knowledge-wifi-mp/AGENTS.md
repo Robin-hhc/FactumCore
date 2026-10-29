@@ -1,6 +1,6 @@
 # WiFi 领域知识入口
 
-本目录为项目根 `repo/` 下的 `himate-knowledge-wifi-mp/`，不包含嵌套 `.git`。原件在 `docs-raw/`，治理契约在 `governance/`，正式卡在 `knowledge/`，系统设计在 `docs-llm-wiki/`。Skill／Workflow 开发分发源码在项目根对应目录，实际能力已装在 Agent 自己的目录，由 harness 调用。首次通过 `hs-knowledge-explore/scripts/setup.py` 检查现有全局 Python 依赖并读取项目入口；不要求额外登记或机器绑定。运行产物使用已有 `.build/`、`logs/`、`artifacts/`。现行布局见[总体设计 §5.3](docs-llm-wiki/HiMate知识库架构设计.md#53-himate-knowledge目录架构)。
+本目录为项目根 `repo/` 下的 `himate-knowledge-wifi-mp/`，不包含嵌套 `.git`。原件在 `docs-raw/`，治理契约在 `governance/`，正式卡在 `knowledge/`，系统设计在 `docs-llm-wiki/`。Skill／Workflow 开发分发源码在项目根对应目录，实际能力已装在 Agent 自己的目录，由 harness 调用。首次部署使用分发仓根 `deploy.ps1`，按需检查本机 Python 和依赖并安装能力与知识库；explore 提供任务路由与只读项目发现，旧 setup 仅供显式诊断或兼容；不要求额外登记或机器绑定。运行产物使用已有 `.build/`、`logs/`、`artifacts/`。现行布局见[总体设计 §5.3](docs-llm-wiki/HiMate知识库架构设计.md#53-himate-knowledge目录架构)。
 
 知识库能力介绍与任务路由见已安装 `hs-knowledge-explore/SKILL.md`；已有有效上下文直接选择业务能力，首次准备和只读发现脚本按需运行。根 `AGENTS.md` 介绍真实业务仓，部署时保留已有内容，仅按 `AGENTS.md.example` 合并四项位置说明和 explore 入口指针；本开发仓的根文件仅本地维护。设计阅读先看[文档入口](docs-llm-wiki/README.md)。详细设计分概要和节点详细设计两层。项目自身的需求、实现任务、测试和验收记录保存在本地 `docs-llm-wiki/sdd/`，任务入口为本地 `docs-llm-wiki/task.md`，均由 Git 忽略，不随仓库分发。开发时按需读取本地已有工件；未提供时依据共享设计、源码与实际验证工作，不把缺少工件视为部署缺项。保留本地历史工件原字节。
 

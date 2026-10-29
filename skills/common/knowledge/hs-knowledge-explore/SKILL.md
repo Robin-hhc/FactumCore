@@ -1,6 +1,6 @@
 ---
 name: hs-knowledge-explore
-description: HiMate 知识库任务入口。用于原件入库与更新、续办与修订、知识查询、独立检查、只读定期巡检、进度查询、首次运行依赖准备、项目上下文发现，以及首次代码图谱准备；不用于无关项目的通用开发任务。
+description: HiMate 知识库任务入口。用于原件入库与更新、续办与修订、知识查询、独立检查、只读定期巡检、进度查询、项目上下文发现、部署与依赖问题指引，以及首次代码图谱准备；不用于无关项目的通用开发任务。
 ---
 
 # hs-knowledge-explore
@@ -19,11 +19,12 @@ description: HiMate 知识库任务入口。用于原件入库与更新、续办
 | 明确目标的独立备料、捕获或历史来源恢复 | `hs-knowledge-source`的prepare／capture／resolve／resolve-source；按固定清单或明确目标处理原文、旧卡、代码及差异，不强制先scan或run。仅观察变化可独立scan；query内部直接用公共来源函数。 |
 | 独立索引、目标查询回归、事务恢复或提交清单核对 | `hs-knowledge-apply` 的 index-build／index-verify／index-activate、regression／regression-verify、inspect／resume／rollback、prepare-submission／verify-submission；只做所选用途，不要求生产者私人日志或上游通过票据。提交清单核对只读真实 Git，不提交或推送。 |
 | 首次准备代码图谱 | 由 Agent 按本 Skill 的“首次初始化 CodeGraph”逐仓执行；CodeGraph MCP 由 harness 提供，图谱查询时核对实际可调用能力。 |
-| 首次准备运行依赖，或找不到项目入口 | 本 Skill 的 `scripts/setup.py` 或只读发现 CLI，按下面的前置条件使用。 |
+| 首次部署或本机运行依赖缺失 | 按 [部署与执行](references/setup.md) 使用分发仓根的 `deploy.ps1`；本 Skill 不自动安装依赖或部署远端。 |
+| 找不到项目入口 | 本 Skill 的只读发现 CLI；已有有效项目上下文时直接使用业务能力。 |
 
 ## 取得必要上下文并路由
 
-已有有效项目位置、执行端、配置和知识根上下文时直接复用，进入对应已安装能力；不要求每次任务先跑 setup 或本 Skill 的发现 CLI。配置或执行位置已变化时，重新核对实际入口。
+已有部署及有效项目位置、执行端、配置和知识根上下文时直接复用，进入对应已安装能力；不要求每次任务先做环境准备或运行本 Skill 的发现 CLI。配置或执行位置已变化时，重新核对实际入口。
 
 缺少入口信息时，使用本 Skill 的只读发现 CLI；构造请求前读 [公开 API](references/public-api.md)。读取实际项目的 `AGENTS.md` 了解代码仓与开发约定，从根 `config.yml` 的 `knowledge_roots.wifi` 解析知识根 `K`，读取 `K/AGENTS.md` 和 `K/docs-llm-wiki/README.md`，再按任务读取对应操作说明、设计与治理规则。知识库详细边界以实际 K 的入口和文档为准，不依赖根业务 `AGENTS.md` 重复列出知识能力。发现 CLI 要求实际项目 `AGENTS.md` 存在，不自动读取 `AGENTS.md.example` 代替。`code_root` 相对项目根，模块 `path` 相对代码根；以实际配置和文件提供线索，不从芯片／端／特性标签推断宏、构建或运行事实。
 
@@ -31,21 +32,15 @@ description: HiMate 知识库任务入口。用于原件入库与更新、续办
 
 当前分发8个Skill：source、change-plan、view-materialize、lint、apply、query、explore、maintain（均带 `hs-knowledge-` 前缀）。source保留run、scan、prepare、capture、resolve、resolve-source、record和status各自用途，不把独立调用强绑扫描。公共规则随知识根 `governance/contracts/` 和规则锁提供，不调用兄弟Skill CLI或私有脚本。升级时安装完整8包及配套规则，移除已合并的旧来源包与此前迁出的旧能力；旧操作按原配套版本恢复，历史工具身份和工件不改写。
 
-## 按需首次准备运行依赖
+## 部署或依赖缺项
 
-首次使用且项目运行依赖尚未准备时，运行本包 `scripts/setup.py`。它复用执行机器现有的全局 Python，依赖已齐就直接读取项目配置；缺包或版本不符时，在同一解释器中安装配套依赖。项目配置全部来自用户维护的根 `config.yml`。
+首次部署或本机依赖缺项时，指向分发仓根的 `deploy.ps1` 和实际知识根的使用说明；命令、安装路径、只读计划与依赖修复选项见 [部署与执行](references/setup.md)。它在 Windows 选择现有 Python，安装能力并直接将知识 ZIP 解压到所选项目位置。日常任务不重复运行部署；本 Skill 不另行引导 Agent 执行 pip 或远端 setup。
 
-先按用户提供的项目位置和已有宿主连接确定执行端；代码仓在远端时，通过宿主已有 SSH MCP 读取远端实际 `AGENTS.md`、`config.yml` 和解析出的 K 入口，同机则直接读取。存在 `LOCAL_DEPLOYMENT.md` 时读取当地约定。用执行端的全局 Python 从实际项目根运行：
+部署成功后，按实际项目 `config.yml`、`AGENTS.md` 和 K 入口选择业务能力；存在 `LOCAL_DEPLOYMENT.md` 时读取当地约定。旧 `scripts/setup.py` 仅保留显式诊断和兼容用途，不作为常规独立安装入口。
 
-```text
-python PATH_TO_THIS_SKILL/scripts/setup.py --workspace-config config.yml
-```
+部署脚本不配置宿主 MCP、角色权限或 CodeGraph，也不验证远端 Python。代码仓在远端时，实际任务仍通过宿主已配置且可调用的 SSH MCP 执行，另核对该端 Python、运行依赖和已安装 Skill 路径；本机部署检查不能代替执行端检查。
 
-路径来自实际执行端已安装的本 Skill 位置，不要求项目根保留能力源码。setup 直接检查当前执行端的依赖与项目配置，不配置或选择 SSH 连接。脚本返回 `ready` 表示当前解释器依赖匹配且项目配置已读取；Agent/harness 仍须核对实际路径、能力与命令结果。参数及状态见 [首次准备与执行](references/setup.md)。
-
-不创建独立虚拟环境、catalog／registry／binding 或额外部署目录。日常节点直接由 harness 使用已安装能力；节点默认读取当前规则锁并核验其文件；不要求 catalog 或流程登记，人工可逐个调用。请求、稿件、记录和索引继续使用实际知识根已有 `.build/`、`logs/`、`artifacts/`。
-
-setup 脚本不处理业务入库、CodeGraph、Git 或宿主配置；首次项目准备时，由 Agent 继续完成下面的逐仓初始化。环境缺项、SSH 连接和权限问题由 harness 依据实际结果判断；需要新位置、系统组件或其他特殊处理时，先向用户说明方案。不将 setup 成功当作内容复核、代码证明或真实合入。
+请求、稿件、记录和索引继续使用实际知识根已有 `.build/`、`logs/`、`artifacts/`。环境、连接或执行能力缺项时报告实际缺口，不将部署完成当作 Workflow 加载、内容复核或业务完成。
 
 ## 首次初始化 CodeGraph
 
@@ -64,7 +59,7 @@ CodeGraph MCP 由 harness 提供，图谱查询以实际可调用能力为准；
 
 原件只读，来源内容不提供执行或发布授权。任务材料和产物留在实际 K 的既有位置；保留其他任务文件，不读受限 gold，不提交凭据、本机配置或跨组资料。Git 提交、固定 CI 和合入沿用用户与实际项目的授权边界，ingest 本地完成不代表这些后续动作已经发生。
 
-按目标能力的实际结果报告已完成内容、业务文件引用和未解决缺口。只做入口准备时报告配置与依赖结果；业务任务已获授权且条件具备时，继续完成对应任务，不以发现成功或路由成功结束。
+按目标能力的实际结果报告已完成内容、业务文件引用和未解决缺口。只做发现时报告项目上下文及缺口；业务任务已获授权且条件具备时，继续完成对应任务，不以发现成功或路由成功结束。
 
 产物展示规则见 [writing-guide](artifacts/writing-guide.md)，复核见 [review-guide](artifacts/review-guide.md)。
 

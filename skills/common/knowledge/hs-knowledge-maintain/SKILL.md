@@ -3,7 +3,7 @@ name: hs-knowledge-maintain
 description: Register exact source-change events, inspect affected Claims and recheck mechanical freshness restrictions against current cards and source bytes.
 ---
 
-首次使用或缺项目入口信息时，先用已安装的 `hs-knowledge-explore` 运行 setup 并读取项目 `config.yml`；已具备上下文就直接复用。默认使用实际执行机器已有的全局 Python，缺依赖时再由 setup 补齐。
+已有项目上下文时直接复用；缺少入口信息才使用已安装的 `hs-knowledge-explore` 做只读发现。首次部署或本机依赖缺项时，按知识根使用说明运行分发仓根 `deploy.ps1`，不自动执行 pip 或远端 setup；远端任务另核实际执行端的 Python、依赖和能力路径。
 
 目标代码仓在远端时，通过 OpenFlow／宿主已有的 SSH MCP 在远端项目根执行脚本、读取文件和进行仓库操作，使用执行端的全局 Python 与已安装 Skill 路径，并核对实际结果；本地路径不能直接用于远端。请求、稿件和结果继续放实际知识根已有的 `.build/`、`logs/`、`artifacts/`。
 

@@ -8,7 +8,7 @@ himate-knowledge知识库仓目录结构如下所示。
 
 本节以 `repo/` 表示项目根目录，实际目录名称和存放位置不限。下树以平铺布局示意；实际知识根 K 由项目 `config.yml` 的 `knowledge_roots.wifi` 相对配置目录解析，允许安全的前置子目录，与业务代码共同管理。开发仓保存 Skill／Workflow 分发源码；实际部署在 Agent 自己的能力目录，运行不依赖项目根保留源码副本。业务工作区可包含 Host、Device、特性和算法等多个代码模块；知识库按配置中的相对路径读取实际文件，以内容指纹核对引用。
 
-当前入口按同一业务工作区读取根 `config.yml`，项目配置全部由用户在这份文件维护。已安装 `hs-knowledge-explore` 是全库能力入口，提供 ingest、query、lint 等任务的选择与指引；首次用 setup 复用全局 Python、补齐实际缺依赖并读取入口，后续缺上下文时才运行只读发现。目标代码仓在远端时，Agent 通过 OpenFlow／宿主已有 SSH MCP 在实际执行端运行脚本与仓库操作。正常流程不增加私有环境或登记步骤。
+当前入口按同一业务工作区读取根 `config.yml`，项目配置全部由用户在这份文件维护。已安装 `hs-knowledge-explore` 是全库能力入口，提供 ingest、query、lint 等任务的选择与指引；首次部署和本机依赖准备使用分发仓根的 `deploy.ps1`，后续缺上下文时才运行只读发现。目标代码仓在远端时，Agent 通过 OpenFlow／宿主已有 SSH MCP 在实际执行端运行脚本与仓库操作。正常流程不增加私有环境或登记步骤。
 
 - AGENTS.md：具体业务仓的代码架构、开发约定与位置说明；由该工作区维护
 - AGENTS.md.example：本项目分发的接入示例，供合并 main、config.yml、知识根及设计文档四项说明
@@ -26,10 +26,12 @@ himate-knowledge知识库仓目录结构如下所示。
 repo/
 ├── AGENTS.md                      # 业务仓说明，本开发仓仅本地维护
 ├── AGENTS.md.example              # 分发接入示例，合并到业务仓已有说明
+├── deploy.ps1                     # Windows 交互部署入口，位于分发仓
+├── tools/deploy/                  # 部署、ZIP 与依赖检查实现及说明
 ├── config.yml                     # 代码根、模块相对路径与归属
 ├── main/                          # 业务代码工作区，可包含多个模块
 ├── skills/common/knowledge/             # 开发分发源码，部署时放入Agent Skills
-│   ├── hs-knowledge-explore/             # 能力入口、setup、发现与CodeGraph准备
+│   ├── hs-knowledge-explore/             # 能力路由、只读发现与CodeGraph准备
 │   ├── hs-knowledge-source/              # P1扫描＋P2备料；独立来源动作、P6记录与进度
 │   ├── hs-knowledge-change-plan/         # P3语义计划及冻结查询
 │   ├── hs-knowledge-view-materialize/    # P4直接成稿、修订与描述
@@ -78,15 +80,15 @@ repo/
 
 节点 Skill 和 Workflow 随 WiFi 知识库维护：
 
-上树展示开发分发源码。实际能力已经安装在 Agent 自己的 `S`、`F` 目录，由 harness 使用；不要求业务仓根保留能力源码。首次运行 `S/hs-knowledge-explore/scripts/setup.py` 检查当前全局 Python 和依赖、读取项目入口；需要跨机时由 Agent 通过 OpenFlow／宿主已有 SSH MCP 在项目所在端执行，不另复制部署工具或建立机器绑定。业务产物仍在 K 已有 `.build/`、`logs/`、`artifacts/`。ingest 完成 P1—P7，lint 保持确定性检查；文档和代码均独立内容复核，代码及混合稿另做适用代码核验。
+上树展示开发分发源码。实际能力已经安装在 Agent 自己的 `S`、`F` 目录，由 harness 使用；不要求业务仓根保留能力源码。首次部署使用分发仓根的 `deploy.ps1`：选择本机 Python、安装能力，并由 Windows 直接在所选项目路径解压知识 ZIP；不使用 SSH，也不验证远端 Python。实际业务任务在目标代码仓所在端执行，远端使用宿主已有 SSH MCP，不建立机器绑定。业务产物仍在 K 已有 `.build/`、`logs/`、`artifacts/`。ingest 完成 P1—P7，lint 保持确定性检查；文档和代码均独立内容复核，代码及混合稿另做适用代码核验。
 
-服务器项目先由用户或部署维护者在 OpenFlow 配置、启用 SSH MCP，并验证该能力实际可调用；连接凭据由宿主管理，操作集中见[远端执行准备](使用说明.md#12-远端执行先配置-openflow-ssh-mcp)。远端须已有全局 Python 和配套已安装 Skill，Agent 再通过 SSH MCP 在服务器原生项目路径执行。harness 须确认实际执行端能调用对应脚本；调用端的安装路径不能当作远端脚本路径。同机执行不要求 SSH。setup 只处理当前执行端的依赖和项目配置，不配置 SSH MCP 或部署远端能力；执行端能力缺失时报告缺口，特殊处理先与用户讨论，不另建目录或工具副本。连接、权限与命令结果由 harness 判断，不另外建立 runner 硬校验层。“本地入库”和“本机索引”指实际执行端；生成物留在 K 原有目录。行为与恢复见[详细设计 §6.3](知识库详细设计.md#63-命令分派与工作流续办)，首次操作见[使用说明](使用说明.md#首次准备运行依赖)。
+服务器项目先由用户或部署维护者在 OpenFlow 配置、启用 SSH MCP，并验证该能力实际可调用；连接凭据由宿主管理，操作集中见[远端执行准备](使用说明.md#12-远端执行先配置-openflow-ssh-mcp)。远端须已有全局 Python 和配套已安装 Skill，Agent 再通过 SSH MCP 在服务器原生项目路径执行。harness 须确认实际执行端能调用对应脚本；调用端的安装路径不能当作远端脚本路径。同机执行不要求 SSH。部署脚本不配置 SSH MCP、角色权限或远端运行环境，旧 setup 仅保留显式诊断和兼容用途；执行端能力缺失时报告缺口，特殊处理先与用户讨论，不另建目录或工具副本。连接、权限与命令结果由 harness 判断，不另外建立 runner 硬校验层。“本地入库”和“本机索引”指实际执行端；生成物留在 K 原有目录。行为与恢复见[详细设计 §6.3](知识库详细设计.md#63-命令分派与工作流续办)，首次操作见[使用说明](使用说明.md#首次准备运行依赖)。
 
 
 
 # 11 HiMate知识库架构
 
-知识库随代码仓一并拉取；首次运行依赖由 `hs-knowledge-explore` 准备，不需要额外业务初始化命令或常驻服务。`ingest` 默认处理六类允许 raw，经扫描、独立备料、作者计划和完整成稿，在 P5 集中独立内容／代码审阅及完整质量检查，P6 转写处理记录，P7 将确切字节安全落位并完成检索收尾；有问题时返回相应阶段。`lint` 是可单独调用的只读确定性检查入口，供手动修改和 CI 复用，不自动修稿或入库；`query` 消费知识。内容批完成本地入库、真实索引全验、冻结目标查询和活动代激活后，由人提交、触发固定 CI 并评审合入；仅记录批保存处置和欠账，不建索引。`ingest --source` 可选限定来源；命令格式见[详细设计 §1.1](知识库详细设计.md#11-从命令进入流程)，OpenFlow 负责 Workflow 的调度和交棒校验；人工测试可逐个调用 Skill 并按实际结果继续。
+知识库随代码仓一并拉取；能力与本机依赖通过 `deploy.ps1` 部署，explore 提供任务路由和只读发现，不需要额外业务初始化命令或常驻服务。`ingest` 默认处理六类允许 raw，经扫描、独立备料、作者计划和完整成稿，在 P5 集中独立内容／代码审阅及完整质量检查，P6 转写处理记录，P7 将确切字节安全落位并完成检索收尾；有问题时返回相应阶段。`lint` 是可单独调用的只读确定性检查入口，供手动修改和 CI 复用，不自动修稿或入库；`query` 消费知识。内容批完成本地入库、真实索引全验、冻结目标查询和活动代激活后，由人提交、触发固定 CI 并评审合入；仅记录批保存处置和欠账，不建索引。`ingest --source` 可选限定来源；命令格式见[详细设计 §1.1](知识库详细设计.md#11-从命令进入流程)，OpenFlow 负责 Workflow 的调度和交棒校验；人工测试可逐个调用 Skill 并按实际结果继续。
 
 ingest 是原件到本地正式知识的完整流程；lint Skill 可被 ingest、独立命令和 CI 复用，query 负责消费。另有同名 lint Workflow，供手动或外部周期调度执行正式全库检查和引用巡检，出报告即结束。它直接调用两个 Skill，不嵌套 ingest，不改变原 lint Skill 默认行为或 ingest 节点。实际宿主加载、代码接入和周期触发需按部署环境验证；这些能力不要求用户顺序执行。
 
@@ -123,7 +125,7 @@ AIoT 业务横跨 WiFi、BGLE、定位、雷达、SLP、NFC、NPU、MCU 等十�
 flowchart TB
     U["用户 / AI Agent 任务"]
     C0{"已有适用项目上下文？"}
-    E0["E0 hs-knowledge-explore<br />首次 setup · 后续项目定位与上下文读取"]
+    E0["E0 hs-knowledge-explore<br />任务路由 · 按需项目定位与上下文读取"]
 
     subgraph S1["① 入口路由层 · 知识库前台"]
         direction LR
@@ -194,7 +196,7 @@ flowchart TB
 
 #### hs-knowledge-explore —— 全库能力入口与按需前置发现 E0
 
-该 Skill 集中介绍知识库能力并按任务引导 ingest、query、lint 及维护入口。Agent 阅读其指引后，已有有效上下文即可直接使用相应能力；阅读指引不要求执行脚本。首次准备时运行 `hs-knowledge-explore/scripts/setup.py`，检查现有全局依赖并读取根 `config.yml`；远端代码仓由 Agent 通过 OpenFlow／宿主已有 SSH MCP 在服务器执行。后续仅在上下文缺失时通过只读 E0 定位代码仓、知识根并读取业务仓 `AGENTS.md` 与配置，无需重复 setup 或登记。
+该 Skill 集中介绍知识库能力并按任务引导 ingest、query、lint 及维护入口。Agent 阅读其指引后，已有有效上下文即可直接使用相应能力；阅读指引不要求执行脚本。首次部署指向根 `deploy.ps1` 和[使用说明](使用说明.md#2-首次环境安装)，不由 Agent 自动执行 pip 或远端 setup；远端任务另核实际执行端的环境与能力。后续仅在上下文缺失时通过只读 E0 定位代码仓、知识根并读取业务仓 `AGENTS.md` 与配置，无需重复部署或登记。
 
 ```mermaid
 flowchart LR
@@ -205,7 +207,7 @@ flowchart LR
     E -->|"不存在或有歧义"| G["返回缺口，保留 unknown"]
 ```
 
-只读发现依据显式配置、有限祖先路径或 harness 提供的既有上下文，不整盘猜测、不创建图谱或伪造配置。首次 setup 只准备全局依赖和入口，E0 继续处理会话信息缺口；它们位于业务命令之前，不属于 ingest，也不是每条命令的必调步骤。图谱线索和服务真实可用性分别核实，缺项保留 unknown。
+只读发现依据显式配置、有限祖先路径或 harness 提供的既有上下文，不整盘猜测、不创建图谱或伪造配置。部署脚本负责能力、本机依赖与知识框架的安装，E0 只处理会话信息缺口；二者不属于 ingest，也不是每条命令的必调步骤。图谱线索和服务真实可用性分别核实，缺项保留 unknown。
 
 #### AGENTS.md / AGENTS.md.example —— 业务仓说明与接入示例
 
@@ -231,13 +233,13 @@ flowchart LR
 
 #### `skills/common/knowledge/` —— 项目入口与节点级能力
 
-该路径是开发分发源码；实际能力位于 Agent 的 `S` 目录，由 harness 使用，不依赖项目根同名目录。Skill 保存操作指引与所需脚本；`hs-knowledge-explore` 承担全库能力路由，并提供按需首次 setup 和只读项目发现，领域事实仍只放知识库：
+该路径是开发分发源码；实际能力位于 Agent 的 `S` 目录，由 harness 使用，不依赖项目根同名目录。Skill 保存操作指引与所需脚本；`hs-knowledge-explore` 承担全库能力路由，并提供部署入口指引和只读项目发现，领域事实仍只放知识库：
 
 公开集合恰好8包；主线使用5包，query、explore、maintain独立保留。
 
 | 技能 | 职责 | 公开动作 |
 |---|---|---|
-| `hs-knowledge-explore/` | 能力路由、按需setup／发现和CodeGraph准备 | setup及只读发现；已有上下文复用 |
+| `hs-knowledge-explore/` | 能力路由、只读发现和CodeGraph准备 | 部署指引；已有上下文复用 |
 | `hs-knowledge-source/` | 默认同进程执行P1扫描和P2备料；独立来源处理、P6暂存冻结处置及只读进度 | run（默认）；scan / prepare / capture / resolve / resolve-source / record / status |
 | `hs-knowledge-change-plan/` | P3记录作者语义决定、保留范围和目标查询 | plan；不生产字节或复核 |
 | `hs-knowledge-view-materialize/` | P4直接生产卡、导航、来源锁及完整视图，修订与描述 | run / revise / describe |
@@ -246,7 +248,7 @@ flowchart LR
 | `hs-knowledge-query/` | 独立知识检索和同代精读 | search / read；延续search绑定原receipt |
 | `hs-knowledge-maintain/` | 影响观察、事件与机械限制；只读引用巡检 | 默认inspect-context；audit-references；register-source-change / register-code-change / recover-events / advance / status |
 
-参与流程：OpenFlow 的 ingest Workflow 编排 P1—P7，内部调用 lint Skill；人工测试由人按需要逐个调用，Skill 不校验前驱步骤、角色身份或上游 passed 票据。query 使用实际知识、来源和索引。上表是能力清单，不表示上库必须逐个执行；固定 CI 复用 lint 的确定性检查函数。`hs-knowledge-explore` 提供首次准备和后续按需项目接口；首次准备时，Agent 按 `config.yml` 的真实代码仓逐个初始化 CodeGraph，MCP 及后续调用由 harness 提供，见[详细设计 §5.11](知识库详细设计.md#511-explorecodegraph-首次初始化)。
+参与流程：OpenFlow 的 ingest Workflow 编排 P1—P7，内部调用 lint Skill；人工测试由人按需要逐个调用，Skill 不校验前驱步骤、角色身份或上游 passed 票据。query 使用实际知识、来源和索引。上表是能力清单，不表示上库必须逐个执行；固定 CI 复用 lint 的确定性检查函数。`hs-knowledge-explore` 提供部署指引和按需只读项目接口；首次准备代码图谱时，Agent 按 `config.yml` 的真实代码仓逐个初始化 CodeGraph，MCP 及后续调用由 harness 提供，见[详细设计 §5.11](知识库详细设计.md#511-explorecodegraph-首次初始化)。
 
 #### `workflows/common/knowledge/` —— 增量更新与治理工作流
 
@@ -261,7 +263,7 @@ ingest不另分独立的生产和治理流程；P5由reviewer使用`S/hs-knowled
 
 #### himate-knowledge-wifi-mp/ —— WiFi 领域知识库
 
-WiFi 原件、知识和治理集中在 `himate-knowledge-wifi-mp/`，项目配置由根 `config.yml` 提供；Skill／Workflow 安装在 Agent 自己的目录，由 harness 调用。首次准备复用现有全局 Python，不要求额外私有部署目录或用户填写能力登记。产物使用既有 K 目录。目录不构成 ACL。
+WiFi 原件、知识和治理集中在 `himate-knowledge-wifi-mp/`，项目配置由根 `config.yml` 提供；Skill／Workflow 安装在 Agent 自己的目录，由 harness 调用。部署复用本机现有 Python 3.10–3.12；实际任务另核执行端环境，不要求私有运行环境或用户填写能力登记。产物使用既有 K 目录。目录不构成 ACL。
 
 参与流程：ingest 负责原件到本地知识，lint 检查固定资产，query 消费合格结论。
 

@@ -35,7 +35,7 @@ repo/
 │   ├── hs-knowledge-change-plan/         # P3语义计划及冻结查询
 │   ├── hs-knowledge-view-materialize/    # P4直接成稿、修订与描述
 │   ├── hs-knowledge-lint/                # P5独立审阅；默认只读固定检查
-│   ├── hs-knowledge-apply/               # P7安全事务、索引、回归及只读提交核对
+│   ├── hs-knowledge-apply/               # P7正式发布、检索收尾、本批清理及只读提交核对
 │   ├── hs-knowledge-query/               # 独立查询与同代精读
 │   └── hs-knowledge-maintain/            # 维护事件、机械限制与只读引用巡检
 
@@ -239,7 +239,7 @@ flowchart LR
 | 技能 | 职责 | 公开动作 |
 |---|---|---|
 | `hs-knowledge-explore/` | 能力路由、按需setup／发现和CodeGraph准备 | setup及只读发现；已有上下文复用 |
-| `hs-knowledge-source-scan/` | P1观察变化、P6机械转写冻结处置、实际进度与续办定位 | scan / record / status |
+| `hs-knowledge-source-scan/` | P1正式状态与当前输入、P6暂存冻结处置、明确target进度及显式全局总览 | scan / record / status |
 | `hs-knowledge-source-prepare/` | P2按固定单元或显式目标备料，恢复确切新旧来源 | prepare（默认）/ capture / resolve / resolve-source |
 | `hs-knowledge-change-plan/` | P3记录作者语义决定、保留范围和目标查询 | plan；不生产字节或复核 |
 | `hs-knowledge-view-materialize/` | P4直接生产卡、导航、来源锁及完整视图，修订与描述 | run / revise / describe |
@@ -256,7 +256,7 @@ flowchart LR
 
 | 工作流 | 职责 | 一句话 |
 |------|------|--------|
-| `hs-knowledge-ingest/` | P1 扫描或续办→P2 独立备料→P3 作者计划→P4成稿／修订→P5独立审阅与完整检查→P6 转写记录→P7 安全落位、索引、冻结查询与激活 | 内容批完成本地检索闭环；仅记录批只落记录 |
+| `hs-knowledge-ingest/` | P1 正式输入扫描→P2 独立备料→P3 作者计划→P4成稿／修订→P5独立审阅与完整检查→P6 转写记录→P7 安全落位、索引、冻结查询、激活与本批清理 | 内容批完成正式发布和本地检索闭环；仅记录批只落记录 |
 | `hs-knowledge-lint/` | `check_formal` 调用原 lint 默认 formal／full → `audit_references` 显式调用 maintain 的只读 audit-references | 汇总固定检查及逐卡／Claim 的来源、代码差异，生成 JSON／Markdown 报告即结束 |
 
 ingest 不另分独立的生产和治理流程；P5 由 reviewer 使用 `S/hs-knowledge-lint/` 的 `review`，其余节点由 coder 执行。材料、作者判断和稿件问题分别返回 P2、P3、P4；运行故障保留原停点等待，不增加重试节点。`F/hs-knowledge-lint/` 与同名 Skill 分目录保存，恰有 `check_formal`、`audit_references` 两个 `type: skill` 节点，不改变 lint Skill 默认 formal／full 或 ingest 主线。外部调度仅负责触发，不另建 runner 或嵌套 Workflow。
@@ -302,7 +302,7 @@ flowchart LR
 
 目录按知识类型和读者问题组织，来源出处在卡内 `sources` 与来源锁登记；不能把 raw 分类或材料平台名当成卡类型。`AGENTS.md` + `index.md` 是领域规则与逐层导航。
 
-**上库管理标准**：正式卡、各级导航、来源锁、采用的原件及附件和 `logs/ingest/` 处理链按本批清单提交；项目映射、规则、模板和测试按项目版本管理。`logs/events/` 含有效使用限制，保留其业务状态；`.build/`、`logs/operations/`、派生索引、私有恢复备份及原始复核／证据日志不整体提交。来源锁登记不等于原版已随仓提供：被引用旧版须可从 Git 历史或同组持久位置恢复，源码及采用的构建／运行材料须在消费端可达。其他用户拉取后核对共享资产并重建、验证及激活本机索引，不依赖原作者的私有计划、审阅报告、事务或缓存，也不继承其本机续办义务。历史处理记录和原件保留原字节，不为升级规则重签或覆盖。文档和代码结论须在 P5 独立内容复核，代码另按 Claim 核对源码及条件；固定 CI 仅检查确定性项，详见[保存与提交边界](知识库详细设计.md#64-哪些内容上库哪些用于本机执行)。
+**上库管理标准**：正式卡、各级导航、来源锁、采用的原件及附件和 `logs/ingest/` 处理链、正式发布记录及必要的已发布证据按本批清单提交；项目映射、规则、模板和测试按项目版本管理。`logs/events/` 含有效使用限制，保留其业务状态；`.build/`、`logs/operations/`、派生索引、私有恢复备份及原始复核／证据日志不整体提交。来源锁登记不等于原版已随仓提供：被引用旧版须可从 Git 历史或同组持久位置恢复，源码及采用的构建／运行材料须在消费端可达。其他用户拉取后核对共享资产并重建、验证及激活本机索引，不依赖原作者的私有计划、审阅报告、事务或缓存，也不继承其本机续办义务。历史处理记录和原件保留原字节，不为升级规则重签或覆盖。文档和代码结论须在 P5 独立内容复核，代码另按 Claim 核对源码及条件；固定 CI 仅检查确定性项，详见[保存与提交边界](知识库详细设计.md#64-哪些内容上库哪些用于本机执行)。
 
 参与链路：治理链路（卡片落位上库）+ 消费链路（定位 / 精读）。
 
@@ -379,9 +379,9 @@ flowchart LR
 
 | 目录 | 一句话职责 | 为什么单独设 |
 |------|-----------|--------------|
-| `.build/` | 转换、规范化、候选暂存（ignored） | 生产过程的半成品不该出现在检索结果里 |
+| `.build/` | 本批捕获材料、稿件、检查报告、待发布记录和新事务／备份（ignored） | 前六步只暂存，按明确引用交接；半成品不进入正式知识或下一次普通扫描 |
 | `evals/` | 检索案例、回归执行与接受/拒绝测试 | 质量门禁：改索引/改契约必须先过回归 |
-| `logs/` | `ingest/` 保存共享处理事实，`events/` 保存影响及使用限制，`operations/` 保存本机事务／恢复材料；证据副本与提取信息按恢复条件管理 | 区分共享业务状态与本机留痕；不能整体删除，也不把日志存在或上游状态当作交棒资格 |
+| `logs/` | `ingest/` 保存正式处理事实，`events/` 保存有效影响与限制，`publications/` 和 `evidence/published/` 保存正式发布记录及必要依据 | 随仓业务事实与本机执行留痕分开；旧 `operations/` 仅用于旧事务兼容，不能整体删除日志或以其存在作为放行资格 |
 | `artifacts/` | 执行端派生索引、同代正文和验证报告（Git 忽略） | 按实际卡、来源和业务材料重建；完整核对集合、内容与指纹，不依赖上游通过证明链 |
 | `docs-llm-wiki/` | LLM WIKI 系统说明 | 讲"系统怎么用"；禁止成为第二份领域事实库 |
 
@@ -397,9 +397,8 @@ Agent已具备业务仓约定及知识根，缺上下文才由explore前置发�
 
 ```mermaid
 flowchart TD
-    P1["P1 source-scan<br/>观察变化与实际续办"] -->|scanned| P2["P2 source-prepare<br/>固定范围备料"]
+    P1["P1 source-scan<br/>当前输入与正式欠账"] -->|scanned| P2["P2 source-prepare<br/>固定范围备料"]
     P1 -->|unchanged| END["结束"]
-    P1 -->|recover / resume_index / resume_queries| P7
     P2 -->|prepared| P3["P3 change-plan<br/>语义计划与冻结查询"]
     P2 -->|source_changed| P1
     P3 -->|content_planned| P4["P4 view-materialize<br/>直接成稿与修订"]
@@ -411,7 +410,7 @@ flowchart TD
     P5 -->|needs_plan| P3
     P5 -->|needs_revision| P4
     P5 -->|passed| P6["P6 source-scan.record<br/>转写冻结处置记录"]
-    P6 -->|recorded| P7["P7 apply.batch<br/>安全落位、真实索引、目标查询与CAS激活"]
+    P6 -->|recorded| P7["P7 apply.batch<br/>正式发布、真实检索、CAS激活及本批清理"]
     P7 -->|completed / recorded| END
 ```
 
@@ -498,8 +497,26 @@ shared 索引可在构建时按 `knowledge_commit` 核对实际 Git 快照，que
 | `knowledge/` | 查重、关联卡和 P7 精确入库 | 正式卡格式与引用检查 | 唯一正文检索对象 |
 | `docs-raw/` | 只读原件 | 来源一致性复核 | 原件与证据溯源 |
 | `governance/` | 模板、来源和卡契约 | 共同规则、来源锁与记录约束 | 范围、来源、依赖与业务材料一致性 |
-| `.build/` | draft、计划和完整视图 | 只读检查视图 | 检索操作暂存 |
+| `.build/` | P1—P6 本批材料、计划、完整稿及新事务／备份 | 本次检查报告与临时视图 | 本机检索暂存 |
 | `evals/` | — | 索引和检索回归 | 回归用例 |
-| `logs/` | 原文、内容复核、核验、事务与续办记录 | 只读核对记录结构和实际引用 | 来源恢复与实际变更事实，不作为上游放行票据 |
+| `logs/` | P7 发布的处理事实、有效限制、必要原版及完成记录 | 核对正式记录与实际引用 | 从正式依据恢复来源；不依赖旧稿件或私有事务 |
 | `artifacts/` | 查重时使用已有索引 | CI 内部构建、验证的派生索引 | 机器召回与同代正文 |
 | `docs-llm-wiki/` | 系统设计与操作说明 | 系统设计与操作说明 | 系统使用说明 |
+
+### 入库暂存、正式发布与清理边界
+
+新工作流根据当前来源、随仓的正式处理记录和有效限制决定待办。P1—P6 生成的材料、稿件、检查报告和待发布记录都放在本批 `.build/operations/<op>/`，不提前改变正式知识。原会话继续或同一工作流返工时，可以使用明确传递的本轮材料；另开工作流不会搜索旧草稿。
+
+```mermaid
+flowchart LR
+    CURRENT["当前来源与正式状态"] --> TEMP["P1—P6<br/>暂存、成稿与检查"]
+    TEMP --> PUBLISH["P7 发布并核验<br/>知识、记录及必要依据"]
+    PUBLISH --> VERIFY["完成适用索引<br/>冻结查询与激活"]
+    VERIFY --> CLEAN["清理本批可删暂存<br/>保存整批完成结果"]
+```
+
+正式依据位于 `logs/evidence/published/`，发布与完成记录位于 `logs/publications/<op>/`。必要旧版原文、被覆盖且仍被历史引用的旧卡须能精确恢复；只供阅读的候选副本和一般执行日志不永久发布。新事务与备份留在本批暂存，协作写锁固定在 `.build/runtime/writer.lock`。
+
+内容已发布与整批完成分开表达。清理失败保留已发布事实，报告 `cleanup_pending`，`batch_complete` 仍为 false；明确重试原 P7 时只补缺失阶段。借用、受保护或用途不明的文件保留并说明，不要求 `.build` 全空。
+
+查询、提交核验和已完成操作的状态读取使用正式发布记录，不要求原机旧稿、事务或索引。消费端仍需配套能力、真实代码与实际业务材料，并重建本机索引；历史完成不等于当前规则下仍具备资格。独立 lint 保持两节点只读报告，maintain 仅在明确调用其业务写入动作时更新正式状态。孤儿暂存的周期回收和罕见 P7 部分写入自动修复后置，现有写入保护继续保留。

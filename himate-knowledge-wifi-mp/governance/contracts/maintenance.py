@@ -20,7 +20,7 @@ from .runtime import (
 
 @contextmanager
 def writer_lock(context):
-    path = safe(context.root, "logs/operations/.writer.lock")
+    path = safe(context.root, ".build/runtime/writer.lock")
     path.parent.mkdir(parents=True, exist_ok=True)
     stream = path.open("a+b")
     acquired = False
@@ -44,7 +44,7 @@ def writer_lock(context):
                 "BUSY", "Another cooperating domain writer holds the lock", blocked=True
             ) from exc
         acquired = True
-        safe(context.root, "logs/operations/.writer.lock")
+        safe(context.root, ".build/runtime/writer.lock")
         yield
     finally:
         if acquired:
@@ -173,13 +173,8 @@ def finish_pending(context, previous):
                 "EVENT_CONFLICT",
                 "Pending source payload differs from its durable change",
             )
-        recovery = snapshot["recovery"]
         try:
-            original = fixed_bytes(
-                context.root,
-                recovery.get("path", recovery.get("reference")),
-                ["logs/evidence"],
-            )
+            original = context.modules["source_operations"].recovered_bytes(context, snapshot)
         except (OSError, ValueError) as exc:
             raise NodeError(
                 "SOURCE_INTEGRITY_ERROR", "Pending event original bytes are unavailable"
@@ -204,12 +199,111 @@ def finish_pending(context, previous):
     return save_state(context, previous, updated)
 
 
+def _publish_registered_objects(context, entries, snapshots):
+    """Explicit maintenance registration may retain its exact staged evidence."""
+    kinds = {"original": ("objects", ".bin"), "extraction": ("extractions", ".txt"),
+             "locator": ("locators", ".json")}
+    needed = set()
+    for snapshot in snapshots:
+        for key in ("recovery", "local_recovery"):
+            recovery = snapshot.get(key) or {}
+            reference = recovery.get("path", recovery.get("reference"))
+            if isinstance(reference, str) and reference.startswith("logs/evidence/"):
+                needed.add(reference)
+        extraction = snapshot.get("extraction") or {}
+        needed.update(extraction[key] for key in ("text_ref", "locator_ref") if key in extraction)
+        locator = snapshot.get("locator") or {}
+        if locator.get("kind") == "locator_map" and locator.get("reference"):
+            needed.add(locator["reference"])
+    payloads = []
+    for row in entries:
+        if row["final_ref"] not in needed:
+            continue
+        folder, suffix = kinds.get(row["kind"], (None, None))
+        expected = "logs/evidence/published/" + folder + "/" + row["sha256"] + suffix if folder else None
+        if row["final_ref"] != expected:
+            raise NodeError("INVALID_EVENT_EVIDENCE", "Registration accepts only exact content-addressed source objects", row["final_ref"])
+        raw = context.modules["staging"].read_bytes(context.root, row["final_ref"], entries,
+                                                   expected_sha=row["sha256"], expected_size=row["bytes"])
+        payloads.append((row["final_ref"], raw))
+    for ref, raw in payloads:
+        write_bytes(context.root, ref, raw)
+        if fixed_bytes(context.root, ref) != raw:
+            raise NodeError("SOURCE_INTEGRITY_ERROR", "Registered evidence readback differs", ref)
+
+
+def publish_changes(context, proposals):
+    """Publish frozen P7 transitions; caller already holds the cooperative lock.
+
+    The current formal lock is the installed output, never the source of the old
+    transition. The exact reviewed view supplies the original lock CAS binding.
+    """
+    if not isinstance(proposals, list):
+        raise NodeError("INVALID_EVENT_PROPOSALS", "Expected explicit frozen event proposals")
+    view = context.record(context.request["view_ref"], "final_view")
+    if (view.get("operation_id") != context.operation
+            or view.get("publication_plan", {}).get("event_proposals") != proposals):
+        raise NodeError("EVENT_PROPOSALS_CHANGED", "Event proposals differ from the exact frozen publication view")
+    if view.get("batch_kind") == "record_only":
+        if proposals:
+            raise NodeError("UNPUBLISHED_SOURCE_TRANSITION", "Record-only batches cannot publish unadopted snapshots")
+        previous = state(context)
+        return {"event_refs": [], "validity_epoch": previous["validity_epoch"],
+                "blocked_claims": previous["blocked_claims"]}
+    lock = context.modules["source_resources"].read_source_lock(context.root)
+    lock_rows = [row for row in view.get("writes", []) if row.get("path") == "governance/sources.lock.yaml"]
+    changes, seen = [], set()
+    for proposal in proposals:
+        if (not isinstance(proposal, dict) or set(proposal) != {
+                "source_id", "old_snapshot_ids", "new_snapshot_id", "source_lock_digest"}
+                or len(lock_rows) != 1 or proposal["source_lock_digest"] != lock_rows[0].get("expected_old_digest")):
+            raise NodeError("EVENT_BASELINE_CHANGED", "Frozen event transition lacks the original source-lock CAS binding")
+        source_id, new_id, old_ids = proposal["source_id"], proposal["new_snapshot_id"], proposal["old_snapshot_ids"]
+        snapshots = [row for row in lock["snapshots"] if row["source_id"] == source_id]
+        resources = [row for row in lock["resources"] if row["source_id"] == source_id]
+        selected = [row for row in snapshots if row["snapshot_id"] == new_id]
+        if (not isinstance(old_ids, list) or not old_ids or any(not isinstance(item, str) for item in old_ids)
+                or len(old_ids) != len(set(old_ids)) or new_id in old_ids
+                or sorted(old_ids) != sorted(row["snapshot_id"] for row in snapshots if row["snapshot_id"] != new_id)
+                or len(resources) != 1 or len(selected) != 1 or source_id in seen):
+            raise NodeError("UNPUBLISHED_SOURCE_TRANSITION", "Frozen source transition does not match the installed formal snapshots")
+        seen.add(source_id)
+        snapshot, resource = selected[0], resources[0]
+        raw = context.modules["source_operations"].recovered_bytes(context, snapshot)
+        if sha(raw) != snapshot["sha256"] or len(raw) != snapshot["bytes"]:
+            raise NodeError("SOURCE_INTEGRITY_ERROR", "Published event snapshot cannot be verified")
+        context.modules["source_operations"].snapshot_text(context, snapshot, resource, raw)
+        code = resource.get("kind") == "code"
+        if code:
+            resolved = context.modules["source_operations"].resolve_source(context, {
+                "evidence_ref": "published-event", "source_id": source_id, "snapshot_id": new_id,
+                "locator": {"kind": "bytes", "start": 0, "end": snapshot["bytes"]}})
+            current = resolved.get("current_source_matches") is True and resolved.get("resource") == resource
+        elif resource.get("kind") in {"raw", "attachment"}:
+            current_raw = fixed_bytes(context.root, resource["path"], ["docs-raw"])
+            current = sha(current_raw) == snapshot["sha256"] and len(current_raw) == snapshot["bytes"]
+        else:
+            raise NodeError("INVALID_SOURCE_KIND", "Unsupported published source transition")
+        if not current:
+            raise NodeError("SOURCE_CHANGED", "Published source changed before event publication", blocked=True)
+        changes.append({"source_id": source_id, "old_snapshot_ids": sorted(old_ids), "new_snapshot_id": new_id,
+                        "new_sha256": snapshot["sha256"],
+                        **({"source_kind": "code", "repo_id": resource["repo_id"], "path": resource["path"]} if code else {})})
+    result = _publish_events(context, changes, lock, provenance={
+        "publication_view_ref": context.request["view_ref"], "publication_view_digest": view["digest"]})
+    if result["blocked_claims"]:
+        advanced, _ = _advance_locked(context)
+        result.update({key: advanced[key] for key in ("validity_epoch", "blocked_claims", "cleared_claims")})
+    return result
+
+
 def register(context, *, code=False):
     bundle = context.record(context.request["bundle_ref"], "source_bundle")
+    entries = context.modules["staging"].validate_entries(context.root, bundle.get("staged_objects", []))
     lock = load_yaml(fixed_bytes(context.root, "governance/sources.lock.yaml"))
     changes = []
     for snapshot in bundle["snapshots"]:
-        data = context.modules["source_operations"].recovered_bytes(context, snapshot)
+        data = context.modules["source_operations"].recovered_bytes(context, snapshot, staged_objects=entries)
         if sha(data) != snapshot["sha256"] or len(data) != snapshot["bytes"]:
             raise NodeError(
                 "SOURCE_INTEGRITY_ERROR", "New source snapshot bytes cannot be verified"
@@ -279,177 +373,195 @@ def register(context, *, code=False):
                 }
             )
     with writer_lock(context):
-        previous = finish_pending(context, state(context))
-        updated = copy.deepcopy(previous)
-        updated["blocked_claims"] = list(previous["blocked_claims"])
-        processed = set(previous.get("processed_event_ids", []))
-        pending = set(previous.get("pending_event_ids", []))
-        refs = []
-        cards = domain_cards(context)
-        for change in changes:
-            event_id = digest(change)
-            ref = "logs/events/" + event_id + ".json"
-            refs.append(ref)
-            if event_id in processed:
-                continue
-            affected = []
-            for card in cards:
-                if card["metadata"]["lifecycle"] != "stable":
-                    continue
-                sources = {s["evidence_ref"]: s for s in card["metadata"]["sources"]}
-                for claim in card["metadata"]["claims"]:
-                    if any(
-                        sources[r]["source_id"] == change["source_id"]
-                        and sources[r]["snapshot_id"] in change["old_snapshot_ids"]
-                        for r in claim["source_refs"]
-                    ):
-                        affected.append(
-                            {
-                                "card_id": card["metadata"]["id"],
-                                "claim_id": claim["id"],
-                                "reason": "code_changed" if code else "source_changed",
-                                "event_id": event_id,
-                                "source_id": change["source_id"],
-                                "old_snapshot_ids": change["old_snapshot_ids"],
-                                "new_snapshot_id": change["new_snapshot_id"],
-                                "conditions": card["metadata"]["scope"],
-                            }
-                        )
-            # Persist blocks/epoch before the event publish: a hard kill can never leave
-            # an observed change consumable merely because its event write was interrupted.
-            if event_id not in pending:
-                updated["blocked_claims"] += [
-                    b for b in affected if b not in updated["blocked_claims"]
-                ]
-                updated["validity_epoch"] += 1
-                pending.add(event_id)
-                updated["pending_event_ids"] = sorted(pending)
-                snapshot = next(
-                    s
-                    for s in bundle["snapshots"]
-                    if s["snapshot_id"] == change["new_snapshot_id"]
-                )
-                resource = next(
-                    r
-                    for r in bundle["resources"]
-                    if r["source_id"] == change["source_id"]
-                )
-                staged_event = context.seal(
-                    {
-                        "event_id": event_id,
-                        "change": change,
-                        "bundle_ref": context.request["bundle_ref"],
-                        "bundle_digest": bundle["digest"],
-                        "source_snapshot": snapshot,
-                        "source_resource": resource,
-                        "affected_claims": affected,
-                    },
-                    "maintenance_event",
-                )
-                updated["pending_events"] = [
-                    *previous.get("pending_events", []),
-                    staged_event,
-                ]
-                previous = save_state(context, previous, updated)
-                updated = copy.deepcopy(previous)
-            if safe(context.root, ref).exists():
+        if changes:
+            _publish_registered_objects(context, entries, bundle["snapshots"])
+        result = _publish_events(context, changes, bundle, provenance={
+            "bundle_ref": context.request["bundle_ref"], "bundle_digest": bundle["digest"]})
+    return result, "registered"
+
+
+def _publish_events(context, changes, bundle, *, provenance):
+    previous = finish_pending(context, state(context))
+    updated = copy.deepcopy(previous)
+    updated["blocked_claims"] = list(previous["blocked_claims"])
+    processed = set(previous.get("processed_event_ids", []))
+    pending = set(previous.get("pending_event_ids", []))
+    refs = []
+    cards = domain_cards(context)
+    for change in changes:
+        event_id = digest(change)
+        ref = "logs/events/" + event_id + ".json"
+        refs.append(ref)
+        if event_id in processed:
+            try:
                 event = context.record(ref, "maintenance_event")
-                if event.get("change") != change:
-                    raise NodeError(
-                        "EVENT_CONFLICT",
-                        "Existing event differs from source transition",
+                if event.get("event_id") != event_id or event.get("change") != change:
+                    raise ValueError("Recorded event differs from its source transition")
+            except (OSError, ValueError, KeyError) as exc:
+                raise NodeError("EVENT_INTEGRITY_ERROR", "Processed event is missing or differs from its durable state", ref) from exc
+            continue
+        affected = []
+        for card in cards:
+            if card["metadata"]["lifecycle"] != "stable":
+                continue
+            sources = {s["evidence_ref"]: s for s in card["metadata"]["sources"]}
+            for claim in card["metadata"]["claims"]:
+                if any(
+                    sources[r]["source_id"] == change["source_id"]
+                    and sources[r]["snapshot_id"] in change["old_snapshot_ids"]
+                    for r in claim["source_refs"]
+                ):
+                    affected.append(
+                        {
+                            "card_id": card["metadata"]["id"],
+                            "claim_id": claim["id"],
+                            "reason": "code_changed" if change.get("source_kind") == "code" else "source_changed",
+                            "event_id": event_id,
+                            "source_id": change["source_id"],
+                            "old_snapshot_ids": change["old_snapshot_ids"],
+                            "new_snapshot_id": change["new_snapshot_id"],
+                            "conditions": card["metadata"]["scope"],
+                        }
                     )
-            else:
-                event = next(
-                    e for e in updated["pending_events"] if e["event_id"] == event_id
-                )
-                context.save(ref, event)
-            # Re-scan actual cards after a crash between event and state publication.
+        # Persist blocks/epoch before the event publish: a hard kill can never leave
+        # an observed change consumable merely because its event write was interrupted.
+        if event_id not in pending:
             updated["blocked_claims"] += [
                 b for b in affected if b not in updated["blocked_claims"]
             ]
-            processed.add(event_id)
-            pending.discard(event_id)
+            updated["validity_epoch"] += 1
+            pending.add(event_id)
             updated["pending_event_ids"] = sorted(pending)
+            snapshot = next(
+                s
+                for s in bundle["snapshots"]
+                if s["snapshot_id"] == change["new_snapshot_id"]
+            )
+            resource = next(
+                r
+                for r in bundle["resources"]
+                if r["source_id"] == change["source_id"]
+            )
+            staged_event = context.seal(
+                {
+                    "event_id": event_id,
+                    "change": change,
+                    **provenance,
+                    "source_snapshot": snapshot,
+                    "source_resource": resource,
+                    "affected_claims": affected,
+                },
+                "maintenance_event",
+            )
             updated["pending_events"] = [
-                e for e in updated["pending_events"] if e["event_id"] != event_id
+                *previous.get("pending_events", []),
+                staged_event,
             ]
-            observed = dict(updated.get("observed_sources", {}))
-            observed[change["source_id"]] = {
-                "snapshot_id": change["new_snapshot_id"],
-                "event_id": event_id,
-            }
-            updated["observed_sources"] = observed
-            updated["impact_scan_watermark"] = event_id
-            updated["processed_event_ids"] = sorted(processed)
             previous = save_state(context, previous, updated)
             updated = copy.deepcopy(previous)
+        if safe(context.root, ref).exists():
+            event = context.record(ref, "maintenance_event")
+            if event.get("change") != change:
+                raise NodeError(
+                    "EVENT_CONFLICT",
+                    "Existing event differs from source transition",
+                )
+        else:
+            event = next(
+                e for e in updated["pending_events"] if e["event_id"] == event_id
+            )
+            context.save(ref, event)
+        # Re-scan actual cards after a crash between event and state publication.
+        updated["blocked_claims"] += [
+            b for b in affected if b not in updated["blocked_claims"]
+        ]
+        processed.add(event_id)
+        pending.discard(event_id)
+        updated["pending_event_ids"] = sorted(pending)
+        updated["pending_events"] = [
+            e for e in updated["pending_events"] if e["event_id"] != event_id
+        ]
+        observed = dict(updated.get("observed_sources", {}))
+        observed[change["source_id"]] = {
+            "snapshot_id": change["new_snapshot_id"],
+            "event_id": event_id,
+        }
+        updated["observed_sources"] = observed
+        updated["impact_scan_watermark"] = event_id
         updated["processed_event_ids"] = sorted(processed)
-        final = (
-            save_state(context, previous, updated) if updated != previous else previous
-        )
+        previous = save_state(context, previous, updated)
+        updated = copy.deepcopy(previous)
+    updated["processed_event_ids"] = sorted(processed)
+    final = (
+        save_state(context, previous, updated) if updated != previous else previous
+    )
     return {
         "event_refs": refs,
         "validity_epoch": final["validity_epoch"],
         "blocked_claims": final["blocked_claims"],
-    }, "registered"
+    }
 
 
 def advance(context):
     """Recheck stale-source restrictions from current cards and actual sources."""
     with writer_lock(context):
-        previous = state(context)
-        if previous.get("pending_event_ids"):
-            raise NodeError(
-                "EVENT_RECOVERY_REQUIRED",
-                "Source event publication must finish before updating restrictions",
-                blocked=True,
-            )
-        cards = {card["metadata"]["id"]: card for card in domain_cards(context)}
-        source_lock = context.modules["source_resources"].read_source_lock(context.root)
-        rules = {**context.rules, "source_lock": source_lock}
-        for card in cards.values():
-            context.modules["knowledge"].validate_card(card, cards, rules)
-        context.modules["knowledge"].validate_relations(cards)
-        before = {card["path"]: card["sha256"] for card in cards.values()}
-        remaining, cleared = [], []
-        freshness_reasons = {"source_changed", "code_changed", "code_source_changed"}
-        for block in previous["blocked_claims"]:
-            # Source-byte checks cannot clear semantic/applicability restrictions.
-            if block.get("reason") not in freshness_reasons or block["card_id"] == "*":
-                remaining.append(block)
-                continue
-            card = cards.get(block["card_id"])
-            if card is None or card["metadata"]["lifecycle"] == "deprecated":
-                cleared.append(block)
-                continue
-            claim = next((row for row in card["claims"] if row["id"] == block["claim_id"]), None)
-            if claim is None and block["claim_id"] != "*":
-                cleared.append(block)
-                continue
-            claims = [claim] if claim is not None else card["claims"]
-            refs = [source for row in claims for source in row["source_records"]
-                    if not block.get("source_id") or source["source_id"] == block["source_id"]]
-            latest = previous.get("observed_sources", {}).get(block.get("source_id"), {}).get("snapshot_id")
-            if not refs or (latest and any(source["snapshot_id"] != latest for source in refs)):
-                remaining.append(block)
-                continue
-            current = True
-            for source in refs:
-                try:
-                    resolved = context.modules["source_operations"].resolve_source(context, ({'operation_id': context.operation, 'source_ref': source})["source_ref"])
-                    current = current and resolved.get("current_source_matches") is True
-                except (ValueError, OSError, KeyError):
-                    current = False
-            (cleared if current else remaining).append(block)
-        for path, expected in before.items():
-            if sha(fixed_bytes(context.root, path)) != expected:
-                raise NodeError("KNOWLEDGE_CHANGED", "Cards changed while checking restrictions", path, blocked=True)
-        updated = copy.deepcopy(previous)
-        updated["blocked_claims"] = remaining
-        if cleared:
-            updated["validity_epoch"] += 1
-        result = save_state(context, previous, updated)
+        return _advance_locked(context)
+
+
+def _advance_locked(context):
+    """Recheck mechanical restrictions while the caller holds the writer lock."""
+    previous = state(context)
+    if previous.get("pending_event_ids"):
+        raise NodeError(
+            "EVENT_RECOVERY_REQUIRED",
+            "Source event publication must finish before updating restrictions",
+            blocked=True,
+        )
+    cards = {card["metadata"]["id"]: card for card in domain_cards(context)}
+    source_lock = context.modules["source_resources"].read_source_lock(context.root)
+    rules = {**context.rules, "source_lock": source_lock}
+    for card in cards.values():
+        context.modules["knowledge"].validate_card(card, cards, rules)
+    context.modules["knowledge"].validate_relations(cards)
+    before = {card["path"]: card["sha256"] for card in cards.values()}
+    remaining, cleared = [], []
+    freshness_reasons = {"source_changed", "code_changed", "code_source_changed"}
+    for block in previous["blocked_claims"]:
+        # Source-byte checks cannot clear semantic/applicability restrictions.
+        if block.get("reason") not in freshness_reasons or block["card_id"] == "*":
+            remaining.append(block)
+            continue
+        card = cards.get(block["card_id"])
+        if card is None or card["metadata"]["lifecycle"] == "deprecated":
+            cleared.append(block)
+            continue
+        claim = next((row for row in card["claims"] if row["id"] == block["claim_id"]), None)
+        if claim is None and block["claim_id"] != "*":
+            cleared.append(block)
+            continue
+        claims = [claim] if claim is not None else card["claims"]
+        refs = [source for row in claims for source in row["source_records"]
+                if not block.get("source_id") or source["source_id"] == block["source_id"]]
+        latest = previous.get("observed_sources", {}).get(block.get("source_id"), {}).get("snapshot_id")
+        if not refs or (latest and any(source["snapshot_id"] != latest for source in refs)):
+            remaining.append(block)
+            continue
+        current = True
+        for source in refs:
+            try:
+                resolved = context.modules["source_operations"].resolve_source(context, ({'operation_id': context.operation, 'source_ref': source})["source_ref"])
+                current = current and resolved.get("current_source_matches") is True
+            except (ValueError, OSError, KeyError):
+                current = False
+        (cleared if current else remaining).append(block)
+    for path, expected in before.items():
+        if sha(fixed_bytes(context.root, path)) != expected:
+            raise NodeError("KNOWLEDGE_CHANGED", "Cards changed while checking restrictions", path, blocked=True)
+    updated = copy.deepcopy(previous)
+    updated["blocked_claims"] = remaining
+    if cleared:
+        updated["validity_epoch"] += 1
+    result = save_state(context, previous, updated)
     return {
         "cleared_claims": cleared,
         "blocked_claims": remaining,

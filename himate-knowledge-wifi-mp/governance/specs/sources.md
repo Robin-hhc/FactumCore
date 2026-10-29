@@ -2,11 +2,13 @@
 
 `source_id` 标识逻辑资料；`snapshot_id` 固定实际原始字节、声明版本与提取身份。主件及显式附件分别登记资源和快照，附件变化改变证据包身份。未知版本写 `unknown`，不推断代码 HEAD。
 
-`document capture --knowledge-root K --path docs-raw/specs/文件.md --source-id ID [--declared-version VERSION] [--attachment docs-raw/specs/附件 ...]` 只读取六类 raw 下实际文件，包括 `docs-raw/troubleshooting/` 的问题定位与排查经验。每个输入读取及完成前复查实际路径和内容，失败不发布完整证据包；支持 UTF-8/BOM Markdown/文本主件，其他格式明确不支持。二进制附件不作文本提取承诺。来源中的外链保持资料内容，不访问。
+`hs-knowledge-source-prepare` 的 `prepare`／`capture` 只读取六类 raw 下实际文件，包括 `docs-raw/troubleshooting/` 的问题定位与排查经验。每个输入读取及完成前复查实际路径和内容；格式提取由配套锁定适配器决定，不支持的格式明确报告缺口，不执行原件。二进制附件不作文本提取承诺。来源中的外链保持资料内容，不访问。
 
-`document load-capture --knowledge-root K --bundle-ref REF --manifest-digest SHA256` 校验清单、对象、提取文本、locator 和资源/快照一致性。即使原件已移走，仍返回被固定的旧字节证据。摘要证明内容一致性，不认证发布者；权限由外部部署承担。
+`resolve-source` 按明确 `bundle_ref`／`source_ref` 校验对象、提取文本、locator 和资源／快照一致性。即使原件已移走，仍须返回被固定的旧字节证据；不可得时报告缺口。摘要证明内容一致性，不认证发布者；权限由外部部署承担。
 
-证据保存在 `logs/evidence/<bundle_id>/` 的 manifest.json、objects/<digest>.bin 和 extractions/<id>/{text.txt,locators.json}。bundle_id 固定内容身份；manifest_digest 固定包含采集时间的确切清单。相同输入幂等复用首次完整证据。每个文本 locator 记录原字节与提取字符/行区间，原始 BOM/换行不因提取而改写。清理 .build 不得删唯一恢复证据。
+新 ingest 的原件、提取和定位只暂存于 `.build/operations/<op>/`。bundle 的 `staged_objects` 显式绑定 `stage_ref`、`final_ref`、`kind`、`sha256`、`bytes`、`owner_operation_id`；来源声明预先使用正式地址。P1—P6 解析只采用本次明确映射，不发现其他操作的暂存。每个文本 locator 保留原字节与提取字符／行区间，原始 BOM／换行不因提取而改写。
+
+P7 按冻结发布计划将必要原件、旧卡、提取及定位原样发布到 `logs/evidence/published/{objects,cards,extractions,locators}/`，核验后保存正式处理记录和 `logs/publications/<op>/` 发布闭包；正常消费与提交不得依赖随后清理的 stage。新捕获只产生冻结的来源变化提案，不提前登记正式维护事件。内容批发布来源锁后，P7 按原 old→new 转换登记事件；仅记录批不登记未被正式来源锁接纳的版本。
 
 捕获不修改 `governance/sources.lock.yaml`、knowledge 或导航；它不证明来源语义正确。来源锁由明确 ChangeSet 经独立内容复核和固定检查后事务落位。
 
@@ -14,7 +16,7 @@
 
 raw 在 capture 时尚未提交并不妨碍随后随正式资产一起提交。当前文件升级或删除后，可从正式登记路径的本地 Git 历史核对最多 1000 个路径变更提交，按 SHA-256 和大小选取确切旧版；不搜索其他路径、不追随改名、不执行签名验证或联网补历史。历史缺失、浅克隆或搜索范围不足时报告缺口，不重签历史锁或以最新版本代替。
 
-`logs/evidence/{objects,checked-code,extractions,locators}/` 是本机缓存。提取文本与定位图缺失时，从已核验的确切原版按配套适配器重建，输出仍须匹配原冻结指纹；不能复现或旧版不可得时报告未完成，不改写来源锁。显式采用的构建／运行材料及有效限制状态另行保全，不能因忽略缓存而一并丢弃。
+旧 `logs/evidence/{objects,checked-code,extractions,locators}/` 是本机缓存；新 `logs/evidence/published/` 是正式随仓依据，不能按缓存忽略或删除。旧声明的恢复路径缺失时，可按冻结 SHA 精确读取正式 published 对象，不搜索目录、不重签旧 snapshot。提取文本与定位图缺失时，从已核验的确切原版按配套适配器重建，结果仍须匹配原冻结指纹；不能复现或旧版不可得时报告未完成。显式构建／运行材料及有效限制状态继续按其原契约保全。
 
 活动卡的每个代码来源须按[卡片规范](cards.md#代码来源的可选符号补充)填写 `code_ref`；缺失由公共固定检查报 `CODE_REF_REQUIRED`，不受 review_mode 限制。它补充该项的符号身份，不改变来源资源、快照、提取器或历史定位；历史记录、旧来源恢复和 deprecated 卡仍允许原四字段。P2 保留已有来源项并提供实际源码材料，作者在 P4 填写符号；捕获成功不会自动生成或批准一个符号引用。纯文档不强制连代码，但已登记代码来源不能用整文件或行段兜底绕过符号要求。
 

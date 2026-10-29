@@ -89,6 +89,18 @@ class Harness:
     def record(self, ref):
         return json.loads((self.root / ref).read_text(encoding="utf-8"))
 
+    def bundle_path(self, bundle, ref):
+        """Physical bytes of this explicitly supplied bundle, never a glob."""
+        matches = [row for row in bundle.get("staged_objects", []) if row["final_ref"] == ref]
+        return self.root / (matches[0]["stage_ref"] if matches else ref)
+
+    def publish_bundle(self, bundle):
+        """Establish synthetic formal-history fixtures; not a P7 success claim."""
+        for row in bundle.get("staged_objects", []):
+            raw = self.bundle_path(bundle, row["final_ref"]).read_bytes()
+            assert hashed(raw) == row["sha256"] and len(raw) == row["bytes"]
+            self.write(row["final_ref"], raw)
+
     def run(self, slug, request, action=None, expected=0):
         self.sequence += 1
         incoming, outgoing = (

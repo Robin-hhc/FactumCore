@@ -34,6 +34,12 @@ def test_accepted_repository_works_without_machine_private_review_files(tmp_path
         pipeline.catalog_path.write_bytes(fixture.canonical(pipeline.catalog))
     domain_path = pipeline.root.relative_to(workspace).as_posix()
     bundle_ref, bundle = pipeline.capture("create", b"# Fixture\nPublished capture rule.\n")
+    # This legacy hand-built acceptance fixture starts with durable source
+    # evidence. New capture does not publish its staged objects by itself.
+    for entry in bundle["staged_objects"]:
+        raw = (pipeline.root / entry["stage_ref"]).read_bytes()
+        assert fixture.sha(raw) == entry["sha256"] and len(raw) == entry["bytes"]
+        pipeline.write(entry["final_ref"], raw)
     view_ref = pipeline.view("create", bundle_ref, "portable-rule", pipeline.card("portable-rule", bundle))
     pipeline.apply("create", view_ref)
     view = pipeline.record(view_ref)
@@ -80,7 +86,9 @@ def test_accepted_repository_works_without_machine_private_review_files(tmp_path
     for relative in (".build", "logs/operations"):
         target = (pipeline.root / relative).resolve()
         assert target.is_relative_to(pipeline.root.resolve())
-        shutil.rmtree(target)
+        if target.exists():
+            shutil.rmtree(target)
+        assert not target.exists()
     assert not (workspace / "config.yml").exists()
     built = pipeline.call("knowledge-index-build", {"operation_id": "portable-build", "channel": "shared", "publication_receipt_ref": receipt_ref})["data"]
     pipeline.call("knowledge-index-build", {"operation_id": "portable-activate", "generation_ref": built["generation_ref"], "expected_active": None}, "activate")

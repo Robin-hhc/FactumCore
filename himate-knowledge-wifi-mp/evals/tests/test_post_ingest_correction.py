@@ -136,6 +136,8 @@ def complete_document_operation(harness, operation, decision, statement, *, expe
         "semantic_plan_ref": semantic,
         "disposition_preview_ref": harness.record(view_ref)["disposition_preview_ref"],
     }, "record")["data"]["ingest_record_ref"]
+    reviewed_view = harness.record(view_ref)
+    review = harness.record(review_ref)
     batch = harness.run("apply", {
         "operation_id": operation, "v3_required": True, "view_ref": view_ref,
         "ingest_record_ref": record_ref,
@@ -152,7 +154,8 @@ def complete_document_operation(harness, operation, decision, statement, *, expe
     assert statement in read["claims"][0]["text"]
     assert read["card_digest"] == search["matches"][0]["card_digest"]
     return {"scan": scan, "view_ref": view_ref, "review_ref": review_ref, "generation_ref": generation,
-            "apply_result_ref": applied}
+            "reviewed_view": reviewed_view, "review": review, "apply_result_ref": applied,
+            "publication_ref": batch["data"]["publication_ref"], "completion_ref": batch["data"]["completion_ref"]}
 
 
 def test_user_can_correct_ingested_document_without_changing_original(tmp_path):
@@ -161,17 +164,26 @@ def test_user_can_correct_ingested_document_without_changing_original(tmp_path):
     harness.write("docs-raw/specs/source.md", original)
     original_sha = hashlib.sha256(original).hexdigest()
     first = complete_document_operation(harness, "first", "create", "Synthetic fixture statement.")
-    old_journal = (harness.root / "logs/operations/first/journal.json").read_bytes()
-    old_result = (harness.root / "logs/operations/first/apply-result.json").read_bytes()
+    old_publication = (harness.root / first["publication_ref"]).read_bytes()
+    old_completion = (harness.root / first["completion_ref"]).read_bytes()
+    old_result = (harness.root / first["apply_result_ref"]).read_bytes()
     old_record = (harness.root / "logs/ingest/first.yaml").read_bytes()
-    assert harness.record("logs/operations/first/journal.json")["status"] == "committed"
+    assert harness.record(first["apply_result_ref"])["status"] == "committed"
+    assert harness.record(first["publication_ref"])["reviewed_view_digest"] == first["reviewed_view"]["digest"]
+    assert harness.record(first["completion_ref"])["batch_complete"] is True
+    old_journal_ref = ".build/operations/first/transaction/journal.json"
+    assert not (harness.root / old_journal_ref).exists()
+    assert not (harness.root / first["view_ref"]).exists()
+    assert not (harness.root / first["review_ref"]).exists()
 
     second = complete_document_operation(harness, "correction", "update", "Synthetic fixture statement for test readers.")
     assert first["view_ref"] != second["view_ref"]
     assert first["generation_ref"] != second["generation_ref"]
-    assert harness.record(second["review_ref"])["sampled_unit_ids"] == [second["scan"]["units"][0]["unit_id"]]
-    assert (harness.root / "logs/operations/first/journal.json").read_bytes() == old_journal
-    assert (harness.root / "logs/operations/first/apply-result.json").read_bytes() == old_result
+    assert second["review"]["sampled_unit_ids"] == [second["scan"]["units"][0]["unit_id"]]
+    assert (harness.root / first["publication_ref"]).read_bytes() == old_publication
+    assert (harness.root / first["completion_ref"]).read_bytes() == old_completion
+    assert (harness.root / first["apply_result_ref"]).read_bytes() == old_result
+    assert not (harness.root / old_journal_ref).exists()
     assert (harness.root / "logs/ingest/first.yaml").read_bytes() == old_record
     assert (harness.root / "docs-raw/specs/source.md").read_bytes() == original
     assert hashlib.sha256((harness.root / "docs-raw/specs/source.md").read_bytes()).hexdigest() == original_sha
@@ -189,9 +201,14 @@ def test_rules_upgrade_revalidates_identical_document_without_rewriting_old_acce
     old_rules = harness.rules
     old_card = (harness.root / "knowledge/rules/rule.md").read_bytes()
     retained = {ref: (harness.root / ref).read_bytes() for ref in (
-        "logs/operations/old-rules/journal.json", first["apply_result_ref"],
-        "logs/ingest/old-rules.yaml", first["view_ref"], first["review_ref"], first["generation_ref"],
+        first["publication_ref"], first["completion_ref"], first["apply_result_ref"],
+        "logs/ingest/old-rules.yaml", first["generation_ref"],
     )}
+    assert first["review"]["rules_digest"] == old_rules
+    assert harness.record(first["publication_ref"])["reviewed_view_digest"] == first["reviewed_view"]["digest"]
+    assert not (harness.root / first["view_ref"]).exists()
+    assert not (harness.root / first["review_ref"]).exists()
+    assert not (harness.root / ".build/operations/old-rules/transaction/journal.json").exists()
 
     # Change only an infrastructure comment in this isolated governance copy.
     contract = harness.root / "governance/contracts/indexing.py"
@@ -206,7 +223,7 @@ def test_rules_upgrade_revalidates_identical_document_without_rewriting_old_acce
     refused = harness.run("query", {"operation_id": "old-active-rejected", "query": "Synthetic", "purpose": "guidance"}, "search", expected=2)
     assert refused["diagnostics"][0]["code"] == "STALE_RULES"
     refused = harness.run("apply", {"operation_id": "old-rules", "apply_result_ref": first["apply_result_ref"]}, "verify-result", expected=2)
-    assert "rules identity mismatch" in refused["diagnostics"][0]["message"]
+    assert refused["diagnostics"][0]["code"] == "STALE_RULES"
     rebuilt = harness.run("apply", {"operation_id": "new-rules-index"}, "index-build")
     assert harness.record(rebuilt["data"]["generation_ref"])["rules_digest"] == harness.rules
 
@@ -220,7 +237,7 @@ def test_rules_upgrade_revalidates_identical_document_without_rewriting_old_acce
     applied = harness.record(second["apply_result_ref"])
     assert applied["rules_digest"] == harness.rules
     assert applied["operation_id"] == "new-rules"
-    assert harness.record(second["review_ref"])["rules_digest"] == harness.rules
+    assert second["review"]["rules_digest"] == harness.rules
     assert harness.record(second["generation_ref"])["rules_digest"] == harness.rules
     active = harness.record("artifacts/indexes/local/active.json")
     assert active["rules_digest"] == harness.rules

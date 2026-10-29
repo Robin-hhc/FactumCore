@@ -194,11 +194,19 @@ def test_completed_historical_code_drift_does_not_reopen_unchanged_raw(harness):
     # historical interpretation and exact original remain available.
     changed_raw = raw + b"A later source version adds a separate observation.\n"
     harness.write("docs-raw/specs/history.md", changed_raw)
-    harness.run("source-prepare", {"operation_id": "raw-upgrade", "source_path": "docs-raw/specs/history.md",
-        "source_id": harness.record(before["scan_ref"])["units"][0]["source_id"]}, action="capture")
+    captured = harness.run("source-prepare", {"operation_id": "raw-upgrade", "source_path": "docs-raw/specs/history.md",
+        "source_id": harness.record(before["scan_ref"])["units"][0]["source_id"]}, action="capture")["data"]
+    assert captured["event_refs"] == []
+    assert len(captured["event_proposals"]) == 1
+    assert state_path.read_bytes() == state_bytes  # P2 cannot publish a formal restriction.
     raw_changed = harness.run("source-scan", {"operation_id": "raw-upgrade-scan"}, "scan")["data"]
     assert harness.record(raw_changed["scan_ref"])["units"][0]["change"] == "changed"
     assert raw_changed["actionable_unit_ids"]
+    assert state_path.read_bytes() == state_bytes
+    # The independent explicit maintain action retains its publishing contract.
+    registered = harness.run("maintain", {"operation_id": "register-raw-upgrade",
+        "bundle_ref": captured["bundle_ref"]}, "register-source-change")
+    assert registered["data"]["event_refs"]
     assert any(block["reason"] == "source_changed" for block in harness.record("logs/events/state.json")["blocked_claims"])
     assert (harness.root / "docs-raw/specs/history.md").read_bytes() == changed_raw
 

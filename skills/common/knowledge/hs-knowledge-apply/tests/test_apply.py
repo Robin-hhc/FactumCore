@@ -122,12 +122,12 @@ class ApplyTests(unittest.TestCase):
                     with patch("transaction.atomic_bytes", side_effect=silently_skip):
                         with self.assertRaisesRegex(Blocked, "verification failed"):
                             execute(ctx, request)
-                    journal = ctx.read("logs/operations/op/journal.json")
+                    journal = ctx.read(".build/operations/op/transaction/journal.json")
                     self.assertEqual(journal["status"], "recovery_required")
                     failed = next(row for row in journal["entries"] if row["path"] == relative)
                     self.assertTrue(failed["attempted"])
                     self.assertFalse(failed["installed"])
-                    self.assertFalse(ctx.path("logs/operations/op/apply-result.json").exists())
+                    self.assertFalse(ctx.path(".build/operations/op/transaction/apply-result.json").exists())
                     result = execute(ctx, {"operation_id": "op"}, recovery)
                     self.assertEqual(result["transaction_status"], "committed" if recovery == "resume" else "rolled_back")
                     self.assertEqual(ctx.path("knowledge/update.md").read_bytes(), b"updated" if recovery == "resume" else b"old")
@@ -150,10 +150,10 @@ class ApplyTests(unittest.TestCase):
             with patch.object(pathlib.Path, "unlink", silently_skip):
                 with self.assertRaisesRegex(Blocked, "verification failed"):
                     execute(ctx, request)
-            journal = ctx.read("logs/operations/op/journal.json")
+            journal = ctx.read(".build/operations/op/transaction/journal.json")
             self.assertEqual(journal["status"], "recovery_required")
             self.assertFalse(journal["entries"][-1]["installed"])
-            self.assertFalse(ctx.path("logs/operations/op/apply-result.json").exists())
+            self.assertFalse(ctx.path(".build/operations/op/transaction/apply-result.json").exists())
             execute(ctx, {"operation_id": "op"}, "resume")
             self.assertFalse(target.exists())
 
@@ -177,8 +177,8 @@ class ApplyTests(unittest.TestCase):
                 with self.assertRaisesRegex(Blocked, "verification failed"):
                     execute(ctx, request)
             self.assertTrue(changed)
-            self.assertEqual(ctx.read("logs/operations/op/journal.json")["status"], "recovery_required")
-            self.assertFalse(ctx.path("logs/operations/op/apply-result.json").exists())
+            self.assertEqual(ctx.read(".build/operations/op/transaction/journal.json")["status"], "recovery_required")
+            self.assertFalse(ctx.path(".build/operations/op/transaction/apply-result.json").exists())
             for recovery in ("resume", "rollback"):
                 with self.assertRaises(Blocked):
                     execute(ctx, {"operation_id": "op"}, recovery)
@@ -200,9 +200,9 @@ class ApplyTests(unittest.TestCase):
             with patch("transaction.atomic_bytes", side_effect=interrupt_after_write):
                 with self.assertRaises(Blocked):
                     execute(ctx, request)
-            self.assertFalse(ctx.read("logs/operations/op/journal.json")["entries"][0]["installed"])
+            self.assertFalse(ctx.read(".build/operations/op/transaction/journal.json")["entries"][0]["installed"])
             execute(ctx, {"operation_id": "op"}, "resume")
-            self.assertTrue(all(row["installed"] for row in ctx.read("logs/operations/op/journal.json")["entries"]))
+            self.assertTrue(all(row["installed"] for row in ctx.read(".build/operations/op/transaction/journal.json")["entries"]))
 
     def test_failure_then_rollback_restores_old_bytes(self):
         from transaction import execute
@@ -235,7 +235,7 @@ class ApplyTests(unittest.TestCase):
             with patch("transaction.atomic_bytes", side_effect=silently_skip):
                 with self.assertRaisesRegex(Blocked, "verification failed"):
                     execute(ctx, {"operation_id": "op"}, "rollback")
-            self.assertEqual(ctx.read("logs/operations/op/journal.json")["status"], "recovery_required")
+            self.assertEqual(ctx.read(".build/operations/op/transaction/journal.json")["status"], "recovery_required")
             self.assertEqual(target.read_bytes(), b"updated")
             result = execute(ctx, {"operation_id": "op"}, "rollback")
             self.assertEqual(result["transaction_status"], "rolled_back")
@@ -266,7 +266,7 @@ class ApplyTests(unittest.TestCase):
             self.assertEqual(result["transaction_status"], "committed")
             self.assertNotIn("review_trust", ctx.catalog)
             self.assertFalse(ctx.path("logs/host-events").exists())
-            journal = ctx.read("logs/operations/op/journal.json")
+            journal = ctx.read(".build/operations/op/transaction/journal.json")
             self.assertNotIn("proof_ref", journal)
             self.assertNotIn("content_review_ref", journal)
 
@@ -279,7 +279,7 @@ class ApplyTests(unittest.TestCase):
             proof["reviewer_id"] = proof["author_id"]
             ctx.path(request["proof_ref"]).write_bytes(canonical(seal(proof)))
             self.assertEqual(execute(ctx, request)["transaction_status"], "committed")
-            result = ctx.read("logs/operations/op/apply-result.json")
+            result = ctx.read(".build/operations/op/transaction/apply-result.json")
             self.assertEqual(result["verification_tier"], "transaction_bytes_only")
 
     def test_optional_review_status_does_not_certify_apply(self):
@@ -291,7 +291,7 @@ class ApplyTests(unittest.TestCase):
             proof.update(record_kind="manual_review", status="approved")
             ctx.path(request["proof_ref"]).write_bytes(canonical(seal(proof)))
             self.assertEqual(execute(ctx, request)["transaction_status"], "committed")
-            result = ctx.read("logs/operations/op/apply-result.json")
+            result = ctx.read(".build/operations/op/transaction/apply-result.json")
             self.assertEqual(result["verification_tier"], "transaction_bytes_only")
 
     def test_changed_document_view_invalidates_review(self):
@@ -356,14 +356,14 @@ class ApplyTests(unittest.TestCase):
                 ctx, request = self.mixed_fixture(pathlib.Path(tmp))
                 with self.assertRaises(Blocked):
                     execute(ctx, {**request, "fault_after": 1})
-                journal = ctx.read("logs/operations/op/journal.json")
+                journal = ctx.read(".build/operations/op/transaction/journal.json")
                 captured = (journal["proof_digest"], journal["content_review_digest"])
                 self.assertEqual(journal["content_review_ref"], request["content_review_ref"])
                 ctx.path(request["content_review_ref"]).write_bytes(b"corrupt optional review")
                 ctx.path(request["proof_ref"]).unlink()
                 result = execute(ctx, {"operation_id": "op"}, action)
                 self.assertEqual(result["transaction_status"], "committed" if action == "resume" else "rolled_back")
-                saved = ctx.read("logs/operations/op/journal.json")
+                saved = ctx.read(".build/operations/op/transaction/journal.json")
                 self.assertEqual((saved["proof_digest"], saved["content_review_digest"]), captured)
                 self.assertEqual(ctx.path("knowledge/update.md").read_bytes(), b"updated" if action == "resume" else b"old")
 
@@ -375,9 +375,9 @@ class ApplyTests(unittest.TestCase):
             ctx, request = self.fixture(pathlib.Path(tmp))
             with self.assertRaises(Blocked):
                 execute(ctx, {**request, "fault_after": 1}, "run")
-            journal = ctx.read("logs/operations/op/journal.json")
+            journal = ctx.read(".build/operations/op/transaction/journal.json")
             journal["entries"][0]["path"] = "docs-raw/specs/original.md"
-            ctx.path("logs/operations/op/journal.json").write_bytes(
+            ctx.path(".build/operations/op/transaction/journal.json").write_bytes(
                 canonical(seal(journal))
             )
             with self.assertRaises(Invalid):

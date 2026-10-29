@@ -20,7 +20,7 @@ CHECKS = (
 STATUSES = {"passed", "failed", "incomplete", "not_applicable"}
 
 
-def _record_resolver(cards, rules, inputs, root, identity):
+def _record_resolver(cards, rules, inputs, root, identity, *, staged_objects=None):
     """Fixed data-only current/archive/Git resolver; never a JSON callback."""
     current = {key: card for card in cards.values() for key in (card["metadata"]["id"], card["path"])}
     declared = inputs.get("historical_card_objects", {})
@@ -211,6 +211,20 @@ def _record_resolver(cards, rules, inputs, root, identity):
         selected = prefer(card) if card else None
         if selected is not None:
             return selected
+        if expected is not None:
+            from . import staging
+            from .runtime import NodeError
+            published = "logs/evidence/published/cards/" + expected + ".md"
+            try:
+                raw = staging.read_bytes(root, published, staged_objects, expected_sha=expected)
+            except FileNotFoundError:
+                pass
+            except NodeError as exc:
+                raise v.ContractError("HISTORICAL_CARD_CHANGED", exc.message, published) from exc
+            else:
+                selected = prefer(parse(raw, path, expected), archive=True)
+                if selected is not None:
+                    return selected
         for candidate in archive_objects(path):
             selected = prefer(candidate, archive=True)
             if selected is not None:
@@ -310,6 +324,18 @@ def run(view, rules, inputs=None, scope=None):
         finding(group, code, str(exc), path or getattr(exc, "path", ""), incomplete=incomplete)
 
     candidate = view.get("candidate")
+    if candidate and ("publication_plan" in candidate or "staged_objects" in candidate
+                      or candidate.get("production_request_digest")):
+        try:
+            from . import publication, staging
+            from .runtime import OperationContext
+            records.verify(candidate)
+            publication_context = OperationContext(root, {"operation_id": candidate["operation_id"]},
+                modules={"records": records, "validation": v, "staging": staging, "publication": publication},
+                rules=rules, tool=candidate.get("tool_identity", {}), rules_digest=rules["rules_digest"])
+            by_group["view"]["publication_check"] = publication.validate_plan(publication_context, candidate)
+        except (v.ContractError, OSError, ValueError, KeyError, TypeError) as exc:
+            caught("view", exc)
     candidate_context = None
     if candidate and candidate.get("input_snapshot"):
         from .runtime import OperationContext
@@ -408,23 +434,6 @@ def run(view, rules, inputs=None, scope=None):
                 expected = {item["path"]: item["expected_old_digest"] for item in candidate.get("writes", []) + candidate.get("deletes", [])}
                 if v.digest_payload({"files": expected}) != candidate["baseline_digest"]:
                     raise v.ContractError("BASELINE_CHANGED", "Candidate baseline digest differs")
-        if report["mode"] != "ci":
-            journal_root = v.safe_path(root, "logs/operations")
-            if journal_root.exists():
-                for journal in journal_root.glob("*/journal.json"):
-                    relative = journal.relative_to(root).as_posix()
-                    try:
-                        item = json.loads(_read(v.safe_path(root, relative)))
-                        records.verify(item)
-                        v.validate_shape("transaction_journal", item, rules)
-                        if item.get("record_kind") != "transaction_journal" or item.get("operation_id") != journal.parent.name:
-                            raise v.ContractError("JOURNAL_BINDING_MISMATCH", "Journal kind or operation differs from its directory")
-                        if item.get("status") not in {"committed", "rolled_back"}:
-                            finding("view", "RECOVERY_REQUIRED", "An unfinished or unknown transaction needs inspection", relative, incomplete=True)
-                        elif candidate and item.get("operation_id") == candidate.get("operation_id"):
-                            finding("view", "RECOVERY_REQUIRED", "This operation already has transaction facts; inspect or resume it", relative, incomplete=True)
-                    except (v.ContractError, OSError, ValueError, KeyError, TypeError) as exc:
-                        finding("view", "TRANSACTION_CONTEXT_UNAVAILABLE", str(exc), relative, incomplete=True)
     except (v.ContractError, OSError, ValueError, KeyError, TypeError) as exc:
         caught("view", exc)
     report["object"]["files_digest"] = v.digest_payload({ref: v.sha256_bytes(raw) for ref, raw in files.items() if isinstance(raw, bytes)})
@@ -521,7 +530,8 @@ def run(view, rules, inputs=None, scope=None):
             return value
         if report["mode"] == "ci":
             raise OSError("CI requires explicitly supplied exact source inputs")
-        return source_resources.recover_snapshot(root, snapshot)
+        return source_resources.recover_snapshot(root, snapshot,
+            staged_objects=(candidate or {}).get("staged_objects", []))
 
     resource_kinds = {item["source_id"]: item["kind"] for item in lock["resources"]} if lock is not None else {}
     code_cards = []
@@ -578,7 +588,8 @@ def run(view, rules, inputs=None, scope=None):
                 caught("source", exc, card["path"])
                 report["code_check_status"] = "incomplete" if getattr(exc, "code", "").endswith("UNAVAILABLE") else "failed"
 
-    record_resolver = _record_resolver(cards, {**rules, "source_lock": lock}, inputs, root, report["object"])
+    record_resolver = _record_resolver(cards, {**rules, "source_lock": lock}, inputs, root, report["object"],
+                                       staged_objects=(candidate or {}).get("staged_objects", []))
     formal_records, record_paths = [], {}
     for ref, raw in files.items():
         if ref.startswith("logs/ingest/") and selected(ref):
@@ -602,7 +613,12 @@ def run(view, rules, inputs=None, scope=None):
     else:
         try:
             from . import indexing
-            with tempfile.TemporaryDirectory(prefix="knowledge-lint-", dir=inputs.get("temporary_parent")) as temporary:
+            temporary_parent = inputs.get("temporary_parent")
+            if candidate:
+                from .runtime import safe, identifier
+                temporary_parent = safe(root, ".build/operations/" + identifier(candidate["operation_id"]) + "/lint-index")
+                temporary_parent.mkdir(parents=True, exist_ok=True)
+            with tempfile.TemporaryDirectory(prefix="knowledge-lint-", dir=temporary_parent) as temporary:
                 by_group["index"]["summary"] = indexing.check(list(cards.values()), rules, temporary)
         except (v.ContractError, OSError, ValueError, ImportError) as exc:
             caught("index", exc)

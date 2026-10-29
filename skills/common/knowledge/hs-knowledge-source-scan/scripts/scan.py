@@ -84,43 +84,6 @@ def previous_units(records):
             for path, entries in values.items()}
 
 
-def pending_units(context, records):
-    finished = [r for r in records if record_applied(r) and all(progress_status(d) in FINISHED for d in r["dispositions"])]
-    done = {r["operation_id"] for r in finished}
-    done.update(r["origin_scan_operation_id"] for r in finished if r.get("origin_scan_operation_id"))
-    directory = safe(context.root, ".build/operations")
-    pending = set()
-    if directory.exists():
-        for operation in directory.iterdir():
-            if not operation.is_dir() or operation.name in done or operation.name == context.operation:
-                continue
-            ref = ".build/operations/" + operation.name + "/source-inventory.json"
-            if safe(context.root, ref).is_file():
-                try:
-                    scan = context.record(ref, "source_inventory")
-                except ValueError as exc:
-                    if getattr(exc, "code", None) != "STALE_RULES":
-                        raise
-                    # An old operation can suggest unfinished paths only. Its
-                    # rules and processing results never authorize this run.
-                    scan = load_yaml(fixed_bytes(context.root, ref, [".build/operations"]))
-                context.modules["records"].validate_scan_manifest(scan, context.rules)
-                if scan["operation_id"] != operation.name:
-                    raise NodeError("RECORD_BINDING_MISMATCH", "Pending inventory belongs to a different operation", ref)
-                for scope in scan["scope"]:
-                    safe(context.root, scope, RAW_DIRS)
-                from progress import observation_only
-                from progress import material_refs
-                if observation_only(scan) and not material_refs(context, operation.name) and not any(
-                        safe(context.root, ".build/operations/" + operation.name + "/" + name).exists()
-                        for name in ("semantic-plan.json", "plan.json", "final-view.json", "ingest-record.yaml", "batch-intent.json")):
-                    continue
-                for unit in scan["units"]:
-                    safe(context.root, unit["path"], RAW_DIRS)
-                    pending.add(unit["path"])
-    return pending
-
-
 def observe(context, scope):
     found, errors, complete = {}, {}, True
     for ref in scope:
@@ -176,7 +139,6 @@ def scan(context):
     if context.request.get("source") is not None and not safe(context.root, scope[0]).exists() and not any(
             selected(path, scope) for path in previous):
         raise NodeError("RAW_SCOPE_NOT_FOUND", "Explicit raw scope does not exist and has no registered deletion history", scope[0])
-    pending = pending_units(context, records)
     found, errors, complete = observe(context, scope)
     lock = context.modules["source_resources"].read_source_lock(context.root)
     identities = {r["path"]: r["source_id"] for r in lock["resources"] if r.get("path")}
@@ -188,7 +150,6 @@ def scan(context):
                 affected_sources.update(s["source_id"] for s in card["metadata"]["sources"])
     paths = set(found) | set(errors)
     paths.update(path for path in previous if selected(path, scope))
-    paths.update(path for path in pending if selected(path, scope))
     units = []
     for path in sorted(paths):
         prior = previous.get(path, [])
@@ -211,7 +172,7 @@ def scan(context):
             change = "missing" if complete and prior else "unfinished"
         elif prior and old is not None and fingerprint != old and not ambiguous:
             change = "changed"
-        elif path in pending or ambiguous or (prior and fingerprint == old and (not finished or source_id in affected_sources)):
+        elif ambiguous or (prior and fingerprint == old and (not finished or source_id in affected_sources)):
             change = "unfinished"
         elif not prior:
             change = "new"
@@ -228,64 +189,11 @@ def scan(context):
     context.modules["records"].validate_scan_manifest(manifest, context.rules)
     ref = context.base + "/source-inventory.json"
     context.save(ref, manifest)
-    from status import operation_details
-    from progress import covers_view, current_baseline, paths, read_saved
-    finalization_pending = []
-    historical_finalization_unknown = []
-    # Shared/formal-only history is portable; only this machine's actual local
-    # committed content transactions create local indexing tail obligations.
-    relevant = {r["operation_id"] for path, entries in previous.items() if selected(path, scope) for _, _, r in entries}
-    relevant.update(r["operation_id"] for r in leaves if r.get("maintenance_dispositions"))
-    formal_operations = {r["operation_id"] for r in records}
-    # Independent apply legitimately has no P6 record. Discover its actual
-    # journal without resurrecting formal operations superseded by successors.
-    local_operations = {PurePosixPath(path).parent.name for path in
-                        paths(context, "logs/operations/*/journal.json") + paths(context, ".build/operations/*/batch-intent.json")}
-    for operation in sorted(local_operations):
-        if operation in formal_operations:
-            continue
-        journal_ref = "logs/operations/" + operation + "/journal.json"
-        intent_ref = ".build/operations/" + operation + "/batch-intent.json"
-        try:
-            journal = read_saved(context, journal_ref) if safe(context.root, journal_ref).is_file() else read_saved(context, intent_ref)
-        except (OSError, ValueError, KeyError):
-            if full_scan:
-                relevant.add(operation)
-            continue
-        if journal.get("batch_kind", "content") != "content" or journal.get("status") == "rolled_back":
-            continue
-        if full_scan:
-            relevant.add(operation)
-            continue
-        view = read_saved(context, journal["view_ref"])
-        adopted = {source["source_id"] for source in view.get("source_refs", [])}
-        bundle = read_saved(context, view["bundle_ref"])
-        sources = [source for source in bundle.get("resources", []) if source["source_id"] in adopted]
-        if any(source.get("kind") == "code" or selected(source.get("path", ""), scope) for source in sources):
-            relevant.add(operation)
-    for operation in sorted(relevant):
-        journal_ref = "logs/operations/" + operation + "/journal.json"
-        has_batch = safe(context.root, ".build/operations/" + operation + "/batch-intent.json").is_file()
-        if not safe(context.root, journal_ref).is_file() and not has_batch:
-            continue
-        details = operation_details(context, operation)
-        journal = next((fact for fact in details["facts"] if fact["stage"] == "transaction"), None)
-        if journal and journal.get("status") == "rolled_back":
-            continue
-        local_content = ((journal and journal.get("batch_kind") == "content")
-                         or any(r["operation_id"] == operation and r.get("batch_kind") == "content" for r in records))
-        if (local_content or has_batch or safe(context.root, journal_ref).is_file()) and details["completion"]["status"] != "complete":
-            pending = {"operation_id": operation, **details["completion"], "gaps": details["gaps"]}
-            if journal and journal.get("status") == "committed" and details["completion"].get("view_ref"):
-                view = read_saved(context, details["completion"]["view_ref"])
-                if not covers_view(current_baseline(context), view):
-                    historical_finalization_unknown.append(pending)
-                    continue
-            finalization_pending.append(pending)
     return {"scan_ref": ref, "scan_digest": manifest["digest"], "complete": complete,
             "affected_claims": current_context.get("affected_claims", []), "context_gaps": current_context.get("gaps", []),
-            "finalization_pending": finalization_pending,
-            "historical_finalization_unknown": historical_finalization_unknown,
+            "finalization_pending": [],
+            "historical_finalization_unknown": [],
+            "execution_history": {"status": "not_inspected"},
             "actionable_unit_ids": [u["unit_id"] for u in units if u["change"] != "unchanged"],
             "unchanged_unit_ids": [u["unit_id"] for u in units if u["change"] == "unchanged"]}, "scanned"
 

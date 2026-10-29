@@ -18,6 +18,7 @@ from .runtime import (
     read_json,
     safe,
     sha,
+    transaction_journals,
     write_index_bytes as write_bytes,
 )
 from . import input_snapshot
@@ -70,7 +71,7 @@ def reuse_generation(ctx, ref, observed):
 
 @contextmanager
 def writer(ctx):
-    path = safe(ctx.root, "logs/operations/.writer.lock")
+    path = safe(ctx.root, ".build/runtime/writer.lock")
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a+b") as handle:
         if os.name == "nt":
@@ -180,24 +181,23 @@ def expected_baseline(ctx, manifest, request, *, current=False):
 
 def check_transactions(ctx):
     """Caller holds the same writer lock as apply; every operation is a barrier."""
-    for path in sorted((ctx.root / "logs/operations").glob("*/journal.json")):
-        ref = path.relative_to(ctx.root).as_posix()
+    for ref, owner in transaction_journals(ctx.root):
         try:
             try:
                 journal = ctx.record(ref, "transaction_journal")
             except NodeError as exc:
-                if exc.code != "STALE_RULES" or path.parent.name == ctx.operation:
+                if exc.code != "STALE_RULES" or owner == ctx.operation:
                     raise
                 # Only foreign terminal liveness may survive a rules upgrade.
                 # This does not supply qualification/proof for any card.
-                journal = read_json(safe(ctx.root, ref, ["logs/operations"]))
+                journal = read_json(safe(ctx.root, ref, ["logs/operations", ".build/operations"]))
                 ctx.modules["records"].verify(journal)
                 ctx.modules["validation"].validate_shape("transaction_journal", journal, ctx.rules)
-                if journal.get("operation_id") != path.parent.name:
+                if journal.get("operation_id") != owner:
                     raise ValueError("transaction journal operation/directory mismatch")
                 if journal.get("status") not in {"committed", "rolled_back"}:
                     raise ValueError("old-rules transaction journal is not terminal")
-            if journal.get("status") in {"committed", "rolled_back"} and journal.get("operation_id") != path.parent.name:
+            if journal.get("status") in {"committed", "rolled_back"} and journal.get("operation_id") != owner:
                 raise ValueError("transaction journal operation/directory mismatch")
         except (ValueError, OSError, KeyError) as exc:
             raise NodeError(

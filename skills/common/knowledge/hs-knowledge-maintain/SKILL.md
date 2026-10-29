@@ -13,7 +13,7 @@ Use `scripts/cli.py --input REQUEST.json --output RESPONSE.json --knowledge-root
 
 `inspect-context` 在 ingest 开始时只读比较实际来源、代码/配置和规则身份，输出受影响 Claim、依赖和缺口，不要求先登记本机变化事件。未知上下文保留限制；OpenFlow 安排必要的 P2—P7 内容修订、复核和收尾。query 另按相同当前引用和确切资格判断过滤，不因 raw 未变而信任旧代码。
 
-Source capture may register new events and blocks; it never clears them. `advance` rechecks actual current cards, Claims and source references to clear resolved mechanical source-freshness restrictions. It requires no apply, query, active-generation or passing-review ticket. Unknown or changed source/configuration scope stays restricted; semantic and applicability restrictions are not cleared by matching source bytes. The result's `current_source_bytes_only` tier does not certify independent review or technical correctness. An index rollback cannot undo live blocks. User data, URLs, model assertions and old successful test records never substitute for these actual checks.
+Explicit maintenance event actions register events and blocks; ingest capture stages proposed events until P7 publication. `advance` rechecks actual current cards, Claims and source references to clear resolved mechanical source-freshness restrictions. It requires no apply, query, active-generation or passing-review ticket. Unknown or changed source/configuration scope stays restricted; semantic and applicability restrictions are not cleared by matching source bytes. The result's `current_source_bytes_only` tier does not certify independent review or technical correctness. An index rollback cannot undo live blocks. User data, URLs, model assertions and old successful test records never substitute for these actual checks.
 
 The [artifact contract](artifacts/result.yaml) requires the actual per-attempt CLI manifest.
 
@@ -24,3 +24,5 @@ The [artifact contract](artifacts/result.yaml) requires the actual per-attempt C
 本动作读取正式卡全部代码来源引用，包括未被 Claim 采用的元数据引用；在实际配置允许的路径内比较整文件字节，列出卡／Claim／用途、旧快照与定位、旧／当前指纹、可恢复的旧片段、差异及修订建议。声明 `code_ref` 时另列实际 `code_navigation`；guidance 的符号仍唯一可定位时，不因纯插行或函数体变化制造导航修复义务。缺失、歧义和解析／材料不可用保留实际状态；未声明符号不虚构导航通过，活动旧卡按固定 lint／CI 的 `CODE_REF_REQUIRED` 交 ingest 补齐，历史恢复及 deprecated 卡保留兼容。`historical` 保持固定历史用途，不因当前代码改变就宣称历史结论失效。源文件／配置在观察期间变化时保守列缺口；字节或导航检查均不证明知识语义，也不能解除 current 实现限制。
 
 只在本操作 `.build/operations/<operation_id>/` 新建 JSON、Markdown 及只读解析的请求／响应。返回 `phase: reported`、`data.audit_ref/report_ref/complete/status/counts`；`data.status` 为 `passed`、`needs_review` 或 `incomplete`，CLI 的成功仅表示实际报告已生成。新 [巡检产物契约](artifacts/audit-result.yaml) 与旧节点结果分开。报告附手动进入 ingest 的提示词，本动作不调用 ingest Workflow、不改源码、卡、来源锁、事件、水位或活动索引，不运行 apply／advance，也不捕获新来源。
+
+独立显式register-source-change/register-code-change/recover-events/advance仍可写其正式事件／水位，使用统一稳定writer协议；ingest P1—P6的事件仅为本批暂存拟稿，由P7按已冻结old→new转换发布。inspect-context与audit-references只读正式业务状态，可写自己的报告。不增加常规cleanup动作；P7负责本批可删stage，maintenance不反扫旧op补出新Workflow意图。

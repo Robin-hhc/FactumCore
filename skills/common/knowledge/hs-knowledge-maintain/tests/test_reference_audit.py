@@ -37,6 +37,13 @@ def code_fixture(harness, usages=("current",), source_bytes=None):
     captured = harness.run("source-prepare", {"operation_id": "captured", "kind": "code", "repo_id": repo_id,
                                             "relative_path": "file.c", "source_id": "selected-code"}, action="capture")
     bundle = harness.record(captured["data"]["bundle_ref"])
+    # Establish an explicitly published old-source fixture before registering
+    # its formal lock/cards. Capture itself is stage-only; audit must never
+    # discover producer-private stage after the working source changes.
+    for entry in bundle["staged_objects"]:
+        raw_object = (harness.root / entry["stage_ref"]).read_bytes()
+        assert hashed(raw_object) == entry["sha256"] and len(raw_object) == entry["bytes"]
+        harness.write(entry["final_ref"], raw_object)
     harness.write("governance/sources.lock.yaml", yaml.safe_dump({"schema_version": "2.0", "resources": bundle["resources"], "snapshots": bundle["snapshots"]}).encode())
     for usage in usages:
         _, header, body = harness.card("audit-" + usage, bundle, lifecycle="stable").decode().split("---", 2)
@@ -137,9 +144,9 @@ def test_audit_retains_actual_failed_or_incomplete_formal_report_status(harness,
         metadata["summary"] = ""
         path.write_text("---\n" + yaml.safe_dump(metadata, sort_keys=False) + "---" + body, encoding="utf-8")
     else:
-        # An unreadable local writer journal is a real unavailable check input;
-        # preserve the actual incomplete report through the read-only audit.
-        harness.write("logs/operations/unreadable/journal.json", b'{"status":')
+        # Fixed code checks require an explicitly supplied checkout. Omit that
+        # real prerequisite; unrelated private writer history is not lint input.
+        checkout = None
     fixed = lint_report(harness, checkout)
     original = harness.record(fixed)
     assert original["status"] == fixed_status
@@ -150,6 +157,20 @@ def test_audit_retains_actual_failed_or_incomplete_formal_report_status(harness,
     report = harness.record(response["data"]["audit_ref"])
     assert report["lint_report"] == original
     assert report["status"] == "incomplete" and report["complete"] is False
+    assert protected_bytes(harness) == before
+
+
+def test_formal_lint_and_audit_ignore_unrelated_broken_private_journal(harness):
+    _, _, _, checkout = code_fixture(harness)
+    harness.write("knowledge/rules/index.md", b"# Rules\n\n- [audit-current](audit-current.md)\n")
+    harness.write("logs/operations/unrelated-abandoned/journal.json", b'{"status":')
+    fixed = lint_report(harness, checkout)
+    assert harness.record(fixed)["status"] == "passed"
+    before = protected_bytes(harness)
+    result = harness.run("maintain", {"operation_id": "unrelated-private-history", "lint_report_ref": fixed}, "audit-references")
+    audit = harness.record(result["data"]["audit_ref"])
+    assert audit["lint_report"]["status"] == "passed"
+    assert audit["complete"] is True
     assert protected_bytes(harness) == before
 
 
@@ -228,6 +249,8 @@ def test_missing_old_object_is_a_gap_but_current_byte_difference_remains_visible
     fixed = lint_report(harness, checkout)
     recovery = bundle["snapshots"][0]["recovery"]
     (harness.root / recovery["path"]).unlink()
+    original_stage = next(row["stage_ref"] for row in bundle["staged_objects"] if row["final_ref"] == recovery["path"])
+    assert (harness.root / original_stage).is_file()
     result = harness.run("maintain", {"operation_id": "old-gap", "lint_report_ref": fixed}, "audit-references")
     row = harness.record(result["data"]["audit_ref"])["references"][0]
     assert result["data"]["complete"] is False

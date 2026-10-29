@@ -152,7 +152,7 @@ def safe(root, relative, prefixes=None):
         if current.exists() and current.is_dir():
             aliases = [
                 p.name
-                for p in current.iterdir()
+                for p in Path(native_path(current)).iterdir()
                 if p.name.casefold() == part.casefold()
             ]
             if aliases and part not in aliases:

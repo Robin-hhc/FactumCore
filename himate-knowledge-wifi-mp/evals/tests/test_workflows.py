@@ -103,10 +103,7 @@ def test_ingest_stays_complete_beside_the_read_only_lint_template():
     assert nodes["record_ingest"]["skill"] == "hs-knowledge-source-scan"
     assert {e["id"]: e["target"] for e in nodes["record_ingest"]["exits"]}["recorded"] == "apply_view"
     routes = {edge["id"]: edge["target"] for edge in nodes["scan_sources"]["exits"]}
-    assert {key: routes[key] for key in ("recover", "resume_index", "resume_queries")} == {
-        "recover": "apply_view", "resume_index": "apply_view", "resume_queries": "apply_view",
-    }
-    assert "resume" not in routes
+    assert routes == {"scanned": "prepare_material", "unchanged": "__end__"}
     assert "proof_set" not in nodes["apply_view"]["prompt"]
 
 
@@ -274,8 +271,6 @@ def test_artifact_contracts_reject_retired_scope_and_missing_real_obligations(tm
 
 
 @pytest.mark.parametrize("node_id,exit_id,target", [
-    ("scan_sources", "resume_index", "prepare_material"),
-    ("scan_sources", "resume_queries", "__end__"),
     ("prepare_material", "source_changed", "plan_change"),
     ("plan_change", "needs_material", "scan_sources"),
     ("materialize_view", "ready", "record_ingest"),
@@ -355,3 +350,15 @@ def test_apply_cannot_restart_materialization_after_its_completion_exit(tmp_path
     next(e for e in node["exits"] if e["id"] == "completed")["target"] = "materialize_view"
     path.write_text(yaml.safe_dump(doc), encoding="utf-8")
     assert any("transition" in e.lower() for e in module.validate(source))
+
+
+@pytest.mark.parametrize("exit_id", ["recover", "resume_index", "resume_queries"])
+def test_ingest_rejects_implicit_history_resume_from_p1(tmp_path, exit_id):
+    module = validator_module()
+    source = fixture_packages(tmp_path / "fixture")
+    path = source / "workflows/common/knowledge/hs-knowledge-ingest/workflow.yaml"
+    workflow = yaml.safe_load(path.read_bytes())
+    node = next(item for item in workflow["nodes"] if item["id"] == "scan_sources")
+    node["exits"].append({"id": exit_id, "label": "old history", "condition": "old fact", "target": "apply_view"})
+    path.write_text(yaml.safe_dump(workflow), encoding="utf-8")
+    assert any(".scan_sources: unsafe or missing transition" in error for error in module.validate(source))

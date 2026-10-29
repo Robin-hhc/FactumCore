@@ -106,6 +106,13 @@ def test_prepare_reads_all_card_states_and_each_adopted_version(harness):
 
     _, first = harness.capture("first", b"# Source\nOld first version.\n")
     _, second = harness.capture("second", b"# Source\nOld second version.\n")
+    # Explicit synthetic pre-existing formal state, not a P2 publication.
+    # Old originals must remain available after the current path changes.
+    for bundle in (first, second):
+        for entry in bundle["staged_objects"]:
+            raw = (harness.root / entry["stage_ref"]).read_bytes()
+            assert hashed(raw) == entry["sha256"] and len(raw) == entry["bytes"]
+            harness.write(entry["final_ref"], raw)
     harness.write("knowledge/rules/draft.md", harness.card("draft", first, lifecycle="draft"))
     harness.write("knowledge/rules/old.md", harness.card("old", second, lifecycle="deprecated"))
     harness.write("governance/sources.lock.yaml", yaml.safe_dump({
@@ -276,14 +283,14 @@ def stale_pending_inventory(harness):
     return ref, scan, raw
 
 
-def test_new_scan_keeps_old_rule_pending_paths_without_resuming_old_operation(harness):
+def test_new_scan_uses_current_raw_instead_of_old_rule_pending_inventory(harness):
     ref, _, old_bytes = stale_pending_inventory(harness)
     response = harness.run("source-scan", {"operation_id": "new-rule-scan"}, "scan")
     scan = harness.record(response["data"]["scan_ref"])
     assert scan["rules_digest"] == harness.rules
     assert scan["operation_id"] == "new-rule-scan"
     assert scan["units"][0]["path"] == "docs-raw/specs/pending.md"
-    assert scan["units"][0]["change"] == "unfinished"
+    assert scan["units"][0]["change"] == "new"
     assert scan["units"][0]["progress"] is None
     assert (harness.root / ref).read_bytes() == old_bytes
     assert not (harness.root / "logs/ingest").exists()
@@ -295,7 +302,7 @@ def test_new_scan_keeps_old_rule_pending_paths_without_resuming_old_operation(ha
     ("scope", "knowledge", "UNSAFE_PATH"),
     ("operation_id", "unrelated-operation", "RECORD_BINDING_MISMATCH"),
 ])
-def test_old_rule_pending_inventory_rejects_unsafe_or_misbound_hints(harness, field, value, expected_code):
+def test_scan_does_not_read_unsafe_or_misbound_unrelated_private_hints(harness, field, value, expected_code):
     ref, scan, _ = stale_pending_inventory(harness)
     if field == "unit_path":
         scan["units"][0]["path"] = value
@@ -308,20 +315,20 @@ def test_old_rule_pending_inventory_rejects_unsafe_or_misbound_hints(harness, fi
     original = canonical(scan)
     harness.write(ref, original)
 
-    response = harness.run("source-scan", {"operation_id": "reject-old-hint"}, "scan", expected=2)
-    assert response["diagnostics"][0]["code"] == expected_code
+    response = harness.run("source-scan", {"operation_id": "reject-old-hint"}, "scan")
+    assert harness.record(response["data"]["scan_ref"])["units"][0]["change"] == "new"
     assert (harness.root / ref).read_bytes() == original
-    assert not (harness.root / ".build/operations/reject-old-hint/source-inventory.json").exists()
+    assert response["data"]["execution_history"] == {"status": "not_inspected"}
 
 
-def test_old_rule_pending_inventory_does_not_ignore_a_broken_seal(harness):
+def test_scan_does_not_read_a_broken_unrelated_private_seal(harness):
     ref, scan, _ = stale_pending_inventory(harness)
     scan["units"][0]["progress"] = "completed"
     original = canonical(scan)  # Deliberately retain the now-invalid digest.
     harness.write(ref, original)
 
-    response = harness.run("source-scan", {"operation_id": "reject-broken-seal"}, "scan", expected=2)
-    assert response["diagnostics"][0]["code"] == "RECORD_DIGEST_MISMATCH"
+    response = harness.run("source-scan", {"operation_id": "reject-broken-seal"}, "scan")
+    assert harness.record(response["data"]["scan_ref"])["units"][0]["change"] == "new"
     assert (harness.root / ref).read_bytes() == original
 
 
@@ -338,9 +345,12 @@ def test_old_rule_pending_inventory_is_not_adoption_or_completion_evidence(harne
         harness.write("docs-raw/specs/pending.md", b"Current bytes differ from the old pending scan\n")
 
     response = harness.run("source-scan", {"operation_id": "old-hint-only"}, "scan")
-    unit = harness.record(response["data"]["scan_ref"])["units"][0]
-    assert unit["change"] == "unfinished"
-    assert unit["previous_fingerprint"] is None and unit["progress"] is None
+    units = harness.record(response["data"]["scan_ref"])["units"]
+    if remove_original:
+        assert units == []
+    else:
+        assert units[0]["change"] == "new"
+        assert units[0]["previous_fingerprint"] is None and units[0]["progress"] is None
     assert not (harness.root / "logs/ingest").exists()
 
 

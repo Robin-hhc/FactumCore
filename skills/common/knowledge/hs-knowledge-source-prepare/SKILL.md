@@ -5,7 +5,7 @@ description: Prepare exact current and historical reading material from fixed sc
 
 本 Skill 是 ingest P2。按扫描清单中的实际单元，或用户明确给出的原件／配置内代码目标，组织本次新旧材料、旧卡候选、原字节、提取文本、定位、差异及缺口。它可独立调用，不要求先运行扫描，不检查 Workflow 身份或上游 passed 票据。
 
-P1 判断变化和续办，P2 准备所选材料。P5 发现缺材料时，使用原 `existing_material_ref` 和明确补充目标定向补料。只核对本次采用来源、旧卡、配置和规则的实际指纹；普通补料不重新扫描全库。已采用输入漂移时停止，依据 `SOURCE_CHANGED` 的 `needs_scan/affected_scope` 回到 P1 的受影响范围或新操作，不能以旧清单冒充补齐。
+P1 对照正式处理记录判断当前变化和欠账，P2 准备所选材料。P5 发现缺材料时，使用原 `existing_material_ref` 和明确补充目标定向补料。只核对本次采用来源、旧卡、配置和规则的实际指纹；普通补料不重新扫描全库。已采用输入漂移时停止，依据 `SOURCE_CHANGED` 的 `needs_scan/affected_scope` 回到 P1 的受影响范围或新操作，不能以旧清单冒充补齐。
 
 先读取实际材料，再由作者决定更新、skip 或暂缓。候选卡及差异只是阅读线索，不表示必须修改、不构成语义通过或代码支持。卡的完整质量审查属于 P5 的 lint；P2 仅解码备料所需数据及核验确切输入。
 
@@ -15,6 +15,8 @@ P1 判断变化和续办，P2 准备所选材料。P5 发现缺材料时，使�
 
 公开入口：`scripts/cli.py --input REQUEST.json --output RESPONSE.json --knowledge-root K`。默认动作及 `--action prepare` 准备材料；`capture` 独立捕获；`resolve` 校验确切 bundle；`resolve-source` 恢复确切来源及原定位。详见[请求契约](references/request.md)。读取 ResultEnvelope 的实际 phase 和缺口，不以退出0推断已审阅、入库、建索引或上库。
 
-公共来源算法位于知识根规则锁固定的 `governance/contracts/source_operations.py` 和 `source_materials.py`，以同进程公共函数复用。不得调用兄弟 Skill CLI 或导入其私有脚本。已登记 raw 来源变化通过公共维护函数登记事件；代码捕获不隐式登记代码变更事件。P2 不写正式卡、来源锁或活动索引。
+公共来源算法位于知识根规则锁固定的 `governance/contracts/source_operations.py` 和 `source_materials.py`，以同进程公共函数复用。不得调用兄弟 Skill CLI 或导入其私有脚本。ingest 捕获只暂存来源变化拟稿，不在P2登记正式事件或推进水位。主件、附件、提取定位、采用旧卡和代码／构建／运行副本均在本批stage，P7才发布必要正式证据。独立显式maintain事件动作保持职责。P2 不写正式卡、来源锁或活动索引。
 
 补料保留原扫描和原目标，产物采用不可变版本路径，旧引用持续可读。已有冻结候选的返工使用新 operation，并以 `previous_view_ref/revision_reason` 精确采用旧候选实际材料；原扫描保持原字节和身份，后续记录明确保存 `origin_scan_operation_id`。不同 operation 不能覆写旧产物。完整业务及保留边界见[请求契约](references/request.md)和[结果模板](artifacts/templates/result.md)。
+
+本次请求、输出和全部新业务材料仅写本批 `.build/operations/<op>/`；提前分配最终证据引用，保留stage→final映射及确切字节。新Workflow不借用旧draft；同Workflow补料只沿明确旧引用，借用材料不归本批清理。正式来源恢复读取来源锁登记的精确snapshot，必要时使用原有Git／登记路径恢复；不枚举旧op寻找相似材料。

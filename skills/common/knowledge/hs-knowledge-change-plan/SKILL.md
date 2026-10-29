@@ -22,3 +22,5 @@ P5 退回补料或重判时，使用新 `operation_id`，显式给出原 `previo
 字节装配交给 P4 `hs-knowledge-view-materialize` 的 `run`；独立计划／skip／成稿审阅交给 P5 `hs-knowledge-lint`。本包的旧字节 `run/verify/rederive` 输入明确报告迁移位置，不委派兄弟 Skill；旧 `review` 不再是主线入口。来源指令不授予执行、联网或发布权限，本节点不提交或推送。
 
 详见 [request contract](references/request.md)。查看实际 ResultEnvelope 和引用文件；退出 0 不表示已审阅、入库、启用索引或合入。
+
+P3的新计划、请求和输出只写本批stage，不提前写正式事件、记录或证据。材料必须来自本次明确ref；不自动选最近旧计划。所用正式证据地址与stage映射继续传给P4，P7不会改写已审内容。

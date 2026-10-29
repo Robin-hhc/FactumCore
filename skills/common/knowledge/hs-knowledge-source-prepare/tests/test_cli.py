@@ -22,13 +22,6 @@ def test_git_source_resolver_recovers_exact_original_without_local_evidence_obje
     import base64
     import yaml
 
-    # The test owns this copied rule fixture, independent from parallel rule edits.
-    lock_path = harness.root / "governance/framework.lock.yaml"
-    lock = yaml.safe_load(lock_path.read_bytes())
-    for entry in lock["files"].values():
-        entry["sha256"] = hashed((harness.root / entry["path"]).read_bytes())
-    lock_path.write_text(yaml.safe_dump(lock, sort_keys=False), encoding="utf-8")
-    harness.rules = hashed(lock_path.read_bytes())
     source_path = "docs-raw/" + raw_class + "/wifi/source.md"
     original_bytes = b"# Source\nCommitted exact version.\n"
     harness.write(source_path, original_bytes)
@@ -52,7 +45,7 @@ def test_git_source_resolver_recovers_exact_original_without_local_evidence_obje
     bundle.pop("digest")
     bundle["digest"] = hashed(canonical(bundle))
     git_ref = harness.write(".build/operations/git-old/git-capture.json", canonical(bundle))
-    original = harness.root / "logs/evidence/objects" / (bundle["snapshots"][0]["sha256"] + ".bin")
+    original = harness.bundle_path(bundle, "logs/evidence/published/objects/" + bundle["snapshots"][0]["sha256"] + ".bin")
     original.unlink()
     harness.write(source_path, b"# Source\nUncommitted newer version.\n")
     response = harness.run("source-prepare", {"operation_id": "git-read", "bundle_ref": git_ref,
@@ -64,12 +57,6 @@ def test_git_source_resolver_recovers_exact_original_without_local_evidence_obje
 
 def test_capture_automatically_registers_matching_committed_raw_git_version(harness):
     import yaml
-    lock_path = harness.root / "governance/framework.lock.yaml"
-    lock = yaml.safe_load(lock_path.read_bytes())
-    for entry in lock["files"].values():
-        entry["sha256"] = hashed((harness.root / entry["path"]).read_bytes())
-    lock_path.write_text(yaml.safe_dump(lock, sort_keys=False), encoding="utf-8")
-    harness.rules = hashed(lock_path.read_bytes())
     workspace = harness.root.parent
     (workspace / "config.yml").write_text(yaml.safe_dump({"knowledge_roots": {"wifi": harness.root.name}, "repos": []}), encoding="utf-8")
     harness.write("docs-raw/specs/source.md", b"# Source\nCommitted bytes.\n")
@@ -80,11 +67,12 @@ def test_capture_automatically_registers_matching_committed_raw_git_version(harn
     git("add", "--", path)
     git("-c", "user.name=Synthetic", "-c", "user.email=synthetic@example.invalid", "commit", "-m", "Synthetic original only")
     response = harness.run("source-prepare", {"operation_id": "portable", "source_id": "synthetic", "source_path": "docs-raw/specs/source.md"}, action="capture")
-    snapshot = harness.record(response["data"]["bundle_ref"])["snapshots"][0]
+    bundle = harness.record(response["data"]["bundle_ref"])
+    snapshot = bundle["snapshots"][0]
     assert snapshot["recovery"] == {"method": "git", "kind": "git", "commit": git("rev-parse", "HEAD"), "path": path, "status": "available"}
     # A second machine has the Git original, not the first machine's evidence cache.
-    for ref in ("logs/evidence/objects/" + snapshot["sha256"] + ".bin", snapshot["extraction"]["text_ref"], snapshot["extraction"]["locator_ref"]):
-        (harness.root / ref).unlink()
+    for row in bundle["staged_objects"]:
+        (harness.root / row["stage_ref"]).unlink()
     resolved = harness.run("source-prepare", {"operation_id": "portable-read", "bundle_ref": response["data"]["bundle_ref"],
         "source_ref": {"evidence_ref": "e1", "source_id": "synthetic", "snapshot_id": snapshot["snapshot_id"], "locator": {"kind": "lines", "start": 1, "end": 2}}}, "resolve-source")
     assert resolved["data"]["text"] == "# Source\nCommitted bytes.\n"
@@ -163,7 +151,7 @@ def test_troubleshooting_original_and_attachment_retain_exact_bytes(harness):
         path = resource["path"]
         snapshot = snapshots[resource["source_id"]]
         assert snapshot["sha256"] == hashed(inputs[path])
-        assert (harness.root / snapshot["recovery"]["reference"]).read_bytes() == inputs[path]
+        assert harness.bundle_path(bundle, snapshot["recovery"]["reference"]).read_bytes() == inputs[path]
         assert (harness.root / path).read_bytes() == inputs[path]
 
 
@@ -174,9 +162,7 @@ def test_exact_source_recovery_survives_original_replacement(harness):
         "source-prepare", {"operation_id": "op", "bundle_ref": ref}, "resolve"
     )
     snapshot = result["data"]["bundle"]["snapshots"][0]
-    assert (
-        harness.root / snapshot["recovery"]["reference"]
-    ).read_bytes() == b"# Source\nSynthetic evidence.\n"
+    assert harness.bundle_path(bundle, snapshot["recovery"]["reference"]).read_bytes() == b"# Source\nSynthetic evidence.\n"
     assert bundle["snapshots"][0] == snapshot
 
 
@@ -207,7 +193,7 @@ def test_required_attachment_is_not_silently_skipped(harness):
 
 def test_retained_byte_tamper_is_detected(harness):
     ref, bundle = harness.capture()
-    (harness.root / bundle["snapshots"][0]["recovery"]["reference"]).write_bytes(
+    harness.bundle_path(bundle, bundle["snapshots"][0]["recovery"]["reference"]).write_bytes(
         b"tampered"
     )
     result = harness.run(
@@ -259,7 +245,7 @@ def test_docx_paragraphs_and_tables_have_locators(harness):
         },
      action="capture")
     bundle = harness.record(result["data"]["bundle_ref"])
-    locators = harness.record(bundle["extractions"][0]["locator_ref"])["locators"]
+    locators = json.loads(harness.bundle_path(bundle, bundle["extractions"][0]["locator_ref"]).read_bytes())["locators"]
     assert {item["kind"] for item in locators} == {"paragraph", "table_row"}
 
 

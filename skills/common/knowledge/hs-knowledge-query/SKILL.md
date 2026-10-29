@@ -26,3 +26,5 @@ description: 按用途、Target、Claim 和证据资格检索正式知识，同�
 产物展示规则见 [writing-guide](artifacts/writing-guide.md)，复核见 [review-guide](artifacts/review-guide.md)。
 
 Read the [public API and boundary guide](references/public-api.md) before constructing requests.
+
+普通search/read只读取当前正式索引、正式卡和确切来源／采用材料；receipt_ref明确读取原回执代次。P7清后不回读生产者旧view、审阅或journal，必要内容由正式published证据及generation闭包提供。新clone没有本机索引时显式重建、验证和激活，不重新提炼原件；不假称原机回执可跨机复现。查询不清任何stage。

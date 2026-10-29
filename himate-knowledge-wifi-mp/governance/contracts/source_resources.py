@@ -165,11 +165,31 @@ def validate_snapshot(bundle, expected=None):
     return bundle
 
 
-def recover_snapshot(knowledge_root, snapshot, *, allow_local_fallback=True):
-    return recover_snapshot_source(knowledge_root, snapshot, allow_local_fallback=allow_local_fallback)[0]
+def recover_snapshot(knowledge_root, snapshot, *, allow_local_fallback=True, staged_objects=None):
+    return recover_snapshot_source(knowledge_root, snapshot, allow_local_fallback=allow_local_fallback,
+                                   staged_objects=staged_objects)[0]
 
 
-def recover_snapshot_source(knowledge_root, snapshot, *, allow_local_fallback=True):
+def _retained_original(knowledge_root, snapshot, path, staged_objects):
+    from . import staging
+    from .runtime import NodeError
+    # Existing snapshot declarations remain signed as originally registered.
+    # Only an exact frozen hash determines the additional published address.
+    published = "logs/evidence/published/objects/" + snapshot["sha256"] + ".bin"
+    for reference in dict.fromkeys([path, published]):
+        safe_path(knowledge_root, reference, ["logs/evidence"])
+        try:
+            data = staging.read_bytes(knowledge_root, reference, staged_objects,
+                                      expected_sha=snapshot["sha256"], expected_size=snapshot["bytes"])
+            return data, reference
+        except FileNotFoundError:
+            continue
+        except NodeError as exc:
+            raise ContractError("EVIDENCE_OBJECT_CHANGED", exc.message, exc.path) from exc
+    return None
+
+
+def recover_snapshot_source(knowledge_root, snapshot, *, allow_local_fallback=True, staged_objects=None):
     """Recover fixed bytes and report the actual source, including clean checkouts."""
     recovery = snapshot.get("recovery", {})
     if isinstance(recovery, dict) and (recovery.get("kind") == "git" or recovery.get("method") == "git"):
@@ -182,11 +202,14 @@ def recover_snapshot_source(knowledge_root, snapshot, *, allow_local_fallback=Tr
             local = snapshot.get("local_recovery")
             data = None
             if isinstance(local, dict) and local.get("method") == "evidence_object":
-                try:
-                    data = safe_path(knowledge_root, local["path"], ["logs/evidence"]).read_bytes()
-                    reference = local["path"]
-                except FileNotFoundError:
-                    pass
+                retained = _retained_original(knowledge_root, snapshot, local["path"], staged_objects)
+                if retained is not None:
+                    data, reference = retained
+            if data is None:
+                published = "logs/evidence/published/objects/" + snapshot["sha256"] + ".bin"
+                retained = _retained_original(knowledge_root, snapshot, published, staged_objects)
+                if retained is not None:
+                    data, reference = retained
             if data is None:
                 current = _current_registered_source(knowledge_root, snapshot)
                 if current is not None:
@@ -200,13 +223,13 @@ def recover_snapshot_source(knowledge_root, snapshot, *, allow_local_fallback=Tr
     path = recovery.get("path") if isinstance(recovery, dict) else recovery
     if not path:
         raise ContractError("UNSUPPORTED_RECOVERY", "Immutable local object required")
-    try:
-        data = safe_path(knowledge_root, path, ["logs/evidence"]).read_bytes()
-    except FileNotFoundError:
+    retained = _retained_original(knowledge_root, snapshot, path, staged_objects)
+    if retained is None:
         current = _current_registered_source(knowledge_root, snapshot) if allow_local_fallback else None
         if current is not None:
             return current
         raise ContractError("SOURCE_INPUT_UNAVAILABLE", "Exact snapshot is unavailable in retained objects, registered current files, or local Git history (at most 1000 path changes; shallow clones may omit the version)")
+    data, path = retained
     if sha256_bytes(data) != snapshot.get("sha256") or len(data) != snapshot.get(
         "bytes"
     ):

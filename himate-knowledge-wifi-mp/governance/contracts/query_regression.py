@@ -16,9 +16,33 @@ class VerifiedRegression:
     binding: tuple
 
 
+def _execution_binding(generation_ref, manifest, report_ref, report):
+    binding = {"generation_ref": generation_ref, "manifest_digest": manifest["digest"],
+               "expected_active": report["expected_active"], "frozen_cases_digest": report["cases_digest"],
+               "regression_report_ref": report_ref, "regression_report_digest": report["digest"],
+               "view_ref": report.get("view_ref"), "view_digest": report.get("view_digest"),
+               "apply_result_ref": report.get("apply_result_ref"), "apply_result_digest": report.get("apply_result_digest")}
+    if report.get("publication_ref"):
+        binding.update({key: report[key] for key in ("publication_ref", "publication_digest", "content_digest")})
+    return binding
+
+
 def persisted_binding(ctx, generation_ref, manifest, report_ref, *, view_ref=None, view=None,
-                      apply_result_ref=None, applied=None, cases=None):
+                      apply_result_ref=None, applied=None, cases=None,
+                      publication_ref=None, publication_manifest=None):
     report = ctx.record(report_ref, "query_regression")
+    publication_ref = publication_ref or report.get("publication_ref")
+    if publication_ref:
+        from . import publication
+        observed_publication = publication.read_manifest(ctx, publication_ref)
+        if publication_manifest is not None and publication_manifest != observed_publication:
+            raise NodeError("REGRESSION_BINDING_CHANGED", "Formal publication changed")
+        frozen = publication.published_view(observed_publication).get("target_queries")
+        if (report.get("publication_ref") != publication_ref
+                or report.get("publication_digest") != observed_publication["digest"]
+                or report.get("content_digest") != observed_publication["content_digest"]
+                or report.get("cases") != frozen):
+            raise NodeError("REGRESSION_BINDING_CHANGED", "Report differs from the formal publication")
     if (report.get("operation_id") != ctx.operation or report.get("passed") is not True
             or report.get("index_verified") is not True
             or report.get("generation_ref") != generation_ref
@@ -30,11 +54,7 @@ def persisted_binding(ctx, generation_ref, manifest, report_ref, *, view_ref=Non
             or (applied is not None and (report.get("apply_result_ref") != apply_result_ref
                                         or report.get("apply_result_digest") != applied["digest"]))):
         raise NodeError("REGRESSION_BINDING_CHANGED", "Actual report differs from this exact batch execution")
-    return {"generation_ref": generation_ref, "manifest_digest": manifest["digest"],
-            "expected_active": report["expected_active"], "frozen_cases_digest": report["cases_digest"],
-            "regression_report_ref": report_ref, "regression_report_digest": report["digest"],
-            "view_ref": report.get("view_ref"), "view_digest": report.get("view_digest"),
-            "apply_result_ref": report.get("apply_result_ref"), "apply_result_digest": report.get("apply_result_digest")}
+    return _execution_binding(generation_ref, manifest, report_ref, report)
 
 
 def reuse_regression(ctx, generation_ref, manifest, observed):
@@ -45,7 +65,8 @@ def reuse_regression(ctx, generation_ref, manifest, observed):
     view_ref, applied_ref = binding.get("view_ref"), binding.get("apply_result_ref")
     current = persisted_binding(ctx, generation_ref, manifest, binding["regression_report_ref"],
         view_ref=view_ref, view=ctx.record(view_ref, "final_view") if view_ref else None,
-        apply_result_ref=applied_ref, applied=ctx.record(applied_ref, "apply_result") if applied_ref else None)
+        apply_result_ref=applied_ref, applied=ctx.record(applied_ref, "apply_result") if applied_ref else None,
+        publication_ref=binding.get("publication_ref"))
     if current != binding:
         raise NodeError("REGRESSION_BINDING_CHANGED", "Verified query execution inputs or result changed")
     return binding
@@ -85,9 +106,21 @@ def execute(ctx, *, verified_generation=None, activate=True):
             if key in request and request[key] != original.get(key):
                 raise NodeError("REGRESSION_INPUT_CHANGED", "Verification cannot replace the original " + key)
         request = {**original, **request}
-    applied = ctx.record(request["apply_result_ref"], "apply_result") if request.get("apply_result_ref") else None
-    view = None
-    view_ref = request.get("view_ref") or (applied or {}).get("view_ref")
+    publication_manifest = None
+    publication_ref = request.get("publication_ref")
+    if publication_ref:
+        from . import publication
+        if request.get("view_ref") or request.get("apply_result_ref"):
+            raise NodeError("REGRESSION_INPUT_CHANGED", "Publication regression cannot substitute private draft inputs")
+        publication_manifest = publication.read_manifest(ctx, publication_ref)
+        view = publication.published_view(publication_manifest)
+        if "cases" in request and request["cases"] != view.get("target_queries"):
+            raise NodeError("REGRESSION_CASES_CHANGED", "Publication queries are frozen")
+        applied, view_ref = None, None
+    else:
+        applied = ctx.record(request["apply_result_ref"], "apply_result") if request.get("apply_result_ref") else None
+        view = None
+        view_ref = request.get("view_ref") or (applied or {}).get("view_ref")
     if view_ref:
         view = ctx.record(view_ref, "final_view")
         if applied and view["digest"] != applied["view_digest"]:
@@ -125,19 +158,18 @@ def execute(ctx, *, verified_generation=None, activate=True):
     report = ctx.seal({"generation_ref": ref, "expected_active": request.get("expected_active"),
                       "cases": cases, "cases_digest": digest(cases), "outcomes": outcomes,
                       "passed": all(row["passed"] for row in outcomes), "index_verified": True,
-                      **({"view_ref": view_ref, "view_digest": view["digest"]} if view is not None else {}),
+                      **({"view_ref": view_ref, "view_digest": view["digest"]} if view_ref else {}),
                       **({"apply_result_ref": request["apply_result_ref"], "apply_result_digest": applied["digest"]}
-                         if applied is not None else {})}, "query_regression")
-    report_ref = ctx.base + "/regression/" + report["digest"] + ".json"
+                         if applied is not None else {}),
+                      **({"publication_ref": publication_ref, "publication_digest": publication_manifest["digest"],
+                          "content_digest": publication_manifest["content_digest"]} if publication_manifest else {})}, "query_regression")
+    report_ref = (("logs/publications/" + publication_manifest["operation_id"]) if publication_manifest else ctx.base)
+    report_ref += "/regression/" + report["digest"] + ".json"
     ctx.save(report_ref, report)
     data = {"report_ref": report_ref, "passed": report["passed"], "activated": False, "generation_ref": ref}
     if not report["passed"]:
         return data, "needs_revision"
-    binding = {"generation_ref": ref, "manifest_digest": manifest["digest"],
-               "expected_active": report["expected_active"], "frozen_cases_digest": report["cases_digest"],
-               "regression_report_ref": report_ref, "regression_report_digest": report["digest"],
-               "view_ref": report.get("view_ref"), "view_digest": report.get("view_digest"),
-               "apply_result_ref": report.get("apply_result_ref"), "apply_result_digest": report.get("apply_result_digest")}
+    binding = _execution_binding(ref, manifest, report_ref, report)
     ctx.verified_regression = VerifiedRegression(ctx.root.resolve(), ctx.args.rules_digest, tuple(sorted(binding.items())))
     if verify_only or not activate:
         return {**data, "gate_verified": verify_only}, "verified"

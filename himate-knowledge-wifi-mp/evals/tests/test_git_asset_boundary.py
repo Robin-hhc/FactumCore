@@ -20,6 +20,8 @@ def checkout(tmp_path):
 
 @pytest.mark.parametrize("relative", [
     ".build/operations/ingest/view.json",
+    ".build/operations/ingest/transaction/journal.json",
+    ".build/runtime/writer.lock",
     ".build/project-context/context.json",
     "artifacts/indexes/local/active.json",
     "logs/operations/ingest/journal.json",
@@ -46,6 +48,12 @@ def test_machine_products_stay_out_of_git(checkout, relative):
     "logs/ingest/ingest.yaml",
     "logs/events/state.json",
     "logs/events/event.json",
+    "logs/evidence/published/objects/source.bin",
+    "logs/evidence/published/cards/card.md",
+    "logs/evidence/published/extractions/source.txt",
+    "logs/evidence/published/locators/source.json",
+    "logs/publications/ingest/manifest.json",
+    "logs/publications/ingest/completion.json",
     "logs/evidence/build-support.bin",
     "logs/evidence/runtime-support.log",
     ".build/.gitkeep",

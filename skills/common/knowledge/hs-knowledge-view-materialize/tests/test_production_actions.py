@@ -1,5 +1,4 @@
 """Migrated byte/action oracles at the P4 public boundary; P5 owns quality."""
-import hashlib
 import json
 import pytest
 import yaml
@@ -247,7 +246,7 @@ def test_resealed_plan_writes_must_rederive_from_authored_candidate(harness):
     assert result["diagnostics"][0]["code"] == "PLAN_CHANGED"
 
 
-def test_same_snapshot_can_gain_verified_git_recovery_without_semantic_version_change(harness):
+def test_registered_snapshot_keeps_original_fields_after_source_is_committed(harness):
     import subprocess
 
     _, old = harness.capture("old")
@@ -261,12 +260,10 @@ def test_same_snapshot_can_gain_verified_git_recovery_without_semantic_version_c
     git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "source")
     ref, current = harness.capture("new")
     assert old["snapshots"][0]["snapshot_id"] == current["snapshots"][0]["snapshot_id"]
-    assert current["snapshots"][0]["recovery"]["kind"] == "git"
-    current["snapshots"][0]["local_recovery"] = old["snapshots"][0]["recovery"]
-    current.pop("digest")
-    current["digest"] = hashlib.sha256(json.dumps(current, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    harness.write(ref, json.dumps(current).encode())
+    assert current["snapshots"] == old["snapshots"]
+    before = (harness.root / "governance/sources.lock.yaml").read_bytes()
     candidate = harness.write(".build/candidates/new.md", harness.card("new", current))
     result = harness.run("view-materialize", {"operation_id": "new", "bundle_ref": ref, "decisions": [
         {"candidate_id": "new", "decision": "create", "reason": "First accepted card", "card_inputs": [candidate]}]})
     assert result["phase"] == "ready"
+    assert (harness.root / "governance/sources.lock.yaml").read_bytes() == before

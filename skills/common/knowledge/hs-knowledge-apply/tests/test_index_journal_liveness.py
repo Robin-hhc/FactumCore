@@ -109,6 +109,13 @@ def test_manual_card_build_and_query_need_no_admission_history(tmp_path):
     captured = trial.call(None, {"operation_id": "raw", "source_id": "fixture", "source_path": "docs-raw/specs/fixture.txt"},
                          skill="hs-knowledge-source-capture")
     bundle = json.loads((trial.root / captured["data"]["bundle_ref"]).read_bytes())
+    # Explicit pre-existing formal evidence fixture: capture itself only stages.
+    for entry in bundle["staged_objects"]:
+        raw = (trial.root / entry["stage_ref"]).read_bytes()
+        assert hashlib.sha256(raw).hexdigest() == entry["sha256"] and len(raw) == entry["bytes"]
+        target = trial.root / entry["final_ref"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(raw)
     snapshot = bundle["snapshots"][0]
     (trial.root / "governance/sources.lock.yaml").write_text(yaml.safe_dump({"schema_version": "2.0", "resources": bundle["resources"],
         "snapshots": bundle["snapshots"]}), encoding="utf-8")

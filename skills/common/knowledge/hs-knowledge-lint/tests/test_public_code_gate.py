@@ -657,8 +657,8 @@ class PublicCodeGateTests(unittest.TestCase):
         slug, request, action = _pipeline.target_call(skill.removeprefix("hs-"), request, action)
         skill = "hs-" + slug
         inp, out = (
-            f".build/operations/op/request-{self.counter}.json",
-            f".build/operations/op/response-{self.counter}.json",
+            f".build/operations/{request['operation_id']}/request-{self.counter}.json",
+            f".build/operations/{request['operation_id']}/response-{self.counter}.json",
         )
         self.save(inp, request)
         completed = subprocess.run(
@@ -688,6 +688,17 @@ class PublicCodeGateTests(unittest.TestCase):
                 expected = {"passed": 0, "failed": 1, "incomplete": 2}.get(response.get("data", {}).get("check_status"), 0)
         self.assertEqual(completed.returncode, expected, (completed.stderr, response))
         return response
+
+    def test_review_report_only_changes_current_operation_staging(self):
+        def formal():
+            return {p.relative_to(self.root).as_posix(): digest(p.read_bytes())
+                    for p in self.root.rglob("*") if p.is_file()
+                    and not p.relative_to(self.root).as_posix().startswith(".build/")}
+        before = formal()
+        checked = self.invoke()
+        self.assertEqual(checked["data"]["check_status"], "passed")
+        self.assertTrue(checked["data"]["local_check_ref"].startswith(".build/operations/op/"))
+        self.assertEqual(formal(), before)
 
     def test_signed_positive_support_then_apply_and_verify(self):
         checked = self.invoke()
@@ -1068,12 +1079,10 @@ class PublicCodeGateTests(unittest.TestCase):
         self.assertEqual(result["data"]["check_status"], "passed")
         for ref, raw in frozen.items():
             self.assertEqual((self.root / ref).read_bytes(), raw)
-        self.assertEqual(
-            (
-                self.root / ("logs/evidence/checked-code/" + digest(newer) + ".bin")
-            ).read_bytes(),
-            newer,
-        )
+        proof = json.loads((self.root / result["data"]["merge_check_ref"]).read_bytes())
+        checked = next(row for row in proof["staged_objects"] if row["kind"] == "checked-code")
+        self.assertEqual((self.root / checked["stage_ref"]).read_bytes(), newer)
+        self.assertFalse((self.root / checked["final_ref"]).exists())
         qualification = {
             "operation_id": "op",
             "apply_result_ref": applied["data"]["apply_result_ref"],

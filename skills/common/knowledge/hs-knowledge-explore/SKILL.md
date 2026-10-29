@@ -9,7 +9,7 @@ description: HiMate 知识库任务入口。用于原件入库与更新、续办
 
 | 用户任务 | 使用能力与处理边界 |
 |---|---|
-| 入库、新增原件、增量更新、续办或修改已有卡 | 已安装的 `hs-knowledge-ingest` Workflow；P1 source-scan → P2 source-prepare → P3 change-plan → P4 view-materialize → P5 lint.review → P6 source-scan.record → P7 apply.batch。P5 集中独立内容、代码和完整固定检查；P7 安全落位、索引全验、冻结查询和激活。活动代成功激活才报告内容批完成；有缺口保存实际停点。原件未变的明确修卡请求也要处理。 |
+| 入库、新增原件、增量更新、续办或修改已有卡 | 已安装的 `hs-knowledge-ingest` Workflow；P1 source-scan → P2 source-prepare → P3 change-plan → P4 view-materialize → P5 lint.review → P6 source-scan.record → P7 apply.batch。P5 集中独立内容、代码和完整固定检查；P1—P6只写本批暂存；P7发布、索引全验、冻结查询和激活后清本批可删暂存。实际batch_complete才报告本批完成；有缺口保存实际停点。原件未变的明确修卡请求也要处理。 |
 | 查询背景、机制或定位代码 | `hs-knowledge-query`；按实际回执精读同代卡片和来源，有 code_ref 时读取实际 code_navigation。背景用 guidance，具体实现继续读取所问版本的实际源码，追查调用、宏条件和早退，不用符号可定位或模块标签代替实现事实。 |
 | 独立检查知识库或候选 | `hs-knowledge-lint`；只检查并报告。需要修订时转交 ingest，检查本身不改稿、不入库。 |
 | 周期巡检正式库、查找过时代码引用 | 启动已安装的 `F/hs-knowledge-lint` Workflow：先调用原 `S/hs-knowledge-lint` 做正式完整库固定检查，再显式调用 `hs-knowledge-maintain --action audit-references`，生成可定位卡片、Claim、来源、代码文件及旧定位的 JSON／Markdown 报告；只出报告，不修改知识或自动启动 ingest。由用户手动将报告和目标卡交给 ingest；独立 `knowledge lint` 仍调用原只读 Skill。 |
@@ -65,3 +65,5 @@ CodeGraph MCP 已由 harness 安装；本 Skill 的准备工作到逐仓初始�
 按目标能力的实际结果报告已完成内容、业务文件引用和未解决缺口。只做入口准备时报告配置与依赖结果；业务任务已获授权且条件具备时，继续完成对应任务，不以发现成功或路由成功结束。
 
 产物展示规则见 [writing-guide](artifacts/writing-guide.md)，复核见 [review-guide](artifacts/review-guide.md)。
+
+新Workflow从正式状态和当前输入开始，使用新operation；不搜索最近draft或旧操作替用户续办。同Workflow明确引用的返工仍可继续，真正未完writer仍受写安全保护。项目上下文和helper环境是派生产物，不进入P7单批清理集合。

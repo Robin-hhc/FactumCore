@@ -314,6 +314,15 @@ class PublicGovernanceTests(unittest.TestCase):
             )
             bundle_ref = captured["data"]["bundle_ref"]
             bundle = json.loads((self.root / bundle_ref).read_bytes())
+            # Construct actual legacy formal evidence explicitly; the capture
+            # CLI now stages these bytes and cannot act as publication setup.
+            for entry in bundle["staged_objects"]:
+                raw = (self.root / entry["stage_ref"]).read_bytes()
+                self.assertEqual(digest(raw), entry["sha256"])
+                self.assertEqual(len(raw), entry["bytes"])
+                target = self.root / entry["final_ref"]
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(raw)
             snapshot = bundle["snapshots"][0]
             self.fixture_original_ref = snapshot["recovery"]["path"]
             source_lock = {
@@ -449,7 +458,7 @@ class PublicGovernanceTests(unittest.TestCase):
         result = self.invoke("hs-knowledge-apply", request, expected=3)
         self.assertIn("full-view checks", result["diagnostics"][0]["message"])
         self.assertEqual((self.root / "knowledge/index.md").read_bytes(), b"old navigation")
-        self.assertFalse((self.root / "logs/operations/invalid-full-view/journal.json").exists())
+        self.assertFalse((self.root / ".build/operations/invalid-full-view/transaction/journal.json").exists())
 
     def test_non_v3_document_requires_exact_source_recovery_before_first_write(self):
         request = self.prepare_reviewed("unrecoverable", include_card=True)
@@ -560,7 +569,7 @@ class PublicGovernanceTests(unittest.TestCase):
         self.invoke("hs-knowledge-apply", request, expected=2)
         self.assertEqual((self.root / "knowledge/index.md").read_bytes(), b"old navigation")
         self.assertFalse((self.root / "knowledge/flows/fixture-flow.md").exists())
-        self.assertFalse((self.root / "logs/operations/manual-bad-card/journal.json").exists())
+        self.assertFalse((self.root / ".build/operations/manual-bad-card/transaction/journal.json").exists())
 
     def test_card_eligibility_ignores_unrelated_navigation_and_source_append(self):
         request = self.prepare_reviewed("card", include_card=True)

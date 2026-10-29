@@ -59,3 +59,5 @@ the shared knowledge relation functions. It includes non-answer states and
 does not relax this query API's answer eligibility. New-search index freshness
 checking is outside this change; generation integrity and same-generation
 read checks remain mandatory.
+
+After P7 cleanup, normal reads use the published source/material closure and the selected real generation. Soft producer stage/view references do not require reopening those paths. Explicit receipt reads retain their exact generation dependencies; missing retained generations require a fresh query rather than history guessing.

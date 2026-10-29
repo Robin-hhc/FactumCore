@@ -41,27 +41,34 @@ def applied_batch(harness, *, fault_after=None, with_record=True):
     return view
 
 
-def operation_status(harness):
-    return harness.run("source-scan", {"operation_id": "status", "target_operation_id": "batch"}, "status")["data"]["operations"][0]
+def operation_status(harness, *, global_history=False):
+    request = {"operation_id": "status"}
+    if not global_history:
+        request["target_operation_id"] = "batch"
+    return next(row for row in harness.run("source-scan", request, "status")["data"]["operations"]
+                if row["operation_id"] == "batch")
 
 
-def test_committed_batch_lists_index_tail_without_reauthoring_original(harness):
+def test_ordinary_scan_does_not_discover_legacy_index_tail(harness):
     applied_batch(harness)
     response = harness.run("source-scan", {"operation_id": "reopened"}, "scan")["data"]
     assert response["actionable_unit_ids"] == []
-    assert [(row["operation_id"], row["next_action"]) for row in response["finalization_pending"]] == [("batch", "rebuild_index")]
+    assert response["finalization_pending"] == []
+    assert response["execution_history"] == {"status": "not_inspected"}
     status = operation_status(harness)
     assert {row["stage"] for row in status["facts"]} >= {"plan", "view", "apply"}
     assert status["stage_status"]["content_review"] == "unknown"
-    assert status["completion"]["status"] == "pending"
-    assert status["completion"]["next_action"] == "rebuild_index"
+    assert status["completion"]["status"] == "unknown"
+    assert status["completion"]["next_action"] == "inspect_finalization"
+    assert operation_status(harness, global_history=True)["completion"]["next_action"] == "rebuild_index"
 
 
-def test_independent_apply_without_processing_record_still_lists_local_tail(harness):
+def test_ordinary_scan_never_reads_independent_apply_tail(harness):
     applied_batch(harness, with_record=False)
     assert not (harness.root / "logs/ingest/batch.yaml").exists()
     response = harness.run("source-scan", {"operation_id": "reopened"}, "scan")["data"]
-    assert [(row["operation_id"], row["next_action"]) for row in response["finalization_pending"]] == [("batch", "rebuild_index")]
+    assert response["finalization_pending"] == []
+    assert response["execution_history"] == {"status": "not_inspected"}
     harness.write("docs-raw/troubleshooting/other.md", b"Unrelated source\n")
     narrow = harness.run("source-scan", {"operation_id": "narrow", "source": "docs-raw/troubleshooting"}, "scan")["data"]
     assert narrow["finalization_pending"] == []
@@ -70,17 +77,18 @@ def test_independent_apply_without_processing_record_still_lists_local_tail(harn
     card.write_bytes(card.read_bytes().replace(b"Synthetic fixture statement.", b"A later current statement."))
     historical = harness.run("source-scan", {"operation_id": "after-new-content"}, "scan")["data"]
     assert historical["finalization_pending"] == []
-    assert historical["historical_finalization_unknown"][0]["operation_id"] == "batch"
+    assert historical["historical_finalization_unknown"] == []
 
 
 def test_cross_operation_regression_activation_and_repeated_noop_stay_complete(harness):
     view = applied_batch(harness)
     built = harness.run("apply", {"operation_id": "index-other"}, action='index-build')["data"]
-    own_index = harness.run("source-scan", {"operation_id": "status", "target_operation_id": "index-other"}, "status")["data"]["operations"][0]
+    own_index = next(row for row in harness.run("source-scan", {"operation_id": "status"}, "status")["data"]["operations"] if row["operation_id"] == "index-other")
     assert "index" in {row["stage"] for row in own_index["facts"]}
     assert own_index["completion"]["status"] == "unknown"
     assert own_index["completion"]["next_action"] == "inspect_finalization"
-    before_query = operation_status(harness)
+    assert operation_status(harness)["completion"]["status"] == "unknown"
+    before_query = operation_status(harness, global_history=True)
     assert before_query["completion"]["next_action"] == "resume_queries"
     checked = harness.run("apply", {
         "operation_id": "query-other", "view_ref": view, "generation_ref": built["generation_ref"],
@@ -88,10 +96,10 @@ def test_cross_operation_regression_activation_and_repeated_noop_stay_complete(h
         "cases": [{"id": "find-new", "query": "Synthetic", "purpose": "guidance", "required": ["new"]}],
     }, action='regression')["data"]
     assert checked["activated"]
-    own_query = harness.run("source-scan", {"operation_id": "status", "target_operation_id": "query-other"}, "status")["data"]["operations"][0]
+    own_query = next(row for row in harness.run("source-scan", {"operation_id": "status"}, "status")["data"]["operations"] if row["operation_id"] == "query-other")
     assert {row["stage"] for row in own_query["facts"]} >= {"regression", "activation"}
     assert own_query["completion"]["status"] == "unknown"
-    after_query = operation_status(harness)
+    after_query = operation_status(harness, global_history=True)
     assert after_query["completion"]["status"] == "complete"
     assert after_query["completion"]["index_health"] == "not_examined"
     assert {row["stage"] for row in after_query["facts"]} >= {"index", "regression", "activation"}
@@ -105,7 +113,7 @@ def test_cross_operation_regression_activation_and_repeated_noop_stay_complete(h
     later = harness.run("apply", {"operation_id": "later-generation"}, action='index-build')["data"]
     harness.run("apply", {"operation_id": "later-activation", "generation_ref": later["generation_ref"],
                                 "expected_active": later["expected_active"]}, 'index-activate')
-    assert operation_status(harness)["completion"]["status"] == "complete"
+    assert operation_status(harness, global_history=True)["completion"]["status"] == "complete"
 
 
 @pytest.mark.parametrize("orphan_history", [False, True], ids=["no-control-plane", "unrooted-history"])
@@ -142,7 +150,7 @@ def test_self_sealed_activation_observation_without_real_active_chain_is_not_com
     control_plane = harness.root / "artifacts/indexes/local"
     assert not (control_plane / "active.json").exists()
     assert not any(control_plane.glob("activations/*.json"))
-    assert operation_status(harness)["completion"]["status"] == "pending"
+    assert operation_status(harness, global_history=True)["completion"]["status"] == "pending"
 
     pointer = sealed("index_manifest", "forged-pointer", {
         "channel": "local", "generation_id": manifest["generation_id"],
@@ -157,11 +165,14 @@ def test_self_sealed_activation_observation_without_real_active_chain_is_not_com
         # A prepared history object that is not reachable from active.json
         # supplies no activation fact, even though every local digest is valid.
         harness.write("artifacts/indexes/local/activations/" + pointer["digest"] + ".json", canonical(pointer))
-    completion = operation_status(harness)["completion"]
+    # Explicitly inspect the legacy cross-operation query/activation chain;
+    # a targeted status intentionally does not discover independent old work.
+    completion = operation_status(harness, global_history=True)["completion"]
     assert completion["status"] in {"pending", "unknown"}
     scanned = harness.run("source-scan", {"operation_id": "after-forged-observation"}, "scan")["data"]
     assert scanned["actionable_unit_ids"] == []
-    assert any(item["operation_id"] == "batch" and item["status"] != "complete" for item in scanned["finalization_pending"])
+    assert scanned["finalization_pending"] == []
+    assert scanned["execution_history"] == {"status": "not_inspected"}
     assert not (control_plane / "active.json").exists()
 
 
@@ -183,7 +194,7 @@ def test_real_independent_activation_without_regression_binding_rejects_forged_c
     else:
         operation, view_ref = "batch", applied_batch(harness)
     view = harness.record(view_ref)
-    journal = harness.record(f"logs/operations/{operation}/journal.json")
+    journal = harness.record(f".build/operations/{operation}/transaction/journal.json")
     applied = harness.record(journal["result_ref"])
     built = harness.run("apply", {"operation_id": "independent-index"}, "index-build")["data"]
     activated = harness.run("apply", {"operation_id": "independent-activation",
@@ -230,11 +241,18 @@ def test_real_independent_activation_without_regression_binding_rejects_forged_c
                 "generation_ref": built["generation_ref"], "expected_active": built["expected_active"],
                 "activated": True, "report_ref": report_ref, "activation_observation_ref": observation_ref}})
         harness.write(f".build/operations/{operation}/batch-complete.json", canonical(complete))
-    status = harness.run("source-scan", {"operation_id": "forgery-status", "target_operation_id": operation}, "status")["data"]["operations"][0]
+    statuses = harness.run("source-scan", {"operation_id": "forgery-status"}, "status")["data"]["operations"]
+    status = next(row for row in statuses if row["operation_id"] == operation)
     assert status["completion"]["status"] in {"pending", "unknown"}
+    if completion_kind == "batch":
+        formal = harness.run("source-scan", {"operation_id": "formal-forgery-status",
+            "target_operation_id": operation}, "status")["data"]["operations"][0]
+        assert formal["completion"]["published"] is True
+        assert formal["completion"]["batch_complete"] is False
     scanned = harness.run("source-scan", {"operation_id": "after-forged-regression"}, "scan")["data"]
     assert scanned["actionable_unit_ids"] == []
-    assert any(row["operation_id"] == operation and row["status"] != "complete" for row in scanned["finalization_pending"])
+    assert scanned["finalization_pending"] == []
+    assert scanned["execution_history"] == {"status": "not_inspected"}
     assert harness.record("artifacts/indexes/local/active.json") == pointer
 
 
@@ -270,11 +288,14 @@ def test_default_empty_raw_scope_is_valid_and_status_is_readonly(harness):
 
 
 def test_portable_formal_only_history_is_visible_without_private_tail_requirement(harness):
+    # Explicit legacy apply-run compatibility: a formal ingest record alone
+    # does not assert the new P7 publication/retrieval/cleanup completion.
     applied_batch(harness)
     # Model a consuming clone that retains shared records and current knowledge.
     import shutil
     shutil.rmtree(harness.root / ".build")
-    shutil.rmtree(harness.root / "logs/operations")
+    if (harness.root / "logs/operations").exists():
+        shutil.rmtree(harness.root / "logs/operations")
     scanned = harness.run("source-scan", {"operation_id": "consumer"}, "scan")["data"]
     assert scanned["actionable_unit_ids"] == [] and scanned["finalization_pending"] == []
     statuses = harness.run("source-scan", {"operation_id": "status"}, "status")["data"]["operations"]
@@ -282,6 +303,31 @@ def test_portable_formal_only_history_is_visible_without_private_tail_requiremen
     assert "record_formal" in {row["stage"] for row in imported["facts"]}
     assert imported["completion"]["status"] == "unknown"
     assert imported["completion"]["next_action"] == "check_local_index"
+
+
+def test_published_history_needs_no_producer_stage_or_local_index(planned_flow):
+    import shutil
+
+    flow = planned_flow
+    flow.produce()
+    harness = flow.h
+    protected = flow.protected_bytes()
+    root = harness.root.resolve(strict=True)
+    for name in (".build", "artifacts"):
+        target = harness.root / name
+        if target.exists():
+            assert target.resolve(strict=True).parent == root
+            shutil.rmtree(target)
+    status = harness.run("source-scan", {"operation_id": "portable-status",
+        "target_operation_id": flow.operation}, "status")["data"]["operations"][0]
+    assert status["completion"]["status"] == "complete"
+    assert status["completion"]["batch_complete"] is True
+    assert status["completion"]["index_health"] == "not_examined"
+    assert {row["stage"] for row in status["facts"]} == {"publication", "publication_completion"}
+    scanned = harness.run("source-scan", {"operation_id": "portable-fresh"}, "scan")["data"]
+    assert scanned["actionable_unit_ids"] == scanned["finalization_pending"] == []
+    assert scanned["execution_history"] == {"status": "not_inspected"}
+    assert flow.protected_bytes() == protected
 
 
 def test_missing_explicit_scope_preserves_registered_deletion(harness):
@@ -330,7 +376,7 @@ def test_empty_raw_inventory_with_maintenance_debt_is_not_a_noop(harness):
     assert status["completion"]["status"] != "not_applicable"
 
 
-def test_frozen_batch_status_binds_plan_review_lint_and_original_cases(planned_flow):
+def test_cleaned_batch_status_uses_formal_completion_and_frozen_queries_cannot_be_replaced(planned_flow):
     import hashlib
     import json
     flow = planned_flow
@@ -338,24 +384,24 @@ def test_frozen_batch_status_binds_plan_review_lint_and_original_cases(planned_f
     harness, operation = flow.h, flow.operation
     status = harness.run("source-scan", {"operation_id": "status", "target_operation_id": operation}, "status")["data"]["operations"][0]
     assert status["completion"]["status"] == "complete"
-    assert {row["stage"] for row in status["facts"]} >= {"semantic_plan", "view", "content_review", "lint", "index", "regression", "activation"}
-    original_report = next((harness.root / ".build/operations" / operation / "regression").glob("*.json"))
-    original_ref = original_report.relative_to(harness.root).as_posix()
+    assert {row["stage"] for row in status["facts"]} == {"publication", "publication_completion"}
+    assert not (harness.root / flow.state["view_ref"]).exists()
+    completion_ref = status["completion"]["completion_ref"]
+    completion = harness.record(completion_ref)
+    original_ref = completion["data"]["report_ref"]
     # A real successful alternate query still cannot replace frozen batch cases.
     original = harness.record(original_ref)
     cases = [{"id": "other-query", "query": "fixture", "purpose": "guidance", "required": ["rule"]}]
-    # Re-execute a separate declared case set without trying to reactivate an
-    # already active generation under a replacement CAS baseline.
-    definition = {**original, "operation_id": "alternate-query", "cases": cases,
-                  "cases_digest": hashlib.sha256(json.dumps(cases, sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
-                  "outcomes": [], "passed": False, "index_verified": False}
-    definition.pop("digest")
-    definition["digest"] = hashlib.sha256(json.dumps(definition, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    ref = harness.write(".build/operations/alternate-query/declared-cases.json", json.dumps(definition).encode())
-    alternate = harness.run("apply", {"operation_id": "alternate-query", "report_ref": ref}, "regression-verify")
-    assert alternate["data"]["passed"]
-    assert alternate["data"]["activated"] is False
-    original_report.rename(original_report.with_suffix(".retained"))
+    alternate = harness.run("apply", {"operation_id": "alternate-query", "report_ref": original_ref,
+        "cases": cases}, "regression-verify", expected=2)
+    assert alternate["diagnostics"][0]["code"] == "REGRESSION_INPUT_CHANGED"
+    assert completion["retrieval"]["regression"]["cases"] == original["cases"]
+    # A broken selected formal binding remains a gap, even with other passing
+    # independent results or old private summaries on this machine.
+    completion["publication_digest"] = "0" * 64
+    completion.pop("digest")
+    completion["digest"] = hashlib.sha256(json.dumps(completion, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    harness.write(completion_ref, json.dumps(completion).encode())
     rejected = harness.run("source-scan", {"operation_id": "status", "target_operation_id": operation}, "status")["data"]["operations"][0]
     assert rejected["completion"]["status"] != "complete"
     assert rejected["completion"]["next_action"] == "inspect_finalization"
@@ -393,7 +439,7 @@ def test_missing_original_cas_baseline_is_unknown_and_never_reconstructed(harnes
 
 def test_unreadable_local_journal_requires_inspection_not_clone_readiness(harness):
     applied_batch(harness)
-    harness.write("logs/operations/batch/journal.json", b"[]")
+    harness.write(".build/operations/batch/transaction/journal.json", b"[]")
     status = operation_status(harness)
     assert status["completion"]["status"] == "unknown"
     assert status["completion"]["next_action"] == "recover_transaction"

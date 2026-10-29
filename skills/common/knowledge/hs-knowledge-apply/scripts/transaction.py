@@ -4,6 +4,7 @@ import base64
 import importlib
 import pathlib
 import re
+from types import SimpleNamespace
 
 from support import (
     Blocked,
@@ -19,13 +20,43 @@ from support import (
 )
 
 
+def transaction_prefix(ctx, operation):
+    current = f".build/operations/{operation}/transaction"
+    legacy = f"logs/operations/{operation}"
+    if ctx.path(current + "/journal.json").exists() and ctx.path(legacy + "/journal.json").exists():
+        raise Invalid("both current and legacy transaction journals exist for this operation")
+    return legacy if ctx.path(legacy + "/journal.json").exists() else current
+
+
+def journal_reference(ctx, operation):
+    return transaction_prefix(ctx, operation) + "/journal.json"
+
+
+def register_owned(ctx, relative, operation):
+    """Private transaction writes register their exact bytes in the public ledger."""
+    modules = getattr(ctx, "modules", None)
+    if not relative.startswith(f".build/operations/{operation}/") or not modules or "runtime" not in modules:
+        return
+    shared = modules["runtime"].OperationContext(ctx.root, {"operation_id": operation},
+        modules=modules, rules=ctx.rules, tool=ctx.identity, rules_digest=ctx.rules_digest)
+    shared.register_owned(relative, pathlib.Path(native_path(ctx.path(relative))).read_bytes())
+
+
+def content_rows(ctx, view):
+    if not view.get("publication_plan"):
+        return view["writes"]
+    publication = importlib.import_module(ctx.domain.__package__ + ".publication")
+    public = SimpleNamespace(root=ctx.root, operation=ctx.operation(view))
+    return publication.transaction_rows(public, view)
+
+
 def current_digest(ctx, path):
     if isinstance(path, str) and path.startswith("logs/ingest/"):
         if not re.fullmatch(r"logs/ingest/[A-Za-z0-9][A-Za-z0-9_.-]{0,120}\.yaml", path):
             raise Invalid("invalid controlled processing-record path")
         target = ctx.path(path, ("logs/ingest",))
     else:
-        target = ctx.path(path, ("knowledge", "governance/sources.lock.yaml", "index.md"))
+        target = ctx.path(path, ("knowledge", "governance/sources.lock.yaml", "index.md", "logs/evidence/published"))
     if target.exists() and not target.is_file():
         raise Invalid("transaction target is not a file")
     return digest(target.read_bytes()) if target.is_file() else None
@@ -38,7 +69,7 @@ def read_other_journal(ctx, relative, directory_operation):
     resumed, re-signed, migrated or used to authorize the new operation.
     Same-operation reads keep Context.read's exact rules identity requirement.
     """
-    path = ctx.path(relative, ("logs/operations",))
+    path = ctx.path(relative, ("logs/operations", ".build/operations"))
     other = verify(strict_json(pathlib.Path(native_path(path)).read_text(encoding="utf-8")))
     if other.get("record_kind") != "transaction_journal":
         raise Invalid("another operation has an unsupported transaction journal kind")
@@ -149,10 +180,11 @@ def fixture_fault_allowed(ctx):
 
 def save_journal(ctx, journal):
     ctx.save(
-        f"logs/operations/{journal['operation_id']}/journal.json",
+        journal_reference(ctx, journal["operation_id"]),
         journal,
         immutable=False,
     )
+    register_owned(ctx, journal_reference(ctx, journal["operation_id"]), journal["operation_id"])
 
 
 def preflight_recovery(ctx, journal):
@@ -183,14 +215,15 @@ def validate_journal(ctx, journal, op):
     if view["digest"] != journal.get("view_digest"):
         raise Invalid("journal is not bound to the exact transaction view")
     expected = []
-    rows = view["writes"] + view.get("deletes", [])
+    rows = content_rows(ctx, view) + view.get("deletes", [])
     if journal.get("ingest_record_ref"):
         from transaction_v3 import record_input
         original, entry = record_input(ctx, {"operation_id": op, "ingest_record_ref": journal["ingest_record_ref"],
                                              "content_review_ref": journal.get("content_review_ref")}, view, proof)
         if original["digest"] != journal.get("ingest_record_digest"):
             raise Invalid("journal processing-record input changed")
-        rows = rows + [entry]
+        if not journal.get("publication_protocol"):
+            rows = rows + [entry]
     for row in rows:
         old = row["expected_old_digest"]
         expected.append(
@@ -199,7 +232,7 @@ def validate_journal(ctx, journal, op):
                 "old_digest": old,
                 "new_digest": row.get("final_digest"),
                 "bytes_b64": row.get("bytes_b64"),
-                "backup_ref": f"logs/operations/{op}/backups/{old}.bin"
+                "backup_ref": transaction_prefix(ctx, op) + f"/backups/{old}.bin"
                 if old
                 else None,
             }
@@ -228,7 +261,7 @@ def finish_commit(ctx, journal):
         view, _ = validate_journal(ctx, journal, journal["operation_id"])
         check_execution_inputs(ctx, view, journal)
     op = journal["operation_id"]
-    result_ref = f"logs/operations/{op}/apply-result.json"
+    result_ref = transaction_prefix(ctx, op) + "/apply-result.json"
     result = ctx.record(
         "apply_result",
         op,
@@ -246,9 +279,10 @@ def finish_commit(ctx, journal):
         verification_tier=journal["verification_tier"],
         batch_kind=journal.get("batch_kind", "content"),
         **({"ingest_record_path": next(row["path"] for row in journal["entries"] if row["path"].startswith("logs/ingest/"))}
-           if journal.get("ingest_record_ref") else {}),
+           if journal.get("ingest_record_ref") and not journal.get("publication_protocol") else {}),
     )
     ctx.save(result_ref, result)
+    register_owned(ctx, result_ref, op)
     journal["status"] = "committed"
     journal["result_ref"] = result_ref
     save_journal(ctx, journal)
@@ -320,9 +354,9 @@ def execute(ctx, request, action="run", *, safety_only=False):
         if purpose not in ("current", "historical"):
             raise Invalid("unknown content verification purpose")
         result_ref = request.get("apply_result_ref")
-        ctx.path(result_ref, (f"logs/operations/{op}",))
+        ctx.path(result_ref, (f"logs/operations/{op}", f".build/operations/{op}/transaction"))
         result = ctx.read(result_ref)
-        journal = ctx.read(f"logs/operations/{op}/journal.json")
+        journal = ctx.read(journal_reference(ctx, op))
         view, proof = validate_journal(ctx, journal, op)
         if (
             journal.get("status") != "committed"
@@ -442,7 +476,7 @@ def execute(ctx, request, action="run", *, safety_only=False):
         }
     if action not in ("run", "inspect", "resume", "rollback"):
         raise Invalid("unsupported transaction action")
-    journal_ref = f"logs/operations/{op}/journal.json"
+    journal_ref = journal_reference(ctx, op)
     with WriterLock(ctx.root):
         journal = ctx.read(journal_ref) if ctx.path(journal_ref).exists() else None
         if action == "inspect":
@@ -463,20 +497,22 @@ def execute(ctx, request, action="run", *, safety_only=False):
                 "phase": "inspected",
             }
         operations = ctx.path("logs/operations")
+        current_operations = ctx.path(".build/operations")
         for other_path in (
-            operations.glob("*/journal.json")
+            list(operations.glob("*/journal.json")) + list(current_operations.glob("*/transaction/journal.json"))
             if action == "run" and journal is None
             else []
         ):
-            if other_path.parent.name == op:
+            other_operation = other_path.parent.parent.name if other_path.parent.name == "transaction" else other_path.parent.name
+            if other_operation == op:
                 continue
-            other = read_other_journal(ctx, other_path.relative_to(ctx.root).as_posix(), other_path.parent.name)
+            other = read_other_journal(ctx, other_path.relative_to(ctx.root).as_posix(), other_operation)
             if other.get("record_kind") != "transaction_journal" or other.get(
                 "status"
             ) not in ("committed", "rolled_back"):
                 raise Blocked(
                     "another operation requires recovery before domain writes: "
-                    + other_path.parent.name
+                    + other_operation
                 )
         if journal and journal["status"] == "committed":
             if action == "rollback":
@@ -578,7 +614,7 @@ def execute(ctx, request, action="run", *, safety_only=False):
             check_execution_view(ctx, view)
         else:
             validate_final_cards(ctx, view)
-        rows = view["writes"] + view.get("deletes", [])
+        rows = content_rows(ctx, view) + view.get("deletes", [])
         ingest_record = None
         if view.get("review_mode") != "record_only" and not safety_only:
             from transaction_v3 import check_admission, check_current_code
@@ -589,7 +625,8 @@ def execute(ctx, request, action="run", *, safety_only=False):
         if request.get("ingest_record_ref"):
             from transaction_v3 import record_input
             ingest_record, entry = record_input(ctx, request, view, proof)
-            rows = rows + [entry]
+            if not (safety_only and view.get("publication_plan")):
+                rows = rows + [entry]
         for row in rows:
             if current_digest(ctx, row["path"]) != row["expected_old_digest"]:
                 raise Blocked("complete write-set CAS conflict: " + row["path"])
@@ -604,7 +641,7 @@ def execute(ctx, request, action="run", *, safety_only=False):
         entries = []
         for row in rows:
             old = row["expected_old_digest"]
-            backup_ref = f"logs/operations/{op}/backups/{old}.bin" if old else None
+            backup_ref = transaction_prefix(ctx, op) + f"/backups/{old}.bin" if old else None
             if old:
                 raw = ctx.path(row["path"]).read_bytes()
                 if digest(raw) != old:
@@ -614,6 +651,7 @@ def execute(ctx, request, action="run", *, safety_only=False):
                     raise Invalid("backup object corrupted")
                 if not backup_path.exists():
                     atomic_bytes(backup_path, raw)
+                register_owned(ctx, backup_ref, op)
             entries.append(
                 {
                     "path": row["path"],
@@ -640,6 +678,7 @@ def execute(ctx, request, action="run", *, safety_only=False):
             verification_tier="fixed_business_checks" if ctx.domain and not safety_only else "transaction_bytes_only",
             **({"execution_checks": "safety_only"} if safety_only else {}),
             entries=entries,
+            **({"publication_protocol": "1.0"} if safety_only and view.get("publication_plan") else {}),
             **({"check_inputs": request["check_inputs"]} if request.get("check_inputs") else {}),
             **({"content_review_ref": request["content_review_ref"],
                 "content_review_digest": content_review["digest"]} if content_review else {}),

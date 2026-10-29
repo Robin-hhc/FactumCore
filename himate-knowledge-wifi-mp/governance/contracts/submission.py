@@ -54,13 +54,59 @@ def checked_view(ctx, request):
     return read_view(ctx.shared, request)
 
 
+def _external_obligations():
+    return [
+        {"owner": "authorized_committer", "action": "review scoped diff and create commit", "status": "pending"},
+        {"owner": "fixed_ci", "action": "reuse lint deterministic checks on submitted content", "status": "pending"},
+        {"owner": "authorized_committer", "action": "push and verify remote commit identity", "status": "pending"},
+    ]
+
+
+def _published_handoff(ctx, request):
+    from . import publication
+    ref = request.get("publication_ref") or publication.manifest_ref(ctx.operation(request))
+    manifest = publication.read_manifest(ctx.shared, ref, verify_files=True)
+    if manifest["operation_id"] != ctx.operation(request):
+        raise Invalid("publication belongs to another operation")
+    completion = publication.read_completion(ctx.shared, manifest)
+    if completion is None or completion.get("batch_complete") is not True:
+        raise Blocked("publication has not completed applicable retrieval and cleanup")
+    rows = list(manifest["files"]) + list(completion.get("retrieval", {}).get("files", []))
+    for path in (ref, publication.completion_ref(manifest["operation_id"])):
+        raw = pathlib.Path(native_path(ctx.path(path))).read_bytes()
+        rows.append({"path": path, "sha256": digest(raw), "bytes": len(raw)})
+    writes = {}
+    for row in rows:
+        path = ctx.path(row["path"], ("knowledge", "governance/sources.lock.yaml", "index.md", "logs"))
+        raw = pathlib.Path(native_path(path)).read_bytes()
+        if digest(raw) != row["sha256"] or len(raw) != row["bytes"]:
+            raise Blocked("formal publication file differs from selected bytes: " + row["path"])
+        if row["path"] in writes and writes[row["path"]]["sha256"] != row["sha256"]:
+            raise Invalid("conflicting publication file identities")
+        writes[row["path"]] = {"path": row["path"], "sha256": row["sha256"]}
+    deletes = [row["path"] for row in manifest.get("deletes", [])]
+    data = {"publication_ref": ref, "publication_digest": manifest["digest"],
+            "publication_status": "ready_to_submit", "phase": "ready_to_submit",
+            "batch_kind": manifest["batch_kind"], "commit_files": sorted(set(writes) | set(deletes)),
+            "write_manifest": [writes[path] for path in sorted(writes)], "delete_manifest": deletes,
+            "view_digest": manifest["reviewed_view_digest"], "external_obligations": _external_obligations(),
+            "git_merge_verified": False, "remote_push_verified": False}
+    handoff_ref = "logs/publications/" + manifest["operation_id"] + "/submit-ready.json"
+    handoff = ctx.record("artifact_manifest", manifest["operation_id"], purpose="publication_handoff", **data)
+    ctx.save(handoff_ref, handoff)
+    return {"publish_handoff_ref": handoff_ref, **data}
+
+
 def publish_handoff(ctx, request):
     ctx = ctx if isinstance(ctx, _DataContext) else _DataContext(ctx)
     op = ctx.operation(request)
+    formal_ref = "logs/publications/" + op + "/manifest.json"
+    if request.get("publication_ref") or ctx.path(formal_ref).is_file():
+        return _published_handoff(ctx, request)
     apply_ref = request.get("apply_result_ref")
     applied = None
     if apply_ref:
-        ctx.path(apply_ref, (f"logs/operations/{op}",))
+        ctx.path(apply_ref, (f"logs/operations/{op}", f".build/operations/{op}/transaction"))
         applied = ctx.read(apply_ref)
         if applied.get("record_kind") != "apply_result":
             raise Invalid("apply_result_ref must name an apply result")
@@ -90,11 +136,7 @@ def publish_handoff(ctx, request):
     batch = request.get("v3_required") or view.get("v3_required") or kind == "record_only"
     phase = ("record_only_ready" if kind == "record_only" else "ready_to_submit") if batch else "awaiting_external_publish"
     files = [row["path"] for row in writes] + deletes
-    obligations = [
-        {"owner": "authorized_committer", "action": "review scoped diff and create commit", "status": "pending"},
-        {"owner": "fixed_ci", "action": "reuse lint deterministic checks on submitted content", "status": "pending"},
-        {"owner": "authorized_committer", "action": "push and verify remote commit identity", "status": "pending"},
-    ]
+    obligations = _external_obligations()
     record = ctx.record(
         "publish_handoff", op, status=phase, view_ref=view_ref, view_digest=view["digest"],
         **({"apply_result_ref": apply_ref, "apply_result_digest": applied["digest"]} if applied else {}),
@@ -115,7 +157,7 @@ def verify_submission(ctx, request):
     """Read actual Git objects; a claimed SHA or ready receipt is insufficient."""
     ctx = ctx if isinstance(ctx, _DataContext) else _DataContext(ctx)
     ready = publish_handoff(ctx, {**request, "v3_required": True})
-    handoff = ctx.read(ready["publish_handoff_ref"])
+    handoff = ready if "publication_ref" in ready else ctx.read(ready["publish_handoff_ref"])
     commit = request.get("commit_sha")
     if not isinstance(commit, str) or not re.fullmatch(r"[0-9a-f]{40}(?:[0-9a-f]{24})?", commit):
         raise Blocked("actual exact Git commit SHA is required; batch remains pending submission")
@@ -167,12 +209,14 @@ def verify_submission(ctx, request):
     allowed = {prefix + ref for ref in handoff["commit_files"]}
     if not changed or not changed <= allowed:
         raise Invalid("Git submission contains files outside the exact authorized batch")
-    record = ctx.record("publish_handoff", ctx.operation(request),
+    record = ctx.record("artifact_manifest" if "publication_ref" in ready else "publish_handoff", ctx.operation(request),
                         **{key: value for key, value in handoff.items() if key not in {
                             "digest", "schema_version", "record_kind", "operation_id", "rules_digest", "tool_identity", "status"}},
+                        **({"purpose": "publication_submission"} if "publication_ref" in ready else {}),
                         status="submitted", commit_sha=commit, repository_root=str(repository),
                         actual_changed_files=sorted(changed), git_commit_verified=True)
-    ref = f"logs/operations/{ctx.operation(request)}/submission-{commit}.json"
+    prefix = "logs/publications" if "publication_ref" in ready else "logs/operations"
+    ref = f"{prefix}/{ctx.operation(request)}/submission-{commit}.json"
     ctx.save(ref, record)
     return {"submission_ref": ref, "commit_sha": commit, "commit_files": handoff["commit_files"],
             "publication_status": "submitted", "phase": "submitted"}

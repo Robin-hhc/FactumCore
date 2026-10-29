@@ -83,6 +83,100 @@
         }
       },
       "additionalProperties": true
+    },
+    "content_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "publication_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "publication_plan_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "staged_objects": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/staged_object"
+      }
+    },
+    "owned_files": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/owned_file"
+      }
+    },
+    "event_proposals": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/event_proposal"
+      }
+    },
+    "publication_plan": {
+      "type": "object",
+      "required": [
+        "protocol_version",
+        "operation_id",
+        "staged_objects",
+        "event_proposals",
+        "payloads",
+        "deletes",
+        "expected_old",
+        "dispositions",
+        "content_digest",
+        "owned_files",
+        "publication_plan_digest"
+      ],
+      "properties": {
+        "protocol_version": {
+          "const": "1.0"
+        },
+        "operation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "publication_plan_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "staged_objects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/staged_object"
+          }
+        },
+        "event_proposals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/event_proposal"
+          }
+        },
+        "owned_files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/owned_file"
+          }
+        },
+        "payloads": {
+          "type": "array"
+        },
+        "deletes": {
+          "type": "array"
+        },
+        "expected_old": {
+          "type": "object"
+        },
+        "dispositions": {
+          "type": "array"
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": true,
@@ -1003,5 +1097,105 @@
         }
       }
     }
-  ]
+  ],
+  "$defs": {
+    "staged_object": {
+      "type": "object",
+      "required": [
+        "stage_ref",
+        "final_ref",
+        "kind",
+        "sha256",
+        "bytes",
+        "owner_operation_id"
+      ],
+      "properties": {
+        "stage_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "final_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "owner_operation_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "owned_file": {
+      "type": "object",
+      "required": [
+        "path",
+        "sha256",
+        "bytes",
+        "owner_operation_id"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "owner_operation_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "event_proposal": {
+      "type": "object",
+      "required": [
+        "source_id",
+        "old_snapshot_ids",
+        "new_snapshot_id",
+        "source_lock_digest"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "old_snapshot_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "new_snapshot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_lock_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
 }

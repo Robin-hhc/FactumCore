@@ -104,7 +104,7 @@ def safe_path(root, relative, prefixes=None):
         if current.exists():
             aliases = [
                 entry.name
-                for entry in current.iterdir()
+                for entry in pathlib.Path(native_path(current)).iterdir()
                 if entry.name.casefold() == part.casefold()
             ]
             if aliases and aliases != [part]:
@@ -189,7 +189,7 @@ def sync_directory(path):
 
 class WriterLock:
     def __init__(self, root):
-        self.path = safe_path(root, "logs/operations/.writer.lock")
+        self.path = safe_path(root, ".build/runtime/writer.lock")
 
     def __enter__(self):
         pathlib.Path(native_path(self.path.parent)).mkdir(parents=True, exist_ok=True)

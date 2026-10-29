@@ -33,6 +33,38 @@ def target(path, **extra):
     return {"source_path": path, **extra}
 
 
+def test_prepare_does_not_publish_or_create_sibling_operations(harness):
+    harness.write("docs-raw/specs/source.md", b"# Source\nCurrent exact input.\n")
+    def formal():
+        return {p.relative_to(harness.root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+                for p in harness.root.rglob("*") if p.is_file()
+                and not p.relative_to(harness.root).as_posix().startswith(".build/")}
+    before = formal()
+    first = prepare(harness, {"operation_id": "first", "targets": [target("docs-raw/specs/source.md")]})
+    assert formal() == before
+    material = harness.record(first["data"]["material_ref"])
+    assert all(row["bundle_ref"].startswith(".build/operations/first/sources/") for row in material["bundles"])
+    assert {p.name for p in (harness.root / ".build/operations").iterdir()} == {"first"}
+    second = prepare(harness, {"operation_id": "fresh", "targets": [target("docs-raw/specs/source.md")]})
+    assert formal() == before
+    assert all(row["owner_operation_id"] == "fresh"
+               for row in harness.record(second["data"]["bundle_ref"])["staged_objects"])
+
+
+def test_capture_rejects_formal_output_before_any_capture(harness):
+    harness.write("docs-raw/specs/source.md", b"# Source\n")
+    incoming = harness.base / "unsafe-output.json"
+    incoming.write_text(json.dumps({"operation_id": "stage-only", "source_path": "docs-raw/specs/source.md",
+                                    "source_id": "source"}), encoding="utf-8")
+    output = harness.root / "logs/unsafe-capture.json"
+    result = subprocess.run([sys.executable, str(harness.packages / "hs-knowledge-source-prepare/scripts/cli.py"),
+                             "--input", str(incoming), "--output", str(output), "--knowledge-root", str(harness.root),
+                             "--rules-digest", harness.rules, "--action", "capture"], capture_output=True)
+    assert result.returncode == 2
+    assert not output.exists()
+    assert not (harness.root / ".build/operations/stage-only").exists()
+
+
 def test_default_prepare_works_with_only_its_installed_package(harness):
     harness.write("docs-raw/specs/source.md", b"# Exact original\nSynthetic facts.\n")
     installation = harness.base / "installed" / "hs-knowledge-source-prepare"
@@ -153,6 +185,8 @@ def test_supplement_checks_only_adopted_sources_and_stops_their_drift(harness):
 def test_prepare_reads_each_adopted_version_across_lifecycles(harness):
     _, first = harness.capture("first", b"# Source\nOld first version.\n")
     _, second = harness.capture("second", b"# Source\nOld second version.\n")
+    harness.publish_bundle(first)
+    harness.publish_bundle(second)
     harness.write("knowledge/rules/draft.md", harness.card("draft", first, lifecycle="draft"))
     harness.write("knowledge/rules/old.md", harness.card("old", second, lifecycle="deprecated"))
     harness.write("governance/sources.lock.yaml", yaml.safe_dump({"schema_version": "2.0", "resources": first["resources"],
@@ -226,18 +260,19 @@ def test_code_config_drift_cannot_reuse_old_material(harness):
     assert any(error["code"] == "SOURCE_CHANGED" for error in invalid["diagnostics"])
 
 
-def test_changed_registered_raw_is_recorded_before_capture_success(harness):
+def test_changed_registered_raw_only_freezes_event_proposal(harness):
     _, old = harness.capture("old", b"# Old source\n")
     harness.write("governance/sources.lock.yaml", yaml.safe_dump({"schema_version": "2.0", "resources": old["resources"],
                                                                "snapshots": old["snapshots"]}).encode())
     formal_lock = (harness.root / "governance/sources.lock.yaml").read_bytes()
     harness.write("docs-raw/specs/source.md", b"# New source\n")
     response = harness.run("source-prepare", {"operation_id": "new", "source_path": "docs-raw/specs/source.md", "source_id": "synthetic"}, "capture")
-    assert len(response["data"]["event_refs"]) == 1
-    assert all((harness.root / reference).is_file() for reference in response["data"]["event_refs"])
-    state = json.loads((harness.root / "logs/events/state.json").read_bytes())
-    assert state["pending_event_ids"] == []
-    assert state["processed_event_ids"]
+    assert response["data"]["event_refs"] == []
+    assert len(response["data"]["event_proposals"]) == 1
+    proposal = response["data"]["event_proposals"][0]
+    assert proposal["old_snapshot_ids"] == [old["snapshots"][0]["snapshot_id"]]
+    assert proposal["source_lock_digest"] == hashlib.sha256(formal_lock).hexdigest()
+    assert not (harness.root / "logs/events").exists()
     assert (harness.root / "governance/sources.lock.yaml").read_bytes() == formal_lock
 
 

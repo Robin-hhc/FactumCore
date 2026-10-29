@@ -88,13 +88,16 @@ def check_admission(ctx, request, view):
         recovery = snapshot.get("recovery", {})
         if recovery.get("kind") != "git" and recovery.get("method") != "git":
             if (recovery.get("method") != "evidence_object"
-                    or recovery.get("path") != "logs/evidence/objects/" + str(snapshot.get("sha256")) + ".bin"):
+                    or recovery.get("path") not in {
+                        "logs/evidence/objects/" + str(snapshot.get("sha256")) + ".bin",
+                        "logs/evidence/published/objects/" + str(snapshot.get("sha256")) + ".bin"}):
                 raise Blocked("local admission requires an exact captured source object")
         try:
             # Local ingest precedes human Git submission. A hash/size checked,
             # captured immutable object is sufficient here; cross-clone source
             # availability is a separate publishing responsibility.
-            contracts(ctx, "source_resources").recover_snapshot(ctx.root, snapshot)
+            contracts(ctx, "source_resources").recover_snapshot(ctx.root, snapshot,
+                staged_objects=view.get("staged_objects"))
         except (ValueError, OSError) as exc:
             raise Blocked("exact source recovery is unavailable for local admission") from exc
 
@@ -132,7 +135,7 @@ def check_execution_view(ctx, view):
             knowledge.decode_card(raw, path, ctx.rules)
     for snapshot in view.get("source_refs", []):
         try:
-            sources.recover_snapshot(ctx.root, snapshot)
+            sources.recover_snapshot(ctx.root, snapshot, staged_objects=view.get("staged_objects"))
         except (ValueError, OSError) as exc:
             raise Blocked("exact source recovery is unavailable for batch execution") from exc
 
@@ -232,6 +235,15 @@ def record_only_view(ctx, request):
     view = ctx.record("final_view", op, review_mode="record_only", writes=[], deletes=[], source_refs=[],
                       plan_ref=record["scan_ref"], plan_digest=record["scan_digest"], baseline_digest=digest({"files": {}}),
                       batch_kind="record_only", ingest_record_ref=request["ingest_record_ref"])
+    if ctx.domain is not None:
+        publication = contracts(ctx, "publication")
+        public = SimpleNamespace(root=ctx.root, operation=op)
+        view["staged_objects"], view["event_proposals"] = [], []
+        view["publication_plan"] = publication.prepare_plan(public, view, disposition_preview=record)
+        view["content_digest"] = view["publication_plan"]["content_digest"]
+        view = seal(view)
     view_ref = f".build/operations/{op}/record-only-view.json"
     ctx.save(view_ref, view)
+    from transaction import register_owned
+    register_owned(ctx, view_ref, op)
     return {**request, "view_ref": view_ref}

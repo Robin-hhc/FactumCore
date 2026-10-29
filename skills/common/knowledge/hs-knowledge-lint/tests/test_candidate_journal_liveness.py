@@ -1,4 +1,4 @@
-"""Migrated candidate quality checks retain actual transaction-context limits."""
+"""Candidate quality reads explicit inputs; writer barriers belong to P7."""
 import hashlib
 import json
 
@@ -37,7 +37,7 @@ def test_old_foreign_terminal_allows_current_candidate_checks(harness, status):
 
 
 @pytest.mark.parametrize("kind", ["prepared", "bad-seal", "bad-op", "bad-schema", "bad-kind", "same-operation", "bad-json", "unknown-state"])
-def test_unverified_or_own_old_journal_cannot_make_candidate_clean(harness, kind):
+def test_unreferenced_old_journal_does_not_change_candidate_quality(harness, kind):
     view, _ = harness.view()
     changes = {"status": "prepared"} if kind == "prepared" else {}
     changes.update({"operation_id": "wrong"} if kind == "bad-op" else {})
@@ -52,10 +52,10 @@ def test_unverified_or_own_old_journal_cannot_make_candidate_clean(harness, kind
     if kind == "bad-json":
         old.write_bytes(b"{unfinished")
     before = old.read_bytes()
-    result = check(harness, view, expected=2)
-    assert result["status"] == "incomplete" and result["complete"] is False
+    result = check(harness, view)
+    assert result["status"] == "passed" and result["complete"] is True
     findings = [finding for row in result["checks"] if row["group"] == "view" for finding in row["findings"]]
-    assert findings
+    assert not findings
     assert old.read_bytes() == before
     assert not (harness.root / "knowledge").exists()
 

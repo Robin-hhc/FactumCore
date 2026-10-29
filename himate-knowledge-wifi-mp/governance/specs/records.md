@@ -12,6 +12,10 @@ apply 自身针对实际拟写视图运行完整固定业务检查，保留来�
 
 事务 journal 记录完整 writes/deletes、expected-old／最终摘要、持久备份及每步结果。committed 重入返回原结果；非终态先受控恢复。发生外部新编辑时停止并保留现场，不覆盖编辑来完成恢复。索引和维护记录独立绑定代次、当前事件 epoch 及两水位，索引回滚不能撤销当前阻断。
 
+新 ingest 的 P1—P6 只在 `.build/operations/<op>/` 保存本批材料、稿件、检查报告、待发布记录和归属清单。普通 scan 以正式处理记录和实际来源为准，不发现或恢复旧执行目录。新事务、备份和结果位于本批 `transaction/`，共用写锁位于 `.build/runtime/writer.lock`；旧事务仅在明确兼容／写安全检查中读取，不自动迁移。
+
+P4 冻结 `publication_plan_digest`（含暂存映射）与 `content_digest`（确切业务内容，排除执行地址及 P7 后生成事实）。P7 内容及依据核验后才发布正式 ingest record 和不可变 `logs/publications/<op>/manifest.json`。`completion.json` 按 CAS 保存实际索引／冻结查询／激活和限定清理进度；`published=true` 与 `batch_complete=true` 分别表达发布和整批收尾。清理失败为 `cleanup_pending`，重入只补清理，保持已经发布的事实；未声明、借用或受保护文件保留并列原因。不得将执行完成记录解释为所有 defer／failed／uncovered 欠账已解决。
+
 索引和查询不要求 apply／复核的上游通过证明。当前源码及模块／Target 范围直接按实际配置核验；已采用构建／运行材料时按其实际业务指纹复查，不以流程票据代替。
 
 直接指定 Git knowledge_commit 时只核对实际仓库快照内容，不推断发布者身份或 CI 已通过。显式提供发布签名回执时，发布身份与受信签名仍须核验；这是发布数据真实性，不是上游 Skill 交棒证明。普通本地运行不需要发布回执、签名或 catalog 登记。真实宿主 Workflow 触发、六 Target、CI 合入与权限部署各有独立验收；Schema、包测试或合成数据不能代替。

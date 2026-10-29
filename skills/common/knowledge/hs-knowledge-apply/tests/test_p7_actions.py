@@ -66,12 +66,19 @@ class PublicP7:
         assert response.get("digest") == HELPER.sha(HELPER.canonical({key: value for key, value in response.items() if key != "digest"}))
         return response
 
-    def content(self, operation="batch", *, omitted_heading=False):
+    def content(self, operation="batch", *, omitted_heading=False, legacy_objects=True):
         original = b"Capture marker is an explicit synthetic rule.\nSecond line.\n"
         self.write("docs-raw/specs/raw.md", original)
         captured = self.call("capture", {"operation_id": operation + "-raw", "source_id": "raw",
                              "source_path": "docs-raw/specs/raw.md"}, skill="hs-knowledge-source-prepare")
         bundle = self.record(captured["data"]["bundle_ref"])
+        if legacy_objects:
+            # These cases deliberately exercise the legacy, already-formal
+            # source protocol. New publication cases keep the capture staged.
+            for entry in bundle.get("staged_objects", []):
+                raw = Path(self.modules["runtime"].native_path(self.root / entry["stage_ref"])).read_bytes()
+                assert len(raw) == entry["bytes"] and HELPER.sha(raw) == entry["sha256"]
+                self.write(entry["final_ref"], raw)
         snapshot = bundle["snapshots"][0]
         template = (self.root / "governance/templates/rule.md").read_text(encoding="utf-8")
         for key, value in {"card_id": "batch-card", "title": "Batch card", "summary": "Capture marker",
@@ -133,7 +140,7 @@ def test_public_batch_complete_reentry_and_independent_query(tmp_path):
     completed = trial.call("batch", request)
     data = completed["data"]
     assert completed["phase"] == "completed" and data["batch_complete"] and data["activated"]
-    journal = trial.record("logs/operations/batch/journal.json")
+    journal = trial.record(".build/operations/batch/transaction/journal.json")
     assert journal["status"] == "committed" and journal["verification_tier"] == "transaction_bytes_only"
     assert journal["execution_checks"] == "safety_only"
     assert set(data["commit_files"]) == {"knowledge/rules/batch-card.md", "governance/sources.lock.yaml"}
@@ -151,7 +158,7 @@ def test_batch_does_not_repeat_p5_quality_and_old_run_json_cannot_disable_it(tmp
     assert old["status"] == "error" and set((trial.root / "knowledge").rglob("*.md")) == before
     result = trial.call("batch", request)
     assert result["data"]["batch_complete"]
-    assert trial.record("logs/operations/batch/apply-result.json")["verification_tier"] == "transaction_bytes_only"
+    assert trial.record(".build/operations/batch/transaction/apply-result.json")["verification_tier"] == "transaction_bytes_only"
 
 
 def test_batch_input_drift_blocks_before_any_target_write(tmp_path):
@@ -163,7 +170,7 @@ def test_batch_input_drift_blocks_before_any_target_write(tmp_path):
     assert blocked["status"] == "blocked"
     assert not (trial.root / "knowledge/rules/batch-card.md").exists()
     assert (trial.root / "governance/sources.lock.yaml").read_bytes() == original_lock
-    assert not (trial.root / "logs/operations/batch/journal.json").exists()
+    assert not (trial.root / ".build/operations/batch/transaction/journal.json").exists()
 
 
 def test_partial_batch_can_be_inspected_and_resumed_without_new_transaction(tmp_path):
@@ -176,7 +183,7 @@ def test_partial_batch_can_be_inspected_and_resumed_without_new_transaction(tmp_
     assert inspected["data"]["transaction_status"] == "recovery_required"
     resumed = trial.call("batch", request)
     assert resumed["phase"] == "completed" and resumed["data"]["activated"]
-    assert len(list((trial.root / "logs/operations").glob("*/journal.json"))) == 1
+    assert len(list((trial.root / ".build/operations").glob("*/transaction/journal.json"))) == 1
 
 
 def test_batch_failed_frozen_query_keeps_local_commit_and_active_pointer(tmp_path):
@@ -200,7 +207,7 @@ def test_resealed_committed_journal_cannot_replace_the_candidates_write_bytes(tm
     view["target_queries"][0]["required"] = ["absent-card"]
     trial.write(request["view_ref"], HELPER.canonical(trial.modules["records"].seal(view)))
     assert trial.call("batch", request)["phase"] == "needs_revision"
-    ref = "logs/operations/batch/journal.json"
+    ref = ".build/operations/batch/transaction/journal.json"
     journal = trial.record(ref)
     changed = b"forged installed bytes\n"
     row = next(entry for entry in journal["entries"] if entry["path"] == "knowledge/rules/batch-card.md")
@@ -217,7 +224,7 @@ def test_invalid_index_channel_is_rejected_before_local_application(tmp_path):
     request = trial.content()
     denied = trial.call("batch", {**request, "channel": "unknown"}, expected=2)
     assert denied["diagnostics"][0]["code"] == "INVALID_CHANNEL"
-    assert not (trial.root / "logs/operations/batch/journal.json").exists()
+    assert not (trial.root / ".build/operations/batch/transaction/journal.json").exists()
 
 
 def test_new_batch_accepts_the_shared_operation_id_contract(tmp_path):
@@ -246,7 +253,7 @@ def test_independent_empty_expected_order_and_verify_do_not_require_producer_his
     verified = trial.call("regression-verify", {"operation_id": "recheck", "report_ref": checked["data"]["report_ref"]})
     assert verified["phase"] == "verified" and not verified["data"]["activated"]
     assert (trial.root / "artifacts/indexes/local/active.json").read_bytes() == pointer
-    assert not (trial.root / "logs/operations").exists() or not list((trial.root / "logs/operations").glob("*/journal.json"))
+    assert not list((trial.root / ".build/operations").glob("*/transaction/journal.json"))
 
 
 def test_submission_verifies_actual_git_blobs_deletion_and_exact_changed_scope(tmp_path):
@@ -314,7 +321,7 @@ def test_recovery_without_actual_transaction_facts_cannot_report_success(tmp_pat
     trial = PublicP7(tmp_path)
     denied = trial.call("resume", {"operation_id": "absent"}, expected=3)
     assert denied["status"] == "blocked"
-    assert not (trial.root / "logs/operations/absent/apply-result.json").exists()
+    assert not (trial.root / ".build/operations/absent/transaction/apply-result.json").exists()
 
 
 def test_claimed_commit_sha_without_a_real_object_cannot_report_submission(tmp_path):
@@ -345,7 +352,9 @@ def test_record_only_batch_preserves_failure_debt_and_skips_index(tmp_path):
     ctx.save(reference, record)
     result = trial.call("batch", {"operation_id": "facts", "ingest_record_ref": reference})
     assert result["phase"] == "recorded" and result["data"]["batch_complete"]
-    assert result["data"]["commit_files"] == ["logs/ingest/facts.yaml"]
+    assert set(result["data"]["commit_files"]) == {"logs/ingest/facts.yaml",
+        "logs/publications/facts/apply-result.json", "logs/publications/facts/manifest.json",
+        "logs/publications/facts/completion.json"}
     assert not (trial.root / "artifacts/indexes").exists()
     saved = trial.record("logs/ingest/facts.yaml")
     assert saved["dispositions"][0]["progress"] == "blocked"

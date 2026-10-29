@@ -194,7 +194,7 @@ def test_resealed_build_and_completion_cannot_relabel_a_real_old_active_generati
     denied = trial.call("batch", request, expected=3 if replace_report else 2)
     assert denied["diagnostics"][0]["code"] == ("BATCH_COMPLETION_CHANGED" if replace_report else "REGRESSION_BINDING_CHANGED")
     assert active(trial) == pointer
-    assert trial.record("logs/operations/new/journal.json")["status"] == "committed"
+    assert trial.record(".build/operations/new/transaction/journal.json")["status"] == "committed"
 
 
 @pytest.mark.parametrize("damage", ["missing_report", "changed_cases"])
@@ -224,7 +224,7 @@ def test_retry_omitting_an_explicit_intent_baseline_cannot_capture_a_later_activ
     environment, _ = probe_environment(tmp_path, "before_build")
     stopped = trial.call("batch", {**request, "expected_active": None}, expected=2, environment=environment)
     assert "SYNTHETIC_before_build" in stopped["diagnostics"][0]["message"]
-    assert trial.record("logs/operations/batch/journal.json")["status"] == "committed"
+    assert trial.record(".build/operations/batch/transaction/journal.json")["status"] == "committed"
     assert not (trial.root / ".build/operations/batch/batch-build.json").exists()
     activate(trial, build(trial, "other"), "activate-other")
     current = active(trial)
@@ -232,7 +232,7 @@ def test_retry_omitting_an_explicit_intent_baseline_cannot_capture_a_later_activ
     assert denied["diagnostics"][0]["code"] == "ACTIVE_CHANGED"
     assert trial.record(".build/operations/batch/batch-intent.json")["requested_expected_active"] is None
     assert not (trial.root / ".build/operations/batch/batch-build.json").exists()
-    assert len(list((trial.root / "logs/operations").glob("*/journal.json"))) == 1
+    assert len(list((trial.root / ".build/operations").glob("*/transaction/journal.json"))) == 1
     assert active(trial) == current
 
 

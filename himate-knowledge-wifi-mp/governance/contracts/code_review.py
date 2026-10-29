@@ -9,6 +9,9 @@ import re
 import subprocess
 import time
 
+from . import staging
+from .runtime import OperationContext
+
 from .legacy_runtime import (
     Blocked,
     Invalid,
@@ -16,7 +19,6 @@ from .legacy_runtime import (
     digest,
     safe_path,
     strict_json,
-    atomic_bytes,
 )
 
 
@@ -26,6 +28,13 @@ class Incomplete(Blocked):
 
 class Failed(Invalid):
     pass
+
+
+def _stage_context(ctx, operation):
+    modules = {"records": importlib.import_module(ctx.domain.__package__ + ".records"),
+               "validation": ctx.domain}
+    return OperationContext(ctx.root, {"operation_id": operation}, modules=modules,
+                             rules=ctx.rules, tool=ctx.identity, rules_digest=ctx.rules_digest)
 
 
 def known(value):
@@ -100,7 +109,7 @@ def read_configuration(ctx, context):
     return config, declared, raw
 
 
-def mapped_code_identity(ctx, context, config, mode, source_only=False, require_build=True):
+def mapped_code_identity(ctx, context, config, mode, source_only=False, require_build=True, *, staged_objects=None):
     """Check exact files in a relative module workspace without Git/mm.
 
     Module labels locate code. Actual macros, builds and execution still come
@@ -140,7 +149,8 @@ def mapped_code_identity(ctx, context, config, mode, source_only=False, require_
         ):
             raise Incomplete("actual build/macro evidence is missing")
         for artifact in build["artifacts"]:
-            raw = ctx.path(artifact.get("path"), ("logs/evidence",)).read_bytes()
+            ctx.path(artifact.get("path"), ("logs/evidence",))
+            raw = staging.read_bytes(ctx.root, artifact["path"], staged_objects)
             if digest(raw) != artifact.get("sha256"):
                 raise Incomplete("build evidence bytes changed")
             build_files[artifact["path"]] = artifact["sha256"]
@@ -202,9 +212,9 @@ def artifact_requirements(claim):
     return required
 
 
-def code_identity(ctx, context, config, policy, mode, source_only=False, require_build=True):
+def code_identity(ctx, context, config, policy, mode, source_only=False, require_build=True, *, staged_objects=None):
     if config.get("mapping_kind") == "modules":
-        return mapped_code_identity(ctx, context, config, mode, source_only, require_build)
+        return mapped_code_identity(ctx, context, config, mode, source_only, require_build, staged_objects=staged_objects)
     repos = context.get("repos")
     target = context.get("target")
     check_build = require_build or context.get("build_evidence") is not None
@@ -254,8 +264,8 @@ def code_identity(ctx, context, config, policy, mode, source_only=False, require
         ):
             raise Incomplete("build/macro evidence is missing")
         for item in build["artifacts"]:
-            path = ctx.path(item.get("path"), ("logs/evidence",))
-            raw = path.read_bytes()
+            ctx.path(item.get("path"), ("logs/evidence",))
+            raw = staging.read_bytes(ctx.root, item["path"], staged_objects)
             if digest(raw) != item.get("sha256"):
                 raise Incomplete("build evidence bytes changed")
             build_files[item["path"]] = item["sha256"]
@@ -434,7 +444,7 @@ def verify_report(ctx, report, view, context, mode):
     return payload, "agent_content_review"
 
 
-def frozen_identity(ctx, context, mode, source_only=False, require_build=True):
+def frozen_identity(ctx, context, mode, source_only=False, require_build=True, *, staged_objects=None):
     """Validate retained review context/evidence without reading today's checkout."""
     target, build, repos = (
         context.get("target"),
@@ -467,7 +477,8 @@ def frozen_identity(ctx, context, mode, source_only=False, require_build=True):
         ):
             raise Incomplete("historical build evidence is missing")
     for item in build["artifacts"] if build else []:
-        raw = ctx.path(item.get("path"), ("logs/evidence",)).read_bytes()
+        ctx.path(item.get("path"), ("logs/evidence",))
+        raw = staging.read_bytes(ctx.root, item["path"], staged_objects)
         if digest(raw) != item.get("sha256"):
             raise Incomplete("historical build evidence bytes changed")
         result["build_files"][item["path"]] = item["sha256"]
@@ -508,6 +519,7 @@ def evaluate(
     report_override=None,
     record_snapshots=False,
     historical=False,
+    staged_objects=None,
 ):
     context_ref = request.get("context_ref") or view.get("context_ref")
     if not context_ref:
@@ -515,7 +527,7 @@ def evaluate(
     ctx.path(
         context_ref,
         (
-            f".build/operations/{view['operation_id']}",
+            ".build/operations",
             ".build/project-context",
             "logs/contexts",
         ),
@@ -533,13 +545,15 @@ def evaluate(
     ):
         raise Incomplete("code context is not a project context")
     claims, source_lock, resources = claims_and_sources(ctx, view)
+    staged_objects = staging.validate_entries(ctx.root, staging.merge_entries(view.get("staged_objects", []), staged_objects or []))
+    stage_context = _stage_context(ctx, view["operation_id"])
     source_only = all(source_analysis_claim(claim) for claim in claims.values())
     require_build = any(artifact_requirements(claim) for claim in claims.values())
     if historical:
-        before = frozen_identity(ctx, context, mode, source_only, require_build)
+        before = frozen_identity(ctx, context, mode, source_only, require_build, staged_objects=staged_objects)
     else:
         config, policy, config_raw = read_configuration(ctx, context)
-        before = code_identity(ctx, context, config, policy, mode, source_only, require_build)
+        before = code_identity(ctx, context, config, policy, mode, source_only, require_build, staged_objects=staged_objects)
     selected_card = request.get("card_path")
     if selected_card and selected_card not in {
         claim["card_path"] for claim in claims.values()
@@ -624,7 +638,7 @@ def evaluate(
             if not matching:
                 raise Incomplete("Claim source locator is not positively covered")
             snapshot = resources.validate_source_ref(ref, source_lock)
-            raw = resources.recover_snapshot(ctx.root, snapshot)
+            raw = resources.recover_snapshot(ctx.root, snapshot, staged_objects=staged_objects)
             if any(item.get("sha256") != digest(raw) for item in matching):
                 raise Failed("review evidence digest does not match immutable snapshot")
             resource = resource_map[ref["source_id"]]
@@ -665,10 +679,15 @@ def evaluate(
                             "checked snapshot is not bound to the latest authorized context"
                         )
                     recovery_ref = (
-                        "logs/evidence/checked-code/" + checked["sha256"] + ".bin"
+                        "logs/evidence/published/checked-code/" + checked["sha256"] + ".bin"
                     )
                     if historical:
-                        current = ctx.path(recovery_ref).read_bytes()
+                        try:
+                            current = staging.read_bytes(ctx.root, recovery_ref, staged_objects,
+                                                         expected_sha=checked["sha256"])
+                        except FileNotFoundError:
+                            # Explicit legacy proof compatibility, never a directory search.
+                            current = ctx.path("logs/evidence/checked-code/" + checked["sha256"] + ".bin").read_bytes()
                     else:
                         source_path = safe_path(repo["root"], relative)
                         current = (
@@ -694,15 +713,19 @@ def evaluate(
                     ):
                         raise Incomplete("checked code bytes or locator are not valid")
                     recovery_ref = (
-                        "logs/evidence/checked-code/" + checked["sha256"] + ".bin"
+                        "logs/evidence/published/checked-code/" + checked["sha256"] + ".bin"
                     )
-                    recovery = ctx.path(recovery_ref)
-                    if recovery.exists() and recovery.read_bytes() != current:
-                        raise Invalid("checked evidence object was changed")
-                    if not recovery.exists():
+                    try:
+                        retained = staging.read_bytes(ctx.root, recovery_ref, staged_objects,
+                                                      expected_sha=checked["sha256"], expected_size=checked["bytes"])
+                    except FileNotFoundError:
                         if not record_snapshots:
                             raise Incomplete("checked code recovery object is missing")
-                        atomic_bytes(recovery, current)
+                        staged_objects = staging.merge_entries(staged_objects,
+                            [staging.stage_bytes(stage_context, recovery_ref, current, kind="checked-code")])
+                    else:
+                        if retained != current:
+                            raise Invalid("checked evidence object was changed")
                     checked_record = {**checked, "recovery": {"path": recovery_ref}}
                     if (
                         checked["snapshot_id"] in checked_snapshots
@@ -717,9 +740,9 @@ def evaluate(
             raise Incomplete("code Claims require positive code-snapshot support")
         verified_claims.append(row)
     after = (
-        frozen_identity(ctx, context, mode, source_only, require_build)
+        frozen_identity(ctx, context, mode, source_only, require_build, staged_objects=staged_objects)
         if historical
-        else code_identity(ctx, context, config, policy, mode, source_only, require_build)
+        else code_identity(ctx, context, config, policy, mode, source_only, require_build, staged_objects=staged_objects)
     )
     if (
         before != after
@@ -739,6 +762,7 @@ def evaluate(
         "checked_snapshots": list(checked_snapshots.values()),
         "semantic_report": report,
         "verification_tier": tier,
+        "staged_objects": staged_objects,
     }
 
 
@@ -750,11 +774,11 @@ def local_check(ctx, request, action="run"):
     if action not in ("run", "merge", "verify-proof"):
         raise Invalid("unsupported code-gate action")
     if action == "verify-proof":
-        ctx.path(request.get("proof_ref"), (f"logs/operations/{op}",))
+        ctx.path(request.get("proof_ref"), (f".build/operations/{op}", f"logs/operations/{op}"))
         proof = ctx.read(request.get("proof_ref"))
         if proof.get("delegated_proof_ref"):
             delegated_ref = proof["delegated_proof_ref"]
-            ctx.path(delegated_ref, (f"logs/operations/{op}",))
+            ctx.path(delegated_ref, (f".build/operations/{op}", f"logs/operations/{op}"))
             delegated = ctx.read(delegated_ref)
             if (
                 proof.get("record_kind") != "merge_check"
@@ -785,13 +809,16 @@ def local_check(ctx, request, action="run"):
             mode,
             proof.get("semantic_report"),
             historical=purpose == "historical",
+            staged_objects=proof.get("staged_objects", []),
         )
         if (
             verified["claims"] != proof.get("claims")
             or verified["context_digest"] != proof.get("context_digest")
             or verified["code_identity"] != proof.get("code_identity")
             or any(
-                snapshot not in proof.get("checked_snapshots", [])
+                not any({key: value for key, value in snapshot.items() if key != "recovery"}
+                        == {key: value for key, value in retained.items() if key != "recovery"}
+                        for retained in proof.get("checked_snapshots", []))
                 for snapshot in verified["checked_snapshots"]
             )
         ):
@@ -824,8 +851,11 @@ def local_check(ctx, request, action="run"):
         gaps=gaps,
         **details,
     )
-    ref = f"logs/operations/{op}/{mode}-check-{record['digest'][:24]}.json"
+    ref = f".build/operations/{op}/code-review/{mode}-check-{record['digest'][:24]}.json"
     ctx.save(ref, record)
+    if ctx.domain is not None and ctx.rules is not None:
+        owner = _stage_context(ctx, op)
+        owner.register_owned(ref, ctx.path(ref).read_bytes())
     return {
         "merge_check_ref" if mode == "merge" else "local_check_ref": ref,
         "check_status": status,

@@ -152,7 +152,7 @@ def safe(root, relative, prefixes=None):
         if current.exists() and current.is_dir():
             aliases = [
                 p.name
-                for p in current.iterdir()
+                for p in Path(native_path(current)).iterdir()
                 if p.name.casefold() == part.casefold()
             ]
             if aliases and part not in aliases:
@@ -416,9 +416,20 @@ def run(handler, package):
         "rules_digest": args.rules_digest,
     }
     code = 2
+    output = Path(args.output).absolute()
+    root = Path(args.knowledge_root).resolve()
+    output_allowed = not output.is_relative_to(root)
     try:
         request = read_json(args.input)
+        if output.is_relative_to(root):
+            safe(root, output.relative_to(root).as_posix(), [".build/operations/" + identifier(request.get("operation_id"))])
+        output_allowed = True
         context = Context(args, request, package)
+        incoming = Path(args.input).absolute()
+        if incoming.is_relative_to(context.root):
+            relative = incoming.relative_to(context.root).as_posix()
+            if relative.startswith(context.operation_root + "/"):
+                context.register_owned(relative, incoming.read_bytes())
         data, phase = handler(context)
         envelope.update(status="ok", phase=phase, data=data)
         code = 0
@@ -438,13 +449,14 @@ def run(handler, package):
         )
         code = 3 if blocked else 2
     envelope["rules_digest"] = args.rules_digest
-    output = Path(args.output).absolute()
-    root = Path(args.knowledge_root).resolve()
-    if root.exists() and output.is_relative_to(root):
-        safe(root, output.relative_to(root).as_posix(), [".build", "logs"])
+    if not output_allowed:
+        print(json.dumps(envelope, ensure_ascii=True))
+        return code
     output.parent.mkdir(parents=True, exist_ok=True)
     envelope["digest"] = digest(
         {key: value for key, value in envelope.items() if key != "digest"}
     )
     output.write_bytes(canonical(envelope))
+    if "context" in locals() and output.is_relative_to(root):
+        context.register_owned(output.relative_to(root).as_posix(), canonical(envelope))
     return code

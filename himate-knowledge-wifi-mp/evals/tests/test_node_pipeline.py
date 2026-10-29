@@ -28,8 +28,9 @@ def test_raw_to_reviewed_stable_generation_and_post_ingest_correction(tmp_path):
     assert handoff["phase"] == "described"
     assert handoff["data"]["view_digest"] == p.record(view_ref)["digest"]
     assert not (p.root / "knowledge/rules/capture-rule.md").exists()
+    reviewed_view_digest = p.record(view_ref)["digest"]
     applied_ref, review = p.apply("create-card", view_ref)
-    assert review["view_digest"] == p.record(view_ref)["digest"]
+    assert review["view_digest"] == reviewed_view_digest
     assert "review_trust" not in p.catalog
     card_path = p.root / "knowledge/rules/capture-rule.md"
     original_card = card_path.read_bytes()
@@ -52,9 +53,18 @@ def test_raw_to_reviewed_stable_generation_and_post_ingest_correction(tmp_path):
     assert [row["card_id"] for row in found["matches"]] == ["capture-rule"]
     first_generation = found["generation_ref"]
     old_pointer = (p.root / "artifacts/indexes/local/active.json").read_bytes()
+    event_state = p.root / "logs/events/state.json"
+    previous_event_state = event_state.read_bytes() if event_state.exists() else None
     new_bundle_ref, new_bundle = p.capture(
         "update-source", b"# Original\nChanged marker requires another independent content review.\n"
     )
+    # Capture/P2 remains stage-only. This independent explicit action is the
+    # event-registration boundary used by the remainder of this legacy test.
+    assert (event_state.read_bytes() if event_state.exists() else None) == previous_event_state
+    registered = p.call("knowledge-maintain", {
+        "operation_id": "register-source-update", "bundle_ref": new_bundle_ref,
+    }, "register-source-change")["data"]
+    assert registered["event_refs"]
     stale = p.call("knowledge-query", {**search, "operation_id": "consume-stale"}, "search")["data"]
     assert stale["matches"] == []
     assert stale["validity_epoch"] > found["validity_epoch"]
@@ -73,6 +83,11 @@ def test_raw_to_reviewed_stable_generation_and_post_ingest_correction(tmp_path):
         decision="update",
     )
     updated_apply, _ = p.apply("update-source", updated_view)
+    published_state = p.record("logs/events/state.json")
+    assert not published_state["blocked_claims"]
+    assert set(published_state["processed_event_ids"]) >= {
+        p.record(ref)["event_id"] for ref in registered["event_refs"]
+    }
     next_generation = p.call("knowledge-apply", {"operation_id": "build-updated"}, "index-build")["data"]
     p.call(
         "knowledge-apply",
@@ -92,7 +107,7 @@ def test_raw_to_reviewed_stable_generation_and_post_ingest_correction(tmp_path):
         },
         "advance",
     )["data"]
-    assert advanced["cleared_claims"] and not advanced["blocked_claims"]
+    assert advanced["cleared_claims"] == [] and not advanced["blocked_claims"]
     assert advanced["knowledge_apply_watermark"] is None
     assert advanced["verification_tier"] == "current_source_bytes_only"
     current = p.call("knowledge-query", {**search, "operation_id": "consume-updated"}, "search")["data"]

@@ -91,7 +91,15 @@ def test_manual_document_scan_record_apply_index_query_keeps_business_checks(tmp
         "operation_id": "manual-status", "target_operation_id": "manual",
     }, "status")["data"]["operations"]
     assert len(status) == 1 and status[0]["gaps"] == []
-    assert {fact["stage"] for fact in status[0]["facts"]} >= {"scan", "record_formal", "apply"}
+    assert {fact["stage"] for fact in status[0]["facts"]} == {"publication", "publication_completion"}
+    assert status[0]["completion"]["status"] == "complete"
+    assert status[0]["completion"]["published"] is True
+    assert status[0]["completion"]["batch_complete"] is True
+    manifest = p.record(applied["data"]["publication_ref"])
+    assert manifest["processing_record"]["path"] == "logs/ingest/manual.yaml"
+    assert manifest["apply_result"]["status"] == "committed"
+    assert any(row["path"] == "knowledge/rules/manual-rule.md" for row in manifest["files"])
+    assert p.record("logs/ingest/manual.yaml")["status"] == "applied"
     repeated = p.call("knowledge-source-scan", {"operation_id": "manual-repeat"}, "scan")
     assert p.record(repeated["data"]["scan_ref"])["units"][0]["change"] == "unchanged"
     original_record = (p.root / "logs/ingest/manual.yaml").read_bytes()

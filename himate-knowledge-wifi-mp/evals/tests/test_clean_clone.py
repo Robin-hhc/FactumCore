@@ -91,12 +91,19 @@ def test_document_ingest_survives_git_clone_without_private_runtime(tmp_path, co
         "operation_id": operation, "scan_ref": scan_ref, "view_ref": view_ref,
         "disposition_preview_ref": p.record(view_ref)["disposition_preview_ref"],
     }, "record")["data"]["ingest_record_ref"]
-    assert p.call("knowledge-apply", {"operation_id": operation, "view_ref": view_ref,
-                                     "ingest_record_ref": record_ref}, "batch")["phase"] == "completed"
-    # Publish exactly the shared assets; copied original objects and private logs
-    # stay in the producer. An actual clone cannot see those untracked files.
+    published = p.call("knowledge-apply", {"operation_id": operation, "view_ref": view_ref,
+                                            "ingest_record_ref": record_ref}, "batch")
+    assert published["phase"] == "completed" and published["data"]["batch_complete"] is True
+    assert not (p.root / view_ref).exists()
+    ready = p.call("knowledge-apply", {"operation_id": operation,
+        "publication_ref": published["data"]["publication_ref"]}, "prepare-submission")["data"]
+    assert not any(ref.startswith(".build/") for ref in ready["commit_files"])
+    assert any(ref.startswith("logs/evidence/published/") for ref in ready["commit_files"])
+    assert "logs/publications/" + operation + "/manifest.json" in ready["commit_files"]
+    # Commit the actual formal closure. No producer stage or private cache is
+    # copied into the consumer to compensate for a missing publication object.
     git(workspace, "add", ".gitignore", "config.yml", p.root.name + "/governance",
-        p.root.name + "/docs-raw", p.root.name + "/knowledge", p.root.name + "/logs/ingest")
+        p.root.name + "/docs-raw", *[p.root.name + "/" + ref for ref in ready["commit_files"]])
     git(workspace, "commit", "-m", "Isolated formal knowledge")
     cloned = tmp_path / "consumer-workspace"
     git(tmp_path, "clone", "--no-hardlinks", str(workspace), str(cloned))
@@ -107,7 +114,10 @@ def test_document_ingest_survives_git_clone_without_private_runtime(tmp_path, co
     assert not any((consumer.skills / name).exists() for name in MANUAL.FIXTURE.RETIRED_SKILLS)
     assert not (consumer.root / ".build").exists()
     assert not (consumer.root / "artifacts").exists()
-    assert not (consumer.root / "logs/evidence").exists()
+    assert (consumer.root / "logs/evidence/published").is_dir()
+    assert (consumer.root / "logs/publications" / operation / "manifest.json").is_file()
+    for cache in ("objects", "checked-code", "extractions", "locators"):
+        assert not (consumer.root / "logs/evidence" / cache).exists()
     assert not (consumer.root / "logs/operations").exists()
     assert consumer.call("knowledge-lint", {})["status"] == "passed"
     built = consumer.call("knowledge-index-build", {"operation_id": "consumer-build"})["data"]
@@ -125,8 +135,13 @@ def test_document_ingest_survives_git_clone_without_private_runtime(tmp_path, co
     assert read["sources"][0]["current_source_matches"] is True
     scan = consumer.call("knowledge-source-scan", {"operation_id": "consumer-scan"}, "scan")["data"]
     assert consumer.record(scan["scan_ref"])["units"][0]["change"] == "unchanged"
-    # No private source object or extraction cache is silently recreated.
-    assert not (consumer.root / "logs/evidence").exists()
+    # Formal published objects remain; private source/extraction caches are not
+    # silently recreated by ordinary consumption.
+    for cache in ("objects", "checked-code", "extractions", "locators"):
+        assert not (consumer.root / "logs/evidence" / cache).exists()
+    target = consumer.call("knowledge-source-scan", {"operation_id": "consumer-status",
+        "target_operation_id": operation}, "status")["data"]["operations"][0]
+    assert target["completion"]["status"] == "complete"
     if kind == "md" and not committed_original:
         # A semantic restriction is durable shared state, not disposable logs.
         state = {"schema_version": "2.0", "record_kind": "maintenance_state", "validity_epoch": 1,
@@ -158,7 +173,7 @@ def test_document_ingest_survives_git_clone_without_private_runtime(tmp_path, co
     }, "resolve-source")
     assert "Capture marker is a documented rule." in recovered["data"]["text"]
     assert recovered["data"]["current_source_matches"] is False
-    assert recovered["data"]["original_ref"].startswith("git:")
+    assert recovered["data"]["original_ref"].startswith("git:" if committed_original else "logs/evidence/published/")
     stale = consumer.call("knowledge-query", {"operation_id": "consumer-stale", "query": "capture"}, "search")["data"]
     assert stale["matches"] == []
     historical = consumer.call("knowledge-query", {
@@ -173,6 +188,19 @@ def test_document_ingest_survives_git_clone_without_private_runtime(tmp_path, co
         shallow.base = tmp_path / "shallow-consumer-io"
         shallow.base.mkdir()
         shallow.root, shallow.skills, shallow.sequence = shallow_root / consumer.root.name, p.skills, 0
+        retained = shallow.call("knowledge-source-capture", {
+            "operation_id": "published-history", "source_ref": metadata["sources"][0],
+        }, "resolve-source")
+        assert "Capture marker is a documented rule." in retained["data"]["text"]
+        assert retained["data"]["current_source_matches"] is False
+        # A shallow clone is sufficient while its exact published original is
+        # retained. Removing that one formal original exposes the real gap;
+        # neither the changed working file nor truncated Git history replaces it.
+        original_ref = bundle["snapshots"][0]["recovery"]["path"]
+        assert original_ref.startswith("logs/evidence/published/objects/")
+        retained_original = shallow.root / original_ref
+        assert retained_original.resolve().is_relative_to(shallow.root.resolve())
+        retained_original.unlink()
         missing = shallow.call("knowledge-source-capture", {
             "operation_id": "missing-history", "source_ref": metadata["sources"][0],
         }, "resolve-source", expected=2)

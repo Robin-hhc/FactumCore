@@ -151,7 +151,7 @@ def safe(root, relative, prefixes=None):
         if current.exists() and current.is_dir():
             aliases = [
                 p.name
-                for p in current.iterdir()
+                for p in Path(native_path(current)).iterdir()
                 if p.name.casefold() == part.casefold()
             ]
             if aliases and part not in aliases:
@@ -185,6 +185,26 @@ def fixed_bytes(root, ref, prefixes=None):
     if Path(native_path(safe(root, ref, prefixes))).read_bytes() != data:
         raise NodeError("INPUT_CHANGED", "Referenced input changed", ref)
     return data
+
+
+def transaction_journals(root):
+    """Writer-only safety inventory, including pre-upgrade transaction journals.
+
+    This is a write barrier, never an ingest discovery or recovery input.
+    """
+    root = Path(root).resolve(strict=True)
+    refs = []
+    for prefix, pattern in ((".build/operations", "*/transaction/journal.json"),
+                            ("logs/operations", "*/journal.json")):
+        directory = safe(root, prefix)
+        if directory.exists():
+            for path in Path(native_path(directory)).glob(pattern):
+                # Build refs from known layouts, not platform extended paths.
+                owner = path.parent.parent.name if prefix.startswith(".build/") else path.parent.name
+                ref = prefix + "/" + owner + ("/transaction/journal.json" if prefix.startswith(".build/") else "/journal.json")
+                safe(root, ref, [prefix])
+                refs.append((ref, owner))
+    return sorted(refs)
 
 
 def _write_bytes(root, ref, data, prefixes, *, immutable=True):
@@ -316,7 +336,8 @@ class OperationContext:
         self.request, self.modules, self.rules = request, modules, rules
         self.tool, self.package = tool, Path(package) if package else None
         self.operation = identifier(request.get("operation_id"))
-        self.base = ".build/operations/" + self.operation
+        self.operation_root = ".build/operations/" + self.operation
+        self.base = self.operation_root
         self.args = SimpleNamespace(knowledge_root=str(self.root), rules_digest=rules_digest,
                                     action=action, catalog=catalog)
 
@@ -330,7 +351,59 @@ class OperationContext:
 
     def save(self, ref, record):
         writer = write_index_bytes if ref.startswith("artifacts/indexes/") else write_bytes
-        writer(self.root, ref, canonical(record))
+        raw = canonical(record)
+        writer(self.root, ref, raw)
+        if ref.startswith(self.operation_root + "/"):
+            self.register_owned(ref, raw)
+        return ref
+
+    def owned_files(self):
+        """Read this operation's explicit write ledger, never enumerate a directory."""
+        reference = self.operation_root + "/owned-files.json"
+        if not safe(self.root, reference).exists():
+            return []
+        ledger = self.record(reference, "artifact_manifest")
+        if (ledger.get("purpose") != "operation_owned_files"
+                or ledger.get("operation_id") != self.operation
+                or not isinstance(ledger.get("files"), list)):
+            raise NodeError("INVALID_OWNERSHIP", "Ownership ledger has another identity", reference)
+        files = {}
+        for item in ledger["files"]:
+            if not isinstance(item, dict):
+                raise NodeError("INVALID_OWNERSHIP", "An owned file must be an object", reference)
+            row = dict(item)
+            path = row.get("path")
+            safe(self.root, path, [self.operation_root])
+            if (path == reference or row.get("owner_operation_id") != self.operation
+                    or not isinstance(row.get("sha256"), str)
+                    or not re.fullmatch(r"[0-9a-f]{64}", row["sha256"])
+                    or type(row.get("bytes")) is not int or row["bytes"] < 0
+                    or path in files):
+                raise NodeError("INVALID_OWNERSHIP", "Invalid owned file identity", path)
+            files[path] = row
+        return [files[path] for path in sorted(files)]
+
+    def register_owned(self, ref, raw):
+        """Register actual bytes written or explicitly adopted within this operation."""
+        safe(self.root, ref, [self.operation_root])
+        reference = self.operation_root + "/owned-files.json"
+        if ref == reference:
+            return ref
+        if not isinstance(raw, bytes) or fixed_bytes(self.root, ref) != raw:
+            raise NodeError("OWNED_FILE_CHANGED", "Owned bytes differ from the observed file", ref)
+        previous = fixed_bytes(self.root, reference) if safe(self.root, reference).exists() else None
+        files = {row["path"]: row for row in self.owned_files()}
+        observed = {"path": ref, "sha256": sha(raw), "bytes": len(raw),
+                    "owner_operation_id": self.operation}
+        if files.get(ref) == observed:
+            return ref
+        files[ref] = observed
+        ledger = self.seal({"purpose": "operation_owned_files",
+                            "files": [files[path] for path in sorted(files)]}, "artifact_manifest")
+        current = fixed_bytes(self.root, reference) if safe(self.root, reference).exists() else None
+        if current != previous:
+            raise NodeError("OWNERSHIP_CHANGED", "Ownership changed during registration", reference)
+        write_bytes(self.root, reference, canonical(ledger), immutable=False)
         return ref
 
     def record(self, ref, kind=None):

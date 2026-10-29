@@ -29,3 +29,5 @@ For a P4-only return, the new candidate may explicitly adopt the exact unchanged
 Request: operation_id and saved view_ref. Returns existing references, source set, baseline and limitations; no writes or quality checking. Missing/misbound views are errors. Caller names the view's actual business operation; no author/reviewer identity or upstream passing status is inspected.
 
 Identical run reentry checks saved input/display binding and returns existing outputs without rederiving a plan. Changed requests or observed inputs require a new operation. P5 independently reviews content; P7 protects actual writes.
+
+Staging boundary: requests, responses and new business payloads stay under this operation's `.build/operations/<op>/`. Follow the exact returned material/view references; never discover a latest private operation. Final evidence references and stage-to-final hashes are fixed before P5 and may not be rewritten by P7. Explicit revision/adoption preserves old immutable inputs, which are not this operation's owned cleanup set.

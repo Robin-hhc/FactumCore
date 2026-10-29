@@ -149,7 +149,7 @@ def test_registered_export_or_dirty_git_fixes_actual_bytes_without_touching_code
     snapshot = bundle["snapshots"][0]
     assert snapshot["sha256"] == hashlib.sha256(actual).hexdigest()
     assert snapshot["recovery"]["method"] == "evidence_object"
-    assert (harness.root / snapshot["recovery"]["path"]).read_bytes() == actual
+    assert harness.bundle_path(bundle, snapshot["recovery"]["path"]).read_bytes() == actual
     assert snapshot["code_identity"]["checked_file_dirty"] is (True if git else None)
     assert bool(snapshot["code_identity"]["revision"]) is git
     assert bundle["resources"][0]["path"] == "sample.c"
@@ -171,7 +171,7 @@ def test_committed_code_is_portable_and_resolves_without_first_machine_cache(har
     # No snapshot pointer is hand-edited. The second machine lacks the retained
     # object, extracted text and locators; only its configured Git objects remain.
     for ref in (snapshot["local_recovery"]["path"], snapshot["extraction"]["text_ref"], snapshot["extraction"]["locator_ref"]):
-        (harness.root / ref).unlink()
+        harness.bundle_path(bundle, ref).unlink()
     resolved = harness.run("source-prepare", {"operation_id": "read-portable-code", "bundle_ref": captured["data"]["bundle_ref"],
         "source_ref": {"evidence_ref": "e1", "source_id": "portable-code", "snapshot_id": snapshot["snapshot_id"],
                        "locator": {"kind": "lines", "start": 1, "end": 1}}}, "resolve-source")
@@ -206,7 +206,8 @@ def test_authorized_code_capture_and_git_replay_allow_a_different_owner(harness,
     monkeypatch.setenv("GIT_TEST_ASSUME_DIFFERENT_OWNER", "1")
     captured = harness.run("source-prepare", {"operation_id": "other-owner", "kind": "code", "repo_id": "code",
         "relative_path": relative, "source_id": "other-owner", "context_ref": context_ref}, action="capture")
-    snapshot = harness.record(captured["data"]["bundle_ref"])["snapshots"][0]
+    bundle = harness.record(captured["data"]["bundle_ref"])
+    snapshot = bundle["snapshots"][0]
     assert snapshot["recovery"]["method"] == "git"
     assert snapshot["code_identity"]["checked_file_dirty"] is False
     assert not (repo / "fsmonitor-executed.txt").exists()
@@ -227,12 +228,13 @@ def test_explicit_gb18030_preserves_original_and_rebuilds_text_from_exact_git(ha
     harness.write(context_ref, canonical(context))
     captured = harness.run("source-prepare", {"operation_id": "gb-source", "kind": "code", "repo_id": "code",
         "relative_path": "sample.c", "source_id": "gb-source", "context_ref": context_ref, "text_encoding": "gb18030"}, action="capture")
-    snapshot = harness.record(captured["data"]["bundle_ref"])["snapshots"][0]
+    bundle = harness.record(captured["data"]["bundle_ref"])
+    snapshot = bundle["snapshots"][0]
     assert snapshot["extraction"]["extractor"] == "code-gb18030:1"
     assert snapshot["sha256"] == hashlib.sha256(raw).hexdigest()
-    assert (harness.root / snapshot["local_recovery"]["path"]).read_bytes() == raw
+    assert harness.bundle_path(bundle, snapshot["local_recovery"]["path"]).read_bytes() == raw
     for ref in (snapshot["local_recovery"]["path"], snapshot["extraction"]["text_ref"], snapshot["extraction"]["locator_ref"]):
-        (harness.root / ref).unlink()
+        harness.bundle_path(bundle, ref).unlink()
     response = harness.run("source-prepare", {"operation_id": "gb-replay", "bundle_ref": captured["data"]["bundle_ref"],
         "source_ref": {"evidence_ref": "e1", "source_id": "gb-source", "snapshot_id": snapshot["snapshot_id"],
                        "locator": {"kind": "lines", "start": 1, "end": 2}}}, "resolve-source")

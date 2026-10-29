@@ -3,8 +3,8 @@
 import base64
 import copy
 
-from .runtime import NodeError, canonical, digest, fork_context, safe, sha
-from . import index_runtime, input_snapshot, query_regression, submission
+from .runtime import NodeError, canonical, digest, fixed_bytes, fork_context, safe, sha
+from . import index_runtime, input_snapshot, publication, query_regression, submission
 
 
 def checked_view(ctx, request):
@@ -145,12 +145,196 @@ def _activation_observation(ctx, manifest, expected_active, execution_binding):
     return ref
 
 
+def _journal_ref(ctx):
+    current = ctx.base + "/transaction/journal.json"
+    legacy = "logs/operations/" + ctx.operation + "/journal.json"
+    if safe(ctx.root, current).exists() and safe(ctx.root, legacy).exists():
+        raise NodeError("TRANSACTION_CONFLICT", "Both current and legacy journals exist for this operation")
+    return legacy if safe(ctx.root, legacy).exists() else current
+
+
+def _publication_result(ctx, manifest, completion):
+    data = {**completion.get("data", {}), "publication_ref": publication.manifest_ref(ctx.operation),
+            "publication_digest": manifest["digest"], "content_digest": manifest["content_digest"],
+            "completion_ref": publication.completion_ref(ctx.operation), "published": True,
+            "batch_complete": completion["batch_complete"], "cleanup": completion["cleanup"],
+            "batch_kind": manifest["batch_kind"], "apply_result_ref": manifest.get("apply_result_ref"),
+            "apply_result_digest": (manifest.get("apply_result") or {}).get("digest")}
+    if completion["batch_complete"]:
+        data["commit_files"] = sorted({row["path"] for row in manifest["files"]}
+            | {row["path"] for row in completion.get("retrieval", {}).get("files", [])}
+            | {row["path"] for row in manifest.get("deletes", [])}
+            | {publication.manifest_ref(ctx.operation), publication.completion_ref(ctx.operation)})
+    return data, completion["phase"]
+
+
+def _publication_intent(ctx, view):
+    """Freeze the first actual activation baseline before any content writes."""
+    request = ctx.request
+    keys = ("code_contexts", "code_evidence", "knowledge_commit", "publication_receipt_ref")
+    record_ref = request.get("ingest_record_ref")
+    fields = {"purpose": "batch_execution_intent", "protocol_version": "1.0",
+              "view_ref": request["view_ref"], "view_digest": view["digest"],
+              "ingest_record_ref": record_ref,
+              "ingest_record_digest": ctx.record(record_ref, "ingest_record")["digest"] if record_ref else None,
+              "cases": view.get("target_queries"), "channel": request.get("channel", "local"),
+              "index_inputs": {key: copy.deepcopy(request[key]) for key in keys if key in request}}
+    ref = ctx.base + "/batch-intent.json"
+    previous = _saved(ctx, ref, "artifact_manifest")
+    if previous is not None:
+        if any(previous.get(key) != value for key, value in fields.items()):
+            raise NodeError("BATCH_INPUT_CHANGED", "The original batch intent freezes different inputs")
+        baseline = previous["expected_active"]
+        if "expected_active" in request and request["expected_active"] != baseline:
+            raise NodeError("ACTIVE_CHANGED", "Request replaces the first batch activation baseline", blocked=True)
+    else:
+        pointer = index_runtime.active(ctx, fields["channel"])
+        baseline = request.get("expected_active", pointer["digest"] if pointer else None)
+        if baseline is not None and (not isinstance(baseline, str) or len(baseline) != 64
+                or any(value not in "0123456789abcdef" for value in baseline)):
+            raise NodeError("INVALID_ACTIVE_BASELINE", "Expected active must be null or an exact pointer digest")
+        previous = _stage(ctx, ref, {**fields, "expected_active": baseline,
+                                    "baseline_was_explicit": "expected_active" in request})
+    return {**fields["index_inputs"], "channel": fields["channel"], "expected_active": baseline}
+
+
+def _publish_batch(ctx, transact, view=None):
+    """New frozen publication path; legacy views keep their existing execution."""
+    ref = publication.manifest_ref(ctx.operation)
+    existing = safe(ctx.root, ref).is_file()
+    completion = None
+    if existing:
+        manifest = publication.read_manifest(ctx, ref)
+        if (ctx.request.get("publication_ref", ref) != ref
+                or (ctx.request.get("view_ref") and ctx.request["view_ref"] != manifest["trace"].get("view_ref"))):
+            raise NodeError("BATCH_INPUT_CHANGED", "Operation already published another checked view")
+        frozen_inputs = manifest.get("index_inputs", {})
+        if "expected_active" in ctx.request and ctx.request["expected_active"] != frozen_inputs.get("expected_active"):
+            raise NodeError("ACTIVE_CHANGED", "Request replaces the publication's original active baseline", blocked=True)
+        completion = publication.read_completion(ctx, manifest)
+        if completion and (completion["batch_complete"] or completion["retrieval"].get("complete") is True):
+            if not completion["batch_complete"]:
+                completion = publication.cleanup(ctx, manifest, completion)
+            return _publication_result(ctx, manifest, completion)
+        business_view = publication.published_view(manifest)
+    else:
+        view = view or checked_view(ctx, ctx.request)
+        if view.get("v3_required") and not ctx.request.get("ingest_record_ref"):
+            raise NodeError("INGEST_RECORD_REQUIRED", "Content and processing record must publish together")
+        plan = publication.validate_plan(ctx, view)
+        if view.get("batch_kind", "content") != "record_only":
+            query_regression._cases({"cases": view.get("target_queries")}, view)
+        if "cases" in ctx.request and ctx.request["cases"] != view.get("target_queries"):
+            raise NodeError("BATCH_CASES_CHANGED", "Batch cannot replace the frozen query cases")
+        frozen_inputs = _publication_intent(ctx, view)
+        journal = _saved(ctx, _journal_ref(ctx), "transaction_journal")
+        if journal and journal.get("status") == "committed":
+            if journal.get("view_digest") != view["digest"]:
+                raise NodeError("BATCH_VIEW_CHANGED", "Committed transaction describes another view")
+            applied = ctx.record(journal["result_ref"], "apply_result")
+        else:
+            result = transact("resume" if journal and journal.get("status") != "rolled_back" else "run")
+            applied = ctx.record(result["apply_result_ref"], "apply_result")
+            journal = ctx.record(_journal_ref(ctx), "transaction_journal")
+        if (journal.get("status") != "committed" or applied.get("status") != "committed"
+                or applied.get("view_digest") != view["digest"]):
+            raise NodeError("PUBLICATION_NOT_COMMITTED", "The actual content transaction is not committed")
+        if journal.get("ingest_record_ref") != ctx.request.get("ingest_record_ref"):
+            raise NodeError("INGEST_RECORD_CHANGED", "Transaction freezes another processing record")
+        with index_runtime.writer(ctx):
+            compare_view_inputs(ctx, view, journal)
+            expected = publication.transaction_rows(ctx, view, plan) + view.get("deletes", [])
+            if ({row["path"]: row.get("final_digest") for row in expected}
+                    != {row["path"]: row["new_digest"] for row in journal["entries"]}):
+                raise NodeError("JOURNAL_VIEW_MISMATCH", "Committed transaction differs from frozen publication")
+            for row in expected:
+                path = safe(ctx.root, row["path"])
+                actual = sha(fixed_bytes(ctx.root, row["path"])) if path.exists() else None
+                if actual != row.get("final_digest"):
+                    raise NodeError("PUBLICATION_BYTES_CHANGED", "Installed content changed before formal success", row["path"])
+            # Verify the formal recovery closure before making success durable.
+            # Re-capture it after record/events when preparing the index inputs.
+            if view.get("input_snapshot"):
+                input_snapshot.published_inputs(ctx, view["input_snapshot"], staged_objects=plan["staged_objects"])
+            # Empty proposals can still resolve an existing mechanical block
+            # after a real content revision; record-only is handled by the API.
+            events = ctx.modules["maintenance"].publish_changes(ctx, plan["event_proposals"])
+            processing = publication.publish_processing_record(ctx, view, ctx.request.get("ingest_record_ref"),
+                expected_digest=journal.get("ingest_record_digest"))
+            manifest = publication.publish_manifest(ctx, view, plan, processing_record=processing,
+                event_refs=events.get("event_refs", []), applied=applied, index_inputs=frozen_inputs)
+        business_view = publication.published_view(manifest)
+    content = manifest["batch_kind"] != "record_only"
+    if not content:
+        finished = publication.write_completion(ctx, manifest, data={"transaction_status": "committed"},
+            retrieval={"complete": True, "scope": "record_only"},
+            owned_files=publication.owned_files(ctx, view), expected_digest=(completion or {}).get("digest"))
+        finished = publication.cleanup(ctx, manifest, finished)
+        return _publication_result(ctx, manifest, finished)
+    cases = business_view.get("target_queries")
+    if "cases" in ctx.request and ctx.request["cases"] != cases:
+        raise NodeError("BATCH_CASES_CHANGED", "Batch cannot replace its published query cases")
+    inputs = dict(manifest.get("index_inputs", {}))
+    built_ref = ctx.base + "/batch-build.json"
+    built = _saved(ctx, built_ref, "artifact_manifest")
+    if built is None:
+        request = {**inputs, "operation_id": ctx.operation, "publication_ref": ref}
+        index_ctx = fork_context(ctx, request, action="build")
+        indexed, _ = index_runtime.execute(index_ctx)
+        observed = index_ctx.verified_generation
+        built = _stage(ctx, built_ref, {"purpose": "batch_index", "publication_ref": ref,
+            "publication_digest": manifest["digest"], "generation_ref": indexed["generation_ref"],
+            "expected_active": indexed["expected_active"]})
+    else:
+        if built.get("publication_digest") != manifest["digest"]:
+            raise NodeError("BATCH_BUILD_CHANGED", "Saved generation belongs to another publication")
+        observed = index_runtime.verify_generation(ctx, built["generation_ref"])
+    generation_ref, expected_active = built["generation_ref"], built["expected_active"]
+    if "expected_active" in inputs and inputs["expected_active"] != expected_active:
+        raise NodeError("ACTIVE_CHANGED", "Generation replaces the original publication baseline", blocked=True)
+    request = {"operation_id": ctx.operation, "publication_ref": ref, "generation_ref": generation_ref,
+               "expected_active": expected_active, "cases": cases}
+    regression_ctx = fork_context(ctx, request, action="run")
+    regression, _ = query_regression.execute(regression_ctx, verified_generation=observed, activate=False)
+    if not regression["passed"]:
+        return {**regression, "published": True, "batch_complete": False, "publication_ref": ref}, "needs_revision"
+    execution = query_regression.reuse_regression(ctx, generation_ref, observed.manifest, regression_ctx.verified_regression)
+    evidence = {"generation_ref": generation_ref, "manifest_digest": observed.manifest["digest"],
+                "channel": observed.manifest["channel"]}
+    observation_ref = _activation_observation(ctx, evidence, expected_active, execution)
+    if observation_ref is None:
+        activation, _ = index_runtime.execute(fork_context(ctx, request, action="activate"),
+            verified_generation=observed, verified_regression=regression_ctx.verified_regression)
+        observation_ref = activation["activation_observation_ref"]
+    observation = ctx.record(observation_ref, "artifact_manifest")
+    formal_observation_ref = "logs/publications/" + ctx.operation + "/activation/" + observation["digest"] + ".json"
+    ctx.save(formal_observation_ref, observation)
+    retrieval_files = []
+    for path in (regression["report_ref"], formal_observation_ref):
+        raw = fixed_bytes(ctx.root, path)
+        retrieval_files.append({"path": path, "sha256": sha(raw), "bytes": len(raw), "kind": "retrieval_record"})
+    # Completion persists the actual retrieval facts before any stage deletion.
+    finished = publication.write_completion(ctx, manifest, data={**regression, "transaction_status": "committed",
+        "generation_ref": generation_ref, "expected_active": expected_active, "activated": True,
+        "activation_observation_ref": formal_observation_ref},
+        retrieval={"complete": True, "generation_ref": generation_ref, "expected_active": expected_active,
+                   "activation_observation": observation, "files": retrieval_files,
+                   "regression": ctx.record(regression["report_ref"], "query_regression")},
+        owned_files=publication.owned_files(ctx, view), expected_digest=(completion or {}).get("digest"))
+    finished = publication.cleanup(ctx, manifest, finished)
+    return _publication_result(ctx, manifest, finished)
+
+
 def execute_batch(ctx, *, transact):
     """transact(action) invokes this package's transaction engine in-process."""
     request = ctx.request
     if request.get("channel", "local") not in ("local", "shared"):
         raise NodeError("INVALID_CHANNEL", "Choose local or shared index channel")
+    if safe(ctx.root, publication.manifest_ref(ctx.operation)).is_file():
+        return _publish_batch(ctx, transact)
     view = checked_view(ctx, request)
+    if view.get("publication_plan"):
+        return _publish_batch(ctx, transact, view)
     if view.get("v3_required") and not request.get("ingest_record_ref"):
         raise NodeError("INGEST_RECORD_REQUIRED", "The content and its processing record must be applied together")
     content = view.get("batch_kind", "content") != "record_only"
@@ -178,7 +362,7 @@ def execute_batch(ctx, *, transact):
     explicit_baseline = "requested_expected_active" in prior_intent
     original_baseline = prior_intent.get("requested_expected_active")
     completed = _saved(ctx, complete_ref, "artifact_manifest")
-    journal = _saved(ctx, "logs/operations/" + ctx.operation + "/journal.json", "transaction_journal")
+    journal = _saved(ctx, _journal_ref(ctx), "transaction_journal")
     if completed is not None:
         if (not journal or journal.get("status") != "committed"
                 or journal.get("view_digest") != view["digest"]

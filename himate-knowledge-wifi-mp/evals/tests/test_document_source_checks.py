@@ -17,7 +17,7 @@ SPEC = importlib.util.spec_from_file_location(
 CONTRACTS = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = CONTRACTS
 SPEC.loader.exec_module(CONTRACTS)
-from native_document_contracts import checks, source_resources as sources, validation as v  # noqa: E402
+from native_document_contracts import checks, runtime, source_resources as sources, validation as v  # noqa: E402
 
 FIXTURE_SPEC = importlib.util.spec_from_file_location(
     "native_document_fixture", Path(__file__).with_name("test_clean_clone.py")
@@ -139,6 +139,12 @@ def pipeline(tmp_path):
     return result
 
 
+def staged_path(p, bundle, reference):
+    rows = [row for row in bundle["staged_objects"] if row["final_ref"] == reference]
+    assert len(rows) == 1
+    return Path(runtime.native_path(p.root / rows[0]["stage_ref"]))
+
+
 @pytest.mark.parametrize("kind", ["pdf", "docx"])
 def test_source_read_rejects_adapter_drift_when_extraction_cache_is_absent(tmp_path, kind):
     p = pipeline(tmp_path)
@@ -149,8 +155,8 @@ def test_source_read_rejects_adapter_drift_when_extraction_cache_is_absent(tmp_p
                        "source_path": source_path, "source_id": "document"})["data"]["bundle_ref"]
     bundle = p.record(bundle_ref)
     extraction = bundle["snapshots"][0]["extraction"]
-    (p.root / extraction["text_ref"]).unlink()
-    (p.root / extraction["locator_ref"]).unlink()
+    staged_path(p, bundle, extraction["text_ref"]).unlink()
+    staged_path(p, bundle, extraction["locator_ref"]).unlink()
     extraction["extractor"] = "different-adapter:0"
     bundle["digest"] = v.digest_payload(bundle)
     p.write(bundle_ref, v.canonical_bytes(bundle))
@@ -204,7 +210,9 @@ def test_git_document_capture_preserves_its_local_object_fallback(tmp_path):
     FIXTURE.git(workspace, "commit", "-m", "Isolated raw original")
     bundle_ref = p.call("knowledge-source-capture", {"operation_id": "git-fallback",
                        "source_path": source_path, "source_id": "document"})["data"]["bundle_ref"]
-    snapshot = p.record(bundle_ref)["snapshots"][0]
+    bundle = p.record(bundle_ref)
+    snapshot = bundle["snapshots"][0]
     assert snapshot["recovery"]["kind"] == "git"
     assert snapshot["local_recovery"]["method"] == "evidence_object"
-    assert (p.root / snapshot["local_recovery"]["path"]).read_bytes() == original
+    assert staged_path(p, bundle, snapshot["local_recovery"]["path"]).read_bytes() == original
+    assert not (p.root / snapshot["local_recovery"]["path"]).exists()

@@ -109,7 +109,7 @@ def safe_path(root, relative, prefixes=None):
         if current.exists():
             aliases = [
                 entry.name
-                for entry in current.iterdir()
+                for entry in pathlib.Path(native_path(current)).iterdir()
                 if entry.name.casefold() == part.casefold()
             ]
             if aliases and aliases != [part]:
@@ -194,7 +194,7 @@ def sync_directory(path):
 
 class WriterLock:
     def __init__(self, root):
-        self.path = safe_path(root, "logs/operations/.writer.lock")
+        self.path = safe_path(root, ".build/runtime/writer.lock")
 
     def __enter__(self):
         pathlib.Path(native_path(self.path.parent)).mkdir(parents=True, exist_ok=True)
@@ -504,6 +504,31 @@ def load_context(args, package_root):
 
 
 
+def _batch_transport(ctx, request, incoming, outgoing):
+    operation = ctx.modules["runtime"].identifier(request.get("operation_id"))
+    allowed = (".build/operations/" + operation,)
+    root = ctx.root.resolve()
+    for candidate in (incoming, outgoing):
+        absolute = pathlib.Path(candidate).absolute()
+        resolved = absolute.resolve()
+        if absolute.is_relative_to(root):
+            relative = absolute.relative_to(root).as_posix()
+            ctx.path(relative, allowed)
+            if candidate == outgoing:
+                slot = relative[len(allowed[0]) + 1:].casefold()
+                reserved = {"owned-files.json", "batch-intent.json", "batch-build.json", "batch-complete.json",
+                    "view.json", "final-view.json", "plan.json", "preview.json", "summary.json", "revision.json",
+                    "disposition-preview.json", "view-summary.json", "capture.json", "scan.json", "inventory.json",
+                    "record.json", "ingest-record.json", "material.json"}
+                if slot == "transaction" or slot.startswith("transaction/") or slot in reserved:
+                    raise Invalid("batch response cannot overwrite a reserved operation protocol slot")
+        elif resolved.is_relative_to(root):
+            raise Invalid("an aliased knowledge path is not external transport")
+    if pathlib.Path(incoming).resolve() == pathlib.Path(outgoing).resolve():
+        raise Invalid("batch input and output transport paths must differ")
+    return operation
+
+
 def run_cli(handler, package_root):
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True)
@@ -514,9 +539,29 @@ def run_cli(handler, package_root):
     parser.add_argument("--action", default="run")
     args = parser.parse_args()
     tool = identity(package_root)
+    output = pathlib.Path(args.output).absolute()
+    root = pathlib.Path(args.knowledge_root).resolve()
+    output_allowed = args.action != "batch" or (not output.is_relative_to(root) and not output.resolve().is_relative_to(root))
     try:
         ctx = load_context(args, package_root)
-        request = strict_json(pathlib.Path(native_path(args.input)).read_text(encoding="utf-8"))
+        incoming = pathlib.Path(args.input).absolute()
+        request_raw = pathlib.Path(native_path(incoming)).read_bytes()
+        request = strict_json(request_raw.decode("utf-8"))
+        if args.action == "batch":
+            operation = _batch_transport(ctx, request, incoming, output)
+            output_allowed = True
+            # The first batch owns its transport input. Completed/cleanup-only
+            # reentry must not recreate the deleted business ownership ledger.
+            formal = "logs/publications/" + operation + "/manifest.json"
+            completion = None
+            if ctx.path(formal).is_file():
+                shared = ctx.modules["runtime"].OperationContext(ctx.root, request, modules=ctx.modules,
+                    rules=ctx.rules, tool=ctx.identity, rules_digest=ctx.rules_digest)
+                completion = ctx.modules["publication"].read_completion(shared)
+            if incoming.is_relative_to(ctx.root) and not (completion and completion.get("retrieval", {}).get("complete") is True):
+                relative = incoming.relative_to(ctx.root).as_posix()
+                from transaction import register_owned
+                register_owned(ctx, relative, operation)
         data = handler(ctx, request, args.action)
         result = {
             "status": "ok",
@@ -552,10 +597,13 @@ def run_cli(handler, package_root):
             **result,
         }
     )
-    output = pathlib.Path(args.output).resolve()
+    if not output_allowed:
+        sys.stdout.write(canonical(result).decode("utf-8") + "\n")
+        return code
     try:
-        root = pathlib.Path(args.knowledge_root).resolve()
-        if output.is_relative_to(root):
+        if args.action == "batch" and "ctx" in locals() and "request" in locals():
+            _batch_transport(ctx, request, args.input, output)
+        elif output.is_relative_to(root):
             rel = output.relative_to(root).as_posix()
             safe_path(root, rel, (".build", "logs"))
         if output.exists() and pathlib.Path(native_path(output)).read_bytes() != canonical(result) + b"\n":

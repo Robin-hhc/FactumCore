@@ -60,13 +60,6 @@ class Harness:
             self.root / "governance",
             ignore=shutil.ignore_patterns("__pycache__"),
         )
-        # Pin the explicitly isolated current-rule fixture while parallel implementation
-        # changes are in flight. This never changes the repository's trusted lock.
-        lock_path = self.root / "governance/framework.lock.yaml"
-        lock = yaml.safe_load(lock_path.read_bytes())
-        for entry in lock["files"].values():
-            entry["sha256"] = hashed((self.root / entry["path"]).read_bytes())
-        lock_path.write_text(yaml.safe_dump(lock, sort_keys=False), encoding="utf-8")
         (self.root / ".synthetic-test-root").write_text(
             "isolated mechanism fixture", encoding="utf-8"
         )

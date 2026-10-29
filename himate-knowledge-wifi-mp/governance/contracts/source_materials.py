@@ -12,6 +12,12 @@ import difflib
 import yaml
 
 from .runtime import NodeError, digest, fixed_bytes, fork_context, safe, sha, write_bytes
+from . import staging
+
+
+def _save_bytes(context, ref, raw):
+    write_bytes(context.root, ref, raw)
+    context.register_owned(ref, raw)
 
 
 def _source_changed(message, paths):
@@ -170,7 +176,7 @@ def _previous(context, previous_view=None):
     return material, old_bundle
 
 
-def _candidate_material(context, candidates, snapshots, lock, gaps):
+def _candidate_material(context, candidates, snapshots, lock, gaps, staged_objects):
     old_by_id = {snapshot["snapshot_id"]: snapshot for snapshot in lock["snapshots"]}
     resources = {row["source_id"]: row for row in lock["resources"]}
     operations = context.modules["source_operations"]
@@ -178,7 +184,9 @@ def _candidate_material(context, candidates, snapshots, lock, gaps):
     for candidate in candidates:
         card, identity = candidate["card"], candidate["card_id"]
         card_ref = context.base + "/material/cards/" + card["sha256"] + ".md"
-        write_bytes(context.root, card_ref, card["raw"])
+        _save_bytes(context, card_ref, card["raw"])
+        staged_objects.append(staging.stage_bytes(context, "logs/evidence/published/cards/" + card["sha256"] + ".md",
+                                                 card["raw"], kind="card"))
         adopted_objects.append({"path": card_ref, "sha256": card["sha256"], "bytes": len(card["raw"]), "kind": "card"})
         adopted = []
         for source in card["metadata"].get("sources", []):
@@ -195,11 +203,20 @@ def _candidate_material(context, candidates, snapshots, lock, gaps):
                 if suffix not in {".md", ".txt", ".pdf", ".docx"}:
                     suffix = ".bin"
                 original_ref = context.base + "/material/originals/" + sha(raw) + suffix
-                write_bytes(context.root, original_ref, raw)
+                _save_bytes(context, original_ref, raw)
+                staged_objects.append(staging.stage_bytes(context, "logs/evidence/published/objects/" + sha(raw) + ".bin",
+                                                         raw, kind="original"))
                 item.update(original_ref=original_ref, original_sha256=sha(raw), recovery=snapshot["recovery"], sha256=sha(raw), bytes=len(raw))
                 adopted_objects.append({"path": original_ref, "sha256": sha(raw), "bytes": len(raw), "kind": "original"})
                 try:
-                    item["text"], _, limitations = operations.snapshot_text(context, snapshot, resources[source["source_id"]], raw)
+                    item["text"], locators, limitations = operations.snapshot_text(context, snapshot, resources[source["source_id"]], raw)
+                    if snapshot.get("extraction") and item["text"] is not None:
+                        extracted = item["text"].encode("utf-8")
+                        locator_bytes = context.modules["validation"].canonical_bytes({"locators": locators})
+                        staged_objects.extend([
+                            staging.stage_bytes(context, "logs/evidence/published/extractions/" + sha(extracted) + ".txt", extracted, kind="extraction"),
+                            staging.stage_bytes(context, "logs/evidence/published/locators/" + sha(locator_bytes) + ".json", locator_bytes, kind="locator"),
+                        ])
                     if limitations:
                         item["limitations"] = limitations
                 except (OSError, UnicodeError, NodeError, context.modules["validation"].ContractError) as exc:
@@ -208,7 +225,7 @@ def _candidate_material(context, candidates, snapshots, lock, gaps):
                     gaps.append({"card_id": identity, "snapshot_id": source["snapshot_id"], "code": "ADOPTED_EXTRACTION_UNAVAILABLE", "original_ref": original_ref, "reason": str(exc)})
                 current = next((row for row in snapshots.values() if row["source_id"] == source["source_id"]), None)
                 if current and item.get("text") is not None and current.get("format") in {".md", ".txt"}:
-                    now = operations.recovered_bytes(context, current).decode("utf-8-sig")
+                    now = operations.recovered_bytes(context, current, staged_objects=staged_objects).decode("utf-8-sig")
                     item["diff"] = "".join(difflib.unified_diff(item["text"].splitlines(True), now.splitlines(True),
                                                                fromfile=source["snapshot_id"], tofile=current["snapshot_id"]))
             except (OSError, UnicodeError, NodeError, context.modules["validation"].ContractError) as exc:
@@ -247,12 +264,15 @@ def prepare(context):
     else:
         units = [unit for unit in units if unit["change"] != "unchanged"]
     resources, snapshots, extractions = {}, {}, {}
+    staged_objects, event_proposals = [], []
     bundles, gaps, current_code = [], [], []
     material_units = {unit["unit_id"]: unit for unit in units}
     context_refs, config_digests = set(), set()
     targets = {}
     if previous:
         bundle = previous_bundle
+        staged_objects.extend(staging.entries_from_bundle(bundle))
+        event_proposals.extend(bundle.get("event_proposals", []))
         for key, entries, identity in (("resources", resources, "source_id"), ("snapshots", snapshots, "snapshot_id"), ("extractions", extractions, "snapshot_id")):
             _merge(entries, bundle.get(key, []), identity)
         bundles.extend(previous.get("bundles", []))
@@ -279,8 +299,8 @@ def prepare(context):
                          {"target_id": target["target_id"]}, target.get("expected_fingerprint")))
     incoming = []
     for capture_request, origin, expected in captures:
-        child = context.operation[:48] + "-source-" + digest({"parent_operation": context.operation, "capture": capture_request})[:32]
-        child_context = fork_context(context, request={**capture_request, "operation_id": child}, operation_id=child, action="capture")
+        child_context = fork_context(context, request={**capture_request, "operation_id": context.operation}, action="capture")
+        child_context.base = context.base + "/sources/" + digest(capture_request)[:32]
         try:
             captured, _ = operations.capture(child_context)
         except (OSError, NodeError) as exc:
@@ -311,6 +331,8 @@ def prepare(context):
             raise NodeError("CODE_BUNDLE_REQUIRED", "Only explicit registered code bundles are accepted here")
         incoming.append((reference, bundle, True))
     for reference, bundle, is_code in incoming:
+        staged_objects.extend(staging.entries_from_bundle(bundle))
+        event_proposals.extend(bundle.get("event_proposals", []))
         if bundle.get("context_ref"):
             context_refs.add(bundle["context_ref"])
         if bundle.get("config_digest"):
@@ -324,7 +346,7 @@ def prepare(context):
                     raise NodeError("CURRENT_CODE_REQUIRED", "Historical or unauthorized code cannot serve as current P2 material", blocked=True)
                 raw = base64.b64decode(resolved["bytes_b64"], validate=True)
                 original_ref = context.base + "/material/code/" + sha(raw) + ".bin"
-                write_bytes(context.root, original_ref, raw)
+                _save_bytes(context, original_ref, raw)
                 current_code.append({"source_ref": source_ref, "bundle_ref": reference, "bundle_digest": bundle["digest"],
                                      "original_ref": original_ref, "sha256": sha(raw), "bytes": len(raw), "current_source_matches": True,
                                      "code_identity": snapshot.get("code_identity"), "context_ref": bundle.get("context_ref")})
@@ -337,6 +359,8 @@ def prepare(context):
     context_binding = {"context_ref": context_ref, "context_digest": project_context["digest"]} if project_context else {"context_ref": None}
     combined = context.seal({"resources": [resources[key] for key in sorted(resources)], "snapshots": [snapshots[key] for key in sorted(snapshots)],
                              "extractions": [extractions[key] for key in sorted(extractions)],
+                             "staged_objects": staging.validate_entries(context.root, staged_objects),
+                             "event_proposals": list({digest(row): row for row in event_proposals}.values()),
                              **context_binding,
                              **({"config_digest": next(iter(config_digests))} if config_digests else {}),
                              "limitations": sorted({gap["code"] for gap in gaps})}, "source_bundle")
@@ -345,14 +369,16 @@ def prepare(context):
         actual = {item["sha256"] for item in current_files if item.get("kind") == "config"}
         if actual != config_digests:
             raise _source_changed("Workspace configuration changed after code capture", [item["path"] for item in current_files if item.get("kind") == "config"])
-    bundle_ref = context.base + "/materials/" + combined["digest"] + "/capture.json"
-    context.save(bundle_ref, combined)
     cards = domain_cards(context)
     affected = [item["card_id"] for item in (scan or {}).get("current_context", {}).get("affected_claims", [])]
     explicit_candidates = request.get("candidate_card_ids", []) + affected + [item["card_id"] for item in (previous or {}).get("candidates", [])]
     topics = sorted(set(request.get("topics", []) + (previous or {}).get("topics", [])))
     candidates = context.modules["knowledge"].maintenance_candidates(cards, resources, topics, sorted(set(explicit_candidates)))
-    candidate_records, adopted_objects = _candidate_material(context, candidates, snapshots, lock, gaps)
+    candidate_records, adopted_objects = _candidate_material(context, candidates, snapshots, lock, gaps, staged_objects)
+    combined = context.seal({**{key: value for key, value in combined.items() if key != "digest"},
+                             "staged_objects": staging.validate_entries(context.root, staged_objects)}, "source_bundle")
+    bundle_ref = context.base + "/materials/" + combined["digest"] + "/capture.json"
+    context.save(bundle_ref, combined)
     for code in current_code:
         adopted_objects.append({"path": code["original_ref"], "sha256": code["sha256"], "bytes": code["bytes"], "kind": "original"})
     if _current_files(context, combined) != current_files:

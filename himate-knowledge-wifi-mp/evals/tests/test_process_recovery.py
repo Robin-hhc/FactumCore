@@ -82,8 +82,8 @@ runpy.run_path(cli,run_name='__main__')
     assert crashed.returncode == 73, (crashed.stdout, crashed.stderr)
     assert not outgoing.exists(), "hard exit must happen before a normal ResultEnvelope is emitted"
     assert target.read_bytes() == expected[target_ref]
-    journal_ref = f"logs/operations/{operation}/journal.json"
-    result_ref = f"logs/operations/{operation}/apply-result.json"
+    journal_ref = f".build/operations/{operation}/transaction/journal.json"
+    result_ref = f".build/operations/{operation}/transaction/apply-result.json"
     journal = p.record(journal_ref)
     assert journal["status"] not in {"committed", "rolled_back"}
     assert not (p.root / result_ref).exists()

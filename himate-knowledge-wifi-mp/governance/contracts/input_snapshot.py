@@ -204,11 +204,13 @@ def capture_inputs(ctx, *, material=None, semantic_plan=None, bundle=None, conte
         key, actual = _file(ctx, entry, explicit_external=external)
         snapshot["adopted_objects"][key] = actual
     for source in bundle.get("snapshots", []):
-        raw = ctx.modules["source_resources"].recover_snapshot(ctx.root, source)
+        entries = bundle.get("staged_objects", [])
+        raw = ctx.modules["source_resources"].recover_snapshot(ctx.root, source, staged_objects=entries)
         if _sha(raw) != source["sha256"] or len(raw) != source["bytes"]:
             raise NodeError("SOURCE_CHANGED", "Exact adopted source cannot be recovered", source["snapshot_id"])
         snapshot["adopted_objects"]["snapshot:" + source["snapshot_id"]] = {
             "kind": "source_snapshot", "snapshot": copy.deepcopy(source),
+            **({"staged_objects": copy.deepcopy(entries)} if entries else {}),
             "sha256": source["sha256"], "bytes": source["bytes"]}
     current = (_entries(material["current_files"]) if "current_files" in material else
                _legacy_current_files(ctx, bundle)) + _entries(context.get("current_files"))
@@ -222,6 +224,42 @@ def capture_inputs(ctx, *, material=None, semantic_plan=None, bundle=None, conte
             raise NodeError("INPUT_CHANGED", "Same current input has conflicting observations", key)
         snapshot["current_files"][key] = actual
     snapshot["snapshot_digest"] = _digest(snapshot)
+    return snapshot
+
+
+def published_inputs(ctx, prewrite, *, staged_objects=()):
+    """Bind current inputs and retained evidence after actual formal publication.
+
+    Producer plans, drafts and reports describe how the publication was made;
+    they are not index inputs. Their adopted content is now identified by the
+    publication's formal byte set. Explicit retained objects keep their exact
+    bytes, with private copies mapped only to an explicitly published object.
+    """
+    snapshot = capture_inputs(ctx, stage="postwrite")
+    snapshot["current_files"] = copy.deepcopy(prewrite.get("current_files", {}))
+    entries = list(staged_objects)
+    for key, entry in prewrite.get("adopted_objects", {}).items():
+        value = copy.deepcopy(entry)
+        if value.get("kind") == "source_snapshot":
+            value.pop("staged_objects", None)
+            snapshot["adopted_objects"][key] = value
+            continue
+        reference = value.get("path", key)
+        matches = [row for row in entries
+                   if row["sha256"] == value["sha256"] and row["bytes"] == value["bytes"]]
+        if matches:
+            reference = sorted(row["final_ref"] for row in matches)[0]
+            value["path"] = reference
+        elif reference.startswith(".build/"):
+            # Unmapped drafts are execution inputs, already checked before
+            # application. Do not retain their paths in a live generation.
+            continue
+        snapshot["adopted_objects"][reference] = value
+    snapshot["snapshot_digest"] = _digest({key: value for key, value in snapshot.items()
+                                            if key != "snapshot_digest"})
+    observed = compare_inputs(ctx, snapshot, stage="postwrite")
+    if not observed["unchanged"]:
+        raise NodeError("BATCH_INPUT_CHANGED", "Published inputs differ from adopted bytes", data=observed)
     return snapshot
 
 
@@ -277,7 +315,8 @@ def compare_inputs(ctx, snapshot, *, stage="prewrite"):
         for key, entry in snapshot[group].items():
             try:
                 if entry.get("kind") == "source_snapshot":
-                    raw = ctx.modules["source_resources"].recover_snapshot(ctx.root, entry["snapshot"])
+                    raw = ctx.modules["source_resources"].recover_snapshot(
+                        ctx.root, entry["snapshot"], staged_objects=entry.get("staged_objects"))
                 else:
                     reference = entry.get("path", key)
                     # Retained external objects were explicit on capture.  Keep

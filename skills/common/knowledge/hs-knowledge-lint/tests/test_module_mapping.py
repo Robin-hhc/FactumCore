@@ -280,4 +280,6 @@ def test_merge_checked_snapshot_reads_authorized_files_without_git(mapped, monke
         report_override=report, record_snapshots=True)
     assert result["code_identity"]["repos"][repo_id]["head"] is None
     retained = result["checked_snapshots"][0]
-    assert (mapped.domain / retained["recovery"]["path"]).read_bytes() == mapped.data
+    staging = importlib.import_module(package_spec.name + ".staging")
+    assert staging.read_bytes(mapped.domain, retained["recovery"]["path"], result["staged_objects"]) == mapped.data
+    assert not (mapped.domain / retained["recovery"]["path"]).exists()

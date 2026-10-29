@@ -3,6 +3,7 @@
 import base64
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import importlib.util
@@ -10,6 +11,13 @@ from pathlib import Path
 
 import pytest
 import yaml
+
+
+def staged_path(harness, bundle, reference):
+    entries = [row for row in bundle["staged_objects"] if row["final_ref"] == reference]
+    assert len(entries) == 1
+    path = (harness.root / entries[0]["stage_ref"]).absolute()
+    return Path("\\\\?\\" + str(path)) if os.name == "nt" else path
 
 
 @pytest.fixture(autouse=True)
@@ -63,11 +71,12 @@ def test_current_ingest_review_lint_record_apply_query_without_human_confirmatio
     else:
         assert bundle["snapshots"][0]["recovery"]["kind"] == "git"
     if unrelated_nav_changes in {"historical_fallback", "local_only"}:
-        # Local completion may use exact retained capture bytes. This does not
-        # claim that another clone can recover the same source.
+        # P2 binds exact retained stage bytes to their preallocated final ref.
+        # This test still removes Git access without publishing before P7.
         snapshot = bundle["snapshots"][0]
-        local = {"method": "evidence_object", "path": "logs/evidence/objects/" + snapshot["sha256"] + ".bin"}
-        assert (harness.root / local["path"]).is_file()
+        local = dict(snapshot["local_recovery"])
+        assert staged_path(harness, bundle, local["path"]).is_file()
+        assert not (harness.root / local["path"]).exists()
         snapshot["local_recovery"] = local
         if unrelated_nav_changes == "local_only":
             snapshot["recovery"] = local
@@ -107,15 +116,19 @@ def test_current_ingest_review_lint_record_apply_query_without_human_confirmatio
     apply_request = {"operation_id": "op", "v3_required": True, "view_ref": view_ref,
                      "ingest_record_ref": record_ref, "content_review_ref": review}
     if unrelated_nav_changes == "uncommitted_raw":
-        original_path = harness.root / bundle["snapshots"][0]["recovery"]["path"]
+        original_path = staged_path(harness, bundle, bundle["snapshots"][0]["recovery"]["path"])
         original_bytes = original_path.read_bytes()
         for defect in ("missing", "changed"):
             if defect == "missing":
                 original_path.unlink()
             else:
                 original_path.write_bytes(b"!" + original_bytes[1:])
-            rejected = harness.run("apply", apply_request, "batch", expected=3)
-            assert rejected["phase"] == "awaiting"
+            # The new frozen publication map rejects absent/corrupt payloads
+            # as invalid input, before reaching the legacy admission gate.
+            rejected = harness.run("apply", apply_request, "batch", expected=2)
+            assert rejected["phase"] == "invalid"
+            assert rejected["diagnostics"][0]["code"] == (
+                "invalid_input" if defect == "missing" else "STAGED_OBJECT_CHANGED")
             assert not (harness.root / "knowledge/rules/new.md").exists()
             assert not (harness.root / "logs/ingest/op.yaml").exists()
             original_path.write_bytes(original_bytes)
@@ -156,7 +169,9 @@ def test_current_ingest_review_lint_record_apply_query_without_human_confirmatio
     saved = harness.record("logs/ingest/op.yaml")
     assert "acceptance" not in saved
     assert saved["progress"]["apply"]["status"] == "applied"
-    assert saved["content_view_digest"] == harness.record(view_ref)["digest"]
+    manifest = harness.record(completed["data"]["publication_ref"])
+    assert saved["content_view_digest"] == manifest["reviewed_view_digest"]
+    assert not (harness.root / view_ref).exists()
     generation, queries = completed["data"]["generation_ref"], completed["data"]["report_ref"]
     query = harness.run("query", {"operation_id": "local-query", "query": "Synthetic", "purpose": "guidance"}, "search")
     assert query["data"]["matches"][0]["card_id"] == "new"

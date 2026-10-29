@@ -106,7 +106,9 @@ def catalog_gap(ctx, ref, error):
 
 def generation_observation(ctx, ref, manifest):
     """Inspect saved build facts; exact database verification belongs to P7."""
-    cache = catalog(ctx).setdefault("observed_generations", {})
+    if not hasattr(ctx, "_observed_generations"):
+        ctx._observed_generations = {}
+    cache = ctx._observed_generations
     if ref in cache:
         return cache[ref]
     try:
@@ -198,7 +200,7 @@ def pointer_matches(ctx, manifest_ref, manifest, observation, execution_binding)
         return False
 
 
-def finalization(ctx, journal, view):
+def finalization(ctx, journal, view, *, inspect_catalog=True):
     result = {"status": "unknown", "next_action": "inspect_finalization"}
     if journal.get("status") == "rolled_back":
         return {"status": "not_applicable", "scope": "rolled_back", "next_action": "prepare_material",
@@ -212,6 +214,9 @@ def finalization(ctx, journal, view):
         return {**result, "next_action": "inspect_context", "reason": "Missing exact view or current rules binding"}
     if view["digest"] != journal.get("view_digest"):
         return {**result, "reason": "Applied view binding differs"}
+    if not inspect_catalog:
+        return {**result, "verification": "saved_facts_only",
+                "reason": "Legacy independent index/query results have no explicit batch completion chain"}
     data = catalog(ctx)
     generations = dict(data["generations"])
     active_ref = "artifacts/indexes/local/active.json"

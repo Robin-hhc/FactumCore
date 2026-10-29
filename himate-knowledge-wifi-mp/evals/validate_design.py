@@ -67,9 +67,7 @@ WORKFLOW_ENTRIES = {
 # Template identity is independent of Skill identity, even when names match.
 EDGES = {
     'hs-knowledge-ingest': {
-        'scan_sources': {'scanned': 'prepare_material', 'unchanged': '__end__',
-                         'recover': 'apply_view', 'resume_index': 'apply_view',
-                         'resume_queries': 'apply_view'},
+        'scan_sources': {'scanned': 'prepare_material', 'unchanged': '__end__'},
         'prepare_material': {'prepared': 'plan_change', 'source_changed': 'scan_sources'},
         'plan_change': {'content_planned': 'materialize_view', 'needs_material': 'prepare_material'},
         'materialize_view': {'ready': 'lint_view', 'needs_material': 'prepare_material',

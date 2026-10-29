@@ -91,18 +91,20 @@ def test_public_adapter_preserves_safe_external_timeout_and_ignores_request_dead
     support = load_support(name)
     request = {"operation_id": "timeout", "timeout": 0.001, "timeout_seconds": 999999,
                "deadline": "now", "call_timeout_seconds": 1}
-    incoming, outgoing = tmp_path / "input.json", tmp_path / ".build/response.json"
+    knowledge_root = tmp_path / "knowledge-root"
+    knowledge_root.mkdir()
+    incoming, outgoing = tmp_path / "input.json", tmp_path / "response.json"
     incoming.write_bytes(support.canonical(request))
     monkeypatch.setattr(support, "tool_identity", lambda package: {"skill": name, "package_digest": "b" * 64,
         "requirements_digest": "c" * 64, "runtime": "synthetic-external-timeout"})
-    monkeypatch.setattr(support, "Context", lambda args, value, package: SimpleNamespace(root=tmp_path, request=value))
+    monkeypatch.setattr(support, "Context", lambda args, value, package: SimpleNamespace(root=knowledge_root, request=value))
     def timeout(argv, **kwargs):
         assert kwargs["timeout"] == 20
         raise subprocess.TimeoutExpired(["git", MOCK_SECRET], kwargs["timeout"],
             output=MOCK_SECRET.encode(), stderr=MOCK_SECRET.encode())
     monkeypatch.setattr(subprocess, "run", timeout)
     monkeypatch.setattr(sys, "argv", ["public-cli", "--input", str(incoming), "--output", str(outgoing),
-        "--knowledge-root", str(tmp_path), "--rules-digest", "a" * 64])
+        "--knowledge-root", str(knowledge_root), "--rules-digest", "a" * 64])
     def handler(ctx):
         contracts.module("source_operations").git_read(ctx.root, ["rev-parse", "HEAD"])
         raise AssertionError("A timed-out read must not report success")

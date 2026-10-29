@@ -9,11 +9,11 @@ entry:
 entry_node: scan_sources
 nodes:
 - id: scan_sources
-  title: P1 扫描变化与续办
+  title: P1 扫描正式状态与当前输入
   type: skill
   owner: coder
   skill: hs-knowledge-source-scan
-  prompt: 调用scan观察六类原件、共享处理历史、必要维护状态和本机停点，分别读actionable_unit_ids与finalization_pending。无变化且无义务才结束，不捕获材料或制造记录。已落位或有未完事务时，用只读status定位原操作，直接交P7续办，不重新提炼或apply；索引健康未检查不能当通过。消费副本不继承他人的私有恢复义务。异常无法核实事实时保存停点并保留宿主等待。
+  prompt: 新Workflow使用新operation_id，调用scan只观察六类当前原件、正式处理记录和必要维护状态。读取actionable_unit_ids与明确修订目标；完整且无变化、正式欠账或维护事项才结束。普通scan不枚举旧draft、journal、generation或索引收尾，不采用旧操作产物；finalization_pending及historical_finalization_unknown为兼容空数组，execution_history为not_inspected。此入口不恢复旧事务；写入前的真实未完事务保护仍由P7执行。当前Workflow返工按明确引用继续，异常保存本次停点。
   exits:
   - id: scanned
     label: 准备材料
@@ -21,26 +21,14 @@ nodes:
     target: prepare_material
   - id: unchanged
     label: 无需更新
-    condition: 扫描完整且无变化、修订、欠账或本机续办；不新增记录。
+    condition: 扫描完整且无变化、明确修订、正式欠账或维护事项；不新增记录。
     target: __end__
-  - id: recover
-    label: 按原事务恢复
-    condition: 已定位真实未结束写入事务，保持原操作及确切输入。
-    target: apply_view
-  - id: resume_index
-    label: 续办索引
-    condition: 原内容已落位，实际索引尚未完成。
-    target: apply_view
-  - id: resume_queries
-    label: 续办查询和启用
-    condition: 原内容已落位，有确切候选代或收尾事实需要续办。
-    target: apply_view
 - id: prepare_material
   title: P2 准备新旧材料
   type: skill
   owner: coder
   skill: hs-knowledge-source-prepare
-  prompt: 调用独立prepare按固定扫描清单和所选单元准备真实原文、附件、采用旧版、关联旧卡和必要代码或配置。P5补料使用新operation_id，显式传previous_view_ref、revision_reason和旧稿绑定的existing_material_ref，只补明确缺口并保存新材料版本及前序摘要；保留原scan_ref和处理单元身份，不覆盖旧工件、不默认重扫全库。显式目标独立备料不冒称P1完整覆盖。只核所用输入；原观察范围或版本漂移时读取needs_scan和affected_scope，回P1更新真实清单。保留缺口，不代作者决定结论；纯环境故障保存停点。
+  prompt: P1-P6本批业务新文件（含事件拟稿、证据、代码核验副本及输出）仅写本批.build暂存，正式状态不变。调用独立prepare按固定扫描清单和所选单元准备真实原文、附件、采用旧版、关联旧卡和必要代码或配置。P5补料使用新operation_id，显式传previous_view_ref、revision_reason和旧稿绑定的existing_material_ref，只补明确缺口并保存新材料版本及前序摘要；保留原scan_ref和处理单元身份，不覆盖旧工件、不默认重扫全库。显式目标独立备料不冒称P1完整覆盖。只核所用输入；原观察范围或版本漂移时读取needs_scan和affected_scope，回P1更新真实清单。保留缺口，不代作者决定结论；纯环境故障保存停点。
   exits:
   - id: prepared
     label: 材料已保存
@@ -70,7 +58,7 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-view-materialize
-  prompt: 调用run一次组织作者卡、导航、来源锁、写删集合、处置预览、展示字节及完整输入快照，读取实际输出，正式区不变。修订用新operation_id、previous_view_ref和revision_reason，通过同一入口保存新稿。仅退回P4时可明确采用前序稿精确绑定的未变semantic_plan和material；退回P2/P3时用它们的新版本。保留原scan及处理单元身份，核material_digest和previous_view_digest，新稿重新交P5；旧材料、计划、稿件和报告均不覆盖。相同操作重入读取已保存稿，不重新生成计划或导航，不跑整库质量lint。缺材料回P2，作者判断不清楚回P3，采用源变化回P1。
+  prompt: 调用run一次组织作者卡、导航、来源锁、写删集合、处置预览、展示字节及完整输入快照，读取实际输出，提前固定stage→final路径及完整字节，P5所审内容与P7发布字节身份保持一致，正式区不变。修订用新operation_id、previous_view_ref和revision_reason，通过同一入口保存新稿。仅退回P4时可明确采用前序稿精确绑定的未变semantic_plan和material；退回P2/P3时用它们的新版本。保留原scan及处理单元身份，核material_digest和previous_view_digest，新稿重新交P5；旧材料、计划、稿件和报告均不覆盖。相同操作重入读取已保存稿，不重新生成计划或导航，不跑整库质量lint。缺材料回P2，作者判断不清楚回P3，采用源变化回P1。
   exits:
   - id: ready
     label: 完整稿件已保存
@@ -123,15 +111,15 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-apply
-  prompt: 调用action batch，传确切view、待入库记录及原冻结查询。核输入快照、原版本、写锁、未完事务、备份和实际回读；新入口保证安全落位和实际收尾，不重跑整库质量lint，不要求P5通过票据。原journal已committed时只核事实并续办尾部，不再apply。按持久停点和原expected_active继续索引、回归、启用；响应丢失先核原进程、journal、batch停点和实际指针。记录批只落记录，不建索引。实际batch_complete和适用启用事实齐全才结束；运行故障保留原停点，内容问题另建明确修订。输出本批精确文件清单，Git提交、CI及合入另行处理。
+  prompt: 调用action batch，传确切view、待发布记录和原冻结查询。保留输入快照、原版本、写锁、未完事务、CAS、备份和实际回读；发布已审完整字节与必要正式证据，内容核验成功后才发布正式成功处理记录及对应事件，不重跑P5语义工作或完整质量lint。继续适用索引、完整验证、原查询、同代read和原expected_active激活，建立logs/publications下的正式结果闭包。全部适用检索收尾成功后只清本批明确拥有且可删的暂存；借用、保留或用途不明项保留并说明。清理失败保持published/content_applied成功事实，batch_complete=false且cleanup_pending，仅重试缺失收尾或清理，不重apply；最终小响应可仍在.build。已完成操作从正式manifest/completion读取结果，不要求旧view存在。记录批不建索引。实际batch_complete与适用启用事实齐全才结束，Git、CI和合入另行处理。罕见P7半写保留真实状态和现有保护，不宣称自动修复。
   exits:
   - id: completed
     label: 内容和检索收尾完成
-    condition: 实际batch_complete为true，内容事务、确切索引、原查询及启用回读均完成。
+    condition: 实际batch_complete为true，内容事务、确切索引、原查询及启用回读均完成，且本批可删暂存清理完成。
     target: __end__
   - id: recorded
     label: 记录批已落位
-    condition: record_only批安全落记录且batch_complete为true，没有构建或启用索引。
+    condition: record_only批安全落记录且batch_complete为true，没有构建或启用索引，本批可删暂存清理完成。
     target: __end__
 artifacts:
   primary: []

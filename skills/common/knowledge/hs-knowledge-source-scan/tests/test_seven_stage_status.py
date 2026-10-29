@@ -114,3 +114,26 @@ def test_batch_summary_cannot_hide_an_unreadable_local_journal(harness):
           "data": {"transaction_status": "committed", "batch_complete": True}})
     result = status(harness, "batch")["completion"]
     assert result["status"] == "unknown" and result["next_action"] == "recover_transaction"
+
+
+def test_target_reads_new_staged_transaction_protocol(harness):
+    intent(harness)
+    fact(harness, "batch", ".build/operations/batch/transaction/journal.json",
+         {"status": "recovery_required", "batch_kind": "content", "view_digest": "1" * 64,
+          "view_ref": ".build/operations/batch/final-view.json", "entries": []}, "transaction_journal")
+    result = status(harness, "batch")
+    assert result["completion"]["next_action"] == "recover_transaction"
+    assert next(row for row in result["facts"] if row["stage"] == "transaction")["ref"] == (
+        ".build/operations/batch/transaction/journal.json")
+
+
+def test_conflicting_new_and_legacy_journals_are_not_arbitrarily_selected(harness):
+    intent(harness)
+    journal(harness, batch_kind="record_only")
+    fact(harness, "batch", ".build/operations/batch/transaction/journal.json",
+         {"status": "recovery_required", "batch_kind": "content", "view_digest": "1" * 64,
+          "view_ref": ".build/operations/batch/final-view.json", "entries": []}, "transaction_journal")
+    result = status(harness, "batch")
+    assert result["completion"]["status"] == "unknown"
+    assert result["completion"]["next_action"] == "recover_transaction"
+    assert any(gap["stage"] == "transaction" for gap in result["gaps"])

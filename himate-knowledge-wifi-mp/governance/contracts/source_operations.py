@@ -11,6 +11,8 @@ from urllib.parse import unquote, urlsplit
 
 import yaml
 
+from . import staging
+
 from .runtime import (
     NodeError,
     canonical,
@@ -19,7 +21,6 @@ from .runtime import (
     load_yaml,
     safe,
     sha,
-    write_bytes,
 )
 
 RAW_CLASSES = {"conventions", "chips", "storys", "specs", "protocols", "troubleshooting"}
@@ -110,15 +111,15 @@ def check_attachments(members):
     return gaps
 
 
-def snapshot_text(context, snapshot, resource, data):
+def snapshot_text(context, snapshot, resource, data, *, staged_objects=None):
     """Use frozen local extraction or reproduce it from the exact Git original."""
     suffix = snapshot.get("format", PurePosixPath(resource["path"]).suffix.lower())
     retained = snapshot.get("extraction")
     if retained:
         reconstructed = False
         try:
-            extracted = fixed_bytes(context.root, retained["text_ref"], ["logs/evidence"])
-            locator_bytes = fixed_bytes(context.root, retained["locator_ref"], ["logs/evidence"])
+            extracted = _evidence_bytes(context, retained["text_ref"], retained["text_sha256"], "extractions", ".txt", staged_objects)
+            locator_bytes = _evidence_bytes(context, retained["locator_ref"], retained["locator_sha256"], "locators", ".json", staged_objects)
             text = extracted.decode("utf-8")
             locators = json.loads(locator_bytes)["locators"]
             gaps = list(retained.get("limitations", []))
@@ -152,9 +153,18 @@ def snapshot_text(context, snapshot, resource, data):
     return text, locators, gaps
 
 
-def recovered_bytes(context, snapshot):
+def _evidence_bytes(context, ref, expected, folder, suffix, entries=None):
+    safe(context.root, ref, ["logs/evidence"])
     try:
-        return context.modules["source_resources"].recover_snapshot(context.root, snapshot)
+        return staging.read_bytes(context.root, ref, entries, expected_sha=expected)
+    except FileNotFoundError:
+        return staging.read_bytes(context.root, "logs/evidence/published/" + folder + "/" + expected + suffix,
+                                  entries, expected_sha=expected)
+
+
+def recovered_bytes(context, snapshot, *, staged_objects=None):
+    try:
+        return context.modules["source_resources"].recover_snapshot(context.root, snapshot, staged_objects=staged_objects)
     except context.modules["validation"].ContractError as exc:
         if exc.code == "EVIDENCE_OBJECT_CHANGED":
             raise NodeError("SOURCE_INTEGRITY_ERROR", "Recovered bytes differ from exact snapshot") from exc
@@ -206,7 +216,8 @@ def resolve_source(context, reference, bundle=None):
     original_ref = ("git:" + recovery.get("commit", recovery.get("revision", "")) + ":" + recovery["path"]
                     if is_git else recovery.get("path", recovery.get("reference")))
     try:
-        data, original_ref = context.modules["source_resources"].recover_snapshot_source(context.root, snapshot)
+        data, original_ref = context.modules["source_resources"].recover_snapshot_source(context.root, snapshot,
+            staged_objects=staging.entries_from_bundle(bundle))
     except context.modules["validation"].ContractError as exc:
         if exc.code == "EVIDENCE_OBJECT_CHANGED":
             raise NodeError("SOURCE_INTEGRITY_ERROR", "Recovered bytes differ from exact snapshot") from exc
@@ -224,7 +235,8 @@ def resolve_source(context, reference, bundle=None):
         r for r in lock["resources"] if r["source_id"] == reference["source_id"]
     )
     suffix = snapshot.get("format", PurePosixPath(resource["path"]).suffix.lower())
-    text, locators, gaps = snapshot_text(context, snapshot, resource, data)
+    text, locators, gaps = snapshot_text(context, snapshot, resource, data,
+                                      staged_objects=staging.entries_from_bundle(bundle))
     locator = reference.get("locator", {})
     if resource.get("kind") == "code" and locator.get("kind") == "bytes":
         start, end = locator.get("start"), locator.get("end")
@@ -595,6 +607,41 @@ def current_code_hash(context, resource):
         return None
 
 
+def _formal_lock(context):
+    try:
+        raw = fixed_bytes(context.root, "governance/sources.lock.yaml")
+    except FileNotFoundError:
+        return {"resources": [], "snapshots": []}, None
+    return load_yaml(raw), sha(raw)
+
+
+def _registered_snapshot(snapshot, lock):
+    registered = [item for item in lock.get("snapshots", []) if item["snapshot_id"] == snapshot["snapshot_id"]]
+    if registered:
+        if len(registered) != 1 or any(registered[0].get(key) != snapshot.get(key)
+                                      for key in ("source_id", "sha256", "bytes")):
+            raise NodeError("SOURCE_INTEGRITY_ERROR", "Registered snapshot conflicts with captured identity")
+        return dict(registered[0])
+    return snapshot
+
+
+def _stage_payloads(context, payloads):
+    kinds = {"objects": "original", "locators": "locator", "extractions": "extraction"}
+    return staging.merge_entries([staging.stage_bytes(context, ref, data, kind=kinds[PurePosixPath(ref).parent.name])
+                                   for ref, data in sorted(payloads.items())])
+
+
+def _event_proposals(lock, lock_digest, snapshots):
+    changes = []
+    for snapshot in snapshots:
+        prior = [item["snapshot_id"] for item in lock.get("snapshots", [])
+                 if item["source_id"] == snapshot["source_id"]]
+        if prior and snapshot["snapshot_id"] not in prior:
+            changes.append({"source_id": snapshot["source_id"], "old_snapshot_ids": sorted(prior),
+                            "new_snapshot_id": snapshot["snapshot_id"], "source_lock_digest": lock_digest})
+    return changes
+
+
 def capture_code(context):
     request = context.request
     encoding = request.get("text_encoding", "utf-8")
@@ -666,8 +713,8 @@ def capture_code(context):
         }
     )
     object_ref, locator_ref = (
-        "logs/evidence/objects/" + raw_hash + ".bin",
-        "logs/evidence/locators/" + digest(locators) + ".json",
+        "logs/evidence/published/objects/" + raw_hash + ".bin",
+        "logs/evidence/published/locators/" + sha(canonical({"locators": locators})) + ".json",
     )
     payloads = {object_ref: raw, locator_ref: canonical({"locators": locators})}
     snapshot = {
@@ -699,7 +746,7 @@ def capture_code(context):
             raise NodeError("SOURCE_INTEGRITY_ERROR", "Exact configured Git code differs from captured bytes")
     extractions = []
     if text is not None:
-        text_ref = "logs/evidence/extractions/" + sha(text.encode()) + ".txt"
+        text_ref = "logs/evidence/published/extractions/" + sha(text.encode()) + ".txt"
         payloads[text_ref] = text.encode()
         extraction = {
             "snapshot_id": snapshot_id,
@@ -712,6 +759,10 @@ def capture_code(context):
         }
         snapshot["extraction"] = extraction
         extractions.append(extraction)
+    lock, lock_digest = _formal_lock(context)
+    snapshot = _registered_snapshot(snapshot, lock)
+    extractions = [snapshot["extraction"]] if snapshot.get("extraction") else []
+    staged_objects = _stage_payloads(context, payloads)
     bundle = context.seal(
         {
             "resources": [
@@ -727,11 +778,11 @@ def capture_code(context):
             "context_ref": request.get("context_ref"),
             "config_digest": config_digest,
             "limitations": limitations,
+            "staged_objects": staged_objects,
+            "event_proposals": _event_proposals(lock, lock_digest, [snapshot]),
         },
         "source_bundle",
     )
-    for ref, data in payloads.items():
-        write_bytes(context.root, ref, data)
     after, after_signature = read_code(root, relative)
     after_identity, after_committed = metadata(root, registered, relative, item)
     _, _, _, _, after_config = authorized_repo(context, repo_id, receipt)
@@ -752,6 +803,7 @@ def capture_code(context):
         "bundle_ref": ref,
         "bundle_digest": bundle["digest"],
         "event_refs": [],
+        "event_proposals": bundle["event_proposals"],
         "code_identity": code_identity,
         "limitations": limitations,
     }, "captured"
@@ -759,6 +811,7 @@ def capture_code(context):
 
 def resolve_bundle(context, reference):
     bundle = context.record(reference, "source_bundle")
+    entries = staging.validate_entries(context.root, staging.entries_from_bundle(bundle))
     portable_ids = set()
     for snapshot in bundle["snapshots"]:
         recovery = snapshot["recovery"]
@@ -770,19 +823,19 @@ def resolve_bundle(context, reference):
             raise NodeError(
                 "SOURCE_INTEGRITY_ERROR", "Recovery path aliases disagree"
             )
-        data = recovered_bytes(context, snapshot)
+        data = recovered_bytes(context, snapshot, staged_objects=entries)
         if sha(data) != snapshot["sha256"] or len(data) != snapshot["bytes"]:
             raise NodeError(
                 "SOURCE_INTEGRITY_ERROR", "Retained object differs from snapshot"
             )
         if recovery.get("kind") == "git" or recovery.get("method") == "git":
             resource = next(r for r in bundle["resources"] if r["source_id"] == snapshot["source_id"])
-            snapshot_text(context, snapshot, resource, data)
+            snapshot_text(context, snapshot, resource, data, staged_objects=entries)
             portable_ids.add(snapshot["snapshot_id"])
             continue
         locator = snapshot.get("locator", {})
         if locator.get("reference") and sha(
-            fixed_bytes(context.root, locator["reference"], ["logs/evidence"])
+            _evidence_bytes(context, locator["reference"], locator["sha256"], "locators", ".json", entries)
         ) != locator.get("sha256"):
             raise NodeError(
                 "SOURCE_INTEGRITY_ERROR",
@@ -793,7 +846,7 @@ def resolve_bundle(context, reference):
             continue
         if (
             sha(
-                fixed_bytes(context.root, extraction["text_ref"], ["logs/evidence"])
+                _evidence_bytes(context, extraction["text_ref"], extraction["text_sha256"], "extractions", ".txt", entries)
             )
             != extraction["text_sha256"]
         ):
@@ -827,6 +880,7 @@ def capture(context):
     reference_gaps = check_attachments(members)
     resources, snapshots, extractions, payloads, limitations = [], [], [], {}, []
     limitations += reference_gaps
+    lock, lock_digest = _formal_lock(context)
     for i, member in enumerate(members):
         ref, data = member["path"], member["data"]
         text, locators, extractor, gaps = extract(
@@ -847,8 +901,8 @@ def capture(context):
                 "locator_digest": digest(locators),
             }
         )
-        object_ref = "logs/evidence/objects/" + object_hash + ".bin"
-        locator_ref = "logs/evidence/locators/" + digest(locators) + ".json"
+        object_ref = "logs/evidence/published/objects/" + object_hash + ".bin"
+        locator_ref = "logs/evidence/published/locators/" + sha(canonical({"locators": locators})) + ".json"
         payloads[object_ref], payloads[locator_ref] = (
             data,
             canonical({"locators": locators}),
@@ -886,7 +940,7 @@ def capture(context):
             snapshots[-1]["local_recovery"] = dict(snapshots[-1]["recovery"])
             snapshots[-1]["recovery"] = portable
         if text is not None:
-            text_ref = "logs/evidence/extractions/" + sha(text.encode()) + ".txt"
+            text_ref = "logs/evidence/published/extractions/" + sha(text.encode()) + ".txt"
             payloads[text_ref] = text.encode()
             extractions.append(
                 {
@@ -900,6 +954,8 @@ def capture(context):
                 }
             )
             snapshots[-1]["extraction"] = dict(extractions[-1])
+        snapshots[-1] = _registered_snapshot(snapshots[-1], lock)
+    extractions = [item["extraction"] for item in snapshots if item.get("extraction")]
     for member in members:
         now = raw_member(context, member["path"])
         if now["data"] != member["data"] or now["signature"] != member["signature"]:
@@ -908,6 +964,7 @@ def capture(context):
                 "Original changed before evidence publication",
                 member["path"],
             )
+    staged_objects = _stage_payloads(context, payloads)
     bundle = context.seal(
         {
             "resources": resources,
@@ -915,6 +972,8 @@ def capture(context):
             "extractions": extractions,
             "context_ref": request.get("context_ref"),
             "limitations": sorted(set(limitations)),
+            "staged_objects": staged_objects,
+            "event_proposals": _event_proposals(lock, lock_digest, snapshots),
         },
         "source_bundle",
     )
@@ -924,8 +983,6 @@ def capture(context):
         raise NodeError(
             "OPERATION_CONFLICT", "Operation already captures different originals", ref
         )
-    for path, data in payloads.items():
-        write_bytes(context.root, path, data)
     for member in members:
         now = raw_member(context, member["path"])
         if now["data"] != member["data"] or now["signature"] != member["signature"]:
@@ -935,38 +992,11 @@ def capture(context):
                 member["path"],
             )
     context.save(ref, bundle)
-    lock_path = safe(context.root, "governance/sources.lock.yaml")
-    lock = (
-        load_yaml(lock_path.read_bytes())
-        if lock_path.exists()
-        else {"resources": [], "snapshots": []}
-    )
-    changes = []
-    for snapshot in snapshots:
-        prior = [
-            s
-            for s in lock.get("snapshots", [])
-            if s["source_id"] == snapshot["source_id"]
-        ]
-        if prior and snapshot["snapshot_id"] not in {s["snapshot_id"] for s in prior}:
-            changes.append(
-                {
-                    "source_id": snapshot["source_id"],
-                    "old_snapshot_ids": sorted(s["snapshot_id"] for s in prior),
-                    "new_snapshot_id": snapshot["snapshot_id"],
-                }
-            )
-    if changes:
-        response = context.modules["maintenance"].register_source_change(
-            context, {"operation_id": context.operation, "bundle_ref": ref, "changes": changes}
-        )
-        event_refs = response.get("event_refs", [])
-    else:
-        event_refs = []
     return {
         "bundle_ref": ref,
         "bundle_digest": bundle["digest"],
-        "event_refs": event_refs,
+        "event_refs": [],
+        "event_proposals": bundle["event_proposals"],
         "limitations": bundle["limitations"],
     }, "captured"
 

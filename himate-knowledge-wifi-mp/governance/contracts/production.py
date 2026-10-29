@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import base64
 import copy
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from urllib.parse import quote
 import re
 import json
@@ -11,6 +11,7 @@ import yaml
 
 from .runtime import NodeError, digest, fixed_bytes, identifier, load_yaml, safe, sha, write_bytes
 from .input_snapshot import capture_inputs, compare_inputs
+from . import publication, staging
 
 PROFILES = {"entity": "concepts/entities", "flow": "concepts/flows", "protocol": "concepts/protocols",
             "rule": "rules", "command": "commands", "runbook": "runbooks", "glossary": "glossaries"}
@@ -277,6 +278,31 @@ def _reenter(ctx, request):
     return _result(ref, view), "ready"
 
 
+def _lost_card_hashes(existing, writes, deletes=()):
+    changed = {row["path"] for row in writes
+               if row.get("expected_old_digest") is not None
+               and row["expected_old_digest"] != row["final_digest"]}
+    changed.update(row["path"] for row in deletes)
+    return {card["sha256"] for card in existing.values() if card["path"] in changed}
+
+
+def _reading_card_refs(ctx, material):
+    references = [row["card_ref"] for row in material.get("candidates", []) if row.get("card_ref")]
+    objects = material.get("adopted_objects", [])
+    if isinstance(objects, dict):
+        objects = [{"path": path, **value} for path, value in objects.items() if isinstance(value, dict)]
+    references.extend(row["path"] for row in objects
+                      if isinstance(row, dict) and row.get("kind") in {"card", "historical_card"} and row.get("path"))
+    result = set()
+    for reference in references:
+        path = Path(reference)
+        if path.is_absolute():
+            absolute = path.absolute()
+            reference = absolute.relative_to(ctx.root).as_posix() if absolute.is_relative_to(ctx.root) else str(absolute)
+        result.add(reference)
+    return result
+
+
 def assemble(ctx, request=None):
     """Produce the exact authored batch once; do not execute P5 quality rules."""
     request = request if request is not None else ctx.request
@@ -402,7 +428,41 @@ def assemble(ctx, request=None):
                      key=lambda source: source["snapshot_id"])
     summary_ref = ctx.base + "/view-summary.json"
     revision_ref = ctx.base + "/revision.json" if request.get("previous_view_ref") else None
-    view = ctx.seal({"writes": sorted(writes, key=lambda row: row["path"]), "deletes": [],
+    historical_hashes = set((request.get("check_inputs") or {}).get("historical_card_objects", {}))
+    retained_cards = _lost_card_hashes(existing, writes) | historical_hashes
+    reading_cards = _reading_card_refs(ctx, material)
+    staged = [row for row in bundle.get("staged_objects", [])
+              if (row.get("kind") not in {"card", "historical_card"}
+                  and not row["final_ref"].startswith("logs/evidence/published/cards/"))
+              or row["sha256"] in retained_cards]
+    # Retain the exact preimage before an update replaces its only formal copy.
+    # This also covers P4 callers that supplied a bundle without P2 materials.
+    for identity in sorted(set(proposed) & set(existing)):
+        card = existing[identity]
+        if card["sha256"] in retained_cards:
+            staged.append(staging.stage_bytes(ctx, "logs/evidence/published/cards/" + card["sha256"] + ".md",
+                                             card["raw"], kind="card"))
+    for ref, entry in snapshot["adopted_objects"].items():
+        if entry.get("kind") == "source_snapshot" or ref in inputs:
+            continue
+        if ref in reading_cards and entry["sha256"] not in retained_cards:
+            continue  # Reading a candidate binds prewrite inputs, not publication.
+        is_card = ref in reading_cards or entry["sha256"] in historical_hashes
+        final = ("logs/evidence/published/" + ("cards/" if is_card else "objects/")
+                 + entry["sha256"] + (".md" if is_card else ".bin"))
+        if any(row["final_ref"] == final and row["sha256"] == entry["sha256"]
+               and row["bytes"] == entry["bytes"] for row in staged):
+            continue
+        # Explicit adopted history can live outside this batch. Copy its exact
+        # bytes into our publication; never clean the borrowed original.
+        raw = Path(ref).read_bytes() if Path(ref).is_absolute() else fixed_bytes(ctx.root, ref)
+        if sha(raw) != entry["sha256"] or len(raw) != entry["bytes"]:
+            raise NodeError("INPUT_CHANGED", "Retained input changed before staging", ref)
+        staged.append(staging.stage_bytes(ctx, final, raw, kind="card" if is_card else "original"))
+    for ref, entry in {**snapshot["business_records"], **snapshot["adopted_objects"]}.items():
+        if ref.startswith(ctx.operation_root + "/") and entry.get("kind") != "source_snapshot":
+            ctx.register_owned(ref, fixed_bytes(ctx.root, ref, [ctx.operation_root]))
+    view_fields = {"operation_id": ctx.operation, "writes": sorted(writes, key=lambda row: row["path"]), "deletes": [],
                      "plan_ref": plan_ref, "plan_digest": plan["digest"],
                      "review_mode": review_mode, "review_requirements": requirements,
                      "batch_kind": "content" if writes else "record_only",
@@ -423,9 +483,20 @@ def assemble(ctx, request=None):
                          "previous_view_digest": previous["digest"],
                          "revision_reason": request["revision_reason"],
                          "previous_semantic_plan_ref": previous.get("semantic_plan_ref"),
-                         "previous_semantic_plan_digest": previous.get("semantic_plan_digest")} if revision_ref else {})}, "final_view")
+                         "previous_semantic_plan_digest": previous.get("semantic_plan_digest")} if revision_ref else {}),
+                     "staged_objects": staging.merge_entries(staged),
+                     # Record-only dispositions do not register a new source
+                     # version. Their unresolved debt stays in the record.
+                     "event_proposals": copy.deepcopy(bundle.get("event_proposals", [])) if writes else [],
+                     "owned_files": ctx.owned_files()}
+    view_fields["publication_plan"] = publication.prepare_plan(ctx, view_fields, disposition_preview=preview)
+    view_fields["content_digest"] = view_fields["publication_plan"]["content_digest"]
+    view = ctx.seal(view_fields, "final_view")
     for row in writes:
-        write_bytes(ctx.root, ctx.base + "/final-view/" + row["path"], base64.b64decode(row["bytes_b64"]))
+        raw = base64.b64decode(row["bytes_b64"])
+        output_ref = ctx.base + "/final-view/" + row["path"]
+        write_bytes(ctx.root, output_ref, raw)
+        ctx.register_owned(output_ref, raw)
     view_ref = ctx.save(ctx.base + "/final-view.json", view)
     summary = ctx.seal({"purpose": "candidate_summary", "view_ref": view_ref, "view_digest": view["digest"],
                         "plan_ref": plan_ref, "plan_digest": plan["digest"],

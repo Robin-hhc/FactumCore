@@ -6,9 +6,9 @@
 
 `test_manual_skills.py` 以无 catalog 的公开 CLI 逐个调用 Skill，验证扫描、材料、计划、稿件、业务检查、入库、索引及查询的衔接；`test_node_pipeline.py` 继续覆盖更新、历史与恢复机制。人工安排内容复核，Skill 检查实际数据和确切视图绑定，不检查角色或上游通过凭证。真实宿主触发、六 Target/三 pair、真实 CI 合入与权限验收按实际环境单列验证，缺少输入时保持未完成。本项目自身的历史验收记录在本地 `../docs-llm-wiki/sdd/` 保存，不随仓库分发，历史成绩不合并到当前计数。
 
-新增公开检查覆盖自动扫描/材料准备/处理记录、逐 Claim 计划与 skip 抽查、只读 lint 0/1/2、固定 CI、同批记录事务和提交前索引/目标查询。共用 indexing 的完整集合/值核验与跨机接纳凭据另有独立预期测试。操作收尾、连续无变化扫描及显式不存在来源范围按公开 CLI 回归；按现有 Workflow 节点顺序验证正常业务链和已有续办出口，测试复核声明为合成数据，不表示真实宿主运行或角色隔离通过。查询继续消费活动代，响应沿用各节点既有输出与重试规则。
+新增公开检查覆盖自动扫描/材料准备/处理记录、逐 Claim 计划与 skip 抽查、只读 lint 0/1/2、固定 CI、同批记录事务和提交前索引/目标查询。共用 indexing 的完整集合/值核验与跨机接纳凭据另有独立预期测试。操作收尾、连续无变化扫描及显式不存在来源范围按公开 CLI 回归；按现有 Workflow 节点顺序验证正常业务链、明确的本轮返工和正式收尾状态，测试复核声明为合成数据，不表示真实宿主运行或角色隔离通过。查询继续消费活动代，响应沿用各节点既有输出与重试规则。
 
-`test_clean_clone.py` 使用隔离合成资料完成 ingest，只提交共享资产，再执行真实 Git clone；消费副本没有生产端的 `.build/`、`artifacts/`、事务日志及原件／提取缓存，须重新通过正式库检查、索引验证与激活、query／read 和增量扫描。`test_git_asset_boundary.py` 另用 Git 自身检查忽略规则，区分本机缓存与必须可提交的处理记录、使用限制和显式材料。该场景验证跨工作区数据闭包，不证明另一账号权限、实际宿主或部署机文件系统的持久化行为。
+`test_clean_clone.py` 使用隔离合成资料完成 ingest，只提交共享资产，再执行真实 Git clone；消费副本没有生产端的 `.build/`、`artifacts/`、事务日志及旧原件／提取缓存，保留正式 `logs/evidence/published/` 和 `logs/publications/` 闭包，须重新通过正式库检查、索引验证与激活、query／read 和增量扫描。`test_git_asset_boundary.py` 另用 Git 自身检查忽略规则，区分本机缓存与必须可提交的处理记录、使用限制和显式材料。该场景验证跨工作区数据闭包，不证明另一账号权限、实际宿主或部署机文件系统的持久化行为。
 
 
 当前公开集合为9个Skill，ingest的7个节点为scan_sources、prepare_material、plan_change、materialize_view、lint_view、record_ingest、apply_view；P5唯一reviewer，其他coder。validate_design.py逐项核对最终能力集合、节点／owner／转移、布局及真实产物node/exit范围；历史空目录不视为active Skill，旧有SKILL.md的包必须迁移删除后才能通过。
@@ -20,3 +20,5 @@ P1/P2独立测试分别验证观察不备料、固定清单／显式目标备料
 `test_code_symbols.py`、`test_code_ref_contracts.py` 及 query／maintain 包的 `test_code_navigation.py` 验证补充式 `sources[].code_ref`：旧快照绑定与当前符号导航分别检查，涵盖插行、改体、删除、歧义、安全配置绑定、用途边界和公开 CLI。解析使用锁定的 Tree-sitter C/C++ 语法，不执行目标代码；语法或能力不足返回 unavailable。
 
 符号性能诊断可在 `repo/` 执行 `python himate-knowledge-wifi-mp/evals/benchmark_ingest.py --checkout . --output-dir .scratch/symbol-benchmark-new --symbols`。它单独测量 1000 个合成 C 函数的冷解析及同文件操作缓存查询，保留 summary.json；不包含 CLI、文件系统、构建、模型或宿主延迟，也不作为速度阈值。
+
+`test_ingest_phase_boundaries.py` 逐次核对真实 P1—P6 公开调用前后的正式路径与字节；`test_ingest_stage_interrupt.py` 实际停止隔离 P2 子进程，再用新 operation 验证 fresh scan。暂存映射、归属、正式发布、清理失败只补清理、首次 CAS 和清后提交核验的机制用例分别位于领域及 apply 包测试中。孤儿暂存周期 GC、罕见 P7 部分写入自动修复和真实宿主取消语义不由这些用例证明。

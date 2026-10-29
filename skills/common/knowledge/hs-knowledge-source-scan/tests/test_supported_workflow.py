@@ -117,7 +117,7 @@ class SupportedDocumentFlow:
         self.node("apply_view")
         blocker = None
         if stop in {"applied", "built"}:
-            blocker = "artifacts/indexes/local" if stop == "applied" else f".build/operations/{self.operation}/regression"
+            blocker = "artifacts/indexes/local" if stop == "applied" else f"logs/publications/{self.operation}/regression"
             self.h.write(blocker, b"Synthetic IO blocker; no valid index or report is modified.")
         request = {"operation_id": self.operation, "view_ref": self.state["view_ref"],
                    "ingest_record_ref": self.state["ingest_record_ref"], "lint_report_ref": self.state["lint_ref"],
@@ -125,7 +125,7 @@ class SupportedDocumentFlow:
         response = self.h.run("apply", request, "batch", expected=2 if blocker else 0)
         if blocker:
             (self.h.root / blocker).unlink()
-            journal = self.h.record(f"logs/operations/{self.operation}/journal.json")
+            journal = self.h.record(f".build/operations/{self.operation}/transaction/journal.json")
             assert journal["status"] == "committed", response
             self.state["apply_result_ref"] = journal["result_ref"]
             if stop == "built":
@@ -148,7 +148,8 @@ class SupportedDocumentFlow:
         return result, inventory
 
     def protected_bytes(self):
-        refs = ["logs/operations/" + self.operation + "/journal.json", self.state["apply_result_ref"],
+        refs = ["logs/publications/" + self.operation + "/manifest.json",
+            "logs/publications/" + self.operation + "/apply-result.json",
             "logs/ingest/" + self.operation + ".yaml", "governance/sources.lock.yaml"]
         refs += [p.relative_to(self.h.root).as_posix() for p in (self.h.root / "knowledge").rglob("*.md")]
         return {ref: (self.h.root / ref).read_bytes() for ref in refs}
@@ -195,34 +196,35 @@ def test_complete_planned_document_nodes_then_three_noop_runs(planned_flow):
     assert sorted((flow.h.root / "logs/ingest").glob("*.yaml")) == original_records
 
 
-@pytest.mark.parametrize(("stop", "resume_exit", "next_node", "prefix_count"), [
-    ("applied", "resume_index", "apply_view", 7),
-    ("built", "resume_queries", "apply_view", 7),
-])
-def test_supported_p7_stop_resumes_existing_exit_without_reapplying(
-        planned_flow, stop, resume_exit, next_node, prefix_count):
+@pytest.mark.parametrize("stop", ["applied", "built"])
+def test_explicit_current_p7_stop_resumes_without_p1_history_route(planned_flow, stop):
+    next_node, prefix_count = "apply_view", 7
     flow = planned_flow
     flow.produce(stop)
     assert flow.trace == PLANNED_DOCUMENT_NODES[:prefix_count]
     assert flow.current == next_node
     protected = flow.protected_bytes()
-    journal = flow.h.record("logs/operations/" + flow.operation + "/journal.json")
+    journal = flow.h.record(".build/operations/" + flow.operation + "/transaction/journal.json")
     assert journal["status"] == "committed"
     if stop == "built":
         assert flow.state["expected_active"] is None  # no initial generation in this fixture
         assert flow.h.record(flow.state["generation_ref"])["expected_active"] is None
-    scan_result, _ = flow.scan_new_run("resume-check-" + stop)
+    scan_result = flow.h.run("source-scan", {"operation_id": "resume-check-" + stop}, "scan")["data"]
     assert scan_result["actionable_unit_ids"] == []
-    pending = next(row for row in scan_result["finalization_pending"] if row["operation_id"] == flow.operation)
-    assert pending["next_action"] == ("rebuild_index" if stop == "applied" else "resume_queries")
-    # The named exits already existed before this fix; this is a normal saved
-    # stop, not a journal edit, an invented route or replay of completed nodes.
-    flow.take(resume_exit)
+    assert scan_result["finalization_pending"] == []
+    assert scan_result["execution_history"] == {"status": "not_inspected"}
+    details = flow.h.run("source-scan", {"operation_id": "explicit-stop", "target_operation_id": flow.operation}, "status")["data"]["operations"][0]
+    assert details["completion"]["published"] is True
+    assert details["completion"]["batch_complete"] is False
+    assert details["completion"]["next_action"] == "resume_batch"
+    # Resume the explicitly known current P7, without a new Workflow adopting it.
     assert flow.current == next_node
     flow.finish()
-    assert flow.trace == PLANNED_DOCUMENT_NODES[:prefix_count] + ["scan_sources", "apply_view"]
+    assert flow.trace == PLANNED_DOCUMENT_NODES[:prefix_count] + ["apply_view"]
     assert flow.trace.count("apply_view") == 2 and flow.trace.count("record_ingest") == 1
     assert flow.protected_bytes() == protected
     status = flow.h.run("source-scan", {"operation_id": "saved-stop-status", "target_operation_id": flow.operation}, "status")["data"]["operations"][0]
     assert status["completion"]["status"] == "complete"
-    assert {row["stage"] for row in status["facts"]} >= {"plan", "content_review", "lint", "apply", "index", "regression", "activation"}
+    assert {row["stage"] for row in status["facts"]} == {"publication", "publication_completion"}
+    assert status["completion"]["retrieval"]["complete"] is True
+    assert status["completion"]["cleanup"]["status"] == "done"

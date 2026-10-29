@@ -28,7 +28,7 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-change-plan
-  prompt: 目标代码仓在远端时，通过宿主已有 SSH MCP 在实际执行端运行本节点脚本并读取结果，使用该端项目根、全局 Python 和已安装 Skill 路径；本地路径不能直接用于远端。调用plan固定作者判断。逐单元确定content、skip、defer、failed或uncovered及理由，覆盖明确维护事项。判断卡和旧Claim的新建、更新、合并、拆分、退役或暂缓，保留身份和全部去向；同单元多种卡动作时显式record_action并保全明细。冻结本批查询及明确预期，按实际Claim的usage、evidence_kind和scope选择purpose，存在代码链接不等于implementation依据；正向用例推荐expected_claim_ids，负向保留排除或明确空结果断言。P5退回或P2补料后，用新operation_id、previous_view_ref及revision_reason保存新计划；原scan及单元身份不变，采用旧材料须与前序稿精确绑定，补料须引用新材料版本，旧工件不覆盖。这里不做提前独立复核，不生产字节写入清单；缺材料回prepare_sources直接prepare；采用源变化保留诊断，在该节点按实际对象刷新有效输入，不自动无限重扫。
+  prompt: 目标代码仓在远端时，通过宿主已有 SSH MCP 在实际执行端运行本节点脚本并读取结果，使用该端项目根、全局 Python 和已安装 Skill 路径；本地路径不能直接用于远端。plan成功即保存并冻结本批语义计划，同一operation_id下不可追加或覆盖。先汇总核对本批全部卡、Claim、处置和查询，再调用plan提交完整计划；不得用部分卡试跑校验后再扩充。逐单元确定content、skip、defer、failed或uncovered及理由，覆盖明确维护事项。判断卡和旧Claim的新建、更新、合并、拆分、退役或暂缓，保留身份和全部去向；同单元多种卡动作时显式record_action并保全明细。冻结本批查询及明确预期，按实际Claim的usage、evidence_kind和scope选择purpose，存在代码链接不等于implementation依据；正向用例推荐expected_claim_ids，负向保留排除或明确空结果断言。P5退回或P2补料后，用新operation_id、previous_view_ref及revision_reason保存新计划；原scan及单元身份不变，采用旧材料须与前序稿精确绑定，补料须引用新材料版本，旧工件不覆盖。这里不做提前独立复核，不生产字节写入清单；缺材料回prepare_sources直接prepare；采用源变化保留诊断，在该节点按实际对象刷新有效输入，不自动无限重扫。
   exits:
   - id: content_planned
     label: 作者判断已固定

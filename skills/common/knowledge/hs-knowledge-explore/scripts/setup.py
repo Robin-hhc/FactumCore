@@ -1,8 +1,7 @@
 """Prepare the current global Python and read the project's knowledge entry.
 
 No virtual environment, catalog, registry or machine binding is created.
-Optional SSH connection data lives in this Skill's own config.env; the Agent
-and its harness perform the connection and execution checks.
+Run this script on the host that contains the actual project.
 """
 
 from __future__ import annotations
@@ -44,27 +43,6 @@ def missing_packages(pins):
     return missing
 
 
-def connection_entry():
-    path = SKILL / "config.env"
-    if not path.is_file():
-        return None
-    values = {}
-    for line in path.read_text(encoding="utf-8-sig").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        value = value.strip()
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-            value = value[1:-1]
-        values[key.strip()] = value
-    if values.get("EXECUTION_MODE", "ssh") == "local" or not values.get("SSH_HOST"):
-        return None
-    # These are connection hints, never a shell script or executed command.
-    keys = ("SSH_HOST", "SSH_USER", "SSH_PORT", "SSH_IDENTITY_FILE", "REMOTE_PROJECT_ROOT", "PYTHON")
-    return {"config": str(path), **{key: values[key] for key in keys if values.get(key)}}
-
-
 def project_entry(config):
     import yaml
 
@@ -86,19 +64,12 @@ def project_entry(config):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workspace-config", default="config.yml")
-    parser.add_argument("--local", action="store_true", help="run on the actual execution host, bypassing SSH hints")
     parser.add_argument("--check-only", action="store_true", help="report missing dependencies without installing")
     sources = parser.add_mutually_exclusive_group()
     sources.add_argument("--wheelhouse", help="offline wheels for this global Python and operating system")
     sources.add_argument("--index-url", help="explicit package index; otherwise use the existing pip configuration")
     args = parser.parse_args(argv)
     try:
-        ssh = None if args.local else connection_entry()
-        if ssh:
-            print(json.dumps({"status": "ssh_entry", "ssh": ssh,
-                "next_step": "Use the harness SSH connection, then run setup --local with the server config.yml and global Python."},
-                ensure_ascii=False, indent=2))
-            return 0
         config = Path(args.workspace_config).expanduser().absolute()
         if not config.is_file():
             raise ValueError("Provide the actual project config.yml with --workspace-config")

@@ -5,6 +5,8 @@ description: Prepare exact current and historical reading material from fixed sc
 
 本 Skill 是 ingest P2。按扫描清单中的实际单元，或用户明确给出的原件／配置内代码目标，组织本次新旧材料、旧卡候选、原字节、提取文本、定位、差异及缺口。它可独立调用，不要求先运行扫描，不检查 Workflow 身份或上游 passed 票据。
 
+目标代码仓在远端时，通过 OpenFlow／宿主已有的 SSH MCP 在远端项目根执行脚本、读取文件和进行仓库操作，使用执行端的全局 Python 与已安装 Skill 路径，并核对实际结果；本地路径不能直接用于远端。
+
 P1 对照正式处理记录判断当前变化和欠账，P2 准备所选材料。P5 发现缺材料时，使用原 `existing_material_ref` 和明确补充目标定向补料。只核对本次采用来源、旧卡、配置和规则的实际指纹；普通补料不重新扫描全库。已采用输入漂移时停止，依据 `SOURCE_CHANGED` 的 `needs_scan/affected_scope` 回到 P1 的受影响范围或新操作，不能以旧清单冒充补齐。
 
 先读取实际材料，再由作者决定更新、skip 或暂缓。候选卡及差异只是阅读线索，不表示必须修改、不构成语义通过或代码支持。卡的完整质量审查属于 P5 的 lint；P2 仅解码备料所需数据及核验确切输入。

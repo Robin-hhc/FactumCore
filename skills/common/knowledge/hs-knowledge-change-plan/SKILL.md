@@ -5,6 +5,8 @@ description: Freeze Agent-authored Claim decisions, explicit source and maintena
 
 P3 是作者的内容决策入口。已有项目与规则上下文直接复用；缺入口时按已安装的 `hs-knowledge-explore` 指引定位实际知识根和配置。使用执行端已有的全局 Python，材料与结果放知识根现有 `.build/`、`logs/`、`artifacts/`。
 
+目标代码仓在远端时，通过 OpenFlow／宿主已有的 SSH MCP 在远端项目根执行脚本、读取文件和进行仓库操作，使用执行端的全局 Python 与已安装 Skill 路径，并核对实际结果；本地路径不能直接用于远端。
+
 Agent 先阅读实际原文、各卡采用旧版、完整旧卡及需要的源码／配置，再判断新增、更新、保留、退役或欠账，保存逐单元处置、逐 Claim 理由、卡动作及目标查询预期。脚本检查这些业务数据并固定内容，不生成知识断言或替代独立审阅。
 
 默认动作 `plan`：

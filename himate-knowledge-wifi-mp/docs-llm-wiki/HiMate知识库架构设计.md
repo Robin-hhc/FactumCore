@@ -8,7 +8,7 @@ himate-knowledge知识库仓目录结构如下所示。
 
 本节以 `repo/` 表示项目根目录，实际目录名称和存放位置不限。下树以平铺布局示意；实际知识根 K 由项目 `config.yml` 的 `knowledge_roots.wifi` 相对配置目录解析，允许安全的前置子目录，与业务代码共同管理。开发仓保存 Skill／Workflow 分发源码；实际部署在 Agent 自己的能力目录，运行不依赖项目根保留源码副本。业务工作区可包含 Host、Device、特性和算法等多个代码模块；知识库按配置中的相对路径读取实际文件，以内容指纹核对引用。
 
-当前入口按同一业务工作区读取根 `config.yml`，项目配置全部由用户在这份文件维护。已安装 `hs-knowledge-explore` 是全库能力入口，提供 ingest、query、lint 等任务的选择与指引；首次用 setup 复用全局 Python、补齐实际缺依赖并读取入口，后续缺上下文时才运行只读发现。跨机器 SSH 信息放该 Skill 的 `config.env`，连接与实际执行检查交给 harness。正常流程不增加私有环境或登记步骤。
+当前入口按同一业务工作区读取根 `config.yml`，项目配置全部由用户在这份文件维护。已安装 `hs-knowledge-explore` 是全库能力入口，提供 ingest、query、lint 等任务的选择与指引；首次用 setup 复用全局 Python、补齐实际缺依赖并读取入口，后续缺上下文时才运行只读发现。目标代码仓在远端时，Agent 通过 OpenFlow／宿主已有 SSH MCP 在实际执行端运行脚本与仓库操作。正常流程不增加私有环境或登记步骤。
 
 - AGENTS.md：具体业务仓的代码架构、开发约定与位置说明；由该工作区维护
 - AGENTS.md.example：本项目分发的接入示例，供合并 main、config.yml、知识根及设计文档四项说明
@@ -79,9 +79,9 @@ repo/
 
 节点 Skill 和 Workflow 随 WiFi 知识库维护：
 
-上树展示开发分发源码。实际能力已经安装在 Agent 自己的 `S`、`F` 目录，由 harness 使用；不要求业务仓根保留能力源码。首次运行 `S/hs-knowledge-explore/scripts/setup.py` 检查当前全局 Python 和依赖、读取项目入口；需要跨机时从同 Skill 的 `config.env` 提示 harness 通过 SSH 执行，不另复制部署工具或建立机器绑定。业务产物仍在 K 已有 `.build/`、`logs/`、`artifacts/`。ingest 完成 P1—P7，lint 保持确定性检查；文档和代码均独立内容复核，代码及混合稿另做适用代码核验。
+上树展示开发分发源码。实际能力已经安装在 Agent 自己的 `S`、`F` 目录，由 harness 使用；不要求业务仓根保留能力源码。首次运行 `S/hs-knowledge-explore/scripts/setup.py` 检查当前全局 Python 和依赖、读取项目入口；需要跨机时由 Agent 通过 OpenFlow／宿主已有 SSH MCP 在项目所在端执行，不另复制部署工具或建立机器绑定。业务产物仍在 K 已有 `.build/`、`logs/`、`artifacts/`。ingest 完成 P1—P7，lint 保持确定性检查；文档和代码均独立内容复核，代码及混合稿另做适用代码核验。
 
-服务器项目由 Agent/harness 按 `hs-knowledge-explore/config.env` 的 SSH 提示在服务器原生路径执行，使用当地现有全局 Python。harness 须确认实际执行端能调用对应 Skill 脚本；调用端的安装路径不能当作远端脚本路径。setup 只返回连接提示，不上传能力；执行端能力缺失时报告缺口，特殊处理先与用户讨论，不另建目录或工具副本。连接、权限与命令结果由 harness 判断，不另外建立 runner 硬校验层。“本地入库”和“本机索引”指实际执行端；生成物留在 K 原有目录。行为与恢复见[详细设计 §6.3](知识库详细设计.md#63-命令分派与工作流续办)，首次操作见[使用说明](使用说明.md#首次准备运行依赖)。
+服务器项目先由用户或部署维护者在 OpenFlow 配置、启用 SSH MCP，并验证该能力实际可调用；连接凭据由宿主管理，操作集中见[远端执行准备](使用说明.md#12-远端执行先配置-openflow-ssh-mcp)。远端须已有全局 Python 和配套已安装 Skill，Agent 再通过 SSH MCP 在服务器原生项目路径执行。harness 须确认实际执行端能调用对应脚本；调用端的安装路径不能当作远端脚本路径。同机执行不要求 SSH。setup 只处理当前执行端的依赖和项目配置，不配置 SSH MCP 或部署远端能力；执行端能力缺失时报告缺口，特殊处理先与用户讨论，不另建目录或工具副本。连接、权限与命令结果由 harness 判断，不另外建立 runner 硬校验层。“本地入库”和“本机索引”指实际执行端；生成物留在 K 原有目录。行为与恢复见[详细设计 §6.3](知识库详细设计.md#63-命令分派与工作流续办)，首次操作见[使用说明](使用说明.md#首次准备运行依赖)。
 
 
 
@@ -195,7 +195,7 @@ flowchart TB
 
 #### hs-knowledge-explore —— 全库能力入口与按需前置发现 E0
 
-该 Skill 集中介绍知识库能力并按任务引导 ingest、query、lint 及维护入口。Agent 阅读其指引后，已有有效上下文即可直接使用相应能力；阅读指引不要求执行脚本。首次准备时运行 `hs-knowledge-explore/scripts/setup.py`，检查现有全局依赖并读取根 `config.yml`；有 SSH 提示时由 harness 连接服务器实际执行。后续仅在上下文缺失时通过只读 E0 定位代码仓、知识根并读取业务仓 `AGENTS.md` 与配置，无需重复 setup 或登记。
+该 Skill 集中介绍知识库能力并按任务引导 ingest、query、lint 及维护入口。Agent 阅读其指引后，已有有效上下文即可直接使用相应能力；阅读指引不要求执行脚本。首次准备时运行 `hs-knowledge-explore/scripts/setup.py`，检查现有全局依赖并读取根 `config.yml`；远端代码仓由 Agent 通过 OpenFlow／宿主已有 SSH MCP 在服务器执行。后续仅在上下文缺失时通过只读 E0 定位代码仓、知识根并读取业务仓 `AGENTS.md` 与配置，无需重复 setup 或登记。
 
 ```mermaid
 flowchart LR

@@ -13,8 +13,8 @@ config.local.yml
 # This development checkout keeps its own Agent instructions locally.
 # Merge the tracked AGENTS.md.example into the real business repository's AGENTS.md.
 /AGENTS.md
-# Machine-owned execution connection data. The distributable template remains tracked.
-config.env
+# Machine-owned environment files stay private.
+*.env
 
 # Project development artifacts stay local; shared design and usage remain versioned.
 /himate-knowledge-wifi-mp/docs-llm-wiki/sdd/

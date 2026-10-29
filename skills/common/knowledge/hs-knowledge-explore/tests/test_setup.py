@@ -47,7 +47,7 @@ def test_help_and_missing_dependency_report_need_only_stdlib(deployment):
     before = snapshot(project.parent)
     help_result = invoke(deployment, "--help", no_site=True)
     assert help_result.returncode == 0
-    result = invoke(deployment, "--local", "--check-only", no_site=True)
+    result = invoke(deployment, "--check-only", no_site=True)
     report = json.loads(result.stdout)
     assert result.returncode == 2 and report["status"] == "missing_dependencies"
     assert any(row["name"].lower() == "pyyaml" for row in report["missing"])
@@ -58,7 +58,7 @@ def test_existing_global_dependencies_and_repeat_leave_both_parts_unchanged(depl
     skill, project, knowledge = deployment
     before = snapshot(project.parent)
     for _ in range(2):
-        result = invoke(deployment, "--local", "--check-only")
+        result = invoke(deployment, "--check-only")
         report = json.loads(result.stdout)
         assert result.returncode == 0, report
         assert report["status"] == "ready" and report["dependencies"] == "already_available"
@@ -69,19 +69,20 @@ def test_existing_global_dependencies_and_repeat_leave_both_parts_unchanged(depl
     assert not (knowledge / ".build").exists()
 
 
-def test_ssh_config_is_a_harness_hint_without_connecting_or_imposing_port_checks(deployment):
-    skill, project, _ = deployment
-    (skill / "config.env").write_text(
-        "EXECUTION_MODE=ssh\nSSH_HOST=host.example\nSSH_USER=operator\n"
-        "SSH_PORT=port-resolved-by-harness\nREMOTE_PROJECT_ROOT=/srv/real-project\n"
-        "SSH_PASSWORD=must-not-be-returned\n", encoding="utf-8")
+def test_legacy_connection_file_does_not_redirect_or_block_setup(deployment):
+    skill, project, knowledge = deployment
+    (skill / "config.env").write_bytes(
+        b"EXECUTION_MODE=ssh\nSSH_HOST=host.example\nREMOTE_PROJECT_ROOT=/srv/other-project\n\xff")
     before = snapshot(project.parent)
-    # -S also proves that SSH entry discovery neither installs nor imports runtime packages.
-    result = invoke(deployment, no_site=True)
+    result = invoke(deployment, "--check-only")
     report = json.loads(result.stdout)
-    assert result.returncode == 0 and report["status"] == "ssh_entry"
-    assert report["ssh"]["SSH_PORT"] == "port-resolved-by-harness"
-    assert "must-not-be-returned" not in result.stdout.decode()
+    assert result.returncode == 0 and report["status"] == "ready", report
+    assert Path(report["project_root"]) == project
+    assert Path(report["knowledge_root"]) == knowledge
+    assert "host.example" not in result.stdout.decode()
+    missing = invoke(deployment, "--check-only", no_site=True)
+    assert missing.returncode == 2
+    assert json.loads(missing.stdout)["status"] == "missing_dependencies"
     assert snapshot(project.parent) == before
 
 
@@ -95,7 +96,7 @@ def test_missing_packages_are_installed_into_the_same_python(deployment, monkeyp
     commands = []
     monkeypatch.setattr(setup.subprocess, "run", lambda command, **kwargs: commands.append(command))
     before = snapshot(project.parent)
-    code = setup.main(["--local", "--workspace-config", str(project / "config.yml")])
+    code = setup.main(["--workspace-config", str(project / "config.yml")])
     report = json.loads(capsys.readouterr().out)
     assert code == 0 and report["dependencies"] == "installed"
     assert commands[0][:3] == [sys.executable, "-m", "pip"]
@@ -117,7 +118,7 @@ def test_failed_global_install_does_not_publish_any_state(deployment, monkeypatc
 
     monkeypatch.setattr(setup.subprocess, "run", fail)
     before = snapshot(project.parent)
-    assert setup.main(["--local", "--workspace-config", str(project / "config.yml")]) == 3
+    assert setup.main(["--workspace-config", str(project / "config.yml")]) == 3
     assert json.loads(capsys.readouterr().out)["status"] == "failed"
     assert snapshot(project.parent) == before
 
@@ -126,7 +127,7 @@ def test_config_error_is_reported_without_creating_a_binding(deployment):
     _, project, _ = deployment
     (project / "config.yml").write_text("knowledge_roots: [invalid\n", encoding="utf-8")
     before = snapshot(project.parent)
-    result = invoke(deployment, "--local", "--check-only")
+    result = invoke(deployment, "--check-only")
     assert result.returncode == 3
     assert json.loads(result.stdout)["status"] == "failed"
     assert "Traceback" not in result.stderr.decode()
@@ -139,5 +140,5 @@ def test_missing_project_config_is_reported_before_installing_packages(deploymen
     setup = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(setup)
     monkeypatch.setattr(setup, "missing_packages", lambda pins: pytest.fail("project path must be checked first"))
-    assert setup.main(["--local", "--workspace-config", str(project / "absent.yml")]) == 3
+    assert setup.main(["--workspace-config", str(project / "absent.yml")]) == 3
     assert json.loads(capsys.readouterr().out)["status"] == "failed"

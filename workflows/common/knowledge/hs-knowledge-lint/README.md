@@ -2,6 +2,8 @@
 
 此模板由 OpenFlow 直接编排两个已安装 Skill 节点，供手动启动或已有外部调度定期启动。只生成正式库检查及引用差异报告，保留原检查的失败和未完成范围。
 
+目标代码仓在远端时，通过 OpenFlow／宿主已有的 SSH MCP 在远端项目根执行脚本、读取文件和进行仓库操作，使用执行端的全局 Python 与已安装 Skill 路径，并核对实际结果；本地路径不能直接用于远端。连接由宿主管理，Skill／Workflow 不维护单独的 SSH 配置。
+
 1. `check_formal` 调用原 `hs-knowledge-lint` Skill，沿用默认 formal/full。Agent 根据实际项目配置准备确切来源输入及适用的 `inputs.code_checkout`，将原 JSON 报告保存到知识根 `.build/` 内的新路径。
 2. `audit_references` 显式调用 `hs-knowledge-maintain --action audit-references`，传入本次 `operation_id` 与相对知识根的 `lint_report_ref`，读取返回的 `audit_ref` JSON 和 `report_ref` Markdown。将实际 `report_ref` 在执行端解析为真实文件路径，显式填入产物实例的 `location.path`，不能以模板默认位置代替报告，再按 `reported` 出口结束。
 

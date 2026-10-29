@@ -5,6 +5,8 @@ description: Produce one exact authored candidate with navigation, source lock, 
 
 P4 负责一次保存完整候选稿。Agent 按 P3 的内容决定写好实际卡片，再调用本入口组织卡、导航、来源登记、写删目标、旧基线及处置预览。已有项目上下文直接复用；缺入口时按 `hs-knowledge-explore` 指引定位。默认使用执行端全局 Python，产物沿用知识根 `.build/`、`logs/`、`artifacts/`。
 
+目标代码仓在远端时，通过 OpenFlow／宿主已有的 SSH MCP 在远端项目根执行脚本、读取文件和进行仓库操作，使用执行端的全局 Python 与已安装 Skill 路径，并核对实际结果；本地路径不能直接用于远端。
+
 ```text
 python scripts/cli.py --action run --input REQUEST.json --output RESPONSE.json --knowledge-root K
 python scripts/cli.py --action revise --input REQUEST.json --output RESPONSE.json --knowledge-root K

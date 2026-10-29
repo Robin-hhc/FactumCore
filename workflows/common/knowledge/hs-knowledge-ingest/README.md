@@ -2,6 +2,8 @@
 
 OpenFlow 编排已安装的九个配套 Skill，恰好七节点：P1扫描 → P2备料 → P3作者决定 → P4完整稿 → P5独立审阅和完整检查 → P6待发布记录 → P7发布及收尾。P5由reviewer执行，其余由coder执行；角色隔离由宿主落实。
 
+目标代码仓在远端时，通过 OpenFlow／宿主已有的 SSH MCP 在远端项目根执行脚本、读取文件和进行仓库操作，使用执行端的全局 Python 与已安装 Skill 路径，并核对实际结果；本地路径不能直接用于远端。连接由宿主管理，Skill／Workflow 不维护单独的 SSH 配置。
+
 新Workflow使用新operation。普通P1只对照当前输入、正式处理记录和维护限制，出口仅 `scanned`（进入P2）与 `unchanged`（结束）；不枚举旧draft、journal或索引收尾。兼容的两种finalization数组为空，execution_history为not_inspected。无变化仍可按用户明确修订目标进入P2，不回溯上次未记录的作者意图。
 
 P1—P6本批业务新文件，包括原件／附件副本、提取定位、旧卡、代码／构建／运行材料、事件拟稿及输出，均写本批 `.build/operations/<op>/`；正式卡、导航、来源锁、事件、证据和活动索引不变。P4/P5冻结stage→final路径和完整字节；P7不改写已审内容。P5缺料回P2、判断错回P3、稿件错回P4，使用新op和明确前序引用，保留原scan身份，不覆盖旧工件。

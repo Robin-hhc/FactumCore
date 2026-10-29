@@ -28,7 +28,7 @@ def install_packages(destination):
     source = REPO / "skills/common/knowledge"
     for name in PUBLIC_SKILLS:
         shutil.copytree(source / name, destination / name,
-                        ignore=shutil.ignore_patterns("tests", "__pycache__", "config.env", ".env"))
+                        ignore=shutil.ignore_patterns("tests", "__pycache__", "*.env", ".env"))
     assert {path.name for path in destination.iterdir()} == set(PUBLIC_SKILLS)
     assert not any((destination / name).exists() for name in RETIRED_SKILLS)
     return destination

@@ -13,7 +13,7 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-source-scan
-  prompt: 新Workflow使用新operation_id，调用scan只观察六类当前原件、正式处理记录和必要维护状态。读取actionable_unit_ids与明确修订目标；完整且无变化、正式欠账或维护事项才结束。普通scan不枚举旧draft、journal、generation或索引收尾，不采用旧操作产物；finalization_pending及historical_finalization_unknown为兼容空数组，execution_history为not_inspected。此入口不恢复旧事务；写入前的真实未完事务保护仍由P7执行。当前Workflow返工按明确引用继续，异常保存本次停点。
+  prompt: 目标代码仓在远端时，通过宿主已有 SSH MCP 在实际执行端运行本节点脚本并读取结果，使用该端项目根、全局 Python 和已安装 Skill 路径；本地路径不能直接用于远端。新Workflow使用新operation_id，调用scan只观察六类当前原件、正式处理记录和必要维护状态。读取actionable_unit_ids与明确修订目标；完整且无变化、正式欠账或维护事项才结束。普通scan不枚举旧draft、journal、generation或索引收尾，不采用旧操作产物；finalization_pending及historical_finalization_unknown为兼容空数组，execution_history为not_inspected。此入口不恢复旧事务；写入前的真实未完事务保护仍由P7执行。当前Workflow返工按明确引用继续，异常保存本次停点。
   exits:
   - id: scanned
     label: 准备材料
@@ -28,7 +28,7 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-source-prepare
-  prompt: P1-P6本批业务新文件（含事件拟稿、证据、代码核验副本及输出）仅写本批.build暂存，正式状态不变。调用独立prepare按固定扫描清单和所选单元准备真实原文、附件、采用旧版、关联旧卡和必要代码或配置。P5补料使用新operation_id，显式传previous_view_ref、revision_reason和旧稿绑定的existing_material_ref，只补明确缺口并保存新材料版本及前序摘要；保留原scan_ref和处理单元身份，不覆盖旧工件、不默认重扫全库。显式目标独立备料不冒称P1完整覆盖。只核所用输入；原观察范围或版本漂移时读取needs_scan和affected_scope，回P1更新真实清单。保留缺口，不代作者决定结论；纯环境故障保存停点。
+  prompt: 目标代码仓在远端时，通过宿主已有 SSH MCP 在实际执行端运行本节点脚本并读取结果，使用该端项目根、全局 Python 和已安装 Skill 路径；本地路径不能直接用于远端。P1-P6本批业务新文件（含事件拟稿、证据、代码核验副本及输出）仅写本批.build暂存，正式状态不变。调用独立prepare按固定扫描清单和所选单元准备真实原文、附件、采用旧版、关联旧卡和必要代码或配置。P5补料使用新operation_id，显式传previous_view_ref、revision_reason和旧稿绑定的existing_material_ref，只补明确缺口并保存新材料版本及前序摘要；保留原scan_ref和处理单元身份，不覆盖旧工件、不默认重扫全库。显式目标独立备料不冒称P1完整覆盖。只核所用输入；原观察范围或版本漂移时读取needs_scan和affected_scope，回P1更新真实清单。保留缺口，不代作者决定结论；纯环境故障保存停点。
   exits:
   - id: prepared
     label: 材料已保存
@@ -43,7 +43,7 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-change-plan
-  prompt: 调用plan固定作者判断。逐单元确定content、skip、defer、failed或uncovered及理由，覆盖明确维护事项。判断卡和旧Claim的新建、更新、合并、拆分、退役或暂缓，保留身份和全部去向；同单元多种卡动作时显式record_action并保全明细。冻结本批查询及明确预期，按实际Claim的usage、evidence_kind和scope选择purpose，存在代码链接不等于implementation依据；正向用例推荐expected_claim_ids，负向保留排除或明确空结果断言。P5退回或P2补料后，用新operation_id、previous_view_ref及revision_reason保存新计划；原scan及单元身份不变，采用旧材料须与前序稿精确绑定，补料须引用新材料版本，旧工件不覆盖。这里不做提前独立复核，不生产字节写入清单；缺材料回P2，采用源变化回P1。
+  prompt: 目标代码仓在远端时，通过宿主已有 SSH MCP 在实际执行端运行本节点脚本并读取结果，使用该端项目根、全局 Python 和已安装 Skill 路径；本地路径不能直接用于远端。调用plan固定作者判断。逐单元确定content、skip、defer、failed或uncovered及理由，覆盖明确维护事项。判断卡和旧Claim的新建、更新、合并、拆分、退役或暂缓，保留身份和全部去向；同单元多种卡动作时显式record_action并保全明细。冻结本批查询及明确预期，按实际Claim的usage、evidence_kind和scope选择purpose，存在代码链接不等于implementation依据；正向用例推荐expected_claim_ids，负向保留排除或明确空结果断言。P5退回或P2补料后，用新operation_id、previous_view_ref及revision_reason保存新计划；原scan及单元身份不变，采用旧材料须与前序稿精确绑定，补料须引用新材料版本，旧工件不覆盖。这里不做提前独立复核，不生产字节写入清单；缺材料回P2，采用源变化回P1。
   exits:
   - id: content_planned
     label: 作者判断已固定
@@ -58,7 +58,7 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-view-materialize
-  prompt: 调用run一次组织作者卡、导航、来源锁、写删集合、处置预览、展示字节及完整输入快照，读取实际输出，提前固定stage→final路径及完整字节，P5所审内容与P7发布字节身份保持一致，正式区不变。修订用新operation_id、previous_view_ref和revision_reason，通过同一入口保存新稿。仅退回P4时可明确采用前序稿精确绑定的未变semantic_plan和material；退回P2/P3时用它们的新版本。保留原scan及处理单元身份，核material_digest和previous_view_digest，新稿重新交P5；旧材料、计划、稿件和报告均不覆盖。相同操作重入读取已保存稿，不重新生成计划或导航，不跑整库质量lint。缺材料回P2，作者判断不清楚回P3，采用源变化回P1。
+  prompt: 目标代码仓在远端时，通过宿主已有 SSH MCP 在实际执行端运行本节点脚本并读取结果，使用该端项目根、全局 Python 和已安装 Skill 路径；本地路径不能直接用于远端。调用run一次组织作者卡、导航、来源锁、写删集合、处置预览、展示字节及完整输入快照，读取实际输出，提前固定stage→final路径及完整字节，P5所审内容与P7发布字节身份保持一致，正式区不变。修订用新operation_id、previous_view_ref和revision_reason，通过同一入口保存新稿。仅退回P4时可明确采用前序稿精确绑定的未变semantic_plan和material；退回P2/P3时用它们的新版本。保留原scan及处理单元身份，核material_digest和previous_view_digest，新稿重新交P5；旧材料、计划、稿件和报告均不覆盖。相同操作重入读取已保存稿，不重新生成计划或导航，不跑整库质量lint。缺材料回P2，作者判断不清楚回P3，采用源变化回P1。
   exits:
   - id: ready
     label: 完整稿件已保存
@@ -77,7 +77,7 @@ nodes:
   type: skill
   owner: reviewer
   skill: hs-knowledge-lint
-  prompt: 由宿主安排独立reviewer任务，实际读原文、旧卡、作者计划、全部处置和稿件，审结论、归卡、实质skip及必要代码依据。调用action review，传view_ref、实际semantic_plan_ref、sampled_unit_ids、unreviewed_unit_ids、reason及明确findings；代码稿另传code_review的真实context和逐Claim材料。角色标签不认证独立性。正常候选一次完整固定lint，并在同次已全验临时索引上执行最终候选的原冻结查询及同代精读；读取index.build的candidate_queries逐例预期与实际结果，TARGET_QUERY_EXPECTATION_FAILED阻断并回P3，必需输入不可用保持incomplete按实际缺口处理。语义已阻断时记录未执行项。记录批只查处置和适用项，不建临时索引。读实际报告，披露抽样和未审范围；缺材料回P2、判断错回P3、稿件错回P4，并携确切previous_view_ref和理由交新操作返工，保留有效原scan、不覆盖旧工件，新稿必须重审。纯运行故障留本节点等待。
+  prompt: 目标代码仓在远端时，通过宿主已有 SSH MCP 在实际执行端运行本节点脚本并读取结果，使用该端项目根、全局 Python 和已安装 Skill 路径；本地路径不能直接用于远端。由宿主安排独立reviewer任务，实际读原文、旧卡、作者计划、全部处置和稿件，审结论、归卡、实质skip及必要代码依据。调用action review，传view_ref、实际semantic_plan_ref、sampled_unit_ids、unreviewed_unit_ids、reason及明确findings；代码稿另传code_review的真实context和逐Claim材料。角色标签不认证独立性。正常候选一次完整固定lint，并在同次已全验临时索引上执行最终候选的原冻结查询及同代精读；读取index.build的candidate_queries逐例预期与实际结果，TARGET_QUERY_EXPECTATION_FAILED阻断并回P3，必需输入不可用保持incomplete按实际缺口处理。语义已阻断时记录未执行项。记录批只查处置和适用项，不建临时索引。读实际报告，披露抽样和未审范围；缺材料回P2、判断错回P3、稿件错回P4，并携确切previous_view_ref和理由交新操作返工，保留有效原scan、不覆盖旧工件，新稿必须重审。纯运行故障留本节点等待。
   exits:
   - id: passed
     label: 审阅和适用检查完成
@@ -100,7 +100,7 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-source-scan
-  prompt: 调用record，消费实际view、disposition_preview与semantic_plan，机械转写已定单元决定、record_action、卡及Claim引用、理由、范围和欠账。返工记录使用新稿的operation_id，精确绑定原scan_ref、origin_scan_operation_id、材料和前序稿摘要，不伪造新扫描。不用dispositions覆盖既定判断，不重新决定新建或跳过。核新记录结构和确切绑定，保存待入库记录；正式记录及实际写入事实由P7落位。缺口原样保留，不提前声称Git提交、CI或合入。
+  prompt: 目标代码仓在远端时，通过宿主已有 SSH MCP 在实际执行端运行本节点脚本并读取结果，使用该端项目根、全局 Python 和已安装 Skill 路径；本地路径不能直接用于远端。调用record，消费实际view、disposition_preview与semantic_plan，机械转写已定单元决定、record_action、卡及Claim引用、理由、范围和欠账。返工记录使用新稿的operation_id，精确绑定原scan_ref、origin_scan_operation_id、材料和前序稿摘要，不伪造新扫描。不用dispositions覆盖既定判断，不重新决定新建或跳过。核新记录结构和确切绑定，保存待入库记录；正式记录及实际写入事实由P7落位。缺口原样保留，不提前声称Git提交、CI或合入。
   exits:
   - id: recorded
     label: 待入库记录已保存
@@ -111,7 +111,7 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-apply
-  prompt: 调用action batch，传确切view、待发布记录和原冻结查询。保留输入快照、原版本、写锁、未完事务、CAS、备份和实际回读；发布已审完整字节与必要正式证据，内容核验成功后才发布正式成功处理记录及对应事件，不重跑P5语义工作或完整质量lint。继续适用索引、完整验证、原查询、同代read和原expected_active激活，建立logs/publications下的正式结果闭包。全部适用检索收尾成功后只清本批明确拥有且可删的暂存；借用、保留或用途不明项保留并说明。清理失败保持published/content_applied成功事实，batch_complete=false且cleanup_pending，仅重试缺失收尾或清理，不重apply；最终小响应可仍在.build。已完成操作从正式manifest/completion读取结果，不要求旧view存在。记录批不建索引。实际batch_complete与适用启用事实齐全才结束，Git、CI和合入另行处理。罕见P7半写保留真实状态和现有保护，不宣称自动修复。
+  prompt: 目标代码仓在远端时，通过宿主已有 SSH MCP 在实际执行端运行本节点脚本并读取结果，使用该端项目根、全局 Python 和已安装 Skill 路径；本地路径不能直接用于远端。调用action batch，传确切view、待发布记录和原冻结查询。保留输入快照、原版本、写锁、未完事务、CAS、备份和实际回读；发布已审完整字节与必要正式证据，内容核验成功后才发布正式成功处理记录及对应事件，不重跑P5语义工作或完整质量lint。继续适用索引、完整验证、原查询、同代read和原expected_active激活，建立logs/publications下的正式结果闭包。全部适用检索收尾成功后只清本批明确拥有且可删的暂存；借用、保留或用途不明项保留并说明。清理失败保持published/content_applied成功事实，batch_complete=false且cleanup_pending，仅重试缺失收尾或清理，不重apply；最终小响应可仍在.build。已完成操作从正式manifest/completion读取结果，不要求旧view存在。记录批不建索引。实际batch_complete与适用启用事实齐全才结束，Git、CI和合入另行处理。罕见P7半写保留真实状态和现有保护，不宣称自动修复。
   exits:
   - id: completed
     label: 内容和检索收尾完成

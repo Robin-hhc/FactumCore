@@ -1,12 +1,9 @@
-# 治理导航
+# 治理规则导航
 
-| 位置 | 职责 |
-|---|---|
-| `framework.lock.yaml` | 固定 2.0 契约代码、Schema、模板及声明的确切字节摘要 |
-| `sources.lock.yaml` | 来源资源和固定快照登记，以实际内容为准 |
-| `schemas/` | 字段形状、Profile 与公共受控值 |
-| `contracts/` | 同进程公共领域 API，统一解析、来源、Claim、索引、发布与治理；`source_inventory` 复用原件扫描，`patrol`/`patrol_git`/`patrol_index` 负责差异筛选、同步适配和实际完成核验；节点通过受信摘要加载 |
-| `templates/` | 七类卡、导航与处理记录模板 |
-| `specs/` | 卡片、来源、记录和生命周期规范 |
+- [卡片规范](specs/cards.md)：卡ID、文档/代码引用、定位与知识表达。
+- [生命周期](specs/lifecycle.md)：六决策及正式卡去向。
+- [固定CI](specs/ci-runner.md)：只读检查边界。
+- schemas：格式规则；templates：主题模板；contracts：业务算法。
+- sources.lock.yaml：正式来源身份与处理信息；framework.lock.yaml：框架版本与摘要。
 
-目标文件与开发要求见[详细设计](../docs-llm-wiki/知识库详细设计.md)，实际能力核对源码、测试及当前环境的验证结果。本项目自身的开发与验收记录仅在本地 `../docs-llm-wiki/sdd/` 维护，不随仓库分发；旧布局及成绩按历史版本解释。
+执行流程见[详细设计](../docs-llm-wiki/知识库详细设计.md)，不在本目录重复一套Agent编排。

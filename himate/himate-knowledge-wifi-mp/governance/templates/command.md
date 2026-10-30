@@ -1,31 +1,10 @@
 ---
-schema_version: '2.0'
 id: "{{card_id}}"
-profile: command
-title: "{{title}}"
-summary: "{{summary}}"
-lifecycle: draft
-review_mode: manual_document
-owner: "{{owner}}"
-scope:
-  applicability: unknown
-  contexts: []
-aliases: []
-sources:
-- evidence_ref: "{{evidence_ref}}"
-  source_id: "{{source_id}}"
-  snapshot_id: "{{snapshot_id}}"
-  locator: {kind: lines, start: 1, end: 1}
-claims:
-- id: "{{claim_id}}"
-  text_ref: "#{{claim_id}}"
-  evidence_kind: design
-  source_refs:
-  - "{{evidence_ref}}"
-  context_ids: []
-  usage: guidance
-  verification_requirements: []
-relations: []
+doc_ref:
+  - doc_id: "{{doc_id}}"
+    line_start: 1
+    line_end: 1
+code_ref: []
 ---
 # {{title}}
 

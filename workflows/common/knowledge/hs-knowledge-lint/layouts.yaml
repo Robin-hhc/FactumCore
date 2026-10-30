@@ -5,29 +5,32 @@ canvas:
       x: 0
       y: 0
     plan_patrol:
-      x: 360
+      x: 300
       y: 0
     prepare_sources:
-      x: 720
+      x: 600
       y: 0
     plan_change:
-      x: 1080
+      x: 900
       y: 0
     materialize_view:
-      x: 1440
+      x: 1200
       y: 0
     lint_view:
-      x: 1800
-      y: 0
-    record_ingest:
-      x: 2160
+      x: 1500
       y: 0
     apply_view:
-      x: 2520
+      x: 1800
       y: 0
     refresh_index:
-      x: 2880
-      y: 280
+      x: 2100
+      y: 0
     complete_patrol:
-      x: 3240
-      y: 280
+      x: 2400
+      y: 0
+    __start__:
+      x: -250
+      y: 0
+    __end__:
+      x: 2700
+      y: 0

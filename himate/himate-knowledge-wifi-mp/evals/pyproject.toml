@@ -1,5 +1,5 @@
 [tool.pytest.ini_options]
-testpaths = ["stages", "contracts", "cli", "workflows", "integration", "tooling"]
+testpaths = ["."]
 pythonpath = ["."]
 addopts = "--import-mode=importlib"
 

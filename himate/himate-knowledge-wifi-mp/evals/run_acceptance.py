@@ -23,70 +23,28 @@ from acceptance_report import COUNT_KEYS, compare_baseline, performance_report, 
 ROOT = Path(__file__).resolve().parents[3]
 
 
-# Small contract matrices and selected CLI smoke calls only. Full always uses
-# directories instead, so additions never depend on extending this quick list.
-# These do not cover the complete ingest journey, clone or fault/recovery matrix.
-QUICK_FILES = {
-    "hs-knowledge-apply": ("test_publication.py", "test_p7_regression.py"),
-    "hs-knowledge-change-plan": (
-        "test_cli.py::test_missing_request_returns_structured_error_without_creating_knowledge",
-        "test_cli.py::test_independent_review_is_explicitly_moved_to_p5",
-    ),
-    "hs-knowledge-explore": (
-        "test_cli.py::test_path_only_loads_current_rules_without_registration",
-        "test_cli.py::test_explicit_wrong_rules_digest_is_still_rejected",
-    ),
-    "hs-knowledge-lint": ("test_cli.py", "test_local_check.py", "test_module_mapping.py"),
-    "hs-knowledge-maintain": ("test_code_navigation.py",),
-    "hs-knowledge-query": ("test_cli.py", "test_qualification.py"),
-    "hs-knowledge-source": (
-        "test_capture_cli.py::test_missing_request_returns_structured_error_without_creating_knowledge",
-        "test_capture_cli.py::test_source_capture_returns_business_artifact_without_handoff_manifest",
-        "test_manual_entry.py", "test_execution_history_boundary.py",
-    ),
-    "hs-knowledge-view-materialize": (
-        "test_cli.py::test_missing_request_returns_structured_error_without_creating_knowledge",
-        "test_cli.py::test_complete_stable_view_contains_card_navigation_and_lock",
-    ),
-    "domain-and-integration": (
-        "tooling/test_acceptance_runner.py", "contracts/test_contracts.py",
-        "contracts/test_staging_contracts.py", "contracts/test_workspace_mapping.py",
-    ),
-}
-
-
 def select_groups(root, profile, requested):
-    stage_root = root / "himate/himate-knowledge-wifi-mp/evals/stages"
-    stages = sorted(path for path in stage_root.iterdir() if path.is_dir()
-                    and not path.name.startswith((".", "_"))) if stage_root.is_dir() else []
-    available = [(i, "hs-knowledge-" + path.name, path) for i, path in enumerate(stages)]
+    """Discover current feature suites without preserving retired stage groups.
+
+    Full selects directories so newly added tests are included automatically.
+    Quick deliberately chooses only the first file of each selected feature.
+    """
     domain_root = root / "himate/himate-knowledge-wifi-mp/evals"
-    domain_paths = tuple(domain_root / name for name in ("contracts", "cli", "workflows", "integration", "tooling")
-                         if (domain_root / name).is_dir())
-    available.append((len(available), "domain-and-integration", domain_paths))
-    labels = {label for _, label, _ in available}
+    suites = sorted(path for path in domain_root.iterdir()
+                    if path.is_dir() and not path.name.startswith((".", "_"))
+                    and path.name not in {"support", "benchmarks"}
+                    and any(path.rglob("test_*.py")))
+    labels = {path.name for path in suites}
     unknown = set(requested or ()) - labels
     if unknown:
         raise ValueError("Unknown group: " + ", ".join(sorted(unknown)))
     selected = []
-    for number, label, path in available:
+    for number, path in enumerate(suites):
+        label = path.name
         if requested and label not in requested:
             continue
-        if profile == "full":
-            selected.append((number, label, path if isinstance(path, tuple) else (path,)))
-            continue
-        if label not in QUICK_FILES:
-            if requested:
-                raise ValueError("No quick selection for group: " + label)
-            continue
-        selectors = []
-        for relative in QUICK_FILES[label]:
-            file, separator, node = relative.partition("::")
-            test = (domain_root if label == "domain-and-integration" else path) / file
-            if not test.is_file() or not test.resolve().is_relative_to((domain_root if label == "domain-and-integration" else path).resolve()):
-                raise ValueError("Quick test file is missing or outside its group: " + relative)
-            selectors.append(str(test) + separator + node if separator else test)
-        selected.append((number, label, tuple(selectors)))
+        selectors = (path,) if profile == "full" else (sorted(path.rglob("test_*.py"))[0],)
+        selected.append((number, label, selectors))
     if not selected:
         raise ValueError("No groups selected")
     return selected

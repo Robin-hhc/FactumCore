@@ -1,83 +1,29 @@
-# Windows 交互式部署
+# 安装 Skill 与运行依赖
 
-从完整分发仓根运行：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\deploy.ps1
-```
-
-脚本询问三个目标，回车接受默认值：
-
-| 目标 | 默认值／填写方式 |
-|---|---|
-| Skill 安装根 | `~\.openflow\config\skills` |
-| Workflow 模板安装根 | `~\.openflow\config\workflow-templates` |
-| 代码仓根 | 选择包含 `himate/` 的实际 `repo/`，默认见脚本提示；不要填写 `repo/himate/` 或知识根本身 |
-
-第三项始终是代码仓根。新项目默认安装到其下的 `himate/himate-knowledge-wifi-mp/`，已有对应知识根时在该目录更新受管框架；模块列表初始为空，等待维护者按真实代码填写。有效自定义知识根继续沿用；当前标准名的陈旧容器、重复前缀或旧平铺映射按[目标路径规则](../../himate/himate-knowledge-wifi-mp/docs-llm-wiki/使用说明.md#2-首次环境安装)有界纠正，只改配置中的 `knowledge_roots.wifi` 标量，其余字节保留。旧目录与业务数据不迁移、合并或删除，`himate/` 下其他组也不在更新范围。`~` 按当前 Windows 用户目录展开；OpenFlow 使用自定义用户根时，请相应修改安装路径。
-
-dbox仅分发知识根下的 `docs-raw/sources/dbox.example.yml` 与同目录精确 `.gitignore`，不分发私人 `dbox.local.yml` 或整个资料目录；已有local地址保持原字节，自定义ignore只安全补精确项。部署JSON的 `source_setup.status: pending_execution_host`、`configuration_checked: false` 表示来源尚待实际执行端配置。Windows `deployed`不代表SSH服务器目录可用。
-
-首次来源准备须在真正执行ingest的机器进入实际知识根，调用仓内source命令，输入 `{"operation_id":"configure-dbox-unique","path":"ACTUAL_DBOX_DIRECTORY"}`，用该端绝对目录替换占位。Windows调用 `.\knowledge.cmd source --action configure --input REQUEST.json --output RESPONSE.json`；POSIX将启动器换成 `sh ./knowledge.sh`。动作由CLI参数选择；这会验证并保存固定 `dbox.local.yml`，不复制部署私有源码到Linux，不递归资料。无path只检查现有配置，同地址保留字节，显式换地址无需重装能力。详细格式与错误边界见实际知识根使用说明的“首次配置 dbox 资料目录”；日常run不自动重跑配置。
-
-本机需有 Python 3.10–3.12。脚本尝试 `py`、`python3`、`python`；找不到时可输入实际解释器路径或使用 `-Python`，不会自动下载 Python。运行包按知识根 `runtime/requirements.lock.txt` 检查，缺失时由交互选择是否安装；自动化调用只有显式添加 `-InstallDependencies` 才会安装。安装使用选中的同一解释器。
-
-只读预检不创建目标目录，也不安装依赖：
+从完整开发仓根执行：
 
 ```powershell
-.\deploy.ps1 -Plan -NonInteractive -Python 'PATH_TO_PYTHON'
+.\deploy.ps1
 ```
 
-自动化调用可显式提供路径：
-
-```powershell
-.\deploy.ps1 -NonInteractive `
-  -SkillsRoot 'SKILLS_ROOT' `
-  -WorkflowsRoot 'WORKFLOWS_ROOT' `
-  -ProjectRoot 'PROJECT_ROOT' `
-  -Python 'PATH_TO_PYTHON'
-```
-
-将 `PATH_TO_PYTHON`、`SKILLS_ROOT`、`WORKFLOWS_ROOT`、`PROJECT_ROOT` 替换为实际路径。`-SourceRoot` 可指定完整分发源码根。路径中的空格请加引号；运行前确认映射盘在当前 PowerShell 用户会话可访问。
-
-Skill源包以 `SKILL.md` 与 `references/` 为主体，`artifacts/` 仅保存宿主产物YAML声明。写作／复核指南与模板的唯一源码在 `references/results/`；声明中的安全相对路径仍表示宿主安装包的 `artifacts/` 视图。打包时按声明从唯一参考源物化该视图，保留原声明身份、节点／出口和模板引用，不在源码中维护第二份Markdown。缺失资源、旧目录重复正文、非法引用或二进制内容会在写目标前阻断。
-
-Skill ZIP只含指引、参考和上述生成的宿主适配文本，不含scripts、requirements或测试；执行实现与独立运行锁完整进入知识ZIP。旧受管Skill脚本按现有整包镜像策略清退，项目中的个人配置、原件、来源与运行数据保持原保留策略。包内兼容视图的字节保持不等于已经完成真实OpenFlow宿主装载验收，后者仍在实际宿主单列验证。
-
-程序在本机临时目录生成 Skill、Workflow 和知识项目 ZIP。知识 ZIP 整体复制到项目内本次专用暂存目录，校验摘要后由 Windows 在该处解压，再安装明确清单内的文件并回读核验。对于 Samba 映射盘，这仍涉及逐文件的网络写入；不等于服务器本地解压，不保证速度收益。
-
-再次运行同一命令即可升级。受管 Skill／Workflow 包按新版本精确同步：更新变化文件，删除新版已移除的文件、子目录和退役包；包内手工添加的脚本、旧配置、缓存等也会清除。保留其他能力和模板，不清空 OpenFlow 共用安装根，也不改已创建的 Workflow 实例。
-
-两个安装根各保存 `.factum-knowledge-deploy.json`，记录本分发上次安装的包名，用于下一次清退；它不含机器路径，不参与业务运行，不是能力注册或项目绑定。管理范围是本版包、上次清单里的包和脚本内明确列出的历史知识包。旧版无清单时也可清理 source-scan、source-prepare 等已知退役包；未知包即使同样以 `hs-knowledge-` 开头也保留，并在 JSON 的 `unmanaged_packages` 列出。不要随意删除部署清单；清单损坏时停止升级，不猜测清理范围。
-
-知识库采用分区更新，不能把整个知识根删除再复制：
-
-| 范围 | 更新方式 |
-|---|---|
-| `runtime/` | 精确同步仓内运行代码与独立 `manifest.json`，按manifest逐文件校验；三个根入口 `knowledge.py`、`knowledge.sh`、`knowledge.cmd` 按明确清单更新 |
-| `governance/contracts/`、`schemas/`、`specs/`、`templates/` | 精确同步纯框架子树，删除过时文件及空目录，与 `framework.lock.yaml` 成套更新 |
-| 共享设计文档、治理入口、检查脚本等 | 只更新明确列出的分发文件；保留 `docs-llm-wiki/sdd/`、`task.md` 和其他文件 |
-| `docs-raw/`、`knowledge/` 及各级导航 | 保留已有原件、附件、知识和导航；仅补初始骨架；dbox 空模板按分发更新 |
-| `logs/`、`.build/`、`artifacts/` | 保留历史处理、发布／证据、未完事务、稳定写锁、巡检成功基线、索引与查询回执；部署不做运行数据清理 |
-| 项目 `config.yml` | 保留原字节；仅上述陈旧路径纠正可替换 `knowledge_roots.wifi` 标量，其他字段、注释及换行不变 |
-| `governance/sources.lock.yaml`、`dbox.local.yml` 与真实业务入口 | 保留原字节；dbox 同目录 `.gitignore` 沿用精确追加规则 |
-
-可先运行 `-Plan`，只读核对 `targets.project_root`、最终 `targets.knowledge_root`，以及 `files` 中的 `config.yml` 修正和其他 `write`／`delete`、`directories` 的 `remove`。`write_count`、`delete_count`、`remove_directory_count` 分别统计本次更新；无变化时三者均为 0。删除和替换均先备份，受管树最终核对包含文件字节及目录集合；受控失败会恢复已删文件和空目录。存在并发修改或恢复冲突时保留备份与清单并报告失败，不能把部分更新当作成功；升级不是整目录原子切换。
-
-部署前先停用正在使用这些能力的宿主任务，结束同一项目的业务写入；已知未完事务先用原版本处理。不要并行编辑这些目标，也不要从多台机器同时部署到同一目标。检测到中断或写入冲突时，按报告核对恢复结果和保留的备份；强制结束进程或断电后的状态不能据“命令已停止”推断。
-
-此脚本只检查运行它的 Windows Python。远端服务器的 Python、依赖、原生知识根路径、权限和执行结果仍须在实际执行端核实；它不配置 SSH MCP、CodeGraph、宿主角色或资源开关。部署后重启 OpenFlow，核对列表并新建任务验证。已有 Workflow 副本和会话不会因模板更新自动升级。
-
-退出码：`0` 为预检／部署成功，`2` 为运行依赖缺失，`3` 为配置、安装或部署失败。预检和部署的 JSON 均标明当前解释器及环境检查范围。
-
-开发验证在分发仓根 `repo/` 使用已准备的测试解释器执行，与知识业务机制验收分别记录：
+交互仅询问 Skill 安装目录，默认 `~/.openflow/config/skills`。脚本覆盖复制 `repo/skills/common/knowledge/` 中含 `SKILL.md` 的能力包，然后用选定 Python 执行一次：
 
 ```text
-python -m pytest tools/deploy/tests -q
+python -m pip install -r repo/himate/himate-knowledge-wifi-mp/runtime/requirements.lock.txt
 ```
 
-这些用例使用隔离合成目录；实际 Samba、OpenFlow 加载和服务器环境需要另行核验。
+使用已准备的 Python 3.10–3.12；建议将 `-Python` 指向实际执行端的虚拟环境解释器。脚本不创建虚拟环境，不在任务运行中安装依赖。
 
-日常先从当前工作区的实际 `AGENTS.md` 和 `config.yml` 确定知识根，再在该目录用Windows `.\knowledge.cmd`、POSIX `sh ./knowledge.sh`；一次注册后可用裸knowledge。Samba远端由宿主已有SSH在服务器原生知识根执行同一CLI，不自动连接、不猜驱动器映射，服务器无需安装或逐次上传Skill脚本。每个执行端首次分别准备Python与知识根下 `runtime/requirements.lock.txt` 依赖；`doctor`只读核对实际环境，不自动安装。统一入口不等于SMB提速，实际收益须按执行端实测。
+```powershell
+.\deploy.ps1 -NonInteractive -SkillsRoot 'SKILLS_ROOT' -Python 'PATH_TO_PYTHON'
+```
 
-分发从实际包发现十二项能力，升级清退旧 `hs-knowledge-explore` Skill及其受管资源，Workflow在入口定位项目和知识根。底层explore命令保留显式诊断及旧调用兼容，不作为业务前置。P4使用 `hs-knowledge-review` 与 `knowledge review`；升级移除旧 `hs-knowledge-lint` Skill，保留同名治理 Workflow，审阅结果仍使用原宿主ID。治理 Workflow 的同步、计划、索引修复、完成核验分别绑定四个 `hs-knowledge-patrol-*` Skill，maintain仅保留独立维护。P5继续使用 `hs-knowledge-record` 与 `knowledge record`，升级移除source包内旧受管record声明并保留原记录ID。业务记录、旧工具身份和历史工件不改写。
+`-SourceRoot` 可指定另一份完整源码仓。跨平台可直接使用同一后端；不传 `--python` 时安装到当前解释器：
+
+```text
+python tools/deploy/deploy.py --skills-root SKILLS_ROOT --python PATH_TO_PYTHON
+```
+
+安装器仅复制 Skill 并执行 pip，不部署知识仓、Workflow、项目入口或配置，不制作压缩包或执行额外检查。运行端直接使用已取得的知识仓，Workflow 在宿主导入。目标中非同名能力包保留；已退役的旧能力包（如 `hs-knowledge-record`）由维护者手动移除。
+
+开发冒烟位于 `tests/test_install_skills.py`，使用临时目录与模拟 pip 验证覆盖复制、保留无关能力包和解释器选择；不会向本机环境实际安装依赖。

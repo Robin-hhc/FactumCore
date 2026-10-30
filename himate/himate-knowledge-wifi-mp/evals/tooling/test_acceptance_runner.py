@@ -53,37 +53,28 @@ def runner(monkeypatch):
 
 
 def workspace(tmp_path):
-    for label in ("hs-knowledge-one", "hs-knowledge-two"):
-        package = tmp_path / "skills/common/knowledge" / label
-        (tmp_path / "himate/himate-knowledge-wifi-mp/evals/stages" / label.removeprefix("hs-knowledge-")).mkdir(parents=True)
-        package.mkdir(parents=True, exist_ok=True)
-        (package / "SKILL.md").write_text("fixture", encoding="utf-8")
-        (tmp_path / "himate/himate-knowledge-wifi-mp/evals/stages" / label.removeprefix("hs-knowledge-") / "test_smoke.py").write_text("", encoding="utf-8")
-    (tmp_path / "himate/himate-knowledge-wifi-mp/evals/contracts").mkdir(parents=True)
+    for label in ("one", "two", "contracts"):
+        directory = tmp_path / "himate/himate-knowledge-wifi-mp/evals" / label
+        directory.mkdir(parents=True)
+        (directory / "test_smoke.py").write_text("", encoding="utf-8")
     return tmp_path
 
 
 def test_full_is_directory_selection_and_covers_new_files(runner, tmp_path):
     root = workspace(tmp_path)
     groups = runner.select_groups(root, "full", None)
-    assert [item[1] for item in groups] == ["hs-knowledge-one", "hs-knowledge-two", "domain-and-integration"]
+    assert [item[1] for item in groups] == ["contracts", "one", "two"]
     assert all(all(path.is_dir() for path in item[2]) for item in groups)
     (groups[0][2][0] / "test_future.py").write_text("", encoding="utf-8")
-    assert runner.select_groups(root, "full", ["hs-knowledge-one"]) == groups[:1]
+    assert runner.select_groups(root, "full", ["one"]) == groups[1:2]
 
 
-def test_quick_has_explicit_files_and_rejects_missing_or_unknown_selection(runner, monkeypatch, tmp_path):
+def test_quick_selects_a_real_smoke_file_and_rejects_unknown_selection(runner, tmp_path):
     root = workspace(tmp_path)
-    monkeypatch.setattr(runner, "QUICK_FILES", {"hs-knowledge-one": ("test_smoke.py",)})
-    selected = runner.select_groups(root, "quick", None)
-    assert selected == [(0, "hs-knowledge-one", (root / "himate/himate-knowledge-wifi-mp/evals/stages/one/test_smoke.py",))]
+    selected = runner.select_groups(root, "quick", ["one"])
+    assert selected == [(1, "one", (root / "himate/himate-knowledge-wifi-mp/evals/one/test_smoke.py",))]
     with pytest.raises(ValueError, match="Unknown group"):
-        runner.select_groups(root, "full", ["one"])
-    with pytest.raises(ValueError, match="No quick selection"):
-        runner.select_groups(root, "quick", ["hs-knowledge-two"])
-    (selected[0][2][0]).unlink()
-    with pytest.raises(ValueError, match="Quick test file"):
-        runner.select_groups(root, "quick", None)
+        runner.select_groups(root, "full", ["missing"])
 
 
 def test_real_quick_selectors_exist_and_cover_all_current_groups(runner):

@@ -413,6 +413,43 @@ def _bounded_initializer_error(error, declaration, source):
             and bool(re.fullmatch(r"[^\W\d]\w*", _text(error, source), flags=re.UNICODE)))
 
 
+def _guarded_linkage_view(source):
+    """Mask paired standalone C++ linkage boundaries, preserving byte offsets.
+
+    Tree-sitter sees both preprocessor branches before preprocessing. A common
+    header's separately guarded ``extern "C" {`` and ``}`` can therefore absorb
+    the whole file into an ERROR node in either grammar. Only canonical paired
+    __cplusplus guards qualify; all declarations, branches and other errors
+    remain in the full-file parse. This view never replaces original evidence.
+    """
+    ending = rb"[ \t]*(?:/\*[^\r\n]*\*/[ \t]*)?\r?\n"
+    opening = rb"[ \t]*#[ \t]*ifdef[ \t]+__cplusplus" + ending
+    nested = rb"[ \t]*#[ \t]*if[ \t]+__cplusplus" + ending
+    closing = rb"[ \t]*#[ \t]*endif" + ending
+    boundary = rb"(?P<boundary>[ \t]*(?:extern[ \t]+\"C\"[ \t]*\{|})[ \t]*)\r?\n"
+    events = []
+    for depth in (1, 2):
+        pattern = opening + nested * (depth - 1) + boundary + closing * depth
+        for match in re.finditer(rb"^" + pattern, source, flags=re.M):
+            events.append((match.start(), depth, match.group("boundary").strip().startswith(b"extern"),
+                           match.span("boundary")))
+    stack, spans = [], []
+    for _, depth, is_open, span in sorted(events):
+        if is_open:
+            stack.append((depth, span))
+        elif not stack or stack[-1][0] != depth:
+            return source  # An unpaired or mixed wrapper cannot be normalized.
+        else:
+            _, first = stack.pop()
+            spans.extend((first, span))
+    if stack or not spans:
+        return source
+    view = bytearray(source)
+    for start, end in spans:
+        view[start:end] = b" " * (end - start)
+    return bytes(view)
+
+
 def _parse(data, language, extractor):
     codecs = {None: "utf-8-sig", "code-utf8:1": "utf-8-sig", "code-gb18030:1": "gb18030"}
     if extractor not in codecs:
@@ -421,7 +458,7 @@ def _parse(data, language, extractor):
         text = data.decode(codecs[extractor], errors="strict")
         if "\0" in text:
             return [], "NUL bytes prevent reliable source parsing", [], False
-        source = text.encode("utf-8")
+        source = _guarded_linkage_view(text.encode("utf-8"))
         # Importing this shared module never requires a parser installation.
         from tree_sitter import Language, Parser
         if language == "cpp":
@@ -447,7 +484,7 @@ def resolve(data, code_ref, *, path, extractor=None, cache=None):
     parsed, problem, uncertain, partial = [], None, [], False
     try:
         grammar = "tree-sitter-cpp" if language == "cpp" else "tree-sitter-c"
-        key = ("code-symbols:2", digest, language, extractor or "code-utf8:1",
+        key = ("code-symbols:3", digest, language, extractor or "code-utf8:1",
                importlib.metadata.version("tree-sitter"), importlib.metadata.version(grammar))
         if cache is not None and key in cache:
             parsed, problem, uncertain, partial = cache[key]

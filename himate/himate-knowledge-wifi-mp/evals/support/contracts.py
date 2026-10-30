@@ -38,7 +38,7 @@ def copy_runtime(knowledge_root):
     source = KNOWLEDGE_ROOT
     target = Path(knowledge_root)
     shutil.copytree(source / "runtime", target / "runtime", dirs_exist_ok=True,
-                    ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+                    ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".venv"))
     for name in ("knowledge.py", "knowledge.sh", "knowledge.cmd"):
         path = source / name
         if path.is_file():

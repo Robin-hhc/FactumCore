@@ -1,7 +1,7 @@
 version: 1
 id: hs-knowledge-lint
 name: WiFi 知识治理巡检
-description: 同步后脚本筛选raw及登记代码变更，复用ingest备料和P2-P6修订，核真实结果后推进成功基线。
+description: 串行同步与发现raw/code变化，逐文件复用P1-P5处理，最后报告剩余事项。
 kind: custom
 source: user_created
 entry:
@@ -13,186 +13,149 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-patrol-sync
-  prompt: |-
-    复用已确定的项目与执行端；否则从当前工作区读取实际 AGENTS.md 和 config.yml，确定知识根。
-    位置缺失或不唯一时先询问用户；读知识根 AGENTS.md，在数据所在端该目录调用仓内启动器，并将项目、知识根及执行端信息交给后续节点。
-    使用 hs-knowledge-patrol-sync 执行同步，仅采用控制端明确配置的同步请求；内部MM按Skill指引在执行端解析实际工作区根。
-    synced 或未配置的 skipped 进入 L2 计划；失败保留诊断。同步后结束本 CLI，下一节点必须用新进程重载实际运行实现、配置与规则。
+  prompt: '复用已知项目与执行端；否则读当前工作区 AGENTS.md、config.yml，确定知识根，位置不明确才询问用户。在数据所在端的原生知识根调用仓内 CLI，交接实际项目、知识根、执行端及已验证的 CLI 命令前缀（含指定解释器），后续节点沿用。
+
+    使用 hs-knowledge-patrol-sync 采用明确配置的同步 argv/cwd；成功或未配置同步后进入 L2，新 CLI 加载同步后的实际实现。'
   exits:
   - id: synced
-    label: 同步完成
-    condition: 显式同步进程实际成功；尚未证明各仓输入和知识健康。
+    label: 工作区同步完成
+    condition: 配置的同步命令执行成功。
     target: plan_patrol
   - id: skipped
     label: 检查本地现状
-    condition: 未配置同步；明确本轮只检查本地现状。
+    condition: 未配置同步，明确本轮检查本地文件。
     target: plan_patrol
 - id: plan_patrol
-  title: L2 脚本筛选原件与代码变更
+  title: L2 选择原件或代码待办
   type: skill
   owner: coder
   skill: hs-knowledge-patrol-plan
-  prompt: |-
-    使用 hs-knowledge-patrol-plan 固定巡检待办，保存实际 plan_ref、source_request、统计与缺口。
-    按 needs_ingest、needs_index、unchanged 分别进入 P1 备料、L3 索引或 L4 完成核验；blocked 结束本轮并交付真实原因与确切续办请求，不推进成功基线。
+  prompt: '使用 hs-knowledge-patrol-plan 取得一个待办；本步不创建 .build。
+
+    needs_ingest 将 data.next_file.source_id 交 P1；仅索引问题交 L3；无待办交 L4。失败保留真实错误。'
   exits:
   - id: needs_ingest
-    label: 处理发现事项
-    condition: 固定库存及实际材料请求已生成，包含变化raw与修订卡来源并集。
+    label: 处理来源变更
+    condition: 返回真实 next_file，包含来源 ID、kind 和路径。
     target: prepare_sources
-  - id: needs_index
-    label: 维护派生索引
-    condition: 无内容修订事项，活动索引需实际重建和验证。
+  - id: needs_reindex
+    label: 刷新索引
+    condition: 无内容待办，但正式卡与索引需要对齐。
     target: refresh_index
   - id: unchanged
-    label: 本轮无内容变更
-    condition: 当前观察范围无内容或索引待办；仍须核验成功基线。
+    label: 本轮无新待办
+    condition: 当前观察成功且没有待处理来源。
     target: complete_patrol
-  - id: blocked
-    label: 保存未完成事项
-    condition: 实际缺口或已发布未完成操作有确切报告与续办引用；成功基线不推进。
-    target: __end__
 - id: prepare_sources
-  title: P1 观察并准备来源
+  title: P1 选择文件并准备材料
   type: skill
   owner: coder
   skill: hs-knowledge-source
-  prompt: |-
-    使用 hs-knowledge-source 的 prepare 动作，完整采用巡检计划返回的 source_request。
-    保留新增raw与待修卡材料的并集，以及明确空 unit_ids 和代码 targets；不改跑 run 或重新扫描。
-    prepared 携实际 material_ref、scan_ref及 gaps 交 P2；输入漂移或运行故障保留本轮计划与诊断。
+  prompt: '复用已知项目与执行端；否则读当前工作区 AGENTS.md、config.yml，确定知识根，位置不明确才询问用户。在数据所在端的原生知识根调用仓内 CLI，交接实际项目、知识根、执行端及已验证的 CLI 命令前缀（含指定解释器），后续节点沿用。
+
+    使用 hs-knowledge-source 调用 ingest scan --source 实际来源ID；完整采用 L2 选定的 raw 或 code 来源，不重选其它文件。prepared 交 P2，unchanged 交 L4。'
   exits:
   - id: prepared
-    label: 来源材料已保存
-    condition: 本次真实清单及材料引用、实际指纹和缺口已保存；不足可由P2明确记录欠账。
+    label: 本轮材料已准备
+    condition: 本次文件、来源 ID、hash 和关联卡入口已由脚本保存。
     target: plan_change
+  - id: unchanged
+    label: 没有待办
+    condition: 本次所选范围扫描成功且没有待办。
+    target: complete_patrol
 - id: plan_change
-  title: P2 阅读并决定内容
+  title: P2 阅读并制定编辑计划
   type: skill
   owner: coder
   skill: hs-knowledge-change-plan
-  prompt: |-
-    使用 hs-knowledge-change-plan 阅读本批材料，比较新旧事实并决定卡、Claim及各单元处置。
-    汇总完整决定与查询预期后，按该 Skill 一次调用 plan；计划保存后不追加或覆盖。
-    content_planned 交 P3；缺材料回来源节点定向 prepare。保留明确欠账与未覆盖范围，不以检索无命中直接决定新建。
+  prompt: '使用 hs-knowledge-change-plan 以本轮 task 的来源为范围阅读全文和关联卡，完成六决策、新增主题查重及简短计划；不沿用前次问答主题作筛选。
+
+    content_planned 交 P3；必要依据不足则 deferred，说明缺口并保留未完成文件，不推进成功 hash。'
   exits:
   - id: content_planned
-    label: 作者判断已固定
-    condition: 本批单元、卡和旧Claim处置及适用查询预期已保存。
+    label: 编辑计划已明确
+    condition: 本轮 plan.md 已明确卡动作、结论变化、条件、依据和保留部分。
     target: materialize_view
-  - id: needs_material
-    label: 补充材料
-    condition: 需要补充本批原文、旧版或定位才能判断。
-    target: prepare_sources
+  - id: deferred
+    label: 本文件暂缓
+    condition: 必要依据不足，已说明缺口；本文件不标为处理完成。
+    target: complete_patrol
 - id: materialize_view
-  title: P3 保存完整稿件
+  title: P3 按计划写完整卡
   type: skill
   owner: coder
   skill: hs-knowledge-view-materialize
-  prompt: |-
-    使用 hs-knowledge-view-materialize 按本批计划组织并保存完整候选。
-    传实际 semantic_plan_ref 和 material_ref；返工采用 Skill 规定的前序候选引用及新操作，保留旧工件。
-    ready 携真实 view_ref 交 P4；缺材料回来源节点，作者决定不完整回 P2。此步不替代独立内容审阅。
+  prompt: '使用 hs-knowledge-view-materialize 按本轮计划和模板写完整候选卡；明确旧卡去向与必须移除的文件。
+
+    ready 交 P4；发现实质决策问题回 P2，同轮更新计划，不另建冻结轮次。'
   exits:
   - id: ready
-    label: 完整稿件已保存
-    condition: 稿件、完整输入快照和处置预览已保存；记录批也有明确空写集。
+    label: 完整候选稿已保存
+    condition: 本轮 cards/ 和必要 changes.json 已完整表达最终改动，正式知识未修改。
     target: lint_view
-  - id: needs_material
-    label: 补充材料
-    condition: 生成实际稿件所需原件、旧卡或必要材料缺失。
-    target: prepare_sources
   - id: needs_plan
-    label: 完善作者判断
-    condition: 卡动作、旧Claim去向或记录动作需要作者明确。
+    label: 调整编辑决定
+    condition: 结论、归卡或旧结论去向需要重新判断。
     target: plan_change
 - id: lint_view
-  title: P4 独立审阅与质量检查
+  title: P4 检查并独立审阅
   type: skill
   owner: reviewer
   skill: hs-knowledge-review
-  prompt: |-
-    由独立 reviewer 使用 hs-knowledge-review 审阅本批原文、旧卡、作者计划、处置与完整候选。
-    按该 Skill 调用完整 review，传真实 view_ref、审阅范围和 findings；代码依据按所选用途提供必要材料。
-    独立审阅与适用固定检查、候选原冻结查询及同代精读均完成且无阻断，才 passed 交 P5。
-    缺材料回来源节点，判断问题回 P2，稿件问题回 P3；新稿重新审阅。运行故障留本节点，不补记未执行项为通过。
+  prompt: '由独立 reviewer 使用 hs-knowledge-review，沿用已交接的 CLI 先运行 ingest check，再独立阅读来源，对照计划、旧卡与新稿；空候选也检查全文新主题。
+
+    通过后交 P5；决策问题回 P2、成稿问题回 P3，新稿重新审阅。不替作者改稿。'
   exits:
   - id: passed
-    label: 审阅和适用检查完成
-    condition: 独立审阅实际完成，适用固定检查passed且范围明确，内容批冻结查询及同代精读通过，无未解决阻断。
-    target: record_ingest
-  - id: needs_material
-    label: 补充审阅材料
-    condition: 内容批缺必要原文、旧版、代码、配置或定位。
-    target: prepare_sources
+    label: 检查与内容审阅通过
+    condition: 脚本检查及独立内容审阅实际完成，无未解决必要问题。
+    target: apply_view
   - id: needs_plan
     label: 重新判断内容
-    condition: 结论、条件、归卡、旧Claim去向、实质skip或查询预期需重判。
+    condition: 事实、条件、依据或归卡决定需要作者重判。
     target: plan_change
   - id: needs_revision
     label: 修订稿件
-    condition: 作者判断可保留，但正文、字段、来源登记、导航或组稿需改。
+    condition: 决定可保留，但表达、格式、定位或组稿需要修订。
     target: materialize_view
-- id: record_ingest
-  title: P5 转写处理记录
-  type: skill
-  owner: coder
-  skill: hs-knowledge-record
-  prompt: |-
-    使用 hs-knowledge-record 转写处理记录，传本轮 operation_id 和实际 view_ref。
-    读取真实 ingest_record_ref 与 recorded 结果后交 P6。只机械转写已定处置，不重做作者判断、扫描或审阅；正式记录由 P6 发布。
-  exits:
-  - id: recorded
-    label: 待入库记录已保存
-    condition: 全部已定处置已完整转写，结构和确切业务输入绑定有效。
-    target: apply_view
 - id: apply_view
-  title: P6 安全落位和检索收尾
+  title: P5 入库并更新索引
   type: skill
   owner: coder
   skill: hs-knowledge-apply
-  prompt: |-
-    使用 hs-knowledge-apply 的 batch 动作，采用本轮实际 view_ref 与 ingest_record_ref。
-    按真实结果完成发布、适用检索收尾和本批可删暂存清理；batch_complete 为 true 才选择完成出口。
-    已发布但未收尾时保留原批次，按实际缺项续办，不新起操作重复发布。内容批返回 completed，纯记录批返回 recorded；Git提交与CI不属于本节点。
+  prompt: '使用 hs-knowledge-apply 调用 ingest commit，复制候选并刷新关系和检索索引，最后保存本文件成功 hash。
+
+    失败保留本轮暂存并直接重试 P5，不回 P1 清理。需要改稿时回 P3 再审。成功以 commit 回执交付，不用 scan 验证；本节点不提交或推送 Git。
+
+    本文件成功后回 L2 选择下一文件；暂缓文件在本轮报告中说明，不立即反复入库。'
   exits:
   - id: completed
-    label: 内容和检索收尾完成
-    condition: 实际batch_complete为true，内容事务、确切索引、原查询及启用回读均完成，且本批可删暂存清理完成。
-    target: complete_patrol
-  - id: recorded
-    label: 记录批已落位
-    condition: record_only批安全落记录且batch_complete为true，没有构建或启用索引，本批可删暂存清理完成。
-    target: complete_patrol
+    label: 本文件已入库
+    condition: 本轮卡片和索引更新成功，触发文件处理标记已保存。
+    target: plan_patrol
 - id: refresh_index
-  title: L3 修复派生索引
+  title: L3 刷新派生索引
   type: skill
   owner: coder
   skill: hs-knowledge-patrol-reindex
-  prompt: |-
-    使用 hs-knowledge-patrol-reindex 修复派生索引，消费本轮原 plan_ref。
-    只维护派生索引，读取 indexed 的真实结果后交 L4 完成核验；需要内容修订时不能用重建索引替代。失败保留原计划与诊断。
+  prompt: 使用 hs-knowledge-patrol-reindex 重建正式卡的双向关系与检索索引；成功交 L4。索引维护不代替内容判断，不推进未处理来源的成功 hash。
   exits:
-  - id: indexed
-    label: 索引维护完成
-    condition: 实际索引完整验证、适用查询及活动代激活成功。
+  - id: reindexed
+    label: 索引已刷新
+    condition: 实际索引更新成功。
     target: complete_patrol
 - id: complete_patrol
-  title: L4 核验结果并推进成功基线
+  title: L4 汇总结果和剩余事项
   type: skill
   owner: coder
   skill: hs-knowledge-patrol-complete
-  prompt: |-
-    使用 hs-knowledge-patrol-complete 核验完成情况，采用原 plan_ref 以及本轮实际发布/完成引用。
-    读取真实 completed 或 pending 结果、原因和报告。只有脚本完成核验后才报告成功基线已推进；欠账、漂移及P6或清理未完保持 pending 并结束本轮，续办交明确修复任务，不手改水位。
+  prompt: '使用 hs-knowledge-patrol-complete 汇总本轮实际结果及剩余待办。
+
+    文件完成由各次 P5 登记，本步不另建全库成功水位；仍有欠账时据实说明。'
   exits:
   - id: completed
-    label: 本轮实际完成
-    condition: 真实完成核验成功并以CAS保存本地成功基线；报告范围明确。
-    target: __end__
-  - id: pending
-    label: 本轮仍有欠账
-    condition: 实际发现未解决事项，报告保留；成功基线未推进。
+    label: 本轮统计完成
+    condition: 已取得真实剩余事项统计，报告处理范围与未解决问题。
     target: __end__
 artifacts:
   primary: []

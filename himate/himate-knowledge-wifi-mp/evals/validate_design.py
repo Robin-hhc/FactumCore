@@ -1,4 +1,4 @@
-"""Validate node packages, the complete ingest and read-only audit Workflows.
+"""Validate instruction packages, five-step ingest and serial lint Workflows.
 
 Local structural checks do not prove host triggering,
 knowledge semantics or CI permissions. Manual Skill calls do not require a
@@ -15,92 +15,48 @@ import re
 import yaml
 
 
-SKILLS = (
-    'hs-knowledge-source',
-    'hs-knowledge-change-plan',
-    'hs-knowledge-view-materialize',
-    'hs-knowledge-review',
-    'hs-knowledge-record',
-    'hs-knowledge-apply',
-    'hs-knowledge-query',
-    'hs-knowledge-maintain',
-    'hs-knowledge-patrol-sync',
-    'hs-knowledge-patrol-plan',
-    'hs-knowledge-patrol-reindex',
-    'hs-knowledge-patrol-complete',
-)
-ARTIFACT_SCOPE = {
-    'hs-knowledge-source': (['prepare_sources'], ['prepared', 'unchanged']),
-    'hs-knowledge-change-plan': (['plan_change'], ['content_planned']),
-    'hs-knowledge-view-materialize': (['materialize_view'], ['ready']),
-    'hs-knowledge-review': (
-        ['lint_view'],
-        ['passed', 'needs_material', 'needs_plan', 'needs_revision'],
-    ),
-    'hs-knowledge-record': (['record_ingest'], ['recorded']),
-    'hs-knowledge-apply': (['apply_view'], ['completed', 'recorded']),
-    'hs-knowledge-query': ([], []),
-    'hs-knowledge-maintain': ([], []),
-    'hs-knowledge-patrol-sync': (['sync_workspace'], ['synced', 'skipped']),
-    'hs-knowledge-patrol-plan': (['plan_patrol'], ['needs_ingest', 'needs_index', 'unchanged', 'blocked']),
-    'hs-knowledge-patrol-reindex': (['refresh_index'], ['indexed']),
-    'hs-knowledge-patrol-complete': (['complete_patrol'], ['completed', 'pending']),
+SKILLS = tuple("hs-knowledge-" + name for name in (
+    "source", "change-plan", "view-materialize", "review", "apply", "query", "maintain",
+    "patrol-sync", "patrol-plan", "patrol-reindex", "patrol-complete",
+))
+OWNERS = {"lint_view": "reviewer"}
+NODE_SKILLS = {
+    "prepare_sources": "hs-knowledge-source",
+    "plan_change": "hs-knowledge-change-plan",
+    "materialize_view": "hs-knowledge-view-materialize",
+    "lint_view": "hs-knowledge-review",
+    "apply_view": "hs-knowledge-apply",
+    "sync_workspace": "hs-knowledge-patrol-sync",
+    "plan_patrol": "hs-knowledge-patrol-plan",
+    "refresh_index": "hs-knowledge-patrol-reindex",
+    "complete_patrol": "hs-knowledge-patrol-complete",
 }
-EXTRA_ARTIFACT_SCOPE = {
-    'hs-knowledge-maintain': {'audit-result.yaml': ([], [])},
-}
-PRIMARY_ARTIFACT_IDS = {
-    # Split the instruction package without changing the host's record identity.
-    'hs-knowledge-record': 'hs-knowledge-source-record-result',
-    'hs-knowledge-review': 'hs-knowledge-lint-result',
-}
-EXTRA_ARTIFACT_IDS = {
-    ('hs-knowledge-maintain', 'audit-result.yaml'): 'hs-knowledge-code-reference-audit',
-}
-OWNERS = {'lint_view': 'reviewer'}
-NODE_SKILLS = {'prepare_sources': 'hs-knowledge-source',
- 'plan_change': 'hs-knowledge-change-plan',
- 'materialize_view': 'hs-knowledge-view-materialize',
- 'lint_view': 'hs-knowledge-review',
- 'record_ingest': 'hs-knowledge-record',
- 'apply_view': 'hs-knowledge-apply',
- 'sync_workspace': 'hs-knowledge-patrol-sync',
- 'plan_patrol': 'hs-knowledge-patrol-plan',
- 'refresh_index': 'hs-knowledge-patrol-reindex',
- 'complete_patrol': 'hs-knowledge-patrol-complete'}
 WORKFLOW_ENTRIES = {
-    'hs-knowledge-ingest': ('prepare_sources', 'hs-knowledge-source'),
-    'hs-knowledge-lint': ('sync_workspace', 'hs-knowledge-patrol-sync'),
+    "hs-knowledge-ingest": ("prepare_sources", "hs-knowledge-source"),
+    "hs-knowledge-lint": ("sync_workspace", "hs-knowledge-patrol-sync"),
 }
-# Exact contracts for ingest and the governance workflow sharing P2-P6.
-# Template identity is independent of Skill identity, even when names match.
 EDGES = {
-    'hs-knowledge-ingest': {
-        'prepare_sources': {'prepared': 'plan_change', 'unchanged': '__end__'},
-        'plan_change': {'content_planned': 'materialize_view', 'needs_material': 'prepare_sources'},
-        'materialize_view': {'ready': 'lint_view', 'needs_material': 'prepare_sources',
-                             'needs_plan': 'plan_change'},
-        'lint_view': {'passed': 'record_ingest', 'needs_material': 'prepare_sources',
-                      'needs_plan': 'plan_change', 'needs_revision': 'materialize_view'},
-        'record_ingest': {'recorded': 'apply_view'},
-        'apply_view': {'completed': '__end__', 'recorded': '__end__'},
+    "hs-knowledge-ingest": {
+        "prepare_sources": {"prepared": "plan_change", "unchanged": "__end__"},
+        "plan_change": {"content_planned": "materialize_view", "deferred": "__end__"},
+        "materialize_view": {"ready": "lint_view", "needs_plan": "plan_change"},
+        "lint_view": {"passed": "apply_view", "needs_plan": "plan_change", "needs_revision": "materialize_view"},
+        "apply_view": {"completed": "__end__"},
     },
-    'hs-knowledge-lint': {
-        'sync_workspace': {'synced': 'plan_patrol', 'skipped': 'plan_patrol'},
-        'plan_patrol': {'needs_ingest': 'prepare_sources', 'needs_index': 'refresh_index',
-                        'unchanged': 'complete_patrol', 'blocked': '__end__'},
-        'prepare_sources': {'prepared': 'plan_change'},
-        'plan_change': {'content_planned': 'materialize_view', 'needs_material': 'prepare_sources'},
-        'materialize_view': {'ready': 'lint_view', 'needs_material': 'prepare_sources',
-                             'needs_plan': 'plan_change'},
-        'lint_view': {'passed': 'record_ingest', 'needs_material': 'prepare_sources',
-                      'needs_plan': 'plan_change', 'needs_revision': 'materialize_view'},
-        'record_ingest': {'recorded': 'apply_view'},
-        'apply_view': {'completed': 'complete_patrol', 'recorded': 'complete_patrol'},
-        'refresh_index': {'indexed': 'complete_patrol'},
-        'complete_patrol': {'completed': '__end__', 'pending': '__end__'},
+    "hs-knowledge-lint": {
+        "sync_workspace": {"synced": "plan_patrol", "skipped": "plan_patrol"},
+        "plan_patrol": {"needs_ingest": "prepare_sources", "needs_reindex": "refresh_index", "unchanged": "complete_patrol"},
+        "prepare_sources": {"prepared": "plan_change", "unchanged": "complete_patrol"},
+        "plan_change": {"content_planned": "materialize_view", "deferred": "complete_patrol"},
+        "materialize_view": {"ready": "lint_view", "needs_plan": "plan_change"},
+        "lint_view": {"passed": "apply_view", "needs_plan": "plan_change", "needs_revision": "materialize_view"},
+        "apply_view": {"completed": "plan_patrol"},
+        "refresh_index": {"reindexed": "complete_patrol"},
+        "complete_patrol": {"completed": "__end__"},
     },
 }
+
+
 class UniqueLoader(yaml.SafeLoader):
     pass
 
@@ -130,7 +86,6 @@ def load(path):
 def validate(root):
     root = Path(root).resolve(strict=True)
     errors = []
-    artifacts = set()
     knowledge_root = root / "himate/himate-knowledge-wifi-mp"
     for ref in ("knowledge.py", "knowledge.sh", "knowledge.cmd", "runtime/manifest.json",
                 "runtime/requirements.lock.txt", "runtime/himate_knowledge/__init__.py",
@@ -157,88 +112,17 @@ def validate(root):
                               or path.suffix == ".py")]
             if forbidden:
                 errors.append(f"{skill}: Skill source owns implementation, tests or dependency locks")
-            expected_contracts = {"result.yaml", *EXTRA_ARTIFACT_SCOPE.get(skill, {})}
-            actual_contracts = {path.name for path in (package / "artifacts").glob("*.yaml")}
-            if actual_contracts != expected_contracts:
-                errors.append(f"{skill}: exact artifact contract set mismatch")
             text = (package / "SKILL.md").read_text(encoding="utf-8")
             frontmatter = re.match(r"\A---\r?\n(.*?)\r?\n---(?:\r?\n|$)", text, re.S)
-            metadata = (
-                yaml.load(frontmatter.group(1), Loader=UniqueLoader)
-                if frontmatter
-                else {}
-            )
-            if metadata.get("name") != skill or not metadata.get("description"):
+            metadata = yaml.load(frontmatter.group(1), Loader=UniqueLoader) if frontmatter else {}
+            if not isinstance(metadata, dict) or metadata.get("name") != skill or not metadata.get("description"):
                 errors.append(f"{skill}: missing or inconsistent Skill identity")
-            # Source and distribution Skills own instructions/host metadata only.
-            contract = load(package / "artifacts/result.yaml")
-            if (
-                contract.get("id") != PRIMARY_ARTIFACT_IDS.get(skill, skill + "-result")
-                or contract.get("id") in artifacts
-            ):
-                errors.append(f"{skill}: artifact ID must be globally unique and exact")
-            artifacts.add(contract.get("id"))
-            if (
-                contract.get("required") is not True
-                or contract.get("default_location", {}).get("kind") != "markdown_file"
-            ):
-                errors.append(f"{skill}: required markdown_file artifact expected")
-            for field in ("template", "writing_guide", "review_guide"):
-                ref = contract.get(field, "")
-                parts = Path(ref).parts
-                target = package / "references/results" / ref
-                if (
-                    not ref
-                    or Path(ref).is_absolute()
-                    or ".." in parts
-                    or "\\" in ref
-                    or not target.is_file()
-                ):
-                    errors.append(f"{skill}: invalid artifact {field} reference")
-            expected_nodes, expected_exits = ARTIFACT_SCOPE[skill]
-            actual_nodes = contract.get("applies_to", {}).get("node_ids", [])
-            actual_exits = contract.get("required_on", {}).get("exit_ids", [])
-            if actual_nodes != expected_nodes:
-                errors.append(f"{skill}: artifact node scope mismatch")
-            if actual_exits != expected_exits:
-                errors.append(f"{skill}: artifact exit obligations mismatch")
-            legal_exits = {
-                exit_id
-                for edges in EDGES.values()
-                for node_id, transitions in edges.items()
-                if node_id in expected_nodes
-                for exit_id in transitions
-            }
-            if not set(actual_exits).issubset(legal_exits):
-                errors.append(f"{skill}: artifact refers to nonexistent exit")
+            for reference in re.findall(r"\]\((references/[^)#]+)(?:#[^)]*)?\)", text):
+                target = package / reference
+                if ".." in Path(reference).parts or not target.is_file():
+                    errors.append(f"{skill}: missing business reference {reference}")
         except (OSError, ValueError, AttributeError, yaml.YAMLError) as exc:
             errors.append(f"{skill}: {exc}")
-    # Every native contract uses the real node IDs and exit names. The shared
-    # review report covers P4 exits. The explicit manual audit keeps a separate
-    # artifact identity without claiming a removed workflow node obligation.
-    for skill, contracts in EXTRA_ARTIFACT_SCOPE.items():
-        package = root / "skills/common/knowledge" / skill
-        for name, (expected_nodes, expected_exits) in contracts.items():
-            try:
-                contract = load(package / "artifacts" / name)
-                identity = EXTRA_ARTIFACT_IDS.get((skill, name), skill + "-" + name[:-5])
-                if contract.get("id") != identity or identity in artifacts:
-                    errors.append(f"{skill}/{name}: duplicate or inconsistent artifact identity")
-                artifacts.add(identity)
-                if contract.get("required") is not True or contract.get("default_location", {}).get("kind") != "markdown_file":
-                    errors.append(f"{skill}/{name}: required markdown_file artifact expected")
-                if contract.get("applies_to", {}).get("node_ids") != expected_nodes or contract.get("required_on", {}).get("exit_ids") != expected_exits:
-                    errors.append(f"{skill}/{name}: artifact scope mismatch")
-                for field in ("template", "writing_guide", "review_guide"):
-                    ref = contract.get(field, "")
-                    if not ref or Path(ref).is_absolute() or ".." in Path(ref).parts or "\\" in ref or not (package / "references/results" / ref).is_file():
-                        errors.append(f"{skill}/{name}: invalid {field} reference")
-                for node_id in expected_nodes:
-                    exits = next((edges[node_id] for edges in EDGES.values() if node_id in edges), {})
-                    if not set(expected_exits).issubset(exits):
-                        errors.append(f"{skill}/{name}: nonexistent node exit")
-            except (OSError, ValueError, AttributeError, yaml.YAMLError) as exc:
-                errors.append(f"{skill}/{name}: {exc}")
     for identity, expected in EDGES.items():
         try:
             package = root / "workflows/common/knowledge" / identity

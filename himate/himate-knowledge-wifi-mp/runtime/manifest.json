@@ -15,171 +15,21 @@
       "sha256": "e4ae118eb0ebc99af582721a0ea74d1acaf24ac25b49f381c70911ac0708bb13"
     },
     "himate_knowledge/cli.py": {
-      "sha256": "b31ed52d8dabb25fec3f01c3052af44c52b5a80117935a530b7809e8fd91ef82"
+      "sha256": "96cedbc92bb925f3bba77733cca8af9f024083d370dd6915420338b61882fffc"
+    },
+    "himate_knowledge/command_install.py": {
+      "sha256": "1405b6eabf3adf0e8ba8da131add28e5d269404a520107a46858e46497ceb5f0"
+    },
+    "himate_knowledge/doctor.py": {
+      "sha256": "52ed12b5fbecd77216036260e470d4205716359aed96e6135d153a70587ae83c"
     },
     "himate_knowledge/protocol.py": {
-      "sha256": "bc8a6cba5c077852b32d36f60712f711552131b950c5110e81dfa052804ec5cc"
-    },
-    "himate_knowledge/stage_dispatch.py": {
-      "sha256": "a1d8b8f26b59e81834165280f68fd45158980be6c5c084bd0c96c95583b90164"
-    },
-    "himate_knowledge/stages/__init__.py": {
-      "sha256": "cf643dbf0b0587581cb04b4bbcbad7a7c422208bcf2a345e46023347b9af0272"
-    },
-    "himate_knowledge/stages/apply/__init__.py": {
-      "sha256": "1180213d17c5f260574af4f4ab05eda9cea496f0d159584b4f8a84f74d392bdc"
-    },
-    "himate_knowledge/stages/apply/cli.py": {
-      "sha256": "93a619a8ae1a643a2173cd1e7860bc1415b4938008f7a75109a2bb20f9fbed7b"
-    },
-    "himate_knowledge/stages/apply/entry.py": {
-      "sha256": "23a2aaaa6f650894c1210ec7812332ca80476ebffbb052c001c58fe5e9e1a4cc"
-    },
-    "himate_knowledge/stages/apply/requirements.lock.txt": {
-      "sha256": "f0b15c999eb145ca37dc5bfcca5be69dbef37ccff9a8458a16013ad14e7d4f17"
-    },
-    "himate_knowledge/stages/apply/support.py": {
-      "sha256": "e5d5dce6c8bf987aaabb8f26bf53f2f960eaf6789bd49577ee34bfa3f87a8917"
-    },
-    "himate_knowledge/stages/apply/transaction.py": {
-      "sha256": "e4f57c58c11160e321380e05405684302fb7ec9c61fd644ff111ae67b7d35f15"
-    },
-    "himate_knowledge/stages/apply/transaction_v3.py": {
-      "sha256": "4297948467ce3492c409ae649b538934707cd377bba8d0fa39c010c238ff92f8"
-    },
-    "himate_knowledge/stages/candidate_inspect/__init__.py": {
-      "sha256": "69ded6d7e45fb2dc276fbbebea49b2a2ed0ef96e289030be157cae05f36cb4d5"
-    },
-    "himate_knowledge/stages/change_plan/__init__.py": {
-      "sha256": "499d91f10ac1cfdacf09d743b05c8756fb279f33684c806982b54ff676156448"
-    },
-    "himate_knowledge/stages/change_plan/cli.py": {
-      "sha256": "e1c4229a35f8a703fadc723a294f79d9e77db5f233bf8a88538932d6d258de5c"
-    },
-    "himate_knowledge/stages/change_plan/plan_v3.py": {
-      "sha256": "406b9db3459fbf09bd0c4fd1f0093646aca291d9717bab3bbd71d8fb0c1449e7"
-    },
-    "himate_knowledge/stages/change_plan/planning.py": {
-      "sha256": "cf59de49b90ba5b5fc353a2212689d27ee0d3d4db8231e616d298e6fe75b3b82"
-    },
-    "himate_knowledge/stages/change_plan/requirements.lock.txt": {
-      "sha256": "e623485a8adcdbfd2f5598ed7c40637bc4b65bfb0a01941a83407716493c9ac2"
-    },
-    "himate_knowledge/stages/change_plan/support.py": {
-      "sha256": "aad2daed6d1426dc049cbd1b8579f456d47282409a8523348440aa1d428dc4ed"
-    },
-    "himate_knowledge/stages/explore/__init__.py": {
-      "sha256": "34a199898a61b8aad69564d37298c4577c1c8b0ff952df55b3792b36c9edf442"
-    },
-    "himate_knowledge/stages/explore/cli.py": {
-      "sha256": "9d20952b0c9ce4baac489e4485d2cfc92a90341e106109d8e9080b778c6ffcd4"
-    },
-    "himate_knowledge/stages/explore/node.py": {
-      "sha256": "c1e13bb2d6f91b1689b6a9b6464da8c0754dc34f3e82f7d55036d93ffc2fc648"
-    },
-    "himate_knowledge/stages/explore/requirements.lock.txt": {
-      "sha256": "780dc51b79686bebfa95712f16490b94cef1c5a23b642d37075e99262527c481"
-    },
-    "himate_knowledge/stages/explore/setup.py": {
-      "sha256": "924e05657e4a85617e8b969bd3fe8e5dcf6dd19a21301ba4b3e0c92601b348cf"
-    },
-    "himate_knowledge/stages/explore/support.py": {
-      "sha256": "aad2daed6d1426dc049cbd1b8579f456d47282409a8523348440aa1d428dc4ed"
-    },
-    "himate_knowledge/stages/lint/__init__.py": {
-      "sha256": "68a9722596e82b8a9a1d09347d12fe91f90ad4230e4c6ef71dd11de57c358cda"
-    },
-    "himate_knowledge/stages/lint/cli.py": {
-      "sha256": "c88999c14028ad713e156c656e7c92f44ac257a0076a789d8acf2be062f90fd5"
-    },
-    "himate_knowledge/stages/lint/lint.py": {
-      "sha256": "099f27f797c37266800a429f95be5ba45de4a9eca05186b939ef6a6c16016013"
-    },
-    "himate_knowledge/stages/lint/requirements.lock.txt": {
-      "sha256": "8a25706fc9bddf0bb03a1d8f851898a002670c6a7177437019b861ce382acc94"
-    },
-    "himate_knowledge/stages/lint/review.py": {
-      "sha256": "3db557cad8f8ea3b0648284f83df4820415fa4b9bbacca5eb7a0e00c92a6f512"
-    },
-    "himate_knowledge/stages/lint/support.py": {
-      "sha256": "aad2daed6d1426dc049cbd1b8579f456d47282409a8523348440aa1d428dc4ed"
-    },
-    "himate_knowledge/stages/maintain/__init__.py": {
-      "sha256": "88dd8d0d8c596f1fbf90d96c78f07de652e1b4641a87559c3c21e3cf2dfa6701"
-    },
-    "himate_knowledge/stages/maintain/cli.py": {
-      "sha256": "31f2e72106433706c511c7655ebff4946b6c9a2eb26ebe456b45ab2c0071db5a"
-    },
-    "himate_knowledge/stages/maintain/maintain.py": {
-      "sha256": "31973879e147d84bb7d0f236413ce1909555405e2b5ec854f368c24c57e795ac"
-    },
-    "himate_knowledge/stages/maintain/requirements.lock.txt": {
-      "sha256": "8a25706fc9bddf0bb03a1d8f851898a002670c6a7177437019b861ce382acc94"
-    },
-    "himate_knowledge/stages/maintain/support.py": {
-      "sha256": "aad2daed6d1426dc049cbd1b8579f456d47282409a8523348440aa1d428dc4ed"
-    },
-    "himate_knowledge/stages/query/__init__.py": {
-      "sha256": "b1c554f2636e685873f1e888d1d5dc09f47aa8699eda736cbc87bf4fa52d0922"
-    },
-    "himate_knowledge/stages/query/cli.py": {
-      "sha256": "dc7beab47127caac8d404b60cb07978de94258f06359ba05d87a0b2be97d932b"
-    },
-    "himate_knowledge/stages/query/node.py": {
-      "sha256": "4cceffd28a5e1d6b74e844e08af051a91c046ca8a190320643fbfc7f3c39d36d"
-    },
-    "himate_knowledge/stages/query/requirements.lock.txt": {
-      "sha256": "8a25706fc9bddf0bb03a1d8f851898a002670c6a7177437019b861ce382acc94"
-    },
-    "himate_knowledge/stages/query/support.py": {
-      "sha256": "aad2daed6d1426dc049cbd1b8579f456d47282409a8523348440aa1d428dc4ed"
-    },
-    "himate_knowledge/stages/source/__init__.py": {
-      "sha256": "980f68aab0af312cab2995fb9061c1a95fecae6fcff2946b54e8d4e2d701855f"
-    },
-    "himate_knowledge/stages/source/cli.py": {
-      "sha256": "a517517f6b0575e240da8151d9dfe4d713fda23a4ed01f2119db3d6468820416"
-    },
-    "himate_knowledge/stages/source/entry.py": {
-      "sha256": "cbdd5ca310cc520391c9593657bab45a415421d23cd88bf569e859a2fa370f4d"
-    },
-    "himate_knowledge/stages/source/progress.py": {
-      "sha256": "a472d67a128b2a7cc6908a9f4cec02cb2e172441bbb3b9008e9c2ffc38c4153a"
-    },
-    "himate_knowledge/stages/source/record.py": {
-      "sha256": "698d3cc3f23642baeab227ec3e64bf3f1989c7ddae0d94f34db58241fdb5bbfa"
-    },
-    "himate_knowledge/stages/source/requirements.lock.txt": {
-      "sha256": "6b7c13d3cc4cb871e77c34f157eb88abb80653690c152781975eb5bd796aa8b1"
-    },
-    "himate_knowledge/stages/source/scan.py": {
-      "sha256": "2256d7df83e74dd95b59433d6d7fac198dc8c1e08b33bf1a94530cec3e38b912"
-    },
-    "himate_knowledge/stages/source/status.py": {
-      "sha256": "31eff3a16d6a3eb2186f7131e5d2f11b2d2d9ba68a341b145e6dfada48d3f7b5"
-    },
-    "himate_knowledge/stages/source/support.py": {
-      "sha256": "aad2daed6d1426dc049cbd1b8579f456d47282409a8523348440aa1d428dc4ed"
-    },
-    "himate_knowledge/stages/view_materialize/__init__.py": {
-      "sha256": "e01fa3c80cde8c83ea96845f3d21661fe91274c4baf8e2c70a026e7eb64fda7e"
-    },
-    "himate_knowledge/stages/view_materialize/cli.py": {
-      "sha256": "42e59854f2a7a869a95f0d54b091ee2695c39124426fffdfc172d3e8ac9d53e8"
-    },
-    "himate_knowledge/stages/view_materialize/materialize.py": {
-      "sha256": "576ab61908016befef413002411f251e0cda93495540de8e80dc20c29291e990"
-    },
-    "himate_knowledge/stages/view_materialize/requirements.lock.txt": {
-      "sha256": "e623485a8adcdbfd2f5598ed7c40637bc4b65bfb0a01941a83407716493c9ac2"
-    },
-    "himate_knowledge/stages/view_materialize/support.py": {
-      "sha256": "aad2daed6d1426dc049cbd1b8579f456d47282409a8523348440aa1d428dc4ed"
+      "sha256": "47bfb4189c9dd570b44cd5993557d950c48b471dfd55360b540d9c2be7918867"
     },
     "requirements.lock.txt": {
       "sha256": "ab8d221ec6319126160697601c30d9fa803e75378908534c194411fbce6ca8be"
     }
   },
   "schema_version": "1.0",
-  "version": "1.1.0"
+  "version": "0.13.1"
 }

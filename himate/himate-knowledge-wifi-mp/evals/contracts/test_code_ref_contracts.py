@@ -4,9 +4,6 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
-import shutil
-import subprocess
-import sys
 
 from jsonschema import Draft202012Validator
 import pytest
@@ -20,7 +17,6 @@ _helper = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_helper)
 resources = _helper.module("source_resources")
 validation = _helper.module("validation")
-checks = _helper.module("checks")
 
 
 def reference():
@@ -167,77 +163,3 @@ def test_navigation_rejects_configuration_bound_to_another_knowledge_root(worksp
                 "repos": {mapping["repo_id"]: {"root": str(code.parents[1])}}}
     observed = resources.resolve_code_navigation(domain, reference(), lock, checkout)
     assert observed["status"] == "unavailable"
-
-
-def formal_view(workspace, *, mode="formal"):
-    domain, _, _, lock, _, _ = workspace
-    (domain / "governance").mkdir(exist_ok=True)
-    (domain / "governance/sources.lock.yaml").write_text(yaml.safe_dump(lock), encoding="utf-8")
-    (domain / "knowledge").mkdir(exist_ok=True)
-    (domain / "knowledge/index.md").write_text("# Knowledge\n\n[Ready](ready.md)\n", encoding="utf-8")
-    meta = {"schema_version": "2.0", "id": "ready-card", "profile": "flow", "title": "Ready",
-            "summary": "Documented ready flow", "lifecycle": "stable", "review_mode": "manual_document",
-            "owner": "fixture", "scope": {"applicability": "unknown", "contexts": []}, "aliases": [],
-            "sources": [reference()], "claims": [{"id": "ready-claim", "text_ref": "#ready-claim",
-                "evidence_kind": "design", "source_refs": ["entry"], "context_ids": [],
-                "usage": "guidance", "verification_requirements": []}], "relations": []}
-    body = "# Ready\n\n<a id=\"ready-claim\"></a>\nDocumented ready flow.\n"
-    for heading in ("起终点", "步骤", "调用与消息", "异常", "条件", "证据"):
-        body += "\n## " + heading + "\n\nDocumented scope.\n"
-    (domain / "knowledge/ready.md").write_text("---\n" + yaml.safe_dump(meta) + "---\n" + body, encoding="utf-8")
-    governance = Path(__file__).parents[2] / "governance"
-    rules = {"knowledge_root": domain, "rules_digest": "0" * 64,
-             "profiles": yaml.safe_load((governance / "schemas/profiles.yaml").read_bytes()),
-             "registries": yaml.safe_load((governance / "schemas/registries.yaml").read_bytes()),
-             "schemas": {kind: json.loads((governance / "schemas" / (name + ".schema.json")).read_bytes())
-                         for kind, name in (("card", "frontmatter"), ("sources", "sources"),
-                                            ("workspace", "workspace"), ("record", "records"))}}
-    return checks.prepare_view(domain, mode=mode), rules
-
-
-def test_fixed_checks_validate_navigation_for_document_mode_without_code_gate(workspace):
-    view, rules = formal_view(workspace)
-    report = checks.run(view, rules, inputs={"source_objects": {"v1": workspace[2]}}, scope="full")
-    assert report["status"] == "passed", report["findings"]
-    source_result = next(row for row in report["checks"] if row["group"] == "source")
-    assert source_result["code_navigation"][0]["status"] == "resolved"
-    workspace[1].write_bytes(b"int renamed(void) { return 1; }\n")
-    failed = checks.run(view, rules, inputs={"source_objects": {"v1": workspace[2]}}, scope="full")
-    assert failed["status"] == "failed"
-    assert any(row["code"] == "CODE_SYMBOL_MISSING" for row in failed["findings"])
-
-
-def test_ci_does_not_resolve_current_navigation_from_an_unprovided_checkout(workspace):
-    view, rules = formal_view(workspace, mode="ci")
-    report = checks.run(view, rules, inputs={"source_objects": {"v1": workspace[2]}}, scope="full")
-    assert report["status"] == "incomplete"
-    assert any(row["code"] == "CODE_INPUT_UNAVAILABLE" for row in report["findings"])
-
-
-def test_protected_ci_script_loads_symbol_module_and_checks_actual_current_code(workspace):
-    domain, code, original, _, config_path, mapping = workspace
-    formal_view(workspace)
-    code.write_bytes(b"/* new heading */\n\nint ready(void) { return 9; }\n")
-    package_root = Path(__file__).parents[2]
-    trusted = domain.parent / "trusted"
-    trusted.mkdir()
-    shutil.copytree(package_root / "governance", trusted / "governance",
-                    ignore=shutil.ignore_patterns("__pycache__"))
-    shutil.copy2(package_root / "check.py", trusted / "check.py")
-    old_source = domain.parent / "adopted-source.c"
-    old_source.write_bytes(original)
-    job_input = domain.parent / "ci-input.json"
-    job_input.write_text(json.dumps({"inputs": {"source_objects": {"v1": str(old_source)},
-        "code_checkout": {"configuration": str(config_path),
-            "config_digest": hashlib.sha256(config_path.read_bytes()).hexdigest(),
-            "repos": {mapping["repo_id"]: {"root": str(code.parents[1])}}}}}), encoding="utf-8")
-    output = domain.parent / "ci-output.json"
-    process = subprocess.run([sys.executable, str(trusted / "check.py"),
-        "--trusted-root", str(trusted), "--candidate-root", str(domain),
-        "--rules-digest", hashlib.sha256((trusted / "governance/framework.lock.yaml").read_bytes()).hexdigest(),
-        "--commit", "a" * 40, "--input", str(job_input), "--output", str(output)],
-        capture_output=True, text=True, timeout=60)
-    assert process.returncode == 0, process.stdout + process.stderr
-    report = json.loads(output.read_bytes())
-    observed = next(row for row in report["checks"] if row["group"] == "source")["code_navigation"][0]
-    assert observed["status"] == "resolved" and observed["range"]["start_line"] == 3

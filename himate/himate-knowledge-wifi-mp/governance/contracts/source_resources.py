@@ -134,79 +134,8 @@ def read_dbox(knowledge_root, logical, expected_binding=None):
             "actual_path": path, "dbox_binding": observed["binding"], "signature": signature(after)}
 
 
-def _dbox_git_protection(root):
-    import os
-    import subprocess
-    from pathlib import Path
-
-    if not any(os.path.lexists(parent / ".git") for parent in (Path(root), *Path(root).parents)):
-        return {"status": "not_git"}
-    prefix = ["git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + os.devnull,
-              "-c", "core.pager=cat", "-C", str(root)]
-    environment = {key: value for key, value in os.environ.items() if not key.upper().startswith("GIT_")}
-    environment.update({"GIT_TERMINAL_PROMPT": "0", "GIT_OPTIONAL_LOCKS": "0", "GCM_INTERACTIVE": "Never"})
-    options = {"capture_output": True, "check": False, "stdin": subprocess.DEVNULL,
-               "env": environment, "timeout": 10}
-    try:
-        tracked = subprocess.run(prefix + ["ls-files", "--error-unmatch", "--", DBOX_CONFIG], **options)
-        if tracked.returncode == 0:
-            return {"status": "tracked"}
-        if tracked.returncode != 1:
-            return {"status": "unavailable"}
-        ignored = subprocess.run(prefix + ["check-ignore", "--quiet", "--", DBOX_CONFIG], **options)
-        return {"status": "ignored" if ignored.returncode == 0 else "not_ignored" if ignored.returncode == 1 else "unavailable"}
-    except (OSError, subprocess.TimeoutExpired):
-        return {"status": "unavailable"}
 
 
-def configure_dbox(context):
-    import os
-    import tempfile
-    import yaml
-    from pathlib import Path
-    from .runtime import NodeError, safe
-
-    config = safe(context.root, DBOX_CONFIG)
-    before = config.read_bytes() if config.exists() else None
-    protection = _dbox_git_protection(context.root)
-    if protection["status"] not in {"ignored", "not_git"}:
-        raise NodeError("DBOX_CONFIG_UNPROTECTED", "Protect the fixed local configuration before saving it", DBOX_CONFIG,
-                        blocked=True, data={"git_protection": protection})
-    if "path" not in context.request:
-        observed = dbox_root(context.root)
-        return {"configured": True, "git_protection": protection, "dbox_binding": observed["binding"]}, "configured"
-    root, _ = _dbox_location(context.root, context.request["path"])
-    try:
-        previous = dbox_root(context.root)
-    except ContractError:
-        previous = None
-    if previous is not None and previous["root"] == root:
-        return {"configured": True, "git_protection": protection, "dbox_binding": previous["binding"]}, "configured"
-    raw = yaml.safe_dump({"schema_version": "1.0", "path": str(root)}, sort_keys=False, allow_unicode=True).encode("utf-8")
-    with context.modules["maintenance"].writer_lock(context):
-        config.parent.mkdir(parents=True, exist_ok=True)
-        config = safe(context.root, DBOX_CONFIG)
-        if (config.read_bytes() if config.exists() else None) != before:
-            raise NodeError("DBOX_BINDING_CHANGED", "Local configuration changed before replacement", DBOX_CONFIG, blocked=True)
-        if _dbox_git_protection(context.root) != protection:
-            raise NodeError("DBOX_CONFIG_UNPROTECTED", "Git protection changed before replacement", DBOX_CONFIG, blocked=True)
-        _dbox_location(context.root, str(root))
-        descriptor, temporary = tempfile.mkstemp(prefix=".dbox-config-", dir=config.parent)
-        try:
-            with os.fdopen(descriptor, "wb") as stream:
-                stream.write(raw)
-                stream.flush()
-                os.fsync(stream.fileno())
-            if (config.read_bytes() if config.exists() else None) != before:
-                raise NodeError("DBOX_BINDING_CHANGED", "Local configuration changed during replacement", DBOX_CONFIG, blocked=True)
-            os.replace(temporary, safe(context.root, DBOX_CONFIG))
-            if config.read_bytes() != raw:
-                raise NodeError("DBOX_CONFIG_WRITE_FAILED", "Saved local configuration differs from its input", DBOX_CONFIG, blocked=True)
-        finally:
-            if Path(temporary).exists():
-                Path(temporary).unlink()
-    observed = dbox_root(context.root)
-    return {"configured": True, "git_protection": protection, "dbox_binding": observed["binding"]}, "configured"
 
 
 def extract_document(data, suffix, *, primary=True):

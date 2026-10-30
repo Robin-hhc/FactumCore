@@ -1,4 +1,4 @@
-"""Doctor validates installation metadata without executing domain programs."""
+"""Doctor loads only the verified workspace metadata selector, no business engines."""
 
 import hashlib
 import json
@@ -22,7 +22,7 @@ def knowledge(tmp_path):
     root.mkdir(parents=True)
     for name in ("governance", "runtime"):
         shutil.copytree(SOURCE / name, root / name,
-                        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+                        ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".venv"))
     for name in ("knowledge.py", "knowledge.cmd", "knowledge.sh"):
         shutil.copyfile(SOURCE / name, root / name)
     (workspace / "config.yml").write_text(
@@ -116,6 +116,15 @@ def test_doctor_does_not_execute_mismatched_governance(knowledge):
     assert not marker.exists()
 
 
+def test_doctor_never_executes_a_metadata_selector_with_unverified_bytes(knowledge):
+    marker = knowledge.parent / "unverified-selector-executed"
+    (knowledge / "governance/contracts/workspace_config.py").write_text(
+        "from pathlib import Path\nPath(" + repr(str(marker)) + ").touch()\n", encoding="utf-8")
+    report = blocked(knowledge, "RULE_FILE_DIGEST_MISMATCH")
+    assert report["data"]["configuration"]["status"] == "not_checked"
+    assert not marker.exists()
+
+
 def test_doctor_blocks_empty_rule_manifest(knowledge):
     mutate_lock(knowledge, lambda lock: lock.update(files={}))
     blocked(knowledge, "RULE_LOCK_INCOMPLETE")
@@ -132,10 +141,12 @@ def test_doctor_cannot_call_an_ancestor_other_group_configuration_ready(knowledg
     blocked(knowledge, "CONFIG_KNOWLEDGE_ROOT_MISMATCH")
 
 
-def test_doctor_does_not_skip_a_nearer_wrong_configuration(knowledge):
+def test_doctor_skips_a_safe_unrelated_configuration_inside_the_knowledge_root(knowledge):
     (knowledge / "config.yml").write_text(
         "schema_version: '2.0'\nknowledge_roots:\n  wifi: unrelated\n", encoding="utf-8")
-    blocked(knowledge, "CONFIG_KNOWLEDGE_ROOT_MISMATCH")
+    status, report = observe(knowledge)
+    assert status == 0, report
+    assert report["data"]["config_path"] == str(knowledge.parent / "config.yml")
 
 
 def test_doctor_blocks_missing_configuration(knowledge):
@@ -160,3 +171,80 @@ def test_doctor_without_site_packages_still_reports_pinned_dependencies(knowledg
     assert "DEPENDENCY_UNAVAILABLE" in {row["code"] for row in report["diagnostics"]}
     assert any(row["name"].casefold() == "pyyaml" and row["actual"] is None for row in report["data"]["dependencies"])
     assert report["data"]["rules"]["status"] == "not_checked"
+
+
+def nested_knowledge(knowledge):
+    workspace = knowledge.parent
+    target = workspace / "himate/domain"
+    target.parent.mkdir()
+    shutil.move(str(knowledge), str(target))
+    config = workspace / "config.yml"
+    config.write_text(config.read_text(encoding="utf-8").replace(
+        "wifi: himate-knowledge-synthetic", "wifi: himate/domain").replace(
+        "modules: []", "modules:\n- path: wifi\n  chips: []\n  sides: []\n  features: []"), encoding="utf-8")
+    code = workspace / "main/wifi/config.c"
+    code.parent.mkdir(parents=True)
+    code.write_text("int selected_config(void) { return 7; }\n", encoding="utf-8")
+    return target, config
+
+
+
+
+def test_doctor_chooses_one_exact_nested_mapping_over_unrelated_nearer_config(knowledge):
+    root, config = nested_knowledge(knowledge)
+    (root.parent / "config.yml").write_text(
+        "schema_version: '2.0'\nknowledge_roots:\n  wifi: unrelated-domain\n", encoding="utf-8")
+    status, report = observe(root)
+    assert status == 0, report
+    assert report["data"]["config_path"] == str(config)
+
+
+@pytest.mark.parametrize("state,doctor_code", [
+    ("ambiguous", "CONFIG_AMBIGUOUS"),
+    ("invalid", "CONFIG_INVALID"),
+    ("duplicate", "CONFIG_INVALID"),
+    ("unsafe", "CONFIG_KNOWLEDGE_ROOT_MISMATCH"),
+    ("case_alias", "CONFIG_KNOWLEDGE_ROOT_MISMATCH"),
+    ("missing", "CONFIG_UNAVAILABLE"),
+])
+def test_doctor_fails_closed_on_bad_nested_discovery(knowledge, state, doctor_code):
+    root, config = nested_knowledge(knowledge)
+    nearby = root.parent / "config.yml"
+    if state == "ambiguous":
+        nearby.write_text("schema_version: '2.0'\nknowledge_roots:\n  wifi: domain\n", encoding="utf-8")
+    elif state == "invalid":
+        nearby.write_text("knowledge_roots: [broken\n", encoding="utf-8")
+    elif state == "duplicate":
+        nearby.write_text("knowledge_roots: {wifi: other}\nknowledge_roots: {wifi: domain}\n", encoding="utf-8")
+    elif state == "unsafe":
+        nearby.write_text("knowledge_roots: {wifi: '../himate/domain'}\n", encoding="utf-8")
+    elif state == "case_alias":
+        nearby.write_text("knowledge_roots: {wifi: DOMAIN}\n", encoding="utf-8")
+    else:
+        config.unlink()
+    blocked(root, doctor_code)
+
+
+@pytest.mark.parametrize("version", [None, "99.0"])
+def test_doctor_cannot_mark_a_noncurrent_workspace_contract_ready(knowledge, version):
+    config = knowledge.parent / "config.yml"
+    value = yaml.safe_load(config.read_bytes())
+    if version is None:
+        value.pop("schema_version")
+    else:
+        value["schema_version"] = version
+    config.write_text(yaml.safe_dump(value), encoding="utf-8")
+    blocked(knowledge, "CONFIG_INVALID")
+
+
+def test_doctor_never_imports_the_governance_package_even_when_its_bytes_are_locked(knowledge):
+    # Explicit synthetic rule version: metadata selection must not run this
+    # package initializer or load any business engine, even after verification.
+    marker = knowledge.parent / "governance-package-imported"
+    package = knowledge / "governance/contracts/__init__.py"
+    package.write_text("from pathlib import Path\nPath(" + repr(str(marker)) + ").touch()\n", encoding="utf-8")
+    mutate_lock(knowledge, lambda lock: lock["files"]["contracts/__init__.py"].update(
+        sha256=hashlib.sha256(package.read_bytes()).hexdigest()))
+    status, report = observe(knowledge)
+    assert status == 0, report
+    assert not marker.exists()

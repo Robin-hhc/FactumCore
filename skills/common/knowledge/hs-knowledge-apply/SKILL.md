@@ -1,43 +1,24 @@
 ---
 name: hs-knowledge-apply
-description: 将已确定的知识批次及处理记录安全落位，完成索引、冻结查询、激活和本批收尾；也处理明确指定的索引或事务维护任务。
+description: 将通过P4的本轮候选复制入正式库，刷新双向关系与检索索引并保存文件处理hash；用于P5。
 ---
 
-# 发布与检索收尾
+# 入库并更新索引
 
-## 目标与输入
+在实际知识根执行命令，Linux 使用 `sh ./knowledge.sh`，Windows 使用 `.\knowledge.cmd`；已注册入口可直接用 `knowledge`。位置由 Workflow 首节点确认，独立使用时从当前工作区 `AGENTS.md`、`config.yml` 获取。
 
-P6 发布本批已经确定的字节和处理事实，完成适用检索收尾。接收本次 `view_ref` 和 P5 的 `ingest_record_ref`；不重判内容、不重新生成稿件或重复 P4 质量审阅。
+## 入库
 
-复用已知知识根和执行端；缺位置时读当前工作区 `AGENTS.md`、`config.yml`，必要时询问用户。首次读知识根 `AGENTS.md`；以下在该目录执行，POSIX 用 `sh ./knowledge.sh`。
+确认本轮已经完成 P4，运行：
 
-## 正常入库
-
-```powershell
-.\knowledge.cmd apply --action batch --input REQUEST.json --json
+```sh
+knowledge ingest commit --json
 ```
 
-REQUEST.json 传 `operation_id`、本批实际 `view_ref` 和 `ingest_record_ref`。CLI 在一次调用中执行：
+命令依次复制覆盖候选、应用明确删除清单、更新数据库关系和检索索引、保存触发文件的成功 hash，最后清暂存。使用 P1 保存的来源版本，不把其它关联文件顺便标成已处理。
 
-1. 核对输入与旧基线，安全落位冻结内容、必要证据和处理记录。
-2. 为内容批构建并完整验证真实索引，执行 P2 原冻结查询及同代精读，按原活动指针基线激活。
-3. 保存正式发布／完成记录，清理本批明确可删的暂存；借用或受保护材料保留并说明。
+失败保留 `.build` 和错误，修正执行问题后直接重试同一个 P5；不要先运行 P1。重复覆盖及数据库更新由命令处理。需要改稿则回 P3，再经 P4。
 
-沿用真实返回引用与原查询预期，不手工拼装摘要、放宽断言或替换激活基线。仅记录批保留处置及欠账，不建索引。
+无需产卡但已完整处理时，将 `{"reason":"实际不改卡理由"}` 写入 `.build/commit.json`，再运行 `knowledge ingest commit --input .build/commit.json --json`。暂缓／失败不能标成完成。
 
-## 判断完成
-
-- `batch_complete: true` 才表示本批适用落位、检索收尾和清理完成；记录批按其实际结果交付。
-- `published`／`content_applied` 与 `batch_complete` 分别报告。已发布但 `cleanup_pending` 时保留发布事实，按同一操作重试缺失收尾或清理。
-- 查询失败、输入冲突或运行故障时保留实际停点和诊断；不要重复发布已落位内容、另选激活基线或回滚已经成功发布的批次。
-
-交付实际 `publication_ref`、`completion_ref`、索引／查询结果及剩余事项。`committed` 仅表示本地事务状态，Git 提交、CI 和合入另行处理。
-
-## 按需维护
-
-- 中断事务、旧事务或发布后重试：[执行与恢复](references/execution.md#中断与恢复)。先按确切操作观察，再选择恢复；旧历史不迁移、不改签。
-- 明确要求独立建库、校验或激活：[索引维护](references/shared-publication.md#独立索引动作)。
-- 明确要求独立查询回归：[回归请求](references/regression.md)。正常 batch 已包含原冻结用例，不再另跑一套。
-- 准备或核对人工 Git 提交范围：[提交核对](references/execution.md#提交核对)。这些动作本身不提交或推送。
-
-写锁、完整写集 CAS、备份和落盘核验由 CLI 执行。保留冲突处的外部修改；原件、正式证据、其他操作和运行环境不属于本批清理目标。
+成功后依据命令回执交付；需要复核时读 `logs/ingest/latest.json`，不再用 `scan` 验证，它会开启下一轮。Git 提交、推送与合入由用户另行授权。

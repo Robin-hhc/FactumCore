@@ -4,12 +4,11 @@ from __future__ import annotations
 import hashlib
 import json
 import copy
-import os
 import re
-import stat
 from pathlib import Path, PurePosixPath
 import yaml
 from jsonschema import Draft202012Validator
+from . import workspace_config
 
 
 class ContractError(ValueError):
@@ -216,9 +215,11 @@ def load_rules(knowledge_root, expected_digest):
             "validation.py",
             "knowledge.py",
             "source_resources.py",
-            "records.py",
             "indexing.py",
-            "checks.py",
+            "catalog.py",
+            "cards_v3.py",
+            "ingest.py",
+            "library.py",
         )
     }
     if capabilities.get("code_navigation") == "1.0":
@@ -333,18 +334,10 @@ def validate_shape(kind, payload, rules):
 
 
 def _workspace_relative(value):
-    """Validate a portable workspace path without reading the filesystem."""
-    if value == ".":
-        return value
-    if (not isinstance(value, str) or not value or value.startswith("/")
-            or "\\" in value or ":" in value or "\x00" in value):
-        raise ContractError("UNSAFE_WORKSPACE_PATH", "Expected a relative POSIX directory", value)
-    for part in value.split("/"):
-        if (part in {"", ".", ".."} or part != part.rstrip(" .")
-                or any(char in part for char in '<>"|?*')
-                or re.fullmatch(r"(?i)(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\..*)?", part)):
-            raise ContractError("UNSAFE_WORKSPACE_PATH", "Invalid portable component", value)
-    return value
+    try:
+        return workspace_config.relative_path(value)
+    except workspace_config.WorkspaceConfigError as error:
+        raise ContractError(error.code, error.message, error.path) from error
 
 
 def _workspace_declaration(config):
@@ -379,10 +372,10 @@ def _workspace_declaration(config):
 
 
 def _workspace_no_links(path):
-    for item in (path, *path.parents):
-        if item.is_symlink() or (os.path.lexists(item)
-                and getattr(item.lstat(), "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT):
-            raise ContractError("WORKSPACE_LINKED_PATH", "Linked workspace paths are not allowed", item)
+    try:
+        workspace_config.no_links(path)
+    except workspace_config.WorkspaceConfigError as error:
+        raise ContractError(error.code, error.message, error.path) from error
 
 
 def _workspace_path(root, relative):
@@ -393,54 +386,11 @@ def _workspace_path(root, relative):
 
 
 def workspace_config_path(knowledge_root, registrations=None, expected_rules=None, *, config_path=None):
-    """Select one exact configuration whose safe WiFi mapping names this root.
-
-    Installed nodes supply their trusted catalog registrations. Data-only
-    historical readers without a catalog may discover an ancestor config only
-    when its explicit mapping resolves to the exact domain; ambiguity is an
-    error. No arbitrary parent is treated as the project root.
-    """
-    root = Path(knowledge_root).absolute()
-    _workspace_no_links(root)
-    root = root.resolve(strict=True)
-    if config_path is not None:
-        candidates = [(None, {"config": str(config_path)})]
-    elif registrations is not None:
-        if not isinstance(registrations, dict):
-            raise ContractError("WORKSPACE_CONFIG_UNAVAILABLE", "Installed workspace registrations must be a mapping")
-        candidates = list(registrations.items())
-    else:
-        candidates = [(None, {"config": str(parent / "config.yml")}) for parent in root.parents]
-    matches = []
-    for identity, entry in candidates:
-        if not isinstance(entry, dict) or not isinstance(entry.get("config"), str):
-            continue
-        candidate = Path(entry["config"])
-        if not candidate.is_absolute():
-            raise ContractError("WORKSPACE_CONFIG_UNAVAILABLE", "Workspace config must be absolute", candidate)
-        _workspace_no_links(candidate)
-        if not candidate.is_file():
-            continue
-        raw = candidate.read_bytes()
-        value = load_yaml(raw)
-        roots = value.get("knowledge_roots")
-        if not isinstance(roots, dict) or set(roots) != {"wifi"}:
-            continue
-        relative = roots["wifi"]
-        _workspace_relative(relative)
-        if relative == "." or _workspace_path(candidate.parent, relative).resolve() != root:
-            continue
-        if identity is not None and (value.get("workspace_id") != identity
-                or expected_rules is not None and entry.get("rules_digest") != expected_rules):
-            continue
-        if candidate.read_bytes() != raw:
-            raise ContractError("WORKSPACE_CONFIG_CHANGED", "Workspace config changed while selecting", candidate)
-        matches.append(candidate.resolve())
-    if len(matches) > 1:
-        raise ContractError("WORKSPACE_CONFIG_AMBIGUOUS", "Multiple configs map to the selected WiFi root")
-    if not matches:
-        raise ContractError("WORKSPACE_CONFIG_UNAVAILABLE", "No exact workspace config maps to the selected WiFi root")
-    return matches[0]
+    """Use the same exact-mapping policy as execution-host diagnostics."""
+    try:
+        return workspace_config.select(knowledge_root, registrations, expected_rules, config_path=config_path)
+    except workspace_config.WorkspaceConfigError as error:
+        raise ContractError(error.code, error.message, error.path) from error
 
 
 def workspace_layout(config, workspace_root):

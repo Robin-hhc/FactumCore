@@ -18,8 +18,8 @@ def test_unavailable_target_cannot_be_created_or_populated_by_diagnostics(tmp_pa
     before = {p.relative_to(target).as_posix(): p.read_bytes()
               for p in target.rglob("*") if p.is_file()} if target.exists() else None
     result = subprocess.run([
-        sys.executable, str(KNOWLEDGE_ROOT / "knowledge.py"), "apply", "--json",
-        "--knowledge-root", str(target), "--input", str(tmp_path / "missing-request.json"),
+        sys.executable, str(KNOWLEDGE_ROOT / "knowledge.py"), "ingest", "scan", "--json",
+        "--knowledge-root", str(target), "--source", "docs-raw/specs/a.md",
         "--output", str(target / ".build/response.json"),
     ], capture_output=True, timeout=30)
     assert result.returncode == 2

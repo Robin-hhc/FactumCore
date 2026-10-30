@@ -1,10 +1,9 @@
-"""SQLite read-only URIs support UNC without weakening generation immutability."""
+"""SQLite read-only URIs support UNC with exact filenames."""
 
 import importlib.util
 from pathlib import Path, PurePosixPath, PureWindowsPath
 import sqlite3
 import sys
-from types import SimpleNamespace
 
 import pytest
 
@@ -54,59 +53,13 @@ def test_sqlite_opens_encoded_filename_readonly_and_never_creates_missing_input(
     database = tmp_path / "中文 100%# index.sqlite"
     with sqlite3.connect(database) as connection:
         connection.execute("CREATE TABLE marker(value TEXT)")
-        connection.execute("INSERT INTO marker VALUES('immutable generation')")
+        connection.execute("INSERT INTO marker VALUES('read-only marker')")
     uri = indexing.sqlite_readonly_uri(database)
     with sqlite3.connect(uri, uri=True) as connection:
-        assert connection.execute("SELECT value FROM marker").fetchone() == ("immutable generation",)
+        assert connection.execute("SELECT value FROM marker").fetchone() == ("read-only marker",)
         with pytest.raises(sqlite3.OperationalError, match="readonly"):
             connection.execute("DELETE FROM marker")
     missing = tmp_path / "missing.sqlite"
     with pytest.raises(sqlite3.OperationalError):
         sqlite3.connect(indexing.sqlite_readonly_uri(missing), uri=True)
     assert not missing.exists()
-
-
-def test_full_verifier_uses_the_shared_readonly_uri(tmp_path, monkeypatch):
-    database = tmp_path / "verify.sqlite"
-    indexing.build_database([], "1" * 64, database)
-    original = indexing.sqlite_readonly_uri
-    observed = []
-
-    def readonly_uri(path):
-        observed.append(path)
-        return original(path)
-
-    monkeypatch.setattr(indexing, "sqlite_readonly_uri", readonly_uri)
-    assert indexing.verify_database([], "1" * 64, database)["complete"] is True
-    assert len(observed) == 1
-
-
-def test_build_and_verify_long_generation_path(tmp_path):
-    database = tmp_path / ("segment" * 16) / ("segment" * 16) / "中文 100%# index.sqlite"
-    assert len(str(database)) > 260
-    assert indexing.build_database([], "1" * 64, database)["complete"] is True
-    with sqlite3.connect(indexing.sqlite_readonly_uri(database), uri=True) as connection:
-        assert connection.execute("SELECT value FROM metadata WHERE key='rules_digest'").fetchone() == ("1" * 64,)
-
-
-def test_query_uses_shared_readonly_uri_for_unc_generation(monkeypatch):
-    from sqlite_path_contracts import query_runtime as node
-
-    database = PureWindowsPath(r"\\?\UNC\server\share\index.sqlite")
-    monkeypatch.setattr(node, "load_generation", lambda *args, **kwargs: ("generation", {}, database, None))
-    monkeypatch.setattr(node, "event_state", lambda ctx: {"validity_epoch": 0})
-    monkeypatch.setattr(node, "EligibilityEvaluator", lambda *args: None)
-
-    class SharedUriReached(Exception):
-        pass
-
-    def readonly_uri(path):
-        assert path == database
-        raise SharedUriReached
-
-    ctx = SimpleNamespace(
-        request={"query": "marker"}, args=SimpleNamespace(action="search"),
-        modules={"indexing": SimpleNamespace(term_groups=lambda query: [], sqlite_readonly_uri=readonly_uri)},
-    )
-    with pytest.raises(SharedUriReached):
-        node.execute(ctx)

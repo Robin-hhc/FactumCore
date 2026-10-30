@@ -29,6 +29,30 @@
               "code",
               "attachment"
             ]
+          },
+          "encoding": {
+            "enum": ["utf-8", "gb18030"]
+          },
+          "processed_hash": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "processed_exists": {
+            "type": "boolean"
+          },
+          "processed_at": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_commit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9a-f]{40,64}$"
           }
         },
         "additionalProperties": true

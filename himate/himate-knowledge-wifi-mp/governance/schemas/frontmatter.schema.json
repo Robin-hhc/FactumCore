@@ -1,10 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "AIoT WiFi Card/Claim v2",
+  "title": "HiMate concise Card references with legacy Card/Claim support",
   "type": "object",
   "properties": {
     "schema_version": {
-      "const": "2.0"
+      "enum": [
+        "2.0",
+        "3.0"
+      ]
     },
     "id": {
       "type": "string",
@@ -132,52 +135,235 @@
       "items": {
         "type": "string"
       }
+    },
+    "doc_ref": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/doc_reference"
+      }
+    },
+    "code_ref": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/code_reference"
+      }
     }
   },
   "required": [
-    "schema_version",
-    "id",
-    "profile",
-    "title",
-    "summary",
-    "lifecycle",
-    "review_mode",
-    "owner",
-    "scope",
-    "aliases",
-    "sources",
-    "claims",
-    "relations"
+    "id"
   ],
   "additionalProperties": false,
   "$defs": {
     "code_ref": {
       "type": "object",
-      "required": ["kind", "name"],
+      "required": [
+        "kind",
+        "name"
+      ],
       "properties": {
-        "kind": {"enum": ["function", "struct", "class", "enum", "enum_member", "macro", "type_alias", "variable"]},
-        "name": {"type": "string", "minLength": 1},
-        "scope": {"type": "array", "items": {"type": "string", "minLength": 1}},
-        "language": {"enum": ["c", "cpp"]},
-        "parameter_types": {"type": "array", "items": {"type": "string", "minLength": 1}},
-        "qualifiers": {"type": "array", "uniqueItems": true, "items": {"enum": ["const", "volatile", "&", "&&"]}},
-        "role": {"enum": ["definition", "declaration"]},
-        "form": {"enum": ["object", "function"]},
-        "parameter_count": {"type": "integer", "minimum": 0},
-        "variadic": {"type": "boolean"}
+        "kind": {
+          "enum": [
+            "function",
+            "struct",
+            "class",
+            "enum",
+            "enum_member",
+            "macro",
+            "type_alias",
+            "variable"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scope": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "language": {
+          "enum": [
+            "c",
+            "cpp"
+          ]
+        },
+        "parameter_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "qualifiers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "const",
+              "volatile",
+              "&",
+              "&&"
+            ]
+          }
+        },
+        "role": {
+          "enum": [
+            "definition",
+            "declaration"
+          ]
+        },
+        "form": {
+          "enum": [
+            "object",
+            "function"
+          ]
+        },
+        "parameter_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "variadic": {
+          "type": "boolean"
+        }
       },
       "additionalProperties": false,
       "allOf": [
-        {"not": {"required": ["qualifiers"], "properties": {"qualifiers": {
-          "allOf": [{"contains": {"const": "&"}}, {"contains": {"const": "&&"}}]
-        }}}},
-        {"if": {"properties": {"kind": {"const": "function"}}},
-         "then": {"not": {"anyOf": [{"required": ["form"]}, {"required": ["parameter_count"]}, {"required": ["variadic"]}]}},
-         "else": {"not": {"anyOf": [{"required": ["parameter_types"]}, {"required": ["qualifiers"]}, {"required": ["role"]}]}}},
-        {"if": {"properties": {"kind": {"const": "macro"}}},
-         "then": {"if": {"properties": {"form": {"const": "object"}}, "required": ["form"]},
-                  "then": {"not": {"anyOf": [{"required": ["parameter_count"]}, {"required": ["variadic"]}]}}},
-         "else": {"not": {"anyOf": [{"required": ["form"]}, {"required": ["parameter_count"]}, {"required": ["variadic"]}]}}}
+        {
+          "not": {
+            "required": [
+              "qualifiers"
+            ],
+            "properties": {
+              "qualifiers": {
+                "allOf": [
+                  {
+                    "contains": {
+                      "const": "&"
+                    }
+                  },
+                  {
+                    "contains": {
+                      "const": "&&"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "function"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "form"
+                  ]
+                },
+                {
+                  "required": [
+                    "parameter_count"
+                  ]
+                },
+                {
+                  "required": [
+                    "variadic"
+                  ]
+                }
+              ]
+            }
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "parameter_types"
+                  ]
+                },
+                {
+                  "required": [
+                    "qualifiers"
+                  ]
+                },
+                {
+                  "required": [
+                    "role"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "macro"
+              }
+            }
+          },
+          "then": {
+            "if": {
+              "properties": {
+                "form": {
+                  "const": "object"
+                }
+              },
+              "required": [
+                "form"
+              ]
+            },
+            "then": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "parameter_count"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "variadic"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "form"
+                  ]
+                },
+                {
+                  "required": [
+                    "parameter_count"
+                  ]
+                },
+                {
+                  "required": [
+                    "variadic"
+                  ]
+                }
+              ]
+            }
+          }
+        }
       ]
     },
     "context": {
@@ -401,6 +587,126 @@
         "context_ids"
       ],
       "additionalProperties": false
+    },
+    "doc_reference": {
+      "type": "object",
+      "required": [
+        "doc_id"
+      ],
+      "properties": {
+        "doc_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "line_start": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "line_end": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "page_start": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "page_end": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "section": {
+          "type": "string",
+          "minLength": 1
+        },
+        "snapshot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "line_start",
+            "line_end"
+          ]
+        },
+        {
+          "required": [
+            "page_start",
+            "page_end"
+          ]
+        },
+        {
+          "required": [
+            "section"
+          ]
+        }
+      ],
+      "additionalProperties": false
+    },
+    "code_reference": {
+      "type": "object",
+      "required": [
+        "code_id",
+        "line_start",
+        "line_end"
+      ],
+      "properties": {
+        "code_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "line_start": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "line_end": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "symbol": {
+          "type": "string",
+          "minLength": 1
+        },
+        "snapshot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
     }
-  }
+  },
+  "anyOf": [
+    {
+      "required": [
+        "doc_ref",
+        "code_ref"
+      ]
+    },
+    {
+      "required": [
+        "schema_version",
+        "id",
+        "profile",
+        "title",
+        "summary",
+        "lifecycle",
+        "review_mode",
+        "owner",
+        "scope",
+        "aliases",
+        "sources",
+        "claims",
+        "relations"
+      ]
+    }
+  ]
 }

@@ -89,9 +89,11 @@ def trusted_contracts(root, expected):
     sys.meta_path.insert(0, finder)
     try:
         importlib.import_module(name)
-        modules = {part: importlib.import_module(name + '.' + part) for part in ('validation', 'knowledge', 'source_resources', 'records', 'indexing', 'checks')}
-        if 'governance/contracts/code_symbols.py' in verified:
-            modules['code_symbols'] = importlib.import_module(name + '.code_symbols')
+        parts = sorted(ref[len('governance/contracts/'):-3] for ref in verified
+                       if ref.startswith('governance/contracts/') and ref.endswith('.py')
+                       and '/' not in ref[len('governance/contracts/'):]
+                       and not ref.endswith('/__init__.py'))
+        modules = {part: importlib.import_module(name + '.' + part) for part in parts}
         rules = modules['validation'].load_rules(root, expected)
     finally:
         sys.meta_path.remove(finder)
@@ -117,19 +119,15 @@ def main():
             raise ValueError('CI report must be outside input trees')
         modules, rules = trusted_contracts(trusted, args.rules_digest)
         request = strict_json(absolute(args.input).read_bytes()) if args.input else {}
-        inputs = request.get('inputs', {})
-        view = modules['checks'].prepare_view(candidate, mode='ci', identity={'commit': args.commit, 'candidate_root': str(candidate), 'trusted_root': str(trusted)})
-        before = {ref: hashlib.sha256(raw).hexdigest() for ref, raw in view['files'].items()}
-        report = modules['checks'].run(view, rules, inputs=inputs, scope='full')
-        modules['checks'].validate_report(report, expected_rules=args.rules_digest, required_scope='full')
-        after_view = modules['checks'].prepare_view(candidate, mode='ci')
-        if before != {ref: hashlib.sha256(raw).hexdigest() for ref, raw in after_view['files'].items()}:
-            raise ValueError('Candidate inputs changed during fixed checking')
+        data, phase = modules['ingest'].check(candidate, {**request, 'formal': True}, rules)
+        report = {'report_version': '2.0', 'status': phase, 'phase': phase,
+                  'exit_code': 1 if phase == 'failed' else 0, 'complete': True,
+                  'rules_digest': args.rules_digest, 'commit': args.commit, **data}
         output.parent.mkdir(parents=True, exist_ok=True)
         with output.open('xb') as stream:
             stream.write(canonical(report))
         print(json.dumps(report, ensure_ascii=True))
-        return modules['checks'].exit_code(report)
+        return report['exit_code']
     except Exception as exc:
         print(json.dumps({'report_version': '1.0', 'status': 'incomplete', 'phase': 'incomplete', 'exit_code': 2, 'complete': False, 'checks': [], 'findings': [{'code': 'CI_INPUT_UNAVAILABLE', 'severity': 'error', 'reason': str(exc)}]}, ensure_ascii=True))
         return 2

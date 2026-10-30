@@ -1,27 +1,18 @@
 ---
 name: hs-knowledge-patrol-plan
-description: 固定本轮 raw、登记代码及知识库的实际变化，生成材料待办和对应处理分支。
+description: 发现一个待处理raw或已登记代码文件，并判断是否仅需重建索引；用于L2。
 ---
 
-# L2 生成巡检待办
+# 选择巡检待办
 
-复用已知知识根和执行端；缺位置时读当前工作区 `AGENTS.md`、`config.yml`，必要时询问用户。首次读知识根 `AGENTS.md`；以下在该目录执行，POSIX 用 `sh ./knowledge.sh`。
+在实际知识根执行命令，Linux 使用 `sh ./knowledge.sh`，Windows 使用 `.\knowledge.cmd`；已注册入口可直接用 `knowledge`。位置由 Workflow 首节点确认，独立使用时从当前工作区 `AGENTS.md`、`config.yml` 获取。
 
-用新 `operation_id` 启动 CLI，重新加载同步后的实际实现、配置和规则：
+## 执行
 
-```powershell
-.\knowledge.cmd patrol plan --input REQUEST.json --json
-```
+运行 `knowledge patrol plan --json`，让脚本比较来源内容 hash 和各文件的成功处理版本。
 
-读取本次 `plan_ref/plan_digest`、`scan_ref`、`source_request`、统计及报告。脚本比较 raw、直接登记代码与成功基线；保留实际用途、材料缺口和历史降级说明，不另行猜测影响范围。
+- `needs_ingest`：交接 `data.next_file` 的真实 `source_id/kind/path`，进入 P1，用该来源 ID 准备本轮材料。
+- `needs_reindex`：无内容待办且索引需刷新，进入 L3。
+- `unchanged`：进入 L4 报告剩余事项。
 
-| 实际 phase | 交接 |
-|---|---|
-| `needs_ingest` | 完整 `source_request` 交 P1 的 `source prepare`，再走 P2—P6 |
-| `needs_index` | 原 `plan_ref` 交 L3 巡检索引修复 |
-| `unchanged` | 原 `plan_ref` 交 L4 完成核验，尚未推进成功基线 |
-| `blocked` | 结束本轮并报告原因及确切续办请求；续办交明确修复任务 |
-
-`source_request` 保留新增／未完成 raw、待修卡来源和代码目标的并集，包括明确空 `unit_ids`。不改跑 `source run`、丢弃选择字段或伪造 raw 单元。输入漂移保留原固定计划；已发布内容不能另起操作重复发布。
-
-已变且可读代码中的部分解析问题可作为待审事项交 ingest；引用仍保留 `unavailable` 和实际原因，不代表已修复。其它基础故障按实际 `blocked` 处理。
+本步不创建 `.build`，不让 Agent 阅读全库处置表。代码只追踪已登记文件；不扩大到未登记的间接依赖。失败说明具体缺口。

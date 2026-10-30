@@ -178,7 +178,8 @@ def _publication_intent(ctx, view):
               "ingest_record_ref": record_ref,
               "ingest_record_digest": ctx.record(record_ref, "ingest_record")["digest"] if record_ref else None,
               "cases": view.get("target_queries"), "channel": request.get("channel", "local"),
-              "index_inputs": {key: copy.deepcopy(request[key]) for key in keys if key in request}}
+              "index_inputs": {key: copy.deepcopy(request[key]) for key in keys if key in request},
+              "source_execution_files": input_snapshot.source_execution_files(view.get("input_snapshot"))}
     ref = ctx.base + "/batch-intent.json"
     previous = _saved(ctx, ref, "artifact_manifest")
     if previous is not None:
@@ -196,6 +197,28 @@ def _publication_intent(ctx, view):
         previous = _stage(ctx, ref, {**fields, "expected_active": baseline,
                                     "baseline_was_explicit": "expected_active" in request})
     return {**fields["index_inputs"], "channel": fields["channel"], "expected_active": baseline}
+
+
+def _source_execution(ctx, manifest, generation=None):
+    scope = manifest.get("dbox_execution_scope", [])
+    observations = []
+    intent = _saved(ctx, ctx.base + "/batch-intent.json", "artifact_manifest")
+    if intent is not None:
+        if (intent.get("purpose") != "batch_execution_intent"
+                or intent.get("view_digest") != manifest["reviewed_view_digest"]
+                or intent.get("view_ref") != manifest.get("trace", {}).get("view_ref")
+                or intent.get("operation_id") != manifest["operation_id"]):
+            raise NodeError("EXECUTION_INPUTS_UNAVAILABLE", "Original batch intent does not match the publication")
+        observations.append(intent.get("source_execution_files", {} if not scope else None))
+    if generation is not None:
+        observations.append(input_snapshot.source_execution_files(generation.get("input_snapshot")))
+    if not observations and not scope:
+        return {}
+    if (not observations or any(not isinstance(value, dict) for value in observations)
+            or any(input_snapshot.execution_scope(value) != scope for value in observations)
+            or any(value != observations[0] for value in observations[1:])):
+        raise NodeError("EXECUTION_INPUTS_UNAVAILABLE", "Original external input bindings are missing or different")
+    return observations[0]
 
 
 def _publish_batch(ctx, transact, view=None):
@@ -278,6 +301,10 @@ def _publish_batch(ctx, transact, view=None):
     built_ref = ctx.base + "/batch-build.json"
     built = _saved(ctx, built_ref, "artifact_manifest")
     if built is None:
+        local_files = _source_execution(ctx, manifest)
+        if local_files:
+            inputs["input_snapshot"] = input_snapshot.execution_inputs(
+                ctx, inputs["input_snapshot"], local_files, manifest["dbox_execution_scope"])
         request = {**inputs, "operation_id": ctx.operation, "publication_ref": ref}
         index_ctx = fork_context(ctx, request, action="build")
         indexed, _ = index_runtime.execute(index_ctx)
@@ -289,6 +316,10 @@ def _publish_batch(ctx, transact, view=None):
         if built.get("publication_digest") != manifest["digest"]:
             raise NodeError("BATCH_BUILD_CHANGED", "Saved generation belongs to another publication")
         observed = index_runtime.verify_generation(ctx, built["generation_ref"])
+        local_files = _source_execution(ctx, manifest, observed.manifest)
+        if local_files:
+            input_snapshot.execution_inputs(ctx, observed.manifest["input_snapshot"],
+                local_files, manifest["dbox_execution_scope"])
     generation_ref, expected_active = built["generation_ref"], built["expected_active"]
     if "expected_active" in inputs and inputs["expected_active"] != expected_active:
         raise NodeError("ACTIVE_CHANGED", "Generation replaces the original publication baseline", blocked=True)
@@ -335,6 +366,8 @@ def execute_batch(ctx, *, transact):
     view = checked_view(ctx, request)
     if view.get("publication_plan"):
         return _publish_batch(ctx, transact, view)
+    if input_snapshot.source_execution_files(view.get("input_snapshot")):
+        raise NodeError("EXTERNAL_LEGACY_APPLY_UNSUPPORTED", "External current inputs require the publication batch path")
     if view.get("v3_required") and not request.get("ingest_record_ref"):
         raise NodeError("INGEST_RECORD_REQUIRED", "The content and its processing record must be applied together")
     content = view.get("batch_kind", "content") != "record_only"

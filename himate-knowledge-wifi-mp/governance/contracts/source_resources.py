@@ -3,6 +3,212 @@
 from .validation import ContractError, canonical_bytes, load_yaml, safe_path, sha256_bytes, workspace_config_path
 
 
+DBOX_PREFIX = "docs-raw/sources/dbox"
+DBOX_CONFIG = "docs-raw/sources/dbox.local.yml"
+
+
+def is_dbox_path(reference):
+    return isinstance(reference, str) and (reference == DBOX_PREFIX or reference.startswith(DBOX_PREFIX + "/"))
+
+
+def validate_dbox_binding(binding):
+    import re
+
+    if (not isinstance(binding, dict) or set(binding) != {"config_sha256", "root_token"}
+            or any(not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value)
+                   for value in binding.values())):
+        raise ContractError("DBOX_BINDING_REQUIRED", "An observed dbox source needs its exact directory binding", DBOX_PREFIX)
+    return binding
+
+
+def _dbox_location(knowledge_root, value):
+    from pathlib import Path
+    import os
+    from .validation import _workspace_no_links
+
+    if not isinstance(value, str) or not value or "\x00" in value or not Path(value).is_absolute():
+        raise ContractError("DBOX_CONFIG_INVALID", "dbox path must be an explicit native absolute directory", DBOX_CONFIG)
+    root = Path(value)
+    try:
+        _workspace_no_links(root)
+        root = root.resolve(strict=True)
+        knowledge = Path(knowledge_root).resolve(strict=True)
+        if root == knowledge or knowledge.is_relative_to(root) or root.is_relative_to(knowledge):
+            raise ContractError("DBOX_PATH_UNSAFE", "dbox directory must not overlap the knowledge root", DBOX_PREFIX)
+        if not root.is_dir():
+            raise OSError("not a directory")
+        before = root.stat()
+        if not before.st_ino:
+            raise OSError("directory identity unavailable")
+        with os.scandir(root) as entries:
+            next(entries, None)  # Root readability only, never recursive setup.
+        after = root.stat()
+        if (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
+            raise ContractError("DBOX_BINDING_CHANGED", "dbox directory changed while observing its root", DBOX_PREFIX)
+        token = sha256_bytes(canonical_bytes({"path": str(root), "device": after.st_dev, "inode": after.st_ino}))
+        return root, token
+    except ContractError as exc:
+        if exc.code.startswith("DBOX_"):
+            raise
+        raise ContractError("DBOX_PATH_UNSAFE", "dbox root cannot contain a linked path", DBOX_PREFIX) from exc
+    except (OSError, ValueError) as exc:
+        raise ContractError("DBOX_ROOT_UNAVAILABLE", "The configured dbox directory is unavailable or unreadable", DBOX_PREFIX) from exc
+
+
+def dbox_root(knowledge_root, expected_binding=None):
+    import yaml
+    try:
+        config = safe_path(knowledge_root, DBOX_CONFIG)
+        from .validation import _workspace_no_links
+        _workspace_no_links(config)
+        raw = config.read_bytes()
+    except FileNotFoundError as exc:
+        raise ContractError("DBOX_CONFIG_REQUIRED", "Configure dbox on the actual execution host first", DBOX_CONFIG) from exc
+    except (OSError, ContractError) as exc:
+        raise ContractError("DBOX_CONFIG_INVALID", "The fixed local dbox configuration cannot be read safely", DBOX_CONFIG) from exc
+    try:
+        value = load_yaml(raw)
+        if set(value) != {"schema_version", "path"} or value.get("schema_version") != "1.0":
+            raise ValueError("configuration shape")
+    except (ValueError, TypeError, yaml.YAMLError) as exc:
+        raise ContractError("DBOX_CONFIG_INVALID", "Expected only schema_version '1.0' and path", DBOX_CONFIG) from exc
+    if value.get("path") == "":
+        raise ContractError("DBOX_CONFIG_REQUIRED", "Fill the actual execution host's dbox directory", DBOX_CONFIG)
+    root, token = _dbox_location(knowledge_root, value.get("path"))
+    binding = {"config_sha256": sha256_bytes(raw), "root_token": token}
+    try:
+        _workspace_no_links(config)
+        unchanged = config.read_bytes() == raw
+    except (OSError, ContractError):
+        unchanged = False
+    if not unchanged:
+        raise ContractError("DBOX_BINDING_CHANGED", "dbox configuration changed while reading", DBOX_CONFIG)
+    if expected_binding is not None and validate_dbox_binding(expected_binding) != binding:
+        raise ContractError("DBOX_BINDING_CHANGED", "dbox configuration or directory differs from the adopted input", DBOX_PREFIX)
+    return {"root": root, "binding": binding}
+
+
+def dbox_path(knowledge_root, logical, expected_binding=None):
+    """Resolve only the fixed virtual source prefix; ordinary safe paths stay strict."""
+    from .validation import _workspace_no_links
+    from .runtime import safe
+
+    if not is_dbox_path(logical):
+        raise ContractError("DBOX_PATH_UNSAFE", "Expected a dbox logical path", DBOX_PREFIX)
+    from pathlib import PurePosixPath
+    if (logical != PurePosixPath(logical).as_posix() or "\\" in logical or ":" in logical
+            or any(part in {".", "..", ""} for part in logical.split("/"))):
+        raise ContractError("DBOX_PATH_UNSAFE", "dbox logical path cannot contain aliases or traversal", DBOX_PREFIX)
+    observed = dbox_root(knowledge_root, expected_binding)
+    relative = logical[len(DBOX_PREFIX):].lstrip("/")
+    try:
+        path = safe(observed["root"], relative) if relative else observed["root"]
+        _workspace_no_links(path)
+    except (ContractError, OSError, ValueError) as exc:
+        raise ContractError("DBOX_PATH_UNSAFE", "dbox file must stay inside its declared root without links or aliases", logical) from exc
+    return {**observed, "actual_path": path, "path": logical}
+
+
+def read_dbox(knowledge_root, logical, expected_binding=None):
+    from .runtime import native_path
+    from pathlib import Path
+
+    observed = dbox_path(knowledge_root, logical, expected_binding)
+    path = observed["actual_path"]
+    try:
+        if not path.is_file():
+            raise FileNotFoundError()
+        before = path.stat()
+        data = Path(native_path(path)).read_bytes()
+        after = path.stat()
+        def signature(value):
+            return value.st_dev, value.st_ino, value.st_size, value.st_mtime_ns
+        if signature(before) != signature(after) or Path(native_path(path)).read_bytes() != data:
+            raise ContractError("SOURCE_CHANGED", "dbox original changed while reading", logical)
+        dbox_root(knowledge_root, observed["binding"])
+    except FileNotFoundError as exc:
+        raise ContractError("SOURCE_MISSING", "The selected dbox original is missing", logical) from exc
+    except OSError as exc:
+        raise ContractError("SOURCE_INPUT_UNAVAILABLE", "The selected dbox original cannot be read", logical) from exc
+    return {"data": data, "sha256": sha256_bytes(data), "bytes": len(data), "path": logical,
+            "actual_path": path, "dbox_binding": observed["binding"], "signature": signature(after)}
+
+
+def _dbox_git_protection(root):
+    import os
+    import subprocess
+    from pathlib import Path
+
+    if not any(os.path.lexists(parent / ".git") for parent in (Path(root), *Path(root).parents)):
+        return {"status": "not_git"}
+    prefix = ["git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + os.devnull,
+              "-c", "core.pager=cat", "-C", str(root)]
+    environment = {key: value for key, value in os.environ.items() if not key.upper().startswith("GIT_")}
+    environment.update({"GIT_TERMINAL_PROMPT": "0", "GIT_OPTIONAL_LOCKS": "0", "GCM_INTERACTIVE": "Never"})
+    options = {"capture_output": True, "check": False, "stdin": subprocess.DEVNULL,
+               "env": environment, "timeout": 10}
+    try:
+        tracked = subprocess.run(prefix + ["ls-files", "--error-unmatch", "--", DBOX_CONFIG], **options)
+        if tracked.returncode == 0:
+            return {"status": "tracked"}
+        if tracked.returncode != 1:
+            return {"status": "unavailable"}
+        ignored = subprocess.run(prefix + ["check-ignore", "--quiet", "--", DBOX_CONFIG], **options)
+        return {"status": "ignored" if ignored.returncode == 0 else "not_ignored" if ignored.returncode == 1 else "unavailable"}
+    except (OSError, subprocess.TimeoutExpired):
+        return {"status": "unavailable"}
+
+
+def configure_dbox(context):
+    import os
+    import tempfile
+    import yaml
+    from pathlib import Path
+    from .runtime import NodeError, safe
+
+    config = safe(context.root, DBOX_CONFIG)
+    before = config.read_bytes() if config.exists() else None
+    protection = _dbox_git_protection(context.root)
+    if protection["status"] not in {"ignored", "not_git"}:
+        raise NodeError("DBOX_CONFIG_UNPROTECTED", "Protect the fixed local configuration before saving it", DBOX_CONFIG,
+                        blocked=True, data={"git_protection": protection})
+    if "path" not in context.request:
+        observed = dbox_root(context.root)
+        return {"configured": True, "git_protection": protection, "dbox_binding": observed["binding"]}, "configured"
+    root, _ = _dbox_location(context.root, context.request["path"])
+    try:
+        previous = dbox_root(context.root)
+    except ContractError:
+        previous = None
+    if previous is not None and previous["root"] == root:
+        return {"configured": True, "git_protection": protection, "dbox_binding": previous["binding"]}, "configured"
+    raw = yaml.safe_dump({"schema_version": "1.0", "path": str(root)}, sort_keys=False, allow_unicode=True).encode("utf-8")
+    with context.modules["maintenance"].writer_lock(context):
+        config.parent.mkdir(parents=True, exist_ok=True)
+        config = safe(context.root, DBOX_CONFIG)
+        if (config.read_bytes() if config.exists() else None) != before:
+            raise NodeError("DBOX_BINDING_CHANGED", "Local configuration changed before replacement", DBOX_CONFIG, blocked=True)
+        if _dbox_git_protection(context.root) != protection:
+            raise NodeError("DBOX_CONFIG_UNPROTECTED", "Git protection changed before replacement", DBOX_CONFIG, blocked=True)
+        _dbox_location(context.root, str(root))
+        descriptor, temporary = tempfile.mkstemp(prefix=".dbox-config-", dir=config.parent)
+        try:
+            with os.fdopen(descriptor, "wb") as stream:
+                stream.write(raw)
+                stream.flush()
+                os.fsync(stream.fileno())
+            if (config.read_bytes() if config.exists() else None) != before:
+                raise NodeError("DBOX_BINDING_CHANGED", "Local configuration changed during replacement", DBOX_CONFIG, blocked=True)
+            os.replace(temporary, safe(context.root, DBOX_CONFIG))
+            if config.read_bytes() != raw:
+                raise NodeError("DBOX_CONFIG_WRITE_FAILED", "Saved local configuration differs from its input", DBOX_CONFIG, blocked=True)
+        finally:
+            if Path(temporary).exists():
+                Path(temporary).unlink()
+    observed = dbox_root(context.root)
+    return {"configured": True, "git_protection": protection, "dbox_binding": observed["binding"]}, "configured"
+
+
 def extract_document(data, suffix, *, primary=True):
     """The fixed document adapter shared by acquisition and read-only checks."""
     import io
@@ -258,6 +464,14 @@ def _current_registered_source(knowledge_root, snapshot):
         return None
     resource = resources[0]
     if resource.get("kind") in {"raw", "attachment"}:
+        if is_dbox_path(resource.get("path")):
+            try:
+                observed = read_dbox(knowledge_root, resource["path"])
+            except (OSError, ContractError):
+                return None
+            if observed["sha256"] == snapshot.get("sha256") and observed["bytes"] == snapshot.get("bytes"):
+                return observed["data"], str(observed["actual_path"])
+            return None
         allowed = ["docs-raw/" + name for name in ("conventions", "chips", "storys", "specs", "protocols", "troubleshooting")]
         path = safe_path(knowledge_root, resource["path"], allowed)
         reference = resource["path"]
@@ -292,6 +506,8 @@ def _registered_raw_history(knowledge_root, resource, snapshot):
     """Search only this registered raw path in bounded, already local history."""
     from pathlib import Path
 
+    if is_dbox_path(resource.get("path")):
+        return None
     root = Path(knowledge_root).resolve()
     try:
         workspace = workspace_config_path(root).parent
@@ -401,6 +617,8 @@ def _git_read(repository, *args):
 
 def git_recovery_for_current(knowledge_root, source_path, expected_bytes):
     """Discover a portable raw version only when configured HEAD has exact bytes."""
+    if is_dbox_path(source_path):
+        return None
     from pathlib import Path
 
     root = Path(knowledge_root).resolve()

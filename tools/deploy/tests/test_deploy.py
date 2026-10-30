@@ -131,6 +131,10 @@ def make_source(root: Path, skill_count: int = 8) -> Path:
     put(knowledge, "governance/sources.lock.yaml", "sources: [private-source]\n")
     put(knowledge, "governance/local-runtime.json", b"synthetic business data: local governance state")
     put(knowledge, "docs-raw/AGENTS.md", "# Raw input rules\n")
+    put(knowledge, "docs-raw/sources/dbox.example.yml", "schema_version: '1.0'\npath: ''\n")
+    put(knowledge, "docs-raw/sources/.gitignore", "/dbox.local.yml\n")
+    put(knowledge, "docs-raw/sources/dbox.local.yml", "path: /PRIVATE_DBOX_DO_NOT_SHIP\n")
+    put(knowledge, "docs-raw/sources/unregistered-source.txt", "PRIVATE_DBOX_DO_NOT_SHIP\n")
     put(knowledge, "knowledge/AGENTS.md", "# Card rules\n")
     for name in (
         "docs-raw/specs/private.md",
@@ -222,6 +226,94 @@ def test_plan_is_read_only_and_reports_selected_targets(source, targets):
     assert tree(source) == before
     serialized = json.dumps(report).replace("\\\\", "\\")
     assert all(str(value) in serialized for value in targets.values())
+
+
+def test_dbox_template_is_distributed_without_local_mapping_or_source_tree(source, targets):
+    code, report = cli(source, targets)
+    assert (code, report["status"]) == (0, "deployed")
+    knowledge = targets["project_root"] / DOMAIN
+    assert (knowledge / "docs-raw/sources/dbox.example.yml").read_bytes() == (
+        source / DOMAIN / "docs-raw/sources/dbox.example.yml"
+    ).read_bytes()
+    assert (knowledge / "docs-raw/sources/.gitignore").read_bytes() == b"/dbox.local.yml\n"
+    assert not (knowledge / "docs-raw/sources/dbox.local.yml").exists()
+    assert not (knowledge / "docs-raw/sources/unregistered-source.txt").exists()
+    assert all(b"PRIVATE_DBOX_DO_NOT_SHIP" not in value for value in tree(knowledge).values())
+    assert report["source_setup"] == {
+        "status": "pending_execution_host", "source": "dbox", "action": "configure",
+        "config_ref": "docs-raw/sources/dbox.local.yml", "configuration_checked": False,
+    }
+    assert report["remote_checked"] is False
+
+
+@pytest.mark.parametrize("template", [
+    "schema_version: '1.0'\npath: /PRIVATE_PATH\n",
+    "schema_version: 1.0\npath: ''\n",
+    "schema_version: '1.0'\npath: ''\npath: /PRIVATE_PATH\n",
+])
+def test_dbox_template_with_private_or_ambiguous_mapping_cannot_be_distributed(source, targets, template):
+    put(source / DOMAIN, "docs-raw/sources/dbox.example.yml", template)
+    code, report = cli(source, targets)
+    assert (code, report["status"]) == (3, "failed")
+    assert_no_targets(targets)
+
+
+def test_dbox_nested_knowledge_preserves_private_config_and_appends_ignore_once(source, targets):
+    project = targets["project_root"]
+    relative = "nested/domain"
+    original_config = b"knowledge_roots: {wifi: nested/domain}\nmodules: []\n"
+    put(project, "config.yml", original_config)
+    knowledge = project / relative
+    private = b"# Personal server path\r\nschema_version: '1.0'\r\npath: /server/private/dbox\r\n"
+    put(knowledge, "docs-raw/sources/dbox.local.yml", private)
+    custom_ignore = b"# Existing team rules\r\n*.cache\r\n!/dbox.local.yml"
+    ignore = put(knowledge, "docs-raw/sources/.gitignore", custom_ignore)
+    for _ in range(2):
+        code, report = cli(source, targets)
+        assert (code, report["status"]) == (0, "deployed")
+        assert (knowledge / "docs-raw/sources/dbox.local.yml").read_bytes() == private
+        assert ignore.read_bytes() == custom_ignore + b"\r\n/dbox.local.yml\r\n"
+        assert (project / "config.yml").read_bytes() == original_config
+        assert report["source_setup"]["configuration_checked"] is False
+    assert (knowledge / "docs-raw/sources/dbox.example.yml").is_file()
+
+
+def test_dbox_plan_proposes_ignore_update_without_writing_local_state(source, targets):
+    knowledge = targets["project_root"] / DOMAIN
+    ignore = put(knowledge, "docs-raw/sources/.gitignore", b"# Existing\n*.tmp\n")
+    private = put(knowledge, "docs-raw/sources/dbox.local.yml", b"path: /private/root\n")
+    before = all_target_bytes(targets)
+    code, report = cli(source, targets, "--plan")
+    assert (code, report["status"]) == (0, "planned")
+    assert all_target_bytes(targets) == before
+    assert any(row["path"] == str(ignore) and row["action"] == "write" for row in report["files"])
+    assert all(row["path"] != str(private) for row in report["files"])
+    assert report["source_setup"]["status"] == "pending_execution_host"
+
+
+def test_dbox_concurrent_ignore_edit_is_preserved_before_deployment(
+    backend, monkeypatch, capsys, source, targets
+):
+    knowledge = targets["project_root"] / DOMAIN
+    ignore = put(knowledge, "docs-raw/sources/.gitignore", b"# Original\n")
+    concurrent = b"# Concurrent team edit\n*.temporary\n"
+    original_archive = backend._archive
+    changed = False
+
+    def edit_while_packaging(payload):
+        nonlocal changed
+        result = original_archive(payload)
+        if not changed:
+            changed = True
+            ignore.write_bytes(concurrent)
+        return result
+
+    monkeypatch.setattr(backend, "_archive", edit_while_packaging)
+    code, report = invoke(backend, capsys, source, targets)
+    assert (code, report["status"]) == (3, "failed")
+    assert ignore.read_bytes() == concurrent
+    assert not (knowledge / "docs-raw/sources/dbox.example.yml").exists()
+    assert all("dbox.local.yml" not in row.get("path", "") for row in report.get("files", []))
 
 
 @pytest.mark.parametrize("skill_count", [3, 8])

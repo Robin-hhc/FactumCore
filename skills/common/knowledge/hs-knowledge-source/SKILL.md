@@ -1,6 +1,6 @@
 ---
 name: hs-knowledge-source
-description: Observe current source changes, prepare exact current and historical material, stage portable source dispositions, and inspect explicitly selected execution facts.
+description: Configure a local dbox source directory, observe source changes, prepare exact current and historical material, stage portable dispositions, and inspect explicitly selected execution facts.
 ---
 
 已有项目上下文时直接复用；缺少入口信息才使用已安装的 `hs-knowledge-explore` 做只读发现。首次部署或本机依赖缺项时，按知识根使用说明运行分发仓根 `deploy.ps1`，不自动执行 pip 或远端 setup；远端任务另核实际执行端的 Python、依赖和能力路径。
@@ -9,13 +9,15 @@ description: Observe current source changes, prepare exact current and historica
 
 本 Skill 可由人工单独调用。只校验本次业务输入、实际文件及输出，不检查 Workflow 顺序或上游通过凭证。流程顺序、角色分工与交棒合法性由 OpenFlow 的 Workflow 管理；人工测试时由人选择顺序。
 
-Use `scripts/cli.py --input REQUEST.json --output RESPONSE.json --knowledge-root K` after the Agent has read the project entry. Default / `run` observes current inputs and then prepares actual material in the same process. Independent actions are `scan|prepare|capture|resolve|resolve-source|record|status`. This Skill does not locate, bind or initialize the project.
+Use `scripts/cli.py --input REQUEST.json --output RESPONSE.json --knowledge-root K` after the Agent has read the project entry. Default / `run` observes current inputs and then prepares actual material in the same process. Independent actions are `configure|scan|prepare|capture|resolve|resolve-source|record|status`. Project discovery and environment installation stay outside this Skill; explicit configure only manages the fixed local source address.
+
+首次在真正执行端调用 `configure`，填写一个可读的dbox绝对目录；固定 `K/docs-raw/sources/dbox.local.yml` 仅含字符串schema_version 1.0与path。无path只核已有配置，同地址保留原字节，显式新地址才创建或修改；目录、忽略保护或原配置基线有误时保留旧文件。模板和精确ignore分发，local不入Git、正式来源、owned或cleanup。Windows部署不证明服务器来源就绪。configure只核根，日常run不隐式配置或重跑setup；请求细节见[request](references/request.md)。
 
 正常 ingest 的 coder 节点为 `prepare_sources`，将 P1 观察和 P2 备料连续执行，扫描清单与材料仍分别保存。只有观察完整、无 raw 待办、维护事项／缺口且无明确修订目标时返回 `unchanged`，不生成材料或处理记录；有待办返回 `prepared` 和实际 `scan_ref/material_ref`。空 `actionable_unit_ids` 不能单独证明无需处理。
 
 新 Workflow 使用新 `operation_id`。`run` 只采用本操作 `.build/operations/<op>/source-inventory.json`：首次生成，失败后明确重试时校验摘要、规则、格式及单元身份，再复用该确切清单，不重新扫描。请求的 `source` 须与原范围一致；显式 `scan_ref` 也只能是该自产位置，采用外部或原扫描请用独立 `prepare`。旧 no-op 清单不能重新宣称当前无事，须以新操作观察。失败返回原诊断及 `data.stopped_stage: scan|prepare`，已有清单时附真实 `scan_ref`，不补记成功或搜索其他操作。
 
-`scan` defaults to the six supported raw directories; optional `source` narrows that scope. It only observes and returns `scanned`; normal `run` instead returns `prepared` or `unchanged`. An explicit absent path without registered deletion history returns `RAW_SCOPE_NOT_FOUND`; an empty default library remains valid. It compares current inputs with formal processing records, preserving formal unresolved debt and rule/context restrictions. It does not enumerate old draft operations, journals, generations or index/query reports. The compatible `finalization_pending` and `historical_finalization_unknown` arrays stay empty; `execution_history.status` is `not_inspected`. An unchanged source still permits an explicitly requested card revision. Fingerprints do not recover an unrecorded previous author's intent or prove card semantics.
+`scan` defaults to the six supported in-repository raw directories plus logical `docs-raw/sources/dbox`; optional `source` narrows that scope. Ordinary raw selections do not require an unrelated dbox mapping. Missing configuration, inaccessible dbox roots or incomplete traversal cannot mean unchanged or wholesale deletion. Source and patrol share the public inventory implementation; no scan of template/local files or native links occurs. It only observes and returns `scanned`; normal `run` instead returns `prepared` or `unchanged`. An explicit absent file without registered deletion history returns `RAW_SCOPE_NOT_FOUND`; a configured readable empty library remains valid. It compares current inputs with formal processing records and maintenance restrictions, not old draft operations or derived index/query reports. Compatibility finalization arrays stay empty and execution history is not inspected. Unchanged input still permits an explicit card revision; fingerprints do not prove semantics.
 
 显式 `prepare` 保留独立备料：可按真实 `scan_ref/unit_ids`，或明确来源目标、候选卡、主题和代码材料执行，不先强制扫描。P1 观察变化，P2 获取所选新旧原文、附件、旧卡、代码／配置、定位、差异和缺口，不代作者决定新增、更新、skip 或暂缓。`capture` 独立捕获已落地 raw／配置内代码；`resolve` 校验确切 bundle；`resolve-source` 恢复指定正式快照及原定位。缺旧版保留缺口，不用当前新版替换。
 

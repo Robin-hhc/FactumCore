@@ -1,0 +1,5 @@
+# Copy this template to dbox.local.yml on the machine that executes ingest,
+# or use the installed hs-knowledge-source configure action.
+# Supply that machine's existing absolute directory; this template is not a mapping.
+schema_version: '1.0'
+path: ''

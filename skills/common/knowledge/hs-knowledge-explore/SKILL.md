@@ -20,6 +20,7 @@ description: HiMate 知识库任务入口。用于原件入库与更新、续办
 | 独立索引、目标查询回归、事务恢复或提交清单核对 | `hs-knowledge-apply` 的 index-build／index-verify／index-activate、regression／regression-verify、inspect／resume／rollback、prepare-submission／verify-submission；只做所选用途，不要求生产者私人日志或上游通过票据。提交清单核对只读真实 Git，不提交或推送。 |
 | 首次准备代码图谱 | 由 Agent 按本 Skill 的“首次初始化 CodeGraph”逐仓执行；CodeGraph MCP 由 harness 提供，图谱查询时核对实际可调用能力。 |
 | 首次部署或本机运行依赖缺失 | 按 [部署与执行](references/setup.md) 使用分发仓根的 `deploy.ps1`；本 Skill 不自动安装依赖或部署远端。 |
+| 首次配置或修改dbox资料目录 | 实际执行端调用已安装source的configure，填写一个绝对目录；无path只核已有配置。固定K下dbox.local.yml仅留本机，模板和ignore上库；配置只核根，不扫描资料，Windows部署不等于远端来源就绪。细节见[部署与执行](references/setup.md#dbox-首次来源配置)。 |
 | 找不到项目入口 | 本 Skill 的只读发现 CLI；已有有效项目上下文时直接使用业务能力。 |
 
 ## 取得必要上下文并路由
@@ -30,13 +31,15 @@ description: HiMate 知识库任务入口。用于原件入库与更新、续办
 
 按路由读取目标 Skill 或 Workflow 的实际说明并继续执行。人工可以逐个调用节点 Skill；OpenFlow 负责 Workflow 顺序、角色隔离和交棒合法性。节点只校验自身业务输入与固定检查，不要求 Workflow 身份、catalog 登记或上游通过票据。ingest 和治理巡检使用各自已安装的 Workflow；巡检复用相同 P3—P7节点，不嵌套 Workflow。路由本身不表示业务完成。
 
-当前分发8个Skill：source、change-plan、view-materialize、lint、apply、query、explore、maintain（均带 `hs-knowledge-` 前缀）。source保留run、scan、prepare、capture、resolve、resolve-source、record和status各自用途，不把独立调用强绑扫描。公共规则随知识根 `governance/contracts/` 和规则锁提供，不调用兄弟Skill CLI或私有脚本。升级时安装完整8包及配套规则，移除已合并的旧来源包与此前迁出的旧能力；旧操作按原配套版本恢复，历史工具身份和工件不改写。
+当前分发8个Skill：source、change-plan、view-materialize、lint、apply、query、explore、maintain（均带 `hs-knowledge-` 前缀）。source保留configure、run、scan、prepare、capture、resolve、resolve-source、record和status各自用途，不把独立调用强绑扫描。公共规则随知识根 `governance/contracts/` 和规则锁提供，不调用兄弟Skill CLI或私有脚本。升级时安装完整8包及配套规则，移除已合并的旧来源包与此前迁出的旧能力；旧操作按原配套版本恢复，历史工具身份和工件不改写。
 
 ## 部署或依赖缺项
 
 首次部署或本机依赖缺项时，指向分发仓根的 `deploy.ps1` 和实际知识根的使用说明；命令、安装路径、只读计划与依赖修复选项见 [部署与执行](references/setup.md)。它在 Windows 选择现有 Python，安装能力并直接将知识 ZIP 解压到所选项目位置。日常任务不重复运行部署；本 Skill 不另行引导 Agent 执行 pip 或远端 setup。
 
 部署成功后，按实际项目 `config.yml`、`AGENTS.md` 和 K 入口选择业务能力；存在 `LOCAL_DEPLOYMENT.md` 时读取当地约定。旧 `scripts/setup.py` 仅保留显式诊断和兼容用途，不作为常规独立安装入口。
+
+首次来源准备另在真正执行端完成source.configure；日常不隐式重配。默认全量来源观察包括六类仓内raw与`docs-raw/sources/dbox`逻辑根，未配置或不可达不能当无变化；限定普通raw范围不依赖无关dbox。目录映射和绝对路径仅属本机，来源锁及共享身份保存逻辑地址；已发布依据的恢复不依赖生产者配置。query可能在当次响应及私有Receipt给经核验的absolute当前地址，不能据此写回共享配置或来源锁。
 
 部署脚本不配置宿主 MCP、角色权限或 CodeGraph，也不验证远端 Python。代码仓在远端时，实际任务仍通过宿主已配置且可调用的 SSH MCP 执行，另核对该端 Python、运行依赖和已安装 Skill 路径；本机部署检查不能代替执行端检查。
 

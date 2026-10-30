@@ -151,6 +151,12 @@ def validate_scan_manifest(record, rules=None):
     identities = [unit.get("unit_id") for unit in record["units"]]
     if any(not item for item in identities) or len(set(identities)) != len(identities):
         raise ContractError("INVALID_SCAN", "Distinct unit identities are required")
+    from .source_resources import is_dbox_path, validate_dbox_binding
+    observed_dbox = any(is_dbox_path(unit.get("path")) and unit.get("observed_fingerprint") is not None
+                        for unit in record["units"])
+    complete_dbox = record.get("complete") is True and any(is_dbox_path(ref) for ref in record.get("scope", []))
+    if "dbox_binding" in record or observed_dbox or complete_dbox:
+        validate_dbox_binding(record.get("dbox_binding"))
     if rules:
         validate_shape("source_inventory", record, rules)
     return record

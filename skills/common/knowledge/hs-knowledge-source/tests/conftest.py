@@ -63,6 +63,14 @@ class Harness:
         (self.root / ".synthetic-test-root").write_text(
             "isolated mechanism fixture", encoding="utf-8"
         )
+        # New full scans include one configured local directory. Missing-root
+        # tests explicitly remove this fixture-owned, empty source mapping.
+        external = base / "empty-dbox"
+        external.mkdir()
+        self.write("docs-raw/sources/dbox.local.yml", yaml.safe_dump({
+            "schema_version": "1.0", "path": str(external),
+        }, sort_keys=False).encode())
+        self.write("docs-raw/sources/.gitignore", b"/dbox.local.yml\n")
         self.rules = hashed((self.root / "governance/framework.lock.yaml").read_bytes())
         self.packages = Path(__file__).resolve().parents[2]
         entries = {}

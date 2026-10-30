@@ -90,6 +90,13 @@ class Pipeline:
     def __init__(self, base):
         self.base, self.root = base, base / "w/himate-knowledge-wifi-mp"
         self.root.mkdir(parents=True)
+        # Legacy journeys observe an explicitly configured, empty external root.
+        # Dbox-specific tests replace/remove it to exercise real configuration.
+        empty_dbox = base / "empty-dbox"
+        empty_dbox.mkdir()
+        local = self.root / "docs-raw/sources/dbox.local.yml"
+        local.parent.mkdir(parents=True)
+        local.write_text(yaml.safe_dump({"schema_version": "1.0", "path": str(empty_dbox.absolute())}), encoding="utf-8")
         shutil.copytree(
             REPO / "himate-knowledge-wifi-mp/governance",
             self.root / "governance",

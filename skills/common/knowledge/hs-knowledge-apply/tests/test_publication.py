@@ -205,7 +205,7 @@ def test_manifest_includes_actual_durable_maintenance_state(publication_case):
 
 def test_resealed_content_completion_requires_durable_retrieval_facts(publication_case):
     publication, ctx, manifest, _ = installed_publication(publication_case)
-    forged = ctx.seal({"purpose": "knowledge_publication_completion", "protocol_version": "1.0",
+    forged = ctx.seal({"purpose": "knowledge_publication_completion", "protocol_version": manifest["protocol_version"],
         "publication_ref": publication.manifest_ref(ctx.operation), "publication_digest": manifest["digest"],
         "content_digest": manifest["content_digest"], "published": True, "batch_complete": True,
         "phase": "completed", "data": {"activated": True}, "retrieval": {"complete": True},

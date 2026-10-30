@@ -11,7 +11,8 @@ from .runtime import NodeError, canonical, digest, fixed_bytes, identifier, safe
 from . import staging
 
 
-PROTOCOL = "1.0"
+PROTOCOL = "1.1"
+PLAN_PROTOCOL = "1.0"
 
 
 def manifest_ref(operation_id):
@@ -113,7 +114,7 @@ def prepare_plan(ctx, view, *, staged_objects=None, event_proposals=None, dispos
                "source_refs": copy.deepcopy(view.get("source_refs", [])),
                "dispositions": _dispositions(disposition_preview),
                "batch_kind": view.get("batch_kind", "content")}
-    plan = {"protocol_version": PROTOCOL, "operation_id": ctx.operation,
+    plan = {"protocol_version": PLAN_PROTOCOL, "operation_id": ctx.operation,
             "staged_objects": entries, "event_proposals": proposals,
             "payloads": content["payloads"], "deletes": content["deletes"],
             "expected_old": expected, "dispositions": content["dispositions"],
@@ -207,6 +208,8 @@ def publish_manifest(ctx, view, plan=None, *, processing_record=None, event_refs
         from . import input_snapshot
         index_inputs["input_snapshot"] = input_snapshot.published_inputs(
             ctx, view["input_snapshot"], staged_objects=plan["staged_objects"])
+    from . import input_snapshot
+    dbox_scope = input_snapshot.execution_scope(input_snapshot.source_execution_files(view.get("input_snapshot")))
     applied_ref = None
     if applied is not None:
         applied_ref = "logs/publications/" + ctx.operation + "/apply-result.json"
@@ -221,6 +224,7 @@ def publish_manifest(ctx, view, plan=None, *, processing_record=None, event_refs
         "processing_record": processing, "event_refs": events,
         "apply_result": copy.deepcopy(applied), "apply_result_ref": applied_ref,
         "index_inputs": index_inputs,
+        "dbox_execution_scope": dbox_scope,
         "trace": {"view_ref": ctx.request.get("view_ref"), "view_digest": view["digest"]}}, "artifact_manifest")
     ref = manifest_ref(ctx.operation)
     if safe(ctx.root, ref).exists():
@@ -294,7 +298,7 @@ def _read(ctx, ref, purpose):
     value = json.loads(fixed_bytes(ctx.root, ref, ["logs/publications"]), object_pairs_hook=unique)
     ctx.modules["records"].verify(value)
     ctx.modules["validation"].validate_shape("artifact_manifest", value, ctx.rules)
-    if value.get("purpose") != purpose or value.get("protocol_version") != PROTOCOL:
+    if value.get("purpose") != purpose or value.get("protocol_version") not in {"1.0", PROTOCOL}:
         raise NodeError("INVALID_PUBLICATION", "Unsupported publication record", ref)
     return value
 
@@ -305,6 +309,13 @@ def read_manifest(ctx, reference=None, *, operation_id=None, verify_files=False)
     if (ref != manifest_ref(value.get("operation_id")) or value.get("published") is not True
             or digest(value.get("published_view")) != value.get("published_view_digest")):
         raise NodeError("INVALID_PUBLICATION", "Manifest identity or business projection differs", ref)
+    from . import input_snapshot
+    if value["protocol_version"] == PROTOCOL:
+        input_snapshot.validate_execution_scope(value.get("dbox_execution_scope"))
+    elif "dbox_execution_scope" in value:
+        raise NodeError("INVALID_PUBLICATION", "Legacy publication format cannot carry current external scope", ref)
+    if input_snapshot.source_execution_files(value.get("index_inputs", {}).get("input_snapshot")):
+        raise NodeError("INVALID_PUBLICATION", "Public index inputs contain private external execution bindings", ref)
     for row in value.get("files", []):
         safe(ctx.root, row["path"], ["knowledge", "index.md", "governance/sources.lock.yaml", "logs"])
         if verify_files:
@@ -396,6 +407,7 @@ def read_completion(ctx, manifest=None, *, operation_id=None):
         return None
     value = _read(ctx, ref, "knowledge_publication_completion")
     if (value.get("operation_id") != manifest["operation_id"]
+            or value.get("protocol_version") != manifest.get("protocol_version")
             or value.get("publication_ref") != manifest_ref(manifest["operation_id"])
             or value.get("publication_digest") != manifest["digest"]
             or value.get("content_digest") != manifest["content_digest"]):
@@ -420,7 +432,7 @@ def write_completion(ctx, manifest, *, data, retrieval, owned_files, expected_di
     cleanup_result = copy.deepcopy(cleanup_result or {
         "status": "cleanup_pending", "owned": owned, "deleted": [], "retained": [], "failed": []})
     complete = retrieval.get("complete") is True and cleanup_result.get("status") == "done"
-    result = ctx.seal({"purpose": "knowledge_publication_completion", "protocol_version": PROTOCOL,
+    result = ctx.seal({"purpose": "knowledge_publication_completion", "protocol_version": manifest["protocol_version"],
         "publication_ref": manifest_ref(manifest["operation_id"]), "publication_digest": manifest["digest"],
         "content_digest": manifest["content_digest"], "published": True, "batch_complete": complete,
         "phase": ("recorded" if manifest["batch_kind"] == "record_only" else "completed") if complete

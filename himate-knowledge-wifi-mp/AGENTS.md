@@ -4,7 +4,7 @@
 
 知识库能力介绍与任务路由见已安装 `hs-knowledge-explore/SKILL.md`；已有有效上下文直接选择业务能力，首次准备和只读发现脚本按需运行。根 `AGENTS.md` 介绍真实业务仓，部署时保留已有内容，仅按 `AGENTS.md.example` 合并四项位置说明和 explore 入口指针；本开发仓的根文件仅本地维护。设计阅读先看[文档入口](docs-llm-wiki/README.md)。详细设计分概要和节点详细设计两层。项目自身的需求、实现任务、测试和验收记录保存在本地 `docs-llm-wiki/sdd/`，任务入口为本地 `docs-llm-wiki/task.md`，均由 Git 忽略，不随仓库分发。开发时按需读取本地已有工件；未提供时依据共享设计、源码与实际验证工作，不把缺少工件视为部署缺项。保留本地历史工件原字节。
 
-业务范围沿用 chip12、chip08、chip07c 的 Host/Device 逻辑名称。项目根 `config.yml` 只维护 `code_root` 和模块相对路径、芯片／端／特性／用途，不要求逐项填写六 Target 或三 pair；共享模块可关联多个芯片和端。模块读取以实际文件、配置和内容指纹为依据；可选版本材料须保留来源，未知版本不阻断当前文件静态核验。未知构建和适用条件保持 unknown，不创建虚构源码，不从标签推断宏开启或产品兼容。文档仅接受 `docs-raw/conventions`、`chips`、`storys`、`specs`、`protocols`、`troubleshooting` 内已落地原件，`sources/` 链接暂不接入。
+业务范围沿用 chip12、chip08、chip07c 的 Host/Device 逻辑名称。项目根 `config.yml` 只维护 `code_root` 和模块相对路径、芯片／端／特性／用途，不要求逐项填写六 Target 或三 pair；共享模块可关联多个芯片和端。模块读取以实际文件、配置和内容指纹为依据；可选版本材料须保留来源，未知版本不阻断当前文件静态核验。未知构建和适用条件保持 unknown，不创建虚构源码，不从标签推断宏开启或产品兼容。文档接受六类仓内原件与 `docs-raw/sources/dbox` 本机目录映射。首次在实际执行端使用 source.configure 填写并校验 `docs-raw/sources/dbox.local.yml`，其 schema_version 为字符串1.0、path 为一个原生绝对目录；模板和精确 ignore 上库，私人配置忽略。默认全量扫描包括 dbox，缺配置或目录不可读不算无变化；显式普通 raw 范围不依赖无关 dbox。不创建或跟随原生软链接，不接入网页/API。
 
 纯文档经独立 Agent 内容复核和完整固定检查后 stable，免代码实现核验。用户可在执行中退回或入库后要求修订。代码卡本地只读检查通过后 stable，上库固定 CI 复用确定性的格式、索引及来源／代码引用检查。检查不改卡、来源锁、链接或源码。目录、Schema 与示例不证明业务接入、内容正确或权限隔离。
 

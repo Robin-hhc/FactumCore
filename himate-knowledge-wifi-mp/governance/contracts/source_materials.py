@@ -12,7 +12,7 @@ import difflib
 import yaml
 
 from .runtime import NodeError, digest, fixed_bytes, fork_context, safe, sha, write_bytes
-from . import staging
+from . import staging, source_resources
 
 
 def _save_bytes(context, ref, raw):
@@ -76,8 +76,11 @@ def _target_request(context, supplied, lock):
     request["kind"] = kind
     if kind == "raw":
         path = request.get("source_path")
-        safe(context.root, path, ["docs-raw/" + name for name in
-             ("conventions", "chips", "storys", "specs", "protocols", "troubleshooting")])
+        if source_resources.is_dbox_path(path):
+            source_resources.dbox_path(context.root, path, getattr(context, "expected_dbox_binding", None))
+        else:
+            safe(context.root, path, ["docs-raw/" + name for name in
+                 ("conventions", "chips", "storys", "specs", "protocols", "troubleshooting")])
         matches = [row["source_id"] for row in lock["resources"]
                    if row.get("path") == path and row.get("kind") in {"raw", "attachment"}]
         fallback = "raw:" + sha(path.encode())[:32]
@@ -106,12 +109,26 @@ def _current_files(context, bundle):
     bindings = {}
     for snapshot in bundle["snapshots"]:
         resource = resources[snapshot["source_id"]]
-        for binding in operations.current_source_bindings(context, resource, snapshot):
+        if source_resources.is_dbox_path(resource.get("path")):
+            _adopt_dbox_binding(context, bundle.get("dbox_binding"))
+        for binding in operations.current_source_bindings(context, resource, snapshot,
+                                                          expected_binding=bundle.get("dbox_binding")):
             previous = bindings.get(binding["path"])
             if previous is not None and previous != binding:
                 raise NodeError("MATERIAL_IDENTITY_CONFLICT", "Current input path has conflicting fingerprints", binding["path"])
             bindings[binding["path"]] = binding
     return [bindings[key] for key in sorted(bindings)]
+
+
+def _adopt_dbox_binding(context, binding):
+    source_resources.validate_dbox_binding(binding)
+    previous = getattr(context, "expected_dbox_binding", None)
+    if previous is not None and previous != binding:
+        raise NodeError("DBOX_BINDING_CHANGED", "Current materials disagree on the adopted dbox directory",
+                        source_resources.DBOX_PREFIX, blocked=True,
+                        data={"needs_scan": True, "affected_scope": [source_resources.DBOX_PREFIX]})
+    source_resources.dbox_root(context.root, binding)
+    context.expected_dbox_binding = binding
 
 
 def _previous(context, previous_view=None):
@@ -164,6 +181,10 @@ def _previous(context, previous_view=None):
     old_bundle = context.modules["source_operations"].resolve_bundle(context, material["bundle_ref"])["bundle"]
     if old_bundle["digest"] != material.get("bundle_digest"):
         raise NodeError("MATERIAL_INPUT_MISMATCH", "Original bundle differs from the material binding", material["bundle_ref"])
+    if material.get("dbox_binding") or old_bundle.get("dbox_binding"):
+        if material.get("dbox_binding") != old_bundle.get("dbox_binding"):
+            raise NodeError("MATERIAL_INPUT_MISMATCH", "Material and source bundle disagree on the dbox binding", ref)
+        _adopt_dbox_binding(context, material["dbox_binding"])
     try:
         bindings = _current_files(context, old_bundle)
     except (OSError, ValueError, yaml.YAMLError) as exc:
@@ -252,6 +273,8 @@ def prepare(context):
         previous, previous_bundle = _previous(context, previous_view)
         scan_ref = request.get("scan_ref") or (previous.get("scan_ref") if previous else None)
         scan = context.record(scan_ref, "source_inventory") if scan_ref else None
+        if scan and scan.get("dbox_binding"):
+            _adopt_dbox_binding(context, scan["dbox_binding"])
     except NodeError as exc:
         if exc.code == "STALE_RULES":
             raise _source_changed("Adopted rules changed; refresh inputs under a new operation", ["governance/framework.lock.yaml"]) from exc
@@ -321,6 +344,8 @@ def prepare(context):
                     capture_request.get("attachments", []) + operations.local_attachments(context, capture_request["source_path"])))}
             child_context = fork_context(context, request={**capture_request, "operation_id": context.operation}, action="capture")
             child_context.base = context.base + "/sources/" + digest(capture_request)[:32]
+            if getattr(context, "expected_dbox_binding", None) is not None:
+                child_context.expected_dbox_binding = context.expected_dbox_binding
             captured, _ = operations.capture(child_context)
         except (OSError, UnicodeError, NodeError, context.modules["validation"].ContractError) as exc:
             code = getattr(exc, "code", type(exc).__name__)
@@ -346,6 +371,8 @@ def prepare(context):
                 continue
             raise
         bundle = context.record(captured["bundle_ref"], "source_bundle")
+        if bundle.get("dbox_binding"):
+            _adopt_dbox_binding(context, bundle["dbox_binding"])
         if expected and bundle["snapshots"][0]["sha256"] != expected:
             raise _source_changed("Original differs from its fixed inventory; refresh the affected P1 scope", [capture_request.get("source_path", capture_request.get("relative_path"))])
         if "target_id" in origin:
@@ -412,6 +439,7 @@ def prepare(context):
                              "event_proposals": list({digest(row): row for row in event_proposals}.values()),
                              **context_binding,
                              **({"config_digest": next(iter(config_digests))} if config_digests else {}),
+                             **({"dbox_binding": context.expected_dbox_binding} if getattr(context, "expected_dbox_binding", None) else {}),
                              "limitations": sorted({gap["code"] for gap in gaps})}, "source_bundle")
     current_files = _current_files(context, combined)
     if config_digests:
@@ -439,6 +467,7 @@ def prepare(context):
         raise _source_changed("Rules changed during material preparation", ["governance/framework.lock.yaml"])
     gaps = list({digest(gap): gap for gap in gaps}.values())
     value = {"purpose": "source_materials", "bundle_ref": bundle_ref, "bundle_digest": combined["digest"],
+             **({"dbox_binding": combined["dbox_binding"]} if combined.get("dbox_binding") else {}),
              **context_binding,
              "bundles": list({digest(bundle): bundle for bundle in bundles}.values()), "candidates": candidate_records,
              "current_code": list({digest(code): code for code in current_code}.values()), "gaps": gaps,

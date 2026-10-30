@@ -11,7 +11,7 @@ from urllib.parse import unquote, urlsplit
 
 import yaml
 
-from . import staging
+from . import staging, source_resources
 
 from .runtime import (
     NodeError,
@@ -42,7 +42,15 @@ def extract(context, data, suffix, *, primary=True):
         raise
 
 
-def raw_member(context, ref):
+def raw_member(context, ref, expected_binding=None):
+    if source_resources.is_dbox_path(ref):
+        try:
+            observed = source_resources.read_dbox(context.root, ref, expected_binding or getattr(context, "expected_dbox_binding", None))
+        except context.modules["validation"].ContractError as exc:
+            raise NodeError(exc.code, exc.message, exc.path, blocked=exc.code == "DBOX_BINDING_CHANGED",
+                            data={"needs_scan": True, "affected_scope": [ref]} if exc.code == "DBOX_BINDING_CHANGED" else None) from exc
+        return {"path": ref, "data": observed["data"], "signature": observed["signature"],
+                "dbox_binding": observed["dbox_binding"]}
     parts = PurePosixPath(ref).parts if isinstance(ref, str) else ()
     if len(parts) < 3 or parts[0] != "docs-raw" or parts[1] not in RAW_CLASSES:
         raise NodeError(
@@ -109,6 +117,8 @@ def _attachment_references(members):
                 elif part != ".":
                     parts.append(part)
             resolved = "/".join(parts)
+            if source_resources.is_dbox_path(member["path"]) and not source_resources.is_dbox_path(resolved):
+                raise NodeError("UNSAFE_ATTACHMENT", "Attachment cannot leave the dbox source root", member["path"])
             references.append(resolved)
     return sorted(set(references)), gaps
 
@@ -324,9 +334,22 @@ def resolve_source(context, reference, bundle=None):
                 "Unsupported original locator",
                 blocked=True,
             )
+    dbox_current = {}
     try:
         if resource.get("kind") == "code":
             current_hash = current_code_hash(context, resource)
+        elif source_resources.is_dbox_path(resource.get("path")):
+            try:
+                current = source_resources.read_dbox(context.root, resource["path"])
+                current_hash = current["sha256"]
+                dbox_current = {"current_source_binding": current["dbox_binding"],
+                                "current_source_path": str(current["actual_path"]),
+                                "current_source_observation": {"status": "available"}}
+            except (OSError, ValueError) as exc:
+                current_hash = None
+                dbox_current = {"current_source_binding": None, "current_source_path": None,
+                                "current_source_observation": {"status": "unavailable", "code": getattr(exc, "code", "SOURCE_INPUT_UNAVAILABLE")}}
+                gaps.append("Current dbox original is unavailable; only exact retained evidence was recovered")
         else:
             current_hash = sha(
                 fixed_bytes(context.root, resource["path"], ["docs-raw"])
@@ -346,6 +369,7 @@ def resolve_source(context, reference, bundle=None):
     if current_matches is False:
         gaps.append("Current source bytes differ from this fixed historical snapshot")
     result = {
+        **dbox_current,
         "source_ref": reference,
         "source_kind": resource.get("kind"),
         "resource": resource,
@@ -842,6 +866,8 @@ def capture_code(context):
 
 def resolve_bundle(context, reference):
     bundle = context.record(reference, "source_bundle")
+    if any(source_resources.is_dbox_path(row.get("path")) for row in bundle["resources"]):
+        source_resources.validate_dbox_binding(bundle.get("dbox_binding"))
     entries = staging.validate_entries(context.root, staging.entries_from_bundle(bundle))
     portable_ids = set()
     for snapshot in bundle["snapshots"]:
@@ -907,6 +933,12 @@ def capture(context):
     refs = [request["source_path"], *request.get("attachments", [])]
     if len(set(refs)) != len(refs):
         raise NodeError("DUPLICATE_ATTACHMENT", "Each original is enumerated once")
+    uses_dbox = any(source_resources.is_dbox_path(ref) for ref in refs)
+    if uses_dbox:
+        if not all(source_resources.is_dbox_path(ref) for ref in refs):
+            raise NodeError("UNSAFE_ATTACHMENT", "dbox attachments must share the same source root", source_resources.DBOX_PREFIX)
+        current_binding = source_resources.dbox_root(context.root, getattr(context, "expected_dbox_binding", None))["binding"]
+        context.expected_dbox_binding = current_binding
     members = [raw_member(context, ref) for ref in refs]
     reference_gaps = check_attachments(members)
     resources, snapshots, extractions, payloads, limitations = [], [], [], {}, []
@@ -1001,6 +1033,7 @@ def capture(context):
             "resources": resources,
             "snapshots": snapshots,
             "extractions": extractions,
+            **({"dbox_binding": current_binding} if uses_dbox else {}),
             "context_ref": request.get("context_ref"),
             "limitations": sorted(set(limitations)),
             "staged_objects": staged_objects,
@@ -1032,7 +1065,7 @@ def capture(context):
     }, "captured"
 
 
-def current_source_bindings(context, resource, snapshot):
+def current_source_bindings(context, resource, snapshot, *, expected_binding=None):
     """Return authorized current paths only when they still match fixed bytes."""
     if resource.get("kind") == "code":
         root, _, config, _, config_digest = authorized_repo(context, resource["repo_id"])
@@ -1047,9 +1080,11 @@ def current_source_bindings(context, resource, snapshot):
         result = [{"path": safe(root, resource["path"]).as_posix(), "sha256": sha(raw), "bytes": len(raw), "kind": "code"},
                   {"path": config_path.as_posix(), "sha256": config_digest, "bytes": len(config_bytes), "kind": "config"}]
     else:
-        member = raw_member(context, resource["path"])
+        member = raw_member(context, resource["path"], expected_binding)
         raw = member["data"]
-        result = [{"path": resource["path"], "sha256": sha(raw), "bytes": len(raw), "kind": "raw"}]
+        result = [{"path": resource["path"], "sha256": sha(raw), "bytes": len(raw),
+                   "kind": "external_raw" if "dbox_binding" in member else "raw",
+                   **({"dbox_binding": member["dbox_binding"]} if "dbox_binding" in member else {})}]
     if sha(raw) != snapshot["sha256"] or len(raw) != snapshot["bytes"]:
         raise NodeError("SOURCE_CHANGED", "Current source differs from adopted material", resource["path"], blocked=True,
                         data={"needs_scan": True, "affected_scope": [resource["path"]]})

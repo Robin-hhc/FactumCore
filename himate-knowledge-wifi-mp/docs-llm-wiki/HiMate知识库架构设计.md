@@ -53,7 +53,10 @@ repo/
     │   ├── specs/                # 项目需求与设计原件
     │   ├── protocols/            # 内部协议
     │   ├── troubleshooting/      # 问题定位与排查经验
-    │   └── sources/              # dbox、3ms、wiki 登记，暂不接入
+    │   └── sources/              # dbox本机目录映射；3ms/wiki外链预留
+    │       ├── dbox.example.yml  # 共享空模板：格式版本与path
+    │       ├── .gitignore        # 精确忽略dbox.local.yml
+    │       └── dbox.local.yml    # 执行端私人地址，不上库
     ├── governance/
     │   ├── AGENTS.md / index.md
     │   ├── templates/            # 七类卡、导航与处理记录模板
@@ -88,7 +91,7 @@ repo/
 
 # 11 HiMate知识库架构
 
-知识库随代码仓一并拉取；能力与本机依赖通过 `deploy.ps1` 部署，explore 提供任务路由和只读发现，不需要额外业务初始化命令或常驻服务。`ingest` 默认处理六类允许 raw，经扫描、独立备料、作者计划和完整成稿，在 P5 集中独立内容／代码审阅及完整质量检查，P6 转写处理记录，P7 将确切字节安全落位并完成检索收尾；有问题时返回相应阶段。`lint` 是可单独调用的只读确定性检查入口，供手动修改和 CI 复用，不自动修稿或入库；`query` 消费知识。内容批完成本地入库、真实索引全验、冻结目标查询和活动代激活后，由人提交、触发固定 CI 并评审合入；仅记录批保存处置和欠账，不建索引。`ingest --source` 可选限定来源；命令格式见[详细设计 §1.1](知识库详细设计.md#11-从命令进入流程)，OpenFlow 负责 Workflow 的调度和交棒校验；人工测试可逐个调用 Skill 并按实际结果继续。
+知识库随代码仓一并拉取；能力与本机依赖通过 `deploy.ps1` 部署，explore 提供任务路由和只读发现，不需要常驻服务。首次来源准备在真正执行端使用 source.configure 填写并验证一个 dbox 目录，文件已部署与来源就绪分别报告。`ingest` 默认处理六类仓内 raw 与已配置 dbox，经扫描、独立备料、作者计划和完整成稿，在 P5 集中独立内容／代码审阅及完整质量检查，P6 转写处理记录，P7 将确切字节安全落位并完成检索收尾；有问题时返回相应阶段。`lint` 是可单独调用的只读确定性检查入口，供手动修改和 CI 复用，不自动修稿或入库；`query` 消费知识。内容批完成本地入库、真实索引全验、冻结目标查询和活动代激活后，由人提交、触发固定 CI 并评审合入；仅记录批保存处置和欠账，不建索引。`ingest --source` 可选限定来源；命令格式见[详细设计 §1.1](知识库详细设计.md#11-从命令进入流程)，OpenFlow 负责 Workflow 的调度和交棒校验；人工测试可逐个调用 Skill 并按实际结果继续。
 
 ingest 是原件到本地正式知识的完整流程；lint Skill 可被 ingest、独立命令和 CI 复用，query 负责消费。同名 lint Workflow 供手动或外部周期治理：同步后重新加载规则，脚本筛选 raw 与登记代码变更，按待办复用 source.prepare 和 P3—P7，核验真实完成后推进成功基线。无待办结束，失败和欠账保留；独立 lint Skill 保持原默认检查行为。实际宿主加载、内部同步适配和周期触发需按部署环境验证；这些能力不要求用户顺序执行。
 
@@ -138,7 +141,7 @@ flowchart TB
     subgraph S2["② 源事实层 · 证据底座"]
         direction LR
         B1["实际业务代码目录<br />按 config.yml 映射<br />.codegraph/ 可用时提供定位"]
-        B2["docs-raw/sources/<br />来源登记预留，暂不接入"]
+        B2["docs-raw/sources/dbox<br />本机配置映射资料目录<br />采用版本发布为固定证据"]
         B3["docs-raw/ 落库制六类<br />conventions · chips · storys · specs · protocols · troubleshooting"]
     end
 
@@ -157,7 +160,7 @@ flowchart TB
         direction LR
         D1["governance/<br />templates · schemas · contracts · specs · sources.lock.yaml"]
         D2["Agent Skills · S<br />主线五包＋query · explore · maintain"]
-        D3["OpenFlow · Agent Workflows · F<br />ingest：完整 P1—P7<br />lint：正式检查与引用报告"]
+        D3["OpenFlow · Agent Workflows · F<br />ingest：完整 P1—P7<br />lint：治理巡检，按待办复用P3—P7"]
     end
 
     subgraph S5["⑤ 配套支撑层"]
@@ -240,7 +243,7 @@ flowchart LR
 | 技能 | 职责 | 公开动作 |
 |---|---|---|
 | `hs-knowledge-explore/` | 能力路由、只读发现和CodeGraph准备 | 部署指引；已有上下文复用 |
-| `hs-knowledge-source/` | 默认同进程执行P1扫描和P2备料；独立来源处理、P6暂存冻结处置及只读进度 | run（默认）；scan / prepare / capture / resolve / resolve-source / record / status |
+| `hs-knowledge-source/` | 默认同进程执行P1扫描和P2备料；执行端dbox配置、独立来源处理、P6暂存冻结处置及只读进度 | run（默认）；configure / scan / prepare / capture / resolve / resolve-source / record / status |
 | `hs-knowledge-change-plan/` | P3记录作者语义决定、保留范围和目标查询 | plan；不生产字节或复核 |
 | `hs-knowledge-view-materialize/` | P4直接生产卡、导航、来源锁及完整视图，修订与描述 | run / revise / describe |
 | `hs-knowledge-lint/` | P5独立审阅及完整质量检查；独立只读固定检查 | 默认formal/full；review / record-review / code-check / code-recheck / verify-evidence |
@@ -308,11 +311,11 @@ flowchart LR
 
 #### docs-raw/ —— 原始证据层（LLM 只读）
 
-知识卡正文只写"结论 + sources 指针"，不复制原文段落；被指向的原始材料统一落在 `docs-raw/`。这一层的组织逻辑是**按材料性质分类，而不是按项目、时间或团队分类**——因为下游建卡时，第一个判断就是"这份材料是什么性质、该蒸成什么卡"。
+知识卡正文只写"结论 + sources 指针"，不复制原文段落；原件入口统一由 `docs-raw/` 的仓内分类或 dbox 逻辑路径表示。这一层的组织逻辑是**按材料性质分类，而不是按项目、时间或团队分类**——因为下游建卡时，第一个判断就是"这份材料是什么性质、该蒸成什么卡"。
 
 两套存放形态：
 
-- **登记制（`sources/`）**：不好落到本地的文件（dbox、3ms、wiki），按公司三个文档管理工具分类登记"链接 + 版本 + hash + 密级"，原件仍由源系统持有，与薪火平台共管理；`governance/sources.lock.yaml` 锁声明版本与恢复说明。（首发版本暂不支持）
+- **本机目录映射（`sources/dbox`）**：`dbox.local.yml` 的一个绝对 `path` 指向执行端资料目录，脚本递归普通子目录；团队来源身份使用稳定逻辑路径和内容指纹，私人目录不进来源锁。模板和精确 ignore 上库，采用版本的必要原文字节沿现有 P7 发布为正式证据，不镜像整个目录。未配置、根不可达或扫描不完整不能当无变化，不跟随原生链接；3ms/wiki 网页登记与 dbox API 仍未接入。
 - **落库制（conventions / chips / storys / specs / protocols / troubleshooting）**：内部公开、上库 Git 仓的文件，按 WiFi 组可能用到的材料类型分六类。
 
 ##### 分类对知识卡生成的影响

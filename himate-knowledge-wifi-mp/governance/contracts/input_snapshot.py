@@ -10,7 +10,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from .runtime import NodeError, fixed_bytes, native_path, safe
 
@@ -114,6 +114,18 @@ def _file(ctx, entry, *, current=False, explicit_external=()):
     if not isinstance(entry, dict):
         raise NodeError("INVALID_INPUT_SNAPSHOT", "A bound file must be a path or object")
     reference = entry.get("path", entry.get("ref"))
+    if entry.get("kind") == "external_raw" or _dbox_path(reference):
+        if not current or entry.get("kind") != "external_raw":
+            raise NodeError("INVALID_INPUT_SNAPSHOT", "External current input requires its directory binding", reference)
+        _external_entry(reference, entry)
+        observed = ctx.modules["source_resources"].read_dbox(
+            ctx.root, reference, expected_binding=entry["dbox_binding"])
+        actual = {"kind": "external_raw", "path": reference,
+                  "sha256": observed["sha256"], "bytes": observed["bytes"],
+                  "dbox_binding": copy.deepcopy(observed["dbox_binding"])}
+        if actual != entry:
+            raise NodeError("INPUT_CHANGED", "External input differs from its original observation", reference)
+        return reference, actual
     path, key = _path(ctx, reference, current=current, explicit_external=explicit_external)
     before = _read(path)
     actual = {"kind": "file", "path": key, "sha256": _sha(before), "bytes": len(before)}
@@ -123,6 +135,85 @@ def _file(ctx, entry, *, current=False, explicit_external=()):
     if entry.get("bytes") is not None and entry["bytes"] != len(before):
         raise NodeError("INPUT_CHANGED", "Bound input size differs", key)
     return key, actual
+
+
+def _dbox_path(reference):
+    return isinstance(reference, str) and reference.startswith("docs-raw/sources/dbox/")
+
+
+def _hex_digest(value):
+    return isinstance(value, str) and len(value) == 64 and all(c in "0123456789abcdef" for c in value)
+
+
+def validate_execution_scope(scope):
+    """Validate the public logical file set, never a producer's local mapping."""
+    if not isinstance(scope, list):
+        raise NodeError("INVALID_PUBLICATION", "External execution scope must be a list")
+    paths = []
+    for row in scope:
+        if not isinstance(row, dict) or set(row) != {"path", "sha256", "bytes"}:
+            raise NodeError("INVALID_PUBLICATION", "External execution scope has invalid fields")
+        path = row["path"]
+        if (not _dbox_path(path) or "\\" in path or ":" in path
+                or str(PurePosixPath(path)) != path or ".." in PurePosixPath(path).parts
+                or not _hex_digest(row["sha256"]) or type(row["bytes"]) is not int or row["bytes"] < 0):
+            raise NodeError("INVALID_PUBLICATION", "External execution scope has an invalid logical file")
+        paths.append(path)
+    if paths != sorted(set(paths)):
+        raise NodeError("INVALID_PUBLICATION", "External execution scope must be sorted and unique")
+    return scope
+
+
+def _external_entry(path, entry):
+    if (not isinstance(entry, dict) or set(entry) != {"kind", "path", "sha256", "bytes", "dbox_binding"}
+            or entry.get("kind") != "external_raw" or entry.get("path") != path):
+        raise NodeError("INVALID_INPUT_SNAPSHOT", "External current input has invalid fields", path)
+    validate_execution_scope([{key: entry[key] for key in ("path", "sha256", "bytes")}])
+    binding = entry["dbox_binding"]
+    if (not isinstance(binding, dict) or set(binding) != {"config_sha256", "root_token"}
+            or any(not _hex_digest(value) for value in binding.values())):
+        raise NodeError("INVALID_INPUT_SNAPSHOT", "External current input has no valid directory binding", path)
+
+
+def source_execution_files(snapshot):
+    """The exact current dbox inputs retained only in this batch's local state."""
+    result = {}
+    current = (snapshot or {}).get("current_files", {})
+    if not isinstance(current, dict):
+        raise NodeError("INVALID_INPUT_SNAPSHOT", "Current input files must be a mapping")
+    for path, entry in current.items():
+        if not isinstance(path, str) or not isinstance(entry, dict):
+            raise NodeError("INVALID_INPUT_SNAPSHOT", "Current input entry is invalid")
+        if entry.get("kind") == "external_raw" or _dbox_path(path):
+            _external_entry(path, entry)
+            result[path] = copy.deepcopy(entry)
+    return result
+
+
+def execution_scope(files):
+    scope = []
+    for path, entry in sorted(files.items()):
+        _external_entry(path, entry)
+        scope.append({key: entry[key] for key in ("path", "sha256", "bytes")})
+    return validate_execution_scope(scope)
+
+
+def execution_inputs(ctx, snapshot, files, scope):
+    """Restore local guards without changing the publication's portable inputs."""
+    validate_execution_scope(scope)
+    if not isinstance(files, dict) or execution_scope(files) != scope:
+        raise NodeError("EXECUTION_INPUTS_UNAVAILABLE", "Original external input bindings are missing or different")
+    result = copy.deepcopy(snapshot)
+    for path, entry in files.items():
+        prior = result["current_files"].get(path)
+        if prior is not None and prior != entry:
+            raise NodeError("BATCH_INPUT_CHANGED", "External execution input was replaced", path)
+        result["current_files"][path] = copy.deepcopy(entry)
+    result["snapshot_digest"] = _digest({key: value for key, value in result.items() if key != "snapshot_digest"})
+    observed = compare_inputs(ctx, result, stage="postwrite")
+    if not observed["unchanged"]:
+        raise NodeError("BATCH_INPUT_CHANGED", "Original external execution inputs changed", data=observed)
+    return result
 
 
 def _entries(value):
@@ -144,7 +235,10 @@ def _legacy_current_files(ctx, bundle):
             raise NodeError("CURRENT_INPUTS_REQUIRED", "Multiple source versions require explicit current_files", resource["source_id"])
         snapshot = snapshots[0]
         if resource.get("kind") in {"raw", "attachment"}:
-            result.append({"path": resource["path"], "sha256": snapshot["sha256"], "bytes": snapshot["bytes"]})
+            item = {"path": resource["path"], "sha256": snapshot["sha256"], "bytes": snapshot["bytes"]}
+            if _dbox_path(resource["path"]):
+                item.update(kind="external_raw", dbox_binding=copy.deepcopy(bundle.get("dbox_binding")))
+            result.append(item)
         elif resource.get("kind") == "code":
             config_path, config = _configuration(ctx)
             matches = [row for row in (config or {}).get("repos", []) if row["repo_id"] == resource["repo_id"]]
@@ -236,7 +330,11 @@ def published_inputs(ctx, prewrite, *, staged_objects=()):
     bytes, with private copies mapped only to an explicitly published object.
     """
     snapshot = capture_inputs(ctx, stage="postwrite")
-    snapshot["current_files"] = copy.deepcopy(prewrite.get("current_files", {}))
+    execution = source_execution_files(prewrite)
+    for entry in execution.values():
+        _file(ctx, entry, current=True)
+    snapshot["current_files"] = {key: copy.deepcopy(value) for key, value in prewrite.get("current_files", {}).items()
+                                 if key not in execution}
     entries = list(staged_objects)
     for key, entry in prewrite.get("adopted_objects", {}).items():
         value = copy.deepcopy(entry)
@@ -317,6 +415,9 @@ def compare_inputs(ctx, snapshot, *, stage="prewrite"):
                 if entry.get("kind") == "source_snapshot":
                     raw = ctx.modules["source_resources"].recover_snapshot(
                         ctx.root, entry["snapshot"], staged_objects=entry.get("staged_objects"))
+                elif group == "current_files" and (entry.get("kind") == "external_raw" or _dbox_path(key)):
+                    _, observed = _file(ctx, entry, current=True)
+                    raw = None
                 else:
                     reference = entry.get("path", key)
                     # Retained external objects were explicit on capture.  Keep
@@ -324,7 +425,8 @@ def compare_inputs(ctx, snapshot, *, stage="prewrite"):
                     external = (reference,) if group == "adopted_objects" and Path(reference).is_absolute() else ()
                     path, _ = _path(ctx, reference, current=group == "current_files", explicit_external=external)
                     raw = _read(path)
-                actual = {"sha256": _sha(raw), "bytes": len(raw)}
+                actual = ({"sha256": observed["sha256"], "bytes": observed["bytes"]}
+                          if raw is None else {"sha256": _sha(raw), "bytes": len(raw)})
                 expected = {"sha256": entry["sha256"], "bytes": entry["bytes"]}
                 if actual != expected:
                     changes.append({"group": group, "path": key, "reason": "input_changed",

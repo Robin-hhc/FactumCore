@@ -16,6 +16,14 @@ powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 
 已有项目的配置、根 `AGENTS.md`、原件、卡及导航、来源锁和正式记录保留；治理规则和 `framework.lock.yaml` 成套更新。脚本不改宿主 SSH／MCP／权限开关，不安装或初始化 CodeGraph。完成后重启 OpenFlow、核对能力列表，并用新任务验证；已有 Workflow 副本不自动升级。
 
+## dbox 首次来源配置
+
+部署仅精确分发K下的 `docs-raw/sources/dbox.example.yml` 和同目录 `.gitignore`，保留已有 `dbox.local.yml` 地址，安全补齐忽略项。部署结果中的 `source_setup.status: pending_execution_host`、`configuration_checked: false` 与 deployed 分开，不能据Windows本机或映射盘可读声称SSH服务器来源就绪。
+
+首次须在真正执行ingest的机器调用已安装 `hs-knowledge-source/scripts/cli.py --action configure --knowledge-root K --input REQUEST.json --output RESPONSE.json`，独立请求例如 `{"operation_id":"configure-dbox-unique","path":"ACTUAL_DBOX_DIRECTORY"}`。动作由CLI参数选择；用执行端绝对目录替换占位，配置保存为 `schema_version: '1.0'` 与一个path。Linux复用此公开动作，不复制私有部署源码或新建runner。无path只核现有配置，同地址保留字节，显式换目录无需重装能力；目录、Git忽略保护或写前旧基线有误不覆盖旧配置。非Git工作区不虚报忽略已验证。
+
+configure只核根、不递归资料，成功不代表全目录完整或已入库。默认全量scan包含六类raw和dbox逻辑根，缺配置、根不可达或读失败不能假称无变化；限定普通raw范围不检查无关dbox。日常业务不自动重跑configure/setup，不跟随原生链接或调用平台API。已发布的确切原文可独立于生产者私人地址恢复。
+
 ## 日常项目发现
 
 已有部署和有效项目上下文时，直接按 [任务入口](../SKILL.md) 使用业务能力。缺少上下文才调用 [只读发现 CLI](public-api.md)，读取真实 `AGENTS.md`、`config.yml`、K 入口及所需规则；发现过程不安装包、不登记能力，也不生成业务处理义务。

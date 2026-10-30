@@ -34,10 +34,31 @@ the snapshot object. Address bases are explicit:
 | `workspace` | The project root selected by the actual `config.yml`; module paths may be nested under its `code_root`. |
 | `repository` | The authorized repository/scope identified by `repo_id`; do not join it to K. |
 | `git` | The exact local `commit` and repository-relative `path`; code evidence supplies `repo_id`, while its omission selects the workspace Git repository for raw evidence. |
+| `absolute` | A currently readable dbox file's native absolute path on the actual execution host. It may also address the exact registered original when retained evidence is missing and the observed bytes match the frozen snapshot. Do not join it to K or reinterpret a server path on the caller's machine. |
 
 Do not assume K's parent is the project or repo root. A configured
 `code:<repo_id>:<path>` recovery reference is exposed as its resolved workspace
 or repository address, not as a path to append to K.
+
+Configured dbox files keep their fixed evidence in the published objects under
+K. Their `current` address, when available, uses `absolute`; its hash and optional
+locator come from the same actual observation. A changed document has no current
+locator borrowed from its old version. Without a readable local mapping,
+`current` and `current_source_matches` are null while exact retained evidence may
+remain readable. Historical/guidance queries retain their existing qualification
+rules; current/implementation queries still require actual current evidence.
+If the retained original is unavailable, recovery may use only the unique
+registered dbox location whose actual bytes match the frozen hash and size. In
+that case `evidence` also uses `absolute`, with the same checked path and hash;
+an arbitrary absolute file is not an accepted recovery location. These addresses
+may appear in this response and its private query receipt, never in formal source
+identities or publication assets.
+
+A query compares its dbox directory binding between initial qualification,
+fresh qualification and the final source check. Switching to another root with
+identical bytes during that call requires retry. A later search or receipt-bound
+read observes that call's actual local mapping; the producer's or a previous
+query's private directory binding is not a permanent consumption prerequisite.
 
 Code links retain `navigation_status` and `current_source_matches`. Navigation
 is `resolved`, `missing`, `ambiguous` or `unavailable` when a symbol is declared;

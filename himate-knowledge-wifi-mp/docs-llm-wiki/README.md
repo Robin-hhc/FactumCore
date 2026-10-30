@@ -2,6 +2,8 @@
 
 第一次使用从[使用说明](使用说明.md)开始：保留业务仓已有的根 `AGENTS.md`，按 `AGENTS.md.example` 合并位置说明和 `hs-knowledge-explore` 入口指针，核对项目 `config.yml`、知识根和 Agent 已安装的配套能力。首次部署或本机依赖缺项使用[部署脚本](使用说明.md#2-首次环境安装)；已有部署与项目上下文时直接选择业务任务，缺少入口时才做只读发现。
 
+首次来源准备还须在实际执行 ingest 的机器调用 source.configure，填写一个可读的 dbox 资料目录；固定模板与精确忽略规则上库，`docs-raw/sources/dbox.local.yml` 只留本机。Windows 已部署不等于服务器来源就绪，详见[dbox 首次配置](使用说明.md#21-首次配置-dbox-资料目录)。日常脚本固定读取配置递归扫描，P3—P7沿用现有分工；已发布原文证据不依赖生产者的私人地址。
+
 ```mermaid
 flowchart LR
     A["使用说明<br/>部署与项目配置"] --> B["日常任务<br/>入库、查询、检查与续办"]

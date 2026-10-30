@@ -116,6 +116,12 @@ def _run(context):
             saved_reference = reference
             inventory = _checked_inventory(context, reference, own_operation=True)
         observed = _scan_data(inventory, reference)
+        if inventory.get("dbox_root_error"):
+            failure = inventory["dbox_root_error"]
+            raise runtime.NodeError(failure["code"], "The required dbox source root must be configured and readable; use a new operation after repair",
+                                    failure["path"], blocked=True)
+        if inventory.get("dbox_binding"):
+            context.modules["source_resources"].dbox_root(context.root, inventory["dbox_binding"])
         if not _needs_material(context, inventory):
             if saved:
                 raise runtime.NodeError(
@@ -140,8 +146,10 @@ def _run(context):
         raise
 
 
-def execute(context):
+def _execute(context):
     action = context.args.action or "run"
+    if action == "configure":
+        return context.modules["source_resources"].configure_dbox(context)
     if action == "run":
         return _run(context)
     if action == "scan":
@@ -165,5 +173,17 @@ def execute(context):
     if action in {"capture", "resolve", "resolve-source"}:
         return context.modules["source_operations"].execute(context)
     raise context.modules["runtime"].NodeError(
-        "UNKNOWN_ACTION", "Expected run, scan, prepare, capture, resolve, resolve-source, record or status", action,
+        "UNKNOWN_ACTION", "Expected configure, run, scan, prepare, capture, resolve, resolve-source, record or status", action,
     )
+
+
+def execute(context):
+    try:
+        return _execute(context)
+    except ValueError as exc:
+        if getattr(exc, "code", None) != "DBOX_BINDING_CHANGED":
+            raise
+        raise context.modules["runtime"].NodeError(
+            exc.code, exc.message, exc.path, blocked=True,
+            data={"needs_scan": True, "affected_scope": [context.modules["source_resources"].DBOX_PREFIX],
+                  **dict(getattr(exc, "data", {}) or {})}) from exc

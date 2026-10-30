@@ -24,6 +24,29 @@ class _BatchTransactionContext:
         return self.runtime.identifier(request.get("operation_id"))
 
 
+def _reject_legacy_external(ctx, request):
+    """The legacy full-check writer cannot promise the new directory binding."""
+    reference = request.get("view_ref")
+    if not reference or not getattr(ctx, "modules", None):
+        return
+    view = ctx.read(reference)
+    prefix = "docs-raw/sources/dbox/"
+    if any(path.startswith(prefix) or row.get("kind") == "external_raw"
+           for path, row in (view.get("input_snapshot") or {}).get("current_files", {}).items()):
+        raise Invalid("EXTERNAL_LEGACY_APPLY_UNSUPPORTED: use apply.batch for external current inputs")
+    lock = ctx.modules["source_resources"].read_source_lock(ctx.root)
+    sources = {row.get("source_id") for row in view.get("source_refs", [])}
+    for row in view.get("writes", []):
+        if row["path"] == "governance/sources.lock.yaml":
+            lock = ctx.modules["validation"].load_yaml(base64.b64decode(row["bytes_b64"], validate=True))
+        elif row["path"].startswith("knowledge/") and Path(row["path"]).name not in {"AGENTS.md", "index.md", "README.md"}:
+            card = ctx.modules["knowledge"].decode_card(base64.b64decode(row["bytes_b64"], validate=True), row["path"], ctx.rules)
+            sources.update(source["source_id"] for source in card["metadata"]["sources"])
+    if any(row.get("source_id") in sources and row.get("path", "").startswith(prefix)
+           for row in lock.get("resources", [])):
+        raise Invalid("EXTERNAL_LEGACY_APPLY_UNSUPPORTED: use apply.batch for external sources")
+
+
 def _verify_publication(ctx, shared, request):
     publication = shared.modules["publication"]
     purpose = request.get("purpose", "current")
@@ -67,6 +90,8 @@ def execute(ctx, request, action="run"):
                 package=Path(__file__).resolve().parents[1], catalog=ctx.catalog_path)
             return _verify_publication(ctx, shared, request)
     if action not in NEW_ACTIONS:
+        if action == "run":
+            _reject_legacy_external(ctx, request)
         if action in {"inspect", "resume", "rollback", "verify-result"} and getattr(ctx, "modules", None):
             return transaction_execute(_BatchTransactionContext(ctx, ctx.modules["runtime"]), request, action)
         return transaction_execute(ctx, request, action)

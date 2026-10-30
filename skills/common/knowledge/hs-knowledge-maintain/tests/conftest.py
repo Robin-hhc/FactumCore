@@ -70,6 +70,11 @@ class Harness:
         self.base = base
         self.root = base / "synthetic-knowledge"
         self.root.mkdir()
+        empty_dbox = base / "empty-dbox"
+        empty_dbox.mkdir()
+        local = self.root / "docs-raw/sources/dbox.local.yml"
+        local.parent.mkdir(parents=True)
+        local.write_text(yaml.safe_dump({"schema_version": "1.0", "path": str(empty_dbox.absolute())}), encoding="utf-8")
         source = Path(
             os.environ.get(
                 "AIOT_DOMAIN_FIXTURE",

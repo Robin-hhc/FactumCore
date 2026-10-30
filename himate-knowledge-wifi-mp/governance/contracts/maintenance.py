@@ -689,12 +689,28 @@ def inspect_context(context, *, source_ids=None):
     """
     selected_sources = None if source_ids is None else set(source_ids)
     cards = domain_cards(context)
+    dbox_scope = None
+    dbox_sources = {}
+    request = getattr(context, "request", {})
+    if "dbox_observation_scope" in request:
+        from pathlib import PurePosixPath
+        resources = context.modules["source_resources"]
+        dbox_scope = request["dbox_observation_scope"]
+        if (not isinstance(dbox_scope, list) or any(
+                not resources.is_dbox_path(ref) or "\\" in ref or ":" in ref
+                or str(PurePosixPath(ref)) != ref or ".." in PurePosixPath(ref).parts
+                for ref in dbox_scope)):
+            raise NodeError("RAW_SCOPE_REQUIRED", "Expected explicit logical dbox observation scopes")
+        dbox_sources = {row["source_id"]: row["path"]
+                        for row in resources.read_source_lock(context.root)["resources"]
+                        if row.get("kind") in {"raw", "attachment"} and resources.is_dbox_path(row.get("path"))}
     try:
         config_path = context.modules["validation"].workspace_config_path(context.root)
         config_digest = sha(config_path.read_bytes())
     except (ValueError, OSError):
         config_digest = None
     cached, affected, gaps, navigation_observations = {}, [], [], {}
+    source_observations = {}
     record_root = context.root / "logs/ingest"
     if record_root.exists():
         for path in sorted(record_root.iterdir()):
@@ -714,15 +730,31 @@ def inspect_context(context, *, source_ids=None):
             for source in claim["source_records"]:
                 if selected_sources is not None and source["source_id"] not in selected_sources:
                     continue
+                external = dbox_sources.get(source["source_id"])
+                if external is not None and not any(
+                        external == ref or external.startswith(ref + "/") for ref in dbox_scope):
+                    continue
                 key = digest(source)
                 if key not in cached:
                     try:
                         resolved = context.modules["source_operations"].resolve_source(context, ({'operation_id': context.operation, 'source_ref': source})["source_ref"])
-                        cached[key] = (None if resolved.get("current_source_matches") is True else "source_changed",
-                                       None, resolved)
+                        observation = resolved.get("current_source_observation", {})
+                        if observation.get("status") == "unavailable":
+                            cached[key] = ("source_current_unavailable", observation.get("code"), resolved)
+                        else:
+                            cached[key] = (None if resolved.get("current_source_matches") is True else "source_changed",
+                                           None, resolved)
                     except (ValueError, OSError, KeyError) as exc:
                         cached[key] = ("source_unavailable", str(exc), None)
                 reason, details, resolved = cached[key]
+                if resolved and "current_source_observation" in resolved:
+                    observation = source_observations.setdefault((card_id, key), {
+                        "card_id": card_id, "claim_ids": [], "source_ref": source,
+                        "current_source_matches": resolved.get("current_source_matches"),
+                        "current_source_sha256": resolved.get("current_source_sha256"),
+                        "current_source_observation": resolved["current_source_observation"],
+                    })
+                    observation["claim_ids"].append(claim["id"])
                 navigation = (resolved or {}).get("code_navigation")
                 if "code_ref" in source and navigation is not None:
                     observation = navigation_observations.setdefault((card_id, key), {
@@ -740,7 +772,8 @@ def inspect_context(context, *, source_ids=None):
                         details = (navigation or {}).get("reason", "Current symbolic navigation is unavailable")
                 # A recovered historical snapshot need not match today's file.
                 # Keep the cached resolver fact shared across all Claim usages.
-                if reason and not (claim["usage"] == "historical" and reason == "source_changed"):
+                if reason and not (claim["usage"] == "historical"
+                                   and reason in {"source_changed", "source_current_unavailable"}):
                     reasons.append({"reason": reason, "source_id": source["source_id"], "details": details})
             for block in persisted.get("blocked_claims", []):
                 if block.get("card_id") in {card_id, "*"} and block.get("claim_id") in {claim["id"], "*"}:
@@ -788,14 +821,19 @@ def inspect_context(context, *, source_ids=None):
                                  "dependencies": sorted(targets)} for claim in card["claims"])
                 blocked_cards.add(card_id)
                 changed = True
+    all_sources = selected_sources is None and (dbox_scope is None or "docs-raw/sources/dbox" in dbox_scope)
     result = {"complete": not gaps, "affected_claims": affected, "gaps": gaps,
               "rules_digest": context.args.rules_digest, "config_digest": config_digest,
               "state": persisted,
-              "coverage": {"scope": "all_sources" if selected_sources is None else "selected_sources",
+              "coverage": {"scope": "all_sources" if all_sources else "selected_sources" if selected_sources is not None else "selected_dbox_scope",
                            "source_ids": sorted(selected_sources) if selected_sources is not None else [],
-                           "all_sources_checked": selected_sources is None}}
+                           "all_sources_checked": all_sources}}
+    if dbox_scope is not None:
+        result["coverage"]["dbox_observation_scope"] = list(dbox_scope)
     if navigation_observations:
         result["code_navigation"] = list(navigation_observations.values())
+    if source_observations:
+        result["source_observations"] = list(source_observations.values())
     return result, "inspected"
 
 

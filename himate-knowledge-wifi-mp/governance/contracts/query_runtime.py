@@ -634,15 +634,19 @@ def _navigation_changed(previous, current):
                      or _navigation_identity(previous) != _navigation_identity(current))))
 
 
-def _validate_navigation_observations(previous, current, purpose, code_sources):
-    if purpose != "guidance":
-        return
+def _validate_source_observations(previous, current, purpose, code_sources):
     observed = {digest(source["source_ref"]): source for source in current}
     for source in previous:
         reference = source["source_ref"]
-        if "code_ref" not in reference or reference["source_id"] not in code_sources:
-            continue
         fresh = observed.get(digest(reference))
+        if (source.get("current_source_binding") != (fresh or {}).get("current_source_binding")
+                or ("current_source_observation" in source
+                    and source.get("current_source_sha256") != (fresh or {}).get("current_source_sha256"))):
+            raise NodeError("SOURCE_CHANGED_DURING_QUERY",
+                            "A source changed after candidate qualification; retry", blocked=True)
+        if (purpose != "guidance" or "code_ref" not in reference
+                or reference["source_id"] not in code_sources):
+            continue
         if fresh is None or _navigation_changed(
                 source.get("code_navigation", {}), fresh.get("code_navigation", {})):
             raise NodeError("SOURCE_CHANGED_DURING_QUERY",
@@ -661,6 +665,7 @@ def refresh_sources(ctx, sources, purpose, code_sources=()):
         navigation_changed = navigation_only and _navigation_changed(old_navigation, fresh_navigation)
         if (
             fresh.get("snapshot_digest") != source.get("snapshot_digest")
+            or fresh.get("current_source_binding") != source.get("current_source_binding")
             or (not navigation_only
                 and fresh.get("current_source_sha256") != source.get("current_source_sha256"))
             or navigation_changed
@@ -730,6 +735,15 @@ def source_links(ctx, sources):
         elif original.startswith("code:"):
             _, repo_id, relative = original.split(":", 2)
             evidence = code_address(repo_id, relative, navigation.get("config_digest"))
+        elif Path(original).is_absolute():
+            if (source.get("source_kind") not in {"raw", "attachment"}
+                    or not ctx.modules["source_resources"].is_dbox_path(resource.get("path"))
+                    or original != source.get("current_source_path")
+                    or source.get("current_source_binding") is None
+                    or source.get("current_source_matches") is not True
+                    or source.get("current_source_sha256") != source["sha256"]):
+                raise NodeError("SOURCE_LINK_UNAVAILABLE", "Absolute evidence is not an exact registered dbox observation", blocked=True)
+            evidence = {"base": "absolute", "path": original}
         else:
             safe(ctx.root, original)
             evidence = {"base": "knowledge_root", "path": original}
@@ -747,6 +761,12 @@ def source_links(ctx, sources):
             current_sha256 = source["current_source_sha256"]
             if source["source_kind"] == "code":
                 current = code_address(resource["repo_id"], resource["path"])
+            elif "current_source_observation" in source:
+                path = source.get("current_source_path")
+                if (not isinstance(path, str) or not Path(path).is_absolute()
+                        or source.get("current_source_binding") is None):
+                    raise NodeError("SOURCE_LINK_UNAVAILABLE", "Current external source has no bound absolute address", blocked=True)
+                current = {"base": "absolute", "path": path}
             else:
                 safe(ctx.root, resource["path"], ["docs-raw"])
                 current = {"base": "knowledge_root", "path": resource["path"]}
@@ -984,7 +1004,7 @@ def execute(ctx, *, verified_generation=None, candidate=None):
                     "Card or dependency qualification changed before output; retry",
                     blocked=True,
                 )
-            _validate_navigation_observations(
+            _validate_source_observations(
                 evaluator.evaluate(match["card_id"])[2], sources,
                 request.get("purpose", "current"), fresh.code_sources,
             )
@@ -1066,7 +1086,7 @@ def execute(ctx, *, verified_generation=None, candidate=None):
                 "Card or dependency qualification changed before read output",
                 blocked=True,
             )
-        _validate_navigation_observations(
+        _validate_source_observations(
             read_sources, fresh_sources, request.get("purpose", "current"), fresh.code_sources,
         )
         data["source_links"] = source_links(ctx, read_sources)

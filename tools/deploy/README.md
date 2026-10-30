@@ -16,6 +16,10 @@ powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 
 第三项是项目根，不是知识子目录。已有 `config.yml` 时沿用其中安全的 `knowledge_roots.wifi`；新项目默认使用 `himate-knowledge-wifi-mp/`，模块列表为空，等待维护者按真实代码填写。`~` 按当前 Windows 用户目录展开；OpenFlow 使用自定义用户根时，请相应修改安装路径。
 
+dbox仅分发知识根下的 `docs-raw/sources/dbox.example.yml` 与同目录精确 `.gitignore`，不分发私人 `dbox.local.yml` 或整个资料目录；已有local地址保持原字节，自定义ignore只安全补精确项。部署JSON的 `source_setup.status: pending_execution_host`、`configuration_checked: false` 表示来源尚待实际执行端配置。Windows `deployed`不代表SSH服务器目录可用。
+
+首次来源准备须在真正执行ingest的机器调用已安装source的公开CLI，输入 `{"operation_id":"configure-dbox-unique","path":"ACTUAL_DBOX_DIRECTORY"}`，用该端绝对目录替换占位。调用格式为 `python INSTALLED_SOURCE/scripts/cli.py --action configure --knowledge-root K --input REQUEST.json --output RESPONSE.json`。动作由CLI参数选择；这会验证并保存固定 `dbox.local.yml`，不复制部署私有源码到Linux，不递归资料。无path只检查现有配置，同地址保留字节，显式换地址无需重装能力。详细格式与错误边界见实际知识根使用说明的“首次配置 dbox 资料目录”；日常run不自动重跑配置。
+
 本机需有 Python 3.10–3.12。脚本尝试 `py`、`python3`、`python`；找不到时可输入实际解释器路径或使用 `-Python`，不会自动下载 Python。运行包按 explore 的锁定清单检查，缺失时由交互选择是否安装；自动化调用只有显式添加 `-InstallDependencies` 才会安装。安装使用选中的同一解释器。
 
 只读预检不创建目标目录，也不安装依赖：

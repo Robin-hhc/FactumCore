@@ -5,11 +5,12 @@ import stat
 from pathlib import PurePosixPath
 
 from .runtime import NodeError, fixed_bytes, load_yaml, safe, sha
+from . import source_resources
 
 RAW_DIRS = tuple(
     "docs-raw/" + name
     for name in ("conventions", "chips", "storys", "specs", "protocols", "troubleshooting")
-)
+) + (source_resources.DBOX_PREFIX,)
 IGNORED = {"AGENTS.md", ".gitkeep"}
 FINISHED = {"completed", "skipped", "withdrawn"}
 
@@ -86,9 +87,22 @@ def previous_units(records):
 
 def observe(context, scope):
     found, errors, complete = {}, {}, True
+    context.dbox_inventory_binding = None
+    context.dbox_root_error = None
     for ref in scope:
         try:
-            path = safe(context.root, ref)
+            external = source_resources.is_dbox_path(ref)
+            if external:
+                try:
+                    observed = source_resources.dbox_root(context.root, context.dbox_inventory_binding)
+                    context.dbox_inventory_binding = observed["binding"]
+                except (OSError, ValueError) as exc:
+                    context.dbox_root_error = {"path": source_resources.DBOX_PREFIX,
+                                               "code": getattr(exc, "code", "DBOX_ROOT_UNAVAILABLE")}
+                    raise
+                path = source_resources.dbox_path(context.root, ref, observed["binding"])["actual_path"]
+            else:
+                path = safe(context.root, ref)
             if not path.exists():
                 continue
             if path.is_file():
@@ -103,7 +117,7 @@ def observe(context, scope):
 
                 for parent, dirs, files in os.walk(path, followlinks=False, onerror=failed):
                     for name in list(dirs):
-                        child = safe(context.root, ref) / PurePosixPath(os.path.relpath(parent, path)) / name
+                        child = path / PurePosixPath(os.path.relpath(parent, path)) / name
                         if child.is_symlink() or (
                             os.path.lexists(child)
                             and getattr(child.lstat(), "st_file_attributes", 0)
@@ -119,13 +133,19 @@ def observe(context, scope):
                 if PurePosixPath(item).name in IGNORED:
                     continue
                 try:
-                    found[item] = sha(fixed_bytes(context.root, item, ["docs-raw"]))
-                except (OSError, NodeError) as exc:
+                    found[item] = (source_resources.read_dbox(context.root, item, context.dbox_inventory_binding)["sha256"]
+                                   if external else sha(fixed_bytes(context.root, item, ["docs-raw"])))
+                except (OSError, ValueError) as exc:
                     complete = False
                     errors[item] = getattr(exc, "code", type(exc).__name__)
-        except (OSError, NodeError) as exc:
+            if external:
+                source_resources.dbox_root(context.root, context.dbox_inventory_binding)
+        except (OSError, ValueError) as exc:
             complete = False
             errors[ref] = getattr(exc, "code", type(exc).__name__)
+            if external and getattr(exc, "code", "") in {
+                    "DBOX_CONFIG_REQUIRED", "DBOX_CONFIG_INVALID", "DBOX_ROOT_UNAVAILABLE", "DBOX_BINDING_CHANGED"}:
+                context.dbox_root_error = {"path": source_resources.DBOX_PREFIX, "code": exc.code}
     return found, errors, complete
 
 
@@ -139,12 +159,15 @@ def scan(context, *, current_context=None):
     scope, full_scan = scopes(context.request)
     if current_context is None:
         inspection = context.modules["runtime"].fork_context(
-            context, request={"operation_id": context.operation}, action="inspect-context")
+            context, request={"operation_id": context.operation,
+                              "dbox_observation_scope": [ref for ref in scope if source_resources.is_dbox_path(ref)]},
+            action="inspect-context")
         current_context, _ = context.modules["maintenance"].inspect_context(inspection)
     records, leaves = histories(context)
     previous = previous_units(records)
-    if context.request.get("source") is not None and not safe(context.root, scope[0]).exists() and not any(
-            selected(path, scope) for path in previous):
+    if (context.request.get("source") is not None and not source_resources.is_dbox_path(scope[0])
+            and not safe(context.root, scope[0]).exists() and not any(
+            selected(path, scope) for path in previous)):
         raise NodeError("RAW_SCOPE_NOT_FOUND", "Explicit raw scope does not exist and has no registered deletion history", scope[0])
     found, errors, complete = observe(context, scope)
     lock = context.modules["source_resources"].read_source_lock(context.root)
@@ -202,8 +225,15 @@ def scan(context, *, current_context=None):
         units.append({"unit_id": "raw-" + sha(path.encode())[:24], "path": path, "source_id": source_id,
                       "observed_fingerprint": fingerprint, "previous_fingerprint": old,
                       "change": change, "read_error": errors.get(path), "progress": progress})
+    if (context.request.get("source") is not None and source_resources.is_dbox_path(scope[0])
+            and context.dbox_root_error is None and not found and not errors
+            and not source_resources.dbox_path(context.root, scope[0], context.dbox_inventory_binding)["actual_path"].exists()
+            and not any(selected(path, scope) for path in previous)):
+        raise NodeError("RAW_SCOPE_NOT_FOUND", "Explicit dbox scope does not exist and has no registered deletion history", scope[0])
     manifest = context.seal({"scope": scope, "full_scan": full_scan, "complete": complete, "units": units,
                              "current_context": current_context,
+                             **({"dbox_binding": context.dbox_inventory_binding} if context.dbox_inventory_binding else {}),
+                             **({"dbox_root_error": context.dbox_root_error} if context.dbox_root_error else {}),
                              "prior_record_digests": sorted(r["digest"] for r in leaves)}, "source_inventory")
     context.modules["records"].validate_scan_manifest(manifest, context.rules)
     ref = context.base + "/source-inventory.json"

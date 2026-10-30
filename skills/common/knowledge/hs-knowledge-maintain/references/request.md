@@ -6,6 +6,24 @@
 
 `inspect-context`: `operation_id`. Reads exact adopted sources and existing restrictions without advancing state. A `historical` Claim whose exact old source and locator resolve successfully does not acquire a current-maintenance obligation merely because today's source bytes differ or are unavailable. Source-bound `source_changed`, `code_changed` and `code_source_changed` events likewise do not impose current freshness on that recovered history; their durable state is retained. Unrecoverable old evidence, semantic/applicability restrictions and unbound broad restrictions remain affected. Current Claims keep their existing checks. For guidance code sources declaring code_ref, separately inspect actual navigation; pure source drift with resolved navigation does not create a navigation-repair obligation. Real affected cards still propagate through `requires`/`derived_from`, not ordinary links. This uses source facts, never earlier skip or review results. `audit-references` separately retains historical/current byte-difference observations.
 
+For configured dbox documents, `source_observations` separately reports the
+logical source and its actual current access status. Missing configuration or an
+unreadable root is `source_current_unavailable` with the source diagnostic code;
+it is not proof of changed document bytes or lost fixed evidence. An actual byte
+change retains `source_changed`, and unavailable fixed evidence retains
+`source_unavailable`. Recovered historical Claims do not gain a current-source
+restriction solely from local mapping availability. Other existing Claim and
+durable restrictions remain in force. This read-only action never registers a
+team source-change event merely because the local mapping differs, and its
+report does not contain the private physical source path.
+
+An explicit raw scan limits current dbox observation to that scan's selected
+logical dbox ranges; selecting only ordinary raw does not read unrelated dbox
+configuration or current files. The internal `dbox_observation_scope` is reflected
+in coverage, and unobserved sources are not declared current or unavailable.
+Existing durable restrictions still apply. Independent `inspect-context` without
+that limit keeps its default full observation.
+
 `advance`: `operation_id`. Compares actual cards/Claims and exact current source references to clear resolved mechanical freshness restrictions. No apply, query, active-generation or passing-review ticket is required. Unknown or changed code/config scope remains restricted; a matching byte hash does not prove semantics or applicability. It never labels a Claim independently reviewed merely because a restriction was cleared. OpenFlow handles the content-review process.
 
 `recover-events`: `operation_id`. Completes exact sealed source events retained in pending state. Pending restrictions and epoch remain durable before event publication; repeated source versions carry exact snapshot identities. Cooperating writer locks and before/after file checks prevent concurrent state corruption.

@@ -270,6 +270,11 @@ class PublicCodeGateTests(unittest.TestCase):
             self.root / "governance",
             ignore=shutil.ignore_patterns("__pycache__"),
         )
+        empty_dbox = self.workspace / "empty-dbox"
+        empty_dbox.mkdir()
+        local = self.root / "docs-raw/sources/dbox.local.yml"
+        local.parent.mkdir(parents=True)
+        local.write_text(yaml.safe_dump({"schema_version": "1.0", "path": str(empty_dbox)}), encoding="utf-8")
         self.root.joinpath(".isolated-knowledge-fixture").write_text(
             "HIMATE_SYNTHETIC_FIXTURE_V2", encoding="utf-8"
         )

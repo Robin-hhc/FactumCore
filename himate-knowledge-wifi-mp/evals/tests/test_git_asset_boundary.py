@@ -28,6 +28,8 @@ def checkout(tmp_path):
     "logs/operations/ingest/apply-result.json",
     "logs/operations/ingest/backups/old.bin",
     "logs/operations/.writer.lock",
+    "logs/patrol/round/plan.json",
+    "logs/patrol/round/source-inventory.json",
     "logs/evidence/objects/source.bin",
     "logs/evidence/checked-code/wifi.c",
     "logs/evidence/extractions/source.txt",

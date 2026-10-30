@@ -1,9 +1,33 @@
 template_id: hs-knowledge-lint
 canvas:
   nodes:
-    check_formal:
+    sync_workspace:
       x: 0
       y: 0
-    audit_references:
+    plan_patrol:
       x: 360
       y: 0
+    prepare_sources:
+      x: 720
+      y: 0
+    plan_change:
+      x: 1080
+      y: 0
+    materialize_view:
+      x: 1440
+      y: 0
+    lint_view:
+      x: 1800
+      y: 0
+    record_ingest:
+      x: 2160
+      y: 0
+    apply_view:
+      x: 2520
+      y: 0
+    refresh_index:
+      x: 2880
+      y: 280
+    complete_patrol:
+      x: 3240
+      y: 280

@@ -33,6 +33,13 @@ def extract(context, data, suffix, *, primary=True):
         raise NodeError(exc.code, exc.message, exc.path, blocked=exc.code == "PARTIAL_DOCUMENT") from exc
     except ImportError as exc:
         raise NodeError("SOURCE_ADAPTER_UNAVAILABLE", "The fixed document adapter is unavailable", blocked=True) from exc
+    except Exception as exc:
+        # Fixed adapters expose format-specific exceptions for malformed input.
+        # Preserve programmer errors; only adapter/encoding failures become
+        # source diagnostics which an opt-in patrol may isolate per document.
+        if isinstance(exc, (UnicodeError, EOFError)) or type(exc).__module__.split(".")[0] in {"pypdf", "docx", "lxml", "zipfile"}:
+            raise NodeError("UNREADABLE_DOCUMENT", "The fixed adapter cannot read this original: " + str(exc)) from exc
+        raise
 
 
 def raw_member(context, ref):
@@ -56,9 +63,9 @@ def raw_member(context, ref):
     return {"path": ref, "data": data, "signature": signature(after)}
 
 
-def check_attachments(members):
-    supplied = {member["path"] for member in members}
-    gaps = []
+def _attachment_references(members):
+    """Parse local references once for both explicit checks and enumeration."""
+    references, gaps = [], []
     for member in members:
         if PurePosixPath(member["path"]).suffix.lower() != ".md":
             continue
@@ -102,13 +109,37 @@ def check_attachments(members):
                 elif part != ".":
                     parts.append(part)
             resolved = "/".join(parts)
-            if resolved not in supplied:
-                raise NodeError(
-                    "ATTACHMENT_REQUIRED",
-                    "Referenced local attachment must be explicit",
-                    resolved,
-                )
+            references.append(resolved)
+    return sorted(set(references)), gaps
+
+
+def check_attachments(members):
+    supplied = {member["path"] for member in members}
+    references, gaps = _attachment_references(members)
+    for resolved in references:
+        if resolved not in supplied:
+            raise NodeError("ATTACHMENT_REQUIRED", "Referenced local attachment must be explicit", resolved)
     return gaps
+
+
+def local_attachments(context, primary):
+    """Enumerate landed Markdown dependencies; never fetch URIs or follow links.
+
+    This is an explicit prepare option, not source.capture's default behavior.
+    Every discovered path goes through the same raw class and safe-file checks
+    as explicitly supplied evidence. Cycles are finite and originals stay read
+    only. Unsupported media retain opaque bytes and extraction limitations.
+    """
+    members, pending = {}, [primary]
+    while pending:
+        ref = pending.pop()
+        if ref in members:
+            continue
+        member = raw_member(context, ref)
+        members[ref] = member
+        references, _ = _attachment_references([member])
+        pending.extend(path for path in references if path not in members)
+    return sorted(set(members) - {primary})
 
 
 def snapshot_text(context, snapshot, resource, data, *, staged_objects=None):

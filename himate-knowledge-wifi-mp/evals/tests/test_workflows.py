@@ -79,7 +79,7 @@ def test_active_old_skill_is_rejected_but_empty_historical_directory_is_not(tmp_
                for error in module.validate(source))
 
 
-def test_ingest_stays_complete_beside_the_read_only_lint_template():
+def test_ingest_stays_complete_beside_the_governance_lint_template():
     ingest = yaml.safe_load(
         (
             ROOT / "workflows/common/knowledge/hs-knowledge-ingest/workflow.yaml"
@@ -114,24 +114,34 @@ def test_ingest_stays_complete_beside_the_read_only_lint_template():
     assert "proof_set" not in nodes["apply_view"]["prompt"]
 
 
-def test_lint_workflow_is_two_read_only_skills_with_a_report_exit():
+def test_lint_workflow_filters_changes_then_reuses_ingest_without_nested_workflows():
     workflow = yaml.safe_load(
         (ROOT / "workflows/common/knowledge/hs-knowledge-lint/workflow.yaml").read_bytes()
     )
-    assert workflow["entry_node"] == "check_formal"
-    assert workflow["entry"] == {"skill": "hs-knowledge-lint"}
-    nodes = workflow["nodes"]
-    assert [(node["id"], node["type"], node["owner"], node["skill"]) for node in nodes] == [
-        ("check_formal", "skill", "reviewer", "hs-knowledge-lint"),
-        ("audit_references", "skill", "reviewer", "hs-knowledge-maintain"),
-    ]
-    assert [{edge["id"]: edge["target"] for edge in node["exits"]} for node in nodes] == [
-        {"checked": "audit_references"}, {"reported": "__end__"},
-    ]
-    # A report can be complete as an artifact while retaining failed checks.
-    assert "failed" in nodes[0]["exits"][0]["condition"]
-    assert "incomplete" in nodes[0]["exits"][0]["condition"]
-    assert "audit-references" in nodes[1]["prompt"]
+    assert workflow["entry_node"] == "sync_workspace"
+    assert workflow["entry"] == {"skill": "hs-knowledge-maintain"}
+    nodes = {node["id"]: node for node in workflow["nodes"]}
+    assert list(nodes) == ["sync_workspace", "plan_patrol", "prepare_sources", "plan_change",
+                           "materialize_view", "lint_view", "record_ingest", "apply_view",
+                           "refresh_index", "complete_patrol"]
+    assert {e["id"]: e["target"] for e in nodes["plan_patrol"]["exits"]} == {
+        "needs_ingest": "prepare_sources", "needs_index": "refresh_index",
+        "unchanged": "complete_patrol", "blocked": "__end__",
+    }
+    assert {e["id"]: e["target"] for e in nodes["apply_view"]["exits"]} == {
+        "completed": "complete_patrol", "recorded": "complete_patrol"}
+    assert "patrol-sync" in nodes["sync_workspace"]["prompt"]
+    assert "重新" in nodes["plan_patrol"]["prompt"]
+    assert "source_request" in nodes["prepare_sources"]["prompt"]
+    assert "prepare" in nodes["prepare_sources"]["prompt"]
+    assert "patrol-complete" in nodes["complete_patrol"]["prompt"]
+    ingest = yaml.safe_load((ROOT / "workflows/common/knowledge/hs-knowledge-ingest/workflow.yaml").read_bytes())
+    original = {node["id"]: node for node in ingest["nodes"]}
+    for identity in ("plan_change", "materialize_view", "lint_view", "record_ingest"):
+        assert nodes[identity] == original[identity]
+    assert nodes["apply_view"]["prompt"] == original["apply_view"]["prompt"]
+    assert nodes["lint_view"]["owner"] == "reviewer"
+    assert all(not any(key in node for key in ("workflow", "runner", "run")) for node in nodes.values())
 
 
 def test_ingest_finishes_locally_without_repository_submission():
@@ -299,34 +309,35 @@ def test_six_node_graph_rejects_skipped_review_wrong_reentry_and_retired_nodes(t
 
 @pytest.mark.parametrize("mutation, expected", [
     ("wrong_entry", "invalid template identity/entry"),
-    ("write_skill", "wrong Skill/owner/type"),
-    ("skip_audit", "unsafe or missing transition"),
+    ("wrong_skill", "wrong Skill/owner/type"),
+    ("skip_completion", "unsafe or missing transition"),
     ("cross_template", "unsafe or missing transition"),
     ("extra_writer", "complete node set/uniqueness mismatch"),
     ("external_runner", "unsupported runtime field"),
     ("child_workflow", "unsupported runtime field"),
 ])
-def test_read_only_lint_workflow_rejects_writers_shortcuts_and_external_calls(tmp_path, mutation, expected):
+def test_governance_lint_workflow_rejects_shortcuts_and_external_calls(tmp_path, mutation, expected):
     module = validator_module()
     source = fixture_packages(tmp_path / "fixture")
     path = source / "workflows/common/knowledge/hs-knowledge-lint/workflow.yaml"
     workflow = yaml.safe_load(path.read_bytes())
-    check, audit = workflow["nodes"]
+    sync, plan = workflow["nodes"][:2]
     if mutation == "wrong_entry":
-        workflow["entry_node"] = "audit_references"
-    elif mutation == "write_skill":
-        audit["skill"] = "hs-knowledge-apply"
-    elif mutation == "skip_audit":
-        check["exits"][0]["target"] = "__end__"
+        workflow["entry_node"] = "plan_patrol"
+    elif mutation == "wrong_skill":
+        plan["skill"] = "hs-knowledge-apply"
+    elif mutation == "skip_completion":
+        apply = next(node for node in workflow["nodes"] if node["id"] == "apply_view")
+        apply["exits"][0]["target"] = "__end__"
     elif mutation == "cross_template":
-        check["exits"][0]["target"] = "hs-knowledge-ingest:prepare_sources"
+        plan["exits"][0]["target"] = "hs-knowledge-ingest:prepare_sources"
     elif mutation == "extra_writer":
         workflow["nodes"].append({"id": "apply", "type": "skill", "owner": "coder",
                                   "skill": "hs-knowledge-apply", "prompt": "write", "exits": []})
     elif mutation == "external_runner":
-        audit["runner"] = "python external.py"
+        plan["runner"] = "python external.py"
     elif mutation == "child_workflow":
-        audit["workflow"] = "hs-knowledge-ingest"
+        plan["workflow"] = "hs-knowledge-ingest"
     path.write_text(yaml.safe_dump(workflow), encoding="utf-8")
     assert any(expected in error for error in module.validate(source))
 

@@ -39,6 +39,7 @@ config.local.yml
 /himate-knowledge-wifi-mp/logs/evidence/locators/
 /himate-knowledge-wifi-mp/logs/operations/*
 !/himate-knowledge-wifi-mp/logs/operations/.gitkeep
+/himate-knowledge-wifi-mp/logs/patrol/
 
 # Retired independent checkout, if still present locally.
 /aiot-knowledge/

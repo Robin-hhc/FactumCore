@@ -27,6 +27,8 @@ P5 缺材料时直接调用 `prepare`，用新操作、旧稿绑定的 `existing
 
 `record` reconciles every inventory unit with an explicit disposition and writes a proposed record under `.build/operations/`. Every skip retains its reason and exact observed version; OpenFlow may require independent sampling in its workflow. P7 alone writes the formal `logs/ingest/` record with actual apply facts. Defer, failed and uncovered units remain unfinished.
 
+治理巡检显式调用 prepare，直接消费 maintain.patrol-plan 的 source_request，保留变化 raw 与待修卡材料的并集；纯代码可没有 raw。仅显式开启 tolerate_source_errors / collect_local_attachments 时，逐单元保留坏材料欠账并机械枚举安全的本地 Markdown 附件；不吞输入漂移、不抓取远端或声称图片语义已抽取。固定巡检库存保留于本机 logs/patrol，不由生产者 P7 清理；默认 source.run/scan 与严格备料行为保持原约定。
+
 `status` with `target_operation_id` reads that operation's fixed protocol slots and exact referenced closure. Published operations use formal `logs/publications/<op>/manifest.json` and `completion.json`, without requiring cleaned draft/view/journal files. It does not scan unrelated catalogs, search formal records for another filename, infer an adopted successor, or guess associations with independent index/regression reports. Without a target, `status` is an explicit global history overview and reports corrupt history in `catalog_gaps`. Fixed batch intent/build/completion references can explain the original P7 stop; unlinked legacy independent results remain unknown. Saved execution completion is not fresh index health. Reuse the original `expected_active`, including null. The action never repairs or writes files and leaves Git submission, CI and merge unverified.
 
 P1—P6 的本批新业务文件及请求／输出只写本批 `.build/operations/<op>/` 暂存；P6 不提前写正式成功记录。P7 在内容发布和核验后发布正式处理事实，完成适用检索收尾，再清本批可删暂存。清后普通 scan 依赖正式记录和当前输入；明确 target status 依赖正式 publication。旧正式记录及明确旧引用按原版本读取，不重签或默认采用旧稿。

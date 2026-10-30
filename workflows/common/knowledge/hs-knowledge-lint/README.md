@@ -1,18 +1,18 @@
-# WiFi 知识引用巡检 Workflow
+# WiFi 知识治理巡检
 
-此模板由 OpenFlow 直接编排两个已安装 Skill 节点，供手动启动或已有外部调度定期启动。只生成正式库检查及引用差异报告，保留原检查的失败和未完成范围。
+用于个人本地及外部半日／每日调度：自动发现 raw 未入库变化、直接登记的代码文件变化与旧欠账，并复用 ingest 能力处理。公开 Skill 仍为八个；同名 lint Skill 继续提供独立只读检查及 P5 review。
 
-目标代码仓在远端时，通过 OpenFlow／宿主已有的 SSH MCP 在远端项目根执行脚本、读取文件和进行仓库操作，使用执行端的全局 Python 与已安装 Skill 路径，并核对实际结果；本地路径不能直接用于远端。连接由宿主管理，Skill／Workflow 不维护单独的 SSH 配置。
+1. `sync_workspace` 调用已安装 maintain 的 `patrol-sync`。配置来自控制端的 `sync.argv/cwd/timeout_seconds`；未配置同步时为 skipped，仅检查本地现状。内部可适配根目录 `git mm sync`，其它 MM 子命令不作假设。
+2. `plan_patrol` **另起 CLI 进程**，重新加载实际规则／配置／知识仓，调用 `patrol-plan`。脚本比较上次成功水位与各仓 HEAD，合并未提交修改，再只对命中登记文件核 hash／符号；首轮或缺历史等情况回退全部登记文件精确核对。读取实际 `plan_ref/report_ref/source_request/counts/gaps`。
+3. 有内容事项时，`prepare_sources` 直接用 `source_request` 调用 source.prepare。请求明确取“变化 raw + 待修旧卡对应 raw”的并集，纯代码可使用空 raw 加明确 targets。逐单元坏材料保留 gap，漂移仍阻断。
+4. 复用 ingest 的 P3、P4、独立 reviewer P5、P6、P7；算法和返工边相同，仅 P7 完成后回 `complete_patrol`。不嵌套 Workflow，也不复制 Python 内容生产算法。
+5. 仅索引事项走 `refresh_index`，复用公共索引、实际查询和同代 read、原 expected_active 激活。
+6. `complete_patrol` 消费原 `plan_ref` 及真实发布／completion，重新核来源、正式跨轮 Claim 欠账、候选元数据引用和活动索引。事项已完成而仅缺失／陈旧派生索引时，复用实际构建、查询和激活补齐；实际完成才 CAS 保存本地成功基线。欠账、失败、漂移或 cleanup 未完返回 pending，基线不推进。无待办也经此确认后结束。
 
-1. `check_formal` 调用原 `hs-knowledge-lint` Skill，沿用默认 formal/full。Agent 根据实际项目配置准备确切来源输入及适用的 `inputs.code_checkout`，将原 JSON 报告保存到知识根 `.build/` 内的新路径。
-2. `audit_references` 显式调用 `hs-knowledge-maintain --action audit-references`，传入本次 `operation_id` 与相对知识根的 `lint_report_ref`，读取返回的 `audit_ref` JSON 和 `report_ref` Markdown。将实际 `report_ref` 在执行端解析为真实文件路径，显式填入产物实例的 `location.path`，不能以模板默认位置代替报告，再按 `reported` 出口结束。
+current 的整文件证据改变需交作者复核，即使只是函数前插行；guidance 的 code_ref 仍唯一可定位时使用当前位置，不重写旧 locator；historical 保留可恢复的旧依据。删除、改名、歧义及不可解析分别报告，不猜测替换入口。未登记的间接语义依赖暂不扫描。
 
-`workflows/common/knowledge/hs-knowledge-lint/` 是开发分发的 Workflow，安装后位于宿主 Workflow 目录；`skills/common/knowledge/hs-knowledge-lint/` 是同名只读检查 Skill，安装后位于宿主 Skill 目录。两者处于不同资源命名空间。原 `knowledge lint` 逻辑命令仍表示单独调用只读 Skill；巡检需要显式启动本 Workflow。
+已发布未完成 P7 时，plan 返回 blocked 及精确 operation/publication/completion/resume_request。按该引用续办原 batch 的缺失阶段，不能新起 apply 重放。基础配置／登记损坏也保留实际阻断；没有有效结果的运行故障留在原节点等待。
 
-原 lint 报告为 failed/incomplete 时仍可进入引用汇总；巡检报告有问题或未完整时也可完成“报告生成”。这些状态必须原样披露，不能声称全库健康、已修复或已更新索引。规则或运行错误导致没有可用报告时保留宿主原生等待，不能选择结束出口。
+实现位于已安装 maintain 和受锁公共 contracts，Workflow 只分发 YAML、布局和本文。原独立 ingest 不变。观察日志／库存位于本机 `K/logs/patrol/<操作>/`，成功水位位于 `K/.build/runtime/patrol-state.json`，均忽略于 Git；P7 不删除完成核验所需的巡检观察。旧证据、旧定位及正式历史不覆盖。Git 提交、推送和 CI 合入保持后续独立操作。
 
-模板不调用子 Workflow，不自动修订、不入库、不登记变化事件或推进水位，不重建或激活活动索引。后续修订由用户另行发起 ingest。文件指纹变化表示引用依据发生变化，Agent 查询时仍须读取当前实际函数及所需周边代码；未引用的代码语义变化不属于本巡检的完整覆盖范围。
-
-`workflow.yaml` 定义节点、角色和出口；`layouts.yaml` 定义画布坐标。源文件和原件保持只读，报告留在知识根已有 `.build/` 体系。当前模板未内置定时器，也不建立外部 runner。
-
-本Workflow仍仅上述两个节点。lint和audit可写本次自己的stage报告，不清理这些报告、不清其它任务stage，也不发布ingest业务内容。常规本批清理只属于ingest P7；独立maintain明确事件／水位动作保持其原业务职责，不因ingest前六步暂存约束而失效。
+外部调度前需在内部验收实际 MM 配置、同步覆盖仓、权限、宿主新进程规则重载及 reviewer 隔离。这里的脚本和合成测试不证明真实 OpenFlow 调度或业务知识准确性。详细流程、分支和接口见领域[详细设计 §3.1](../../../../himate-knowledge-wifi-mp/docs-llm-wiki/知识库详细设计.md#31-lint-的检查流程)；安装后从实际知识根文档读取。

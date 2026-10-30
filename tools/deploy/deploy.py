@@ -416,6 +416,7 @@ def _knowledge_payload(source_root, project_root):
     add(".gitignore", (
         "/.build/*\n!/.build/.gitkeep\n/artifacts/*\n!/artifacts/.gitkeep\n"
         "/logs/operations/*\n!/logs/operations/.gitkeep\n"
+        "/logs/patrol/\n"
         "/logs/evidence/objects/\n/logs/evidence/checked-code/\n"
         "/logs/evidence/extractions/\n/logs/evidence/locators/\n"
         "/docs-llm-wiki/sdd/\n/docs-llm-wiki/task.md\n__pycache__/\n*.pyc\n*.env\n"

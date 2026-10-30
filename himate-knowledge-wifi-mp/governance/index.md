@@ -5,7 +5,7 @@
 | `framework.lock.yaml` | 固定 2.0 契约代码、Schema、模板及声明的确切字节摘要 |
 | `sources.lock.yaml` | 来源资源和固定快照登记，以实际内容为准 |
 | `schemas/` | 字段形状、Profile 与公共受控值 |
-| `contracts/` | 五个纯领域 API，统一解析、路径、来源、Claim、范围、关系与记录契约；节点程序通过受信摘要加载 |
+| `contracts/` | 同进程公共领域 API，统一解析、来源、Claim、索引、发布与治理；`source_inventory` 复用原件扫描，`patrol`/`patrol_git`/`patrol_index` 负责差异筛选、同步适配和实际完成核验；节点通过受信摘要加载 |
 | `templates/` | 七类卡、导航与处理记录模板 |
 | `specs/` | 卡片、来源、记录和生命周期规范 |
 

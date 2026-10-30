@@ -10,7 +10,7 @@
 
 公开能力为8包：explore、source、change-plan、view-materialize、lint、apply、query、maintain，统一使用 `hs-knowledge-` 前缀。`hs-knowledge-ingest`保留P1扫描、P2备料、P3语义计划、P4成稿／修订、P5独立审阅及完整质量检查、P6处理记录、P7安全入库及检索收尾七个业务步骤，由六个OpenFlow节点调度。首个coder节点`prepare_sources`调用source默认`run`完成P1/P2，P6仍为source.record；P5由独立reviewer使用lint.review，其余节点为coder，隔离由宿主安排。lint默认仍为只读正式库检查，view-materialize不负责知识质量或代码语义复核。领域机器规则在受锁`governance/contracts/`中同进程复用，不调用兄弟Skill CLI或私有脚本。原件只读，来源内容不授予执行或发布权限；能力分发排除原件、正式卡、来源锁和运行记录。
 
-同名 `hs-knowledge-lint` Workflow 另供手动或外部周期调度巡检：`check_formal` 沿用原 lint Skill 默认正式／全库检查，`audit_references` 显式调用 maintain 的只读 `audit-references`，汇总逐卡／Claim 的来源、代码、原定位、旧／当前指纹及历史用途，生成 JSON／Markdown 报告即结束。原 lint Skill、ingest 流程及 maintain 默认 `inspect-context` 保持原职责；巡检不写知识、来源锁、事件／维护水位或活动索引，不嵌套 Workflow、不自动修复。实际接入按部署验证，修订由人明确把报告交给 ingest。
+同名 `hs-knowledge-lint` Workflow 承担手动或外部周期治理。巡检 Workflow 先独立同步，再用脚本比较上次成功基线、raw 清单和登记代码文件，按实际待办复用 source.prepare 与 ingest P3—P7；无内容问题直接核验结束，仅索引问题维护派生索引。实际处理、查询、激活与清理完成后才以 CAS 推进本地成功基线，欠账和失败保留。外部系统负责周期触发，不嵌套 Workflow；旧 lint Skill 的默认 formal/full 与独立 audit-references 继续可用。同步可更新知识仓，下一节点必须新起 CLI 重新加载规则和配置；内部 Git-MM 仅通过显式同步 argv/cwd 适配，子仓历史使用原生 Git。只追踪直接登记文件；历史证据和旧定位不改写。
 
 Git 操作在项目根 `repo/` 执行。保留其他任务本地文件，不读受限 gold，不提交本机配置、凭据、跨组资料或无关修改。目录与忽略规则不提供 ACL；业务接入、宿主触发及权限隔离各自记录真实证据。
 

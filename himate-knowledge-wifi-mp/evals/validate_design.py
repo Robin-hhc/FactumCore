@@ -31,36 +31,40 @@ ARTIFACT_SCOPE = {
     'hs-knowledge-change-plan': (['plan_change'], ['content_planned']),
     'hs-knowledge-view-materialize': (['materialize_view'], ['ready']),
     'hs-knowledge-lint': (
-        ['lint_view', 'check_formal'],
-        ['passed', 'needs_material', 'needs_plan', 'needs_revision', 'checked'],
+        ['lint_view'],
+        ['passed', 'needs_material', 'needs_plan', 'needs_revision'],
     ),
     'hs-knowledge-apply': (['apply_view'], ['completed', 'recorded']),
     'hs-knowledge-query': ([], []),
-    'hs-knowledge-maintain': ([], []),
+    'hs-knowledge-maintain': (
+        ['sync_workspace', 'plan_patrol', 'refresh_index', 'complete_patrol'],
+        ['synced', 'skipped', 'needs_ingest', 'needs_index', 'unchanged', 'blocked',
+         'indexed', 'completed', 'pending'],
+    ),
 }
 EXTRA_ARTIFACT_SCOPE = {
     'hs-knowledge-source': {'record-result.yaml': (['record_ingest'], ['recorded'])},
-    'hs-knowledge-maintain': {'audit-result.yaml': (['audit_references'], ['reported'])},
+    'hs-knowledge-maintain': {'audit-result.yaml': ([], [])},
 }
 EXTRA_ARTIFACT_IDS = {
     ('hs-knowledge-maintain', 'audit-result.yaml'): 'hs-knowledge-code-reference-audit',
 }
-OWNERS = {'lint_view': 'reviewer',
- 'check_formal': 'reviewer',
- 'audit_references': 'reviewer'}
+OWNERS = {'lint_view': 'reviewer'}
 NODE_SKILLS = {'prepare_sources': 'hs-knowledge-source',
  'plan_change': 'hs-knowledge-change-plan',
  'materialize_view': 'hs-knowledge-view-materialize',
  'lint_view': 'hs-knowledge-lint',
  'record_ingest': 'hs-knowledge-source',
  'apply_view': 'hs-knowledge-apply',
- 'check_formal': 'hs-knowledge-lint',
- 'audit_references': 'hs-knowledge-maintain'}
+ 'sync_workspace': 'hs-knowledge-maintain',
+ 'plan_patrol': 'hs-knowledge-maintain',
+ 'refresh_index': 'hs-knowledge-maintain',
+ 'complete_patrol': 'hs-knowledge-maintain'}
 WORKFLOW_ENTRIES = {
     'hs-knowledge-ingest': ('prepare_sources', 'hs-knowledge-source'),
-    'hs-knowledge-lint': ('check_formal', 'hs-knowledge-lint'),
+    'hs-knowledge-lint': ('sync_workspace', 'hs-knowledge-maintain'),
 }
-# Exact contracts for the existing ingest graph and the separate read-only graph.
+# Exact contracts for ingest and the governance workflow sharing P3-P7.
 # Template identity is independent of Skill identity, even when names match.
 EDGES = {
     'hs-knowledge-ingest': {
@@ -74,8 +78,19 @@ EDGES = {
         'apply_view': {'completed': '__end__', 'recorded': '__end__'},
     },
     'hs-knowledge-lint': {
-        'check_formal': {'checked': 'audit_references'},
-        'audit_references': {'reported': '__end__'},
+        'sync_workspace': {'synced': 'plan_patrol', 'skipped': 'plan_patrol'},
+        'plan_patrol': {'needs_ingest': 'prepare_sources', 'needs_index': 'refresh_index',
+                        'unchanged': 'complete_patrol', 'blocked': '__end__'},
+        'prepare_sources': {'prepared': 'plan_change'},
+        'plan_change': {'content_planned': 'materialize_view', 'needs_material': 'prepare_sources'},
+        'materialize_view': {'ready': 'lint_view', 'needs_material': 'prepare_sources',
+                             'needs_plan': 'plan_change'},
+        'lint_view': {'passed': 'record_ingest', 'needs_material': 'prepare_sources',
+                      'needs_plan': 'plan_change', 'needs_revision': 'materialize_view'},
+        'record_ingest': {'recorded': 'apply_view'},
+        'apply_view': {'completed': 'complete_patrol', 'recorded': 'complete_patrol'},
+        'refresh_index': {'indexed': 'complete_patrol'},
+        'complete_patrol': {'completed': '__end__', 'pending': '__end__'},
     },
 }
 class UniqueLoader(yaml.SafeLoader):
@@ -187,8 +202,8 @@ def validate(root):
         except (OSError, ValueError, AttributeError, yaml.YAMLError) as exc:
             errors.append(f"{skill}: {exc}")
     # Every native contract uses the real node IDs and exit names. The shared
-    # lint report covers P5 result exits and the separate formal audit's checked
-    # exit; its statuses remain distinct in the report itself.
+    # lint report covers P5 exits. The explicit manual audit keeps a separate
+    # artifact identity without claiming a removed workflow node obligation.
     for skill, contracts in EXTRA_ARTIFACT_SCOPE.items():
         package = root / "skills/common/knowledge" / skill
         for name, (expected_nodes, expected_exits) in contracts.items():

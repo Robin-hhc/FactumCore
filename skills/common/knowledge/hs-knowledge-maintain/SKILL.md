@@ -1,6 +1,6 @@
 ---
 name: hs-knowledge-maintain
-description: Register exact source-change events, inspect affected Claims and recheck mechanical freshness restrictions against current cards and source bytes.
+description: Plan incremental knowledge patrols, hand exact changes to ingest, verify actual completion and maintain source-change restrictions.
 ---
 
 已有项目上下文时直接复用；缺少入口信息才使用已安装的 `hs-knowledge-explore` 做只读发现。首次部署或本机依赖缺项时，按知识根使用说明运行分发仓根 `deploy.ps1`，不自动执行 pip 或远端 setup；远端任务另核实际执行端的 Python、依赖和能力路径。
@@ -9,7 +9,7 @@ description: Register exact source-change events, inspect affected Claims and re
 
 本 Skill 可由人工单独调用。只校验本次业务输入、实际文件及输出，不检查 Workflow 顺序或上游通过凭证。流程顺序、角色分工与交棒合法性由 OpenFlow 的 Workflow 管理；人工测试时由人选择顺序。
 
-Use `scripts/cli.py --input REQUEST.json --output RESPONSE.json --knowledge-root K  --action inspect-context|audit-references|register-source-change|register-code-change|recover-events|status|advance`. All event changes use the domain cooperative writer lock. [Request details](references/request.md) explain each action's actual inputs and checks.
+Use `scripts/cli.py --input REQUEST.json --output RESPONSE.json --knowledge-root K  --action inspect-context|patrol-sync|patrol-plan|patrol-reindex|patrol-complete|audit-references|register-source-change|register-code-change|recover-events|status|advance`. All event changes use the domain cooperative writer lock. [Request details](references/request.md) explain each action's actual inputs and checks.
 
 `inspect-context` 在 ingest 开始时只读比较实际来源、代码/配置和规则身份，输出受影响 Claim、依赖和缺口，不要求先登记本机变化事件。未知上下文保留限制；OpenFlow 安排必要的 P2—P7 内容修订、复核和收尾。query 另按相同当前引用和确切资格判断过滤，不因 raw 未变而信任旧代码。
 
@@ -26,3 +26,15 @@ The [artifact contract](artifacts/result.yaml) requires the actual per-attempt C
 只在本操作 `.build/operations/<operation_id>/` 新建 JSON、Markdown 及只读解析的请求／响应。返回 `phase: reported`、`data.audit_ref/report_ref/complete/status/counts`；`data.status` 为 `passed`、`needs_review` 或 `incomplete`，CLI 的成功仅表示实际报告已生成。新 [巡检产物契约](artifacts/audit-result.yaml) 与旧节点结果分开。报告附手动进入 ingest 的提示词，本动作不调用 ingest Workflow、不改源码、卡、来源锁、事件、水位或活动索引，不运行 apply／advance，也不捕获新来源。
 
 独立显式register-source-change/register-code-change/recover-events/advance仍可写其正式事件／水位，使用统一稳定writer协议；ingest P1—P6的事件仅为本批暂存拟稿，由P7按已冻结old→new转换发布。inspect-context与audit-references只读正式业务状态，可写自己的报告。不增加常规cleanup动作；P7负责本批可删stage，maintenance不反扫旧op补出新Workflow意图。
+
+## 增量治理动作
+
+`patrol-sync` 仅执行控制端显式提供的同步 argv/cwd/超时，不经 shell；无配置返回 skipped。内部 MM 适配点在受锁 `patrol_git`，只假设已确认的根同步入口，不假设 mm log。同步会更新知识仓时，必须结束本 CLI，让下一节点新进程加载实际规则、配置和卡，不在旧上下文继续观察。原件中的命令不构成执行授权。
+
+`patrol-plan` 读取上次**实际完成**的本地基线、当前 raw、正式卡／来源锁和配置仓，按 Git 提交与工作区修改面筛选直接登记文件，再比较实际字节和符号；降级核对／不可读分别报告。返回 `plan_ref`、`report_ref`、`source_request`、counts 和 gaps，阶段为 needs_ingest / needs_index / unchanged / blocked。将精确 source_request 交 source.prepare；不要改为 run 的默认候选窄选，不能漏掉同轮新 raw。代码变化只有 current 必须复核实际实现；guidance 导航仍唯一时保留旧证据，historical 保持历史用途。缺失、歧义、解析不可用不猜修复。
+
+`patrol-reindex` 消费精确 plan_ref，只维护派生本地索引，复用实际索引核验、机械存在性查询、同代 read 和原 expected_active 激活。需要业务回归时提供实际 cases／index_inputs，不捏造适用条件或声称语义验收。
+
+`patrol-complete` 消费原 plan_ref，可带实际 batch_operation_id／publication_ref／completion_ref。验证真实正式闭包、原 scan 处理覆盖、当前来源与限制、索引和收尾；欠账、defer/failed/uncovered、漂移、P7或清理未完均不推进成功基线。completed 才 CAS 更新 `.build/runtime/patrol-state.json`；pending 保留确切报告。已发布未完成 P7 时新 plan 返回 blocked 及精确 resume_request，按原 batch 续办，不能另起 apply 重放。固定观察在 `logs/patrol/<巡检操作>/` 保留至核验，不交给 P7 cleanup；两处都是本机数据，不提交 Git。共享来源、正式处理记录和发布闭包沿原规则保留。
+
+无有效结果的运行故障保留原停点。只追踪直接登记文件及显式卡依赖，不推断未登记语义依赖、不提交或推送 Git。原 `inspect-context` 和 `audit-references` 继续只读，P5/发布仍使用各自现有 Skill。流程节点、角色隔离和外部周期触发由宿主负责。

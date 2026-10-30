@@ -15,7 +15,7 @@ himate-knowledge知识库仓目录结构如下所示。
 - config.yml：项目架构映射，登记代码根、模块相对路径及芯片／端／特性／用途
 - main/：真实代码工作区
 - skills/common/knowledge/：开发分发用的节点能力源码，部署位置由 Agent 决定
-- workflows/common/knowledge/：开发分发用的 ingest 与只读 lint 巡检工作流源码
+- workflows/common/knowledge/：开发分发用的 ingest 与治理 lint 巡检工作流源码
 - himate-knowledge-wifi-mp/：WiFi 领域根，集中维护原件、知识与治理
   - knowledge/：知识卡，唯一检索对象，处理后知识的仓库
   - docs-raw/：源文档，原始证据层（LLM 只读）
@@ -42,7 +42,7 @@ repo/
 
 ├── workflows/common/knowledge/ # 开发分发源码，部署时放入 Agent Workflows
 │   ├── hs-knowledge-ingest/   # P1—P7：原件到 stable 的完整流程
-│   └── hs-knowledge-lint/     # 正式全库检查 → 引用巡检报告，只读
+│   └── hs-knowledge-lint/     # 同步／差异筛选 → 复用入库 → 实际完成与基线
 └── himate-knowledge-wifi-mp/       # WiFi 领域根，无嵌套 .git
     ├── AGENTS.md / README.md / CONTRIBUTING.md
     ├── check.py / check.sh         # 固定 CI 入口，复用共用检查函数
@@ -90,7 +90,7 @@ repo/
 
 知识库随代码仓一并拉取；能力与本机依赖通过 `deploy.ps1` 部署，explore 提供任务路由和只读发现，不需要额外业务初始化命令或常驻服务。`ingest` 默认处理六类允许 raw，经扫描、独立备料、作者计划和完整成稿，在 P5 集中独立内容／代码审阅及完整质量检查，P6 转写处理记录，P7 将确切字节安全落位并完成检索收尾；有问题时返回相应阶段。`lint` 是可单独调用的只读确定性检查入口，供手动修改和 CI 复用，不自动修稿或入库；`query` 消费知识。内容批完成本地入库、真实索引全验、冻结目标查询和活动代激活后，由人提交、触发固定 CI 并评审合入；仅记录批保存处置和欠账，不建索引。`ingest --source` 可选限定来源；命令格式见[详细设计 §1.1](知识库详细设计.md#11-从命令进入流程)，OpenFlow 负责 Workflow 的调度和交棒校验；人工测试可逐个调用 Skill 并按实际结果继续。
 
-ingest 是原件到本地正式知识的完整流程；lint Skill 可被 ingest、独立命令和 CI 复用，query 负责消费。另有同名 lint Workflow，供手动或外部周期调度执行正式全库检查和引用巡检，出报告即结束。它直接调用两个 Skill，不嵌套 ingest，不改变原 lint Skill 默认行为或 ingest 节点。实际宿主加载、代码接入和周期触发需按部署环境验证；这些能力不要求用户顺序执行。
+ingest 是原件到本地正式知识的完整流程；lint Skill 可被 ingest、独立命令和 CI 复用，query 负责消费。同名 lint Workflow 供手动或外部周期治理：同步后重新加载规则，脚本筛选 raw 与登记代码变更，按待办复用 source.prepare 和 P3—P7，核验真实完成后推进成功基线。无待办结束，失败和欠账保留；独立 lint Skill 保持原默认检查行为。实际宿主加载、内部同步适配和周期触发需按部署环境验证；这些能力不要求用户顺序执行。
 
 前文"HiMate knowledge目录架构"回答的是"有哪些目录"，本章回答三个问题：**每个目录是干什么的？为什么要有这个目录？目录之间怎么协作？** 阅读顺序：11.1 建立动机认知（为什么需要知识库）→ 11.2 仓库架构（分层模型 + 目录职责）→ 11.3 知识生命周期（三条链路看目录协作）。
 
@@ -246,7 +246,7 @@ flowchart LR
 | `hs-knowledge-lint/` | P5独立审阅及完整质量检查；独立只读固定检查 | 默认formal/full；review / record-review / code-check / code-recheck / verify-evidence |
 | `hs-knowledge-apply/` | P7安全事务、实际索引和回归、恢复及只读提交核对 | batch；index-build / index-verify / index-activate；regression / regression-verify；prepare-submission / verify-submission；inspect / resume / rollback / verify-result；旧run保留原完整检查 |
 | `hs-knowledge-query/` | 独立知识检索和同代精读 | search / read；延续search绑定原receipt |
-| `hs-knowledge-maintain/` | 影响观察、事件与机械限制；只读引用巡检 | 默认inspect-context；audit-references；register-source-change / register-code-change / recover-events / advance / status |
+| `hs-knowledge-maintain/` | 差异筛选、完成核验与成功基线；影响观察、事件与只读引用报告 | 默认inspect-context；patrol-sync / patrol-plan / patrol-reindex / patrol-complete；audit-references；register-source-change / register-code-change / recover-events / advance / status |
 
 参与流程：OpenFlow 的 ingest Workflow 编排 P1—P7，内部调用 lint Skill；人工测试由人按需要逐个调用，Skill 不校验前驱步骤、角色身份或上游 passed 票据。query 使用实际知识、来源和索引。上表是能力清单，不表示上库必须逐个执行；固定 CI 复用 lint 的确定性检查函数。`hs-knowledge-explore` 提供部署指引和按需只读项目接口；首次准备代码图谱时，Agent 按 `config.yml` 的真实代码仓逐个初始化 CodeGraph，MCP 及后续调用由 harness 提供，见[详细设计 §5.11](知识库详细设计.md#511-explorecodegraph-首次初始化)。
 
@@ -257,9 +257,9 @@ flowchart LR
 | 工作流 | 职责 | 一句话 |
 |------|------|--------|
 | `hs-knowledge-ingest/` | 首节点prepare_sources完成P1扫描和P2备料→P3 作者计划→P4成稿／修订→P5独立审阅与完整检查→P6 转写记录→P7 安全落位、索引、冻结查询、激活与本批清理 | 七个业务步骤、六个调度节点；内容批完成正式发布和本地检索闭环，仅记录批只落记录 |
-| `hs-knowledge-lint/` | `check_formal` 调用原 lint 默认 formal／full → `audit_references` 显式调用 maintain 的只读 audit-references | 汇总固定检查及逐卡／Claim 的来源、代码差异，生成 JSON／Markdown 报告即结束 |
+| `hs-knowledge-lint/` | 同步并重载规则→raw/Git筛选→source.prepare及同一P3—P7→完成核验；仅索引问题复用索引维护 | 无待办结束，失败及欠账保留，成功基线只在实际完成后推进 |
 
-ingest不另分独立的生产和治理流程；P5由reviewer使用`S/hs-knowledge-lint/`的`review`，其余节点由coder执行。材料问题返回首节点的P2备料动作，作者判断和稿件问题分别回P3、P4；运行故障保留原停点等待，不增加重试节点。`F/hs-knowledge-lint/`与同名Skill分目录保存，恰有`check_formal`、`audit_references`两个节点，不改变lint默认formal／full或ingest主线。外部调度仅负责触发，不另建runner或嵌套Workflow。
+ingest的P5由reviewer使用`S/hs-knowledge-lint/`的`review`，其余节点为coder。治理`F/hs-knowledge-lint/`复用相同P3—P7、返工边和发布保护，不嵌套子Workflow。同步在独立进程执行，后续重新加载实际知识仓规则；子仓Git用于筛选登记文件，不推断未登记依赖。外部调度仅负责触发；内部MM同步配置与真实宿主加载须单独验收。
 
 #### himate-knowledge-wifi-mp/ —— WiFi 领域知识库
 
@@ -389,7 +389,7 @@ flowchart LR
 
 ## 11.3 知识库使用链路
 
-目录共同支撑完整 ingest、只读 lint 和 query。下述先后关系由 OpenFlow 的 Workflow 编排和校验，人工测试时由人掌握；独立 Skill 仍核对本次所需业务文件和内容一致性。先看各自的输入、动作与输出，再对应资产位置；提交后的固定 CI 是独立作业。
+目录共同支撑 ingest、治理巡检、独立只读 lint 和 query。OpenFlow 编排顺序、角色隔离与交棒，Skill 校验实际业务输入和输出；固定 CI 是独立作业。
 
 <a id="流程一ingest--七个节点完成本地入库"></a>
 
@@ -438,17 +438,22 @@ flowchart LR
 
 L3 核对快照、文件指纹、路径、行页段及范围绑定；活动卡的每个代码来源缺 code_ref 时报 CODE_REF_REQUIRED，另核旧证据中的符号绑定及当前导航，独立于 code_gate 和 Claim 采用，文档背景卡同样适用。历史恢复及 deprecated 卡保留原四字段兼容。missing／ambiguous 为失败，unavailable 为未完成，能定位不表示支持结论。文档和代码内容复核集中由P5独立reviewer完成，混合卡不能整体免核验。L4 检查受管导航和派生结构，必要时临时构建验证，不切换活动索引。
 
-手动或外部周期调度可启动 `F/hs-knowledge-lint/` Workflow，先运行上述默认正式全库检查，再以 maintain 的显式 `audit-references` 动作生成引用巡检报告：
+手动或外部周期调度启动 `F/hs-knowledge-lint/` 进行增量治理。同步和观察分成两个 CLI 进程，避免同步知识仓后继续使用旧规则。raw 使用现有扫描/备料算法，代码先按各仓 Git 的提交及工作区修改面筛选登记文件，再比较实际 hash 和符号；首轮、规则/配置/正式卡变化或缺少旧提交时全查登记文件。Git 不可用可降级精确 hash，不把读取失败当成无变化。
 
 ```mermaid
 flowchart LR
-    START["手动／外部调度"] --> CHECK["check_formal<br/>原 lint Skill 默认 formal / full"]
-    CHECK --> AUDIT["audit_references<br/>maintain 显式只读动作"]
-    AUDIT --> REPORT["JSON／Markdown 报告<br/>卡／Claim、旧定位、旧／当前 hash、差异与缺口"]
-    REPORT -. "人工明确修订要求" .-> INGEST["另行交 ingest"]
+    S[同步工作区] --> P[新进程筛选 raw / 登记代码变更]
+    P -->|有内容待办| I[source.prepare → 同一 P3—P7]
+    P -->|仅索引待办| X[重建 / 查询 / 激活]
+    P -->|无需修订| C[核验真实结果与成功基线]
+    I --> C
+    X --> C
+    P -->|阻断| R[保存问题与精确续办依据]
+    C -->|欠账或失败| R
+    C -->|完成| E[CAS 保存本地成功基线]
 ```
 
-两个节点均由reviewer执行。有效的正式检查报告即使failed／incomplete，也交下一节点汇总差异与缺口；规则或运行失败导致有效报告未保存时，留在原节点等待。报告区分当前、指导性与历史用途：旧证据可恢复且定位有效时，与当前 `main/` 不同不直接等于历史引用错误；文件hash改变也不自动证明结论错误。声明 code_ref 时单列当前导航，guidance 符号仍唯一可定位时，不因纯位移或函数体变化制造导航修复义务；current 实现依据限制继续按原规则核对。覆盖以实际卡／Claim引用和已配置范围为准，材料缺失、读取失败和中途变化须保留缺口。巡检不修改知识、来源锁、事件／维护水位或活动索引，不自动修复或调用ingest；报告完成不等于知识健康或已修复。细节见[详细设计 §3.1](知识库详细设计.md#31-lint-的检查流程)。
+代码引用按用途分流：current 整文件改变仍需复核；guidance 的符号唯一可定位时保留旧证据并返回当前位置，插行不用重写旧行号；historical 旧证据可恢复则保留历史用途。函数/文件删除、改名、歧义、配置失效和解析不可用分别记录，不猜测新入口。变化 raw 与旧卡修订材料取并集；未登记的间接语义依赖不在当前范围。P5 保留独立 reviewer，P7 保留事务、真实索引/冻结查询、CAS 激活和本批清理。只在实际完成后推进成功水位；P7 已发布未完必须按精确原引用续办。详见[详细设计 §3.1](知识库详细设计.md#31-lint-的检查流程)。
 
 C1 位于提交之后，复用这些确定性检查及必要的 SQLite 构建验证；代码变化只核已固定文件的 hash、路径和范围。不匹配则失败返回本地修正，不自动修稿或重新组织 Agent 语义复审。
 ### 流程三：query —— 知识消费
@@ -493,7 +498,7 @@ shared 索引可在构建时按 `knowledge_commit` 核对实际 Git 快照，que
 | `AGENTS.md` / `config.yml` | 项目约定、代码根与模块归属 | 适用规则、实际代码上下文和条件缺口 | 路由与范围依据 |
 | 实际业务代码目录 | 代码取证与P5独立内容复核 | 固定引用与文件身份检查 | 源码交叉印证 |
 | Agent Skills（`S`） | 可独立调用的 P1—P7 材料、计划、内容复核、lint、核验及入库能力 | 独立 lint Skill；固定 CI 直接复用 K 内规则 | 查询、精读、来源恢复 |
-| Agent Workflows（`F`） | OpenFlow 编排 P1—P7，校验顺序、角色与交棒 | lint Workflow 只读巡检并出报告；固定 CI 不调用 Workflow | — |
+| Agent Workflows（`F`） | OpenFlow 编排 P1—P7，校验顺序、角色与交棒 | lint Workflow 脚本筛选变更并复用入库，核实际结果后推进成功基线；固定 CI 不调用 Workflow | — |
 | `knowledge/` | 查重、关联卡和 P7 精确入库 | 正式卡格式与引用检查 | 唯一正文检索对象 |
 | `docs-raw/` | 只读原件 | 来源一致性复核 | 原件与证据溯源 |
 | `governance/` | 模板、来源和卡契约 | 共同规则、来源锁与记录约束 | 范围、来源、依赖与业务材料一致性 |
@@ -519,4 +524,4 @@ flowchart LR
 
 内容已发布与整批完成分开表达。清理失败保留已发布事实，报告 `cleanup_pending`，`batch_complete` 仍为 false；明确重试原 P7 时只补缺失阶段。借用、受保护或用途不明的文件保留并说明，不要求 `.build` 全空。
 
-查询、提交核验和已完成操作的状态读取使用正式发布记录，不要求原机旧稿、事务或索引。消费端仍需配套能力、真实代码与实际业务材料，并重建本机索引；历史完成不等于当前规则下仍具备资格。独立 lint 保持两节点只读报告，maintain 仅在明确调用其业务写入动作时更新正式状态。孤儿暂存的周期回收和罕见 P7 部分写入自动修复后置，现有写入保护继续保留。
+查询、提交核验和已完成操作的状态读取使用正式发布记录，不要求原机旧稿、事务或索引。消费端仍需配套能力、真实代码与实际业务材料，并重建本机索引；历史完成不等于当前规则下仍具备资格。独立 lint Skill 保持只读检查，治理 Workflow 复用入库并核实际完成后保存本地成功基线。孤儿暂存的周期回收和罕见 P7 部分写入自动修复后置，现有写入保护继续保留。

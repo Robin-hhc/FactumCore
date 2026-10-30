@@ -1,6 +1,6 @@
 """One source entry: fixed current observation, then exact reading material."""
 
-from scan import scan, scopes
+from scan import scan
 
 
 def _checked_inventory(context, reference, *, own_operation=False):
@@ -104,7 +104,7 @@ def _run(context):
         if saved:
             saved_reference = reference
             inventory = _checked_inventory(context, reference, own_operation=True)
-            expected_scope, full_scan = scopes(context.request)
+            expected_scope, full_scan = context.modules["source_inventory"].scopes(context.request)
             if inventory["scope"] != expected_scope or inventory["full_scan"] != full_scan:
                 raise runtime.NodeError(
                     "RUN_SCOPE_CHANGED", "A retry cannot replace its original source scope; use a new operation",

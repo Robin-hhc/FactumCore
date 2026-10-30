@@ -1,6 +1,6 @@
 schema_version: '2.0'
 contract_family: aiot-wifi
-tool_version: 0.7.1
+tool_version: 0.8.0
 files:
   contracts/__init__.py:
     path: governance/contracts/__init__.py
@@ -100,7 +100,7 @@ files:
     sha256: 0314816e40354a83dd55b86c72514645b85f7a8c10a5ab6f9846ef113ee19fc3
   contracts/maintenance.py:
     path: governance/contracts/maintenance.py
-    sha256: 099e54c4c4ad7c2e4d2124274638909df715786ee68054c6f23fd605b38461ea
+    sha256: 4b96dce6c3ccfc0366c7fc38ee576c6029c49403893e8452e7596a2c779592b3
   contracts/production.py:
     path: governance/contracts/production.py
     sha256: 0390e693c19cf80a338f6b0e5f1c1a4358b36bcd86daebc50854f86d1dd5b66d
@@ -121,10 +121,10 @@ files:
     sha256: c53269eb98ea4bd9f47e926361aad47de4a2c284fa086615f3dbfe3f6cc1dc0e
   contracts/source_materials.py:
     path: governance/contracts/source_materials.py
-    sha256: a5422a73b926714bbaade382fed23d2dee9bd9300399db66c2b9b04a2cfca667
+    sha256: f41e1af3ac0a0b947753632620941dbd8b2f89018543ef460c8bc45856bab51c
   contracts/source_operations.py:
     path: governance/contracts/source_operations.py
-    sha256: 5b6720dd06f93eaed3362f88bc2c8e5f66225642fa860e75dc6504aaf73025a2
+    sha256: 3d0509df04d266e12a093f8a719ad6a3b3ca37c5a984040795a867802a43e227
   contracts/submission.py:
     path: governance/contracts/submission.py
     sha256: d271397d46a7aeca006a600b395d493c6ab214ebe73b242a4929b92f4b43e001
@@ -140,9 +140,22 @@ files:
   contracts/candidate_queries.py:
     path: governance/contracts/candidate_queries.py
     sha256: ea9c518eeff8ce7ee367a1d817956d464675909b3100202ebe9c30e285252630
+  contracts/patrol.py:
+    path: governance/contracts/patrol.py
+    sha256: c763a7002e2b5b0ebf78bb6861c12d7c23e67c82a53b5641d333c46f860e1ee6
+  contracts/patrol_git.py:
+    path: governance/contracts/patrol_git.py
+    sha256: e524b89c2bd38af916decd72f278f37e48fe8820f95697e60559ee172e7bd514
+  contracts/patrol_index.py:
+    path: governance/contracts/patrol_index.py
+    sha256: 997bf0a880edcdc0b57b4c4baabf603ee8fed00f637e997f5d75e29726dd1cf5
+  contracts/source_inventory.py:
+    path: governance/contracts/source_inventory.py
+    sha256: 2843a8860d544f318f6d49d0672928a9b5ecbda2fa927aef40a36a3bfea7925a
 capabilities:
   checks: '1.0'
   indexing: '1.0'
   ingest_records: '1.0'
   workspace_mapping: '1.0'
   code_navigation: '1.0'
+  incremental_patrol: '1.0'

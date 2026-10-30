@@ -680,8 +680,14 @@ def _advance_locked(context):
     }, "advanced"
 
 
-def inspect_context(context):
-    """Reconstruct current restrictions; no event registration or knowledge writes."""
+def inspect_context(context, *, source_ids=None):
+    """Inspect all sources by default, or an explicitly selected internal scope.
+
+    A partial patrol saves symbol/hash work without asserting unselected sources
+    are current. Durable restrictions and explicit dependency propagation remain
+    visible even when their sources were outside this observation's scope.
+    """
+    selected_sources = None if source_ids is None else set(source_ids)
     cards = domain_cards(context)
     try:
         config_path = context.modules["validation"].workspace_config_path(context.root)
@@ -706,6 +712,8 @@ def inspect_context(context):
         for claim in card["claims"]:
             reasons = []
             for source in claim["source_records"]:
+                if selected_sources is not None and source["source_id"] not in selected_sources:
+                    continue
                 key = digest(source)
                 if key not in cached:
                     try:
@@ -744,6 +752,7 @@ def inspect_context(context):
                             and (not block.get("old_snapshot_ids") or source["snapshot_id"] in block["old_snapshot_ids"])]
                         if navigation_sources and all(
                                 "code_ref" in source
+                                and digest(source) in cached
                                 and cached[digest(source)][0] != "source_unavailable"
                                 and (cached[digest(source)][2] or {}).get("code_navigation", {}).get("status") == "resolved"
                                 for source in navigation_sources):
@@ -756,7 +765,7 @@ def inspect_context(context):
                         historical_sources = [source for source in claim["source_records"]
                             if (not block.get("source_id") or source["source_id"] == block["source_id"])
                             and (not block.get("old_snapshot_ids") or source["snapshot_id"] in block["old_snapshot_ids"])]
-                        if historical_sources and all(cached[digest(source)][0] != "source_unavailable"
+                        if historical_sources and all(digest(source) in cached and cached[digest(source)][0] != "source_unavailable"
                                                       for source in historical_sources):
                             # This source-specific freshness event does not change
                             # recoverable history. Retain the durable event/state.
@@ -781,7 +790,10 @@ def inspect_context(context):
                 changed = True
     result = {"complete": not gaps, "affected_claims": affected, "gaps": gaps,
               "rules_digest": context.args.rules_digest, "config_digest": config_digest,
-              "state": persisted}
+              "state": persisted,
+              "coverage": {"scope": "all_sources" if selected_sources is None else "selected_sources",
+                           "source_ids": sorted(selected_sources) if selected_sources is not None else [],
+                           "all_sources_checked": selected_sources is None}}
     if navigation_observations:
         result["code_navigation"] = list(navigation_observations.values())
     return result, "inspected"
@@ -789,6 +801,12 @@ def inspect_context(context):
 
 def execute(context):
     action = context.args.action or "inspect-context"
+    if action == "patrol-sync":
+        from .patrol_git import sync
+        return sync(context)
+    if action in {"patrol-plan", "patrol-reindex", "patrol-complete"}:
+        from .patrol import execute as patrol
+        return patrol(context)
     if action == "audit-references":
         from .reference_audit import audit_references
         return audit_references(context)
@@ -808,7 +826,9 @@ def execute(context):
         return advance(context)
     raise NodeError(
         "INVALID_ACTION",
-        "Choose status, inspect-context, register-source-change, register-code-change, recover-events or advance",
+        "Choose status, inspect-context, audit-references, register-source-change, "
+        "register-code-change, recover-events, advance, patrol-sync, patrol-plan, "
+        "patrol-reindex or patrol-complete",
     )
 
 

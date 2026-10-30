@@ -241,6 +241,12 @@ def _candidate_material(context, candidates, snapshots, lock, gaps, staged_objec
 def prepare(context):
     request = context.request
     operations = context.modules["source_operations"]
+    tolerate_errors = request.get("tolerate_source_errors", False)
+    if not isinstance(tolerate_errors, bool):
+        raise NodeError("INVALID_INPUT", "tolerate_source_errors must be a boolean")
+    collect_attachments = request.get("collect_local_attachments", False)
+    if not isinstance(collect_attachments, bool):
+        raise NodeError("INVALID_INPUT", "collect_local_attachments must be a boolean")
     try:
         previous_view = context.modules["production"].revision_view(context, request) if request.get("previous_view_ref") else None
         previous, previous_bundle = _previous(context, previous_view)
@@ -299,13 +305,45 @@ def prepare(context):
                          {"target_id": target["target_id"]}, target.get("expected_fingerprint")))
     incoming = []
     for capture_request, origin, expected in captures:
-        child_context = fork_context(context, request={**capture_request, "operation_id": context.operation}, action="capture")
-        child_context.base = context.base + "/sources/" + digest(capture_request)[:32]
         try:
+            # A malformed replacement must not turn a frozen-input change into
+            # an ordinary per-document debt before capture can compare hashes.
+            if tolerate_errors and expected:
+                if capture_request.get("kind") == "raw":
+                    observed = operations.raw_member(context, capture_request["source_path"])["data"]
+                else:
+                    checkout, *_ = operations.authorized_repo(context, capture_request["repo_id"])
+                    observed, _ = operations.read_code(checkout, capture_request["relative_path"])
+                if sha(observed) != expected:
+                    raise _source_changed("Selected original differs from its fixed observation", [capture_request.get("source_path", capture_request.get("relative_path"))])
+            if collect_attachments and capture_request.get("kind") == "raw":
+                capture_request = {**capture_request, "attachments": sorted(set(
+                    capture_request.get("attachments", []) + operations.local_attachments(context, capture_request["source_path"])))}
+            child_context = fork_context(context, request={**capture_request, "operation_id": context.operation}, action="capture")
+            child_context.base = context.base + "/sources/" + digest(capture_request)[:32]
             captured, _ = operations.capture(child_context)
-        except (OSError, NodeError) as exc:
-            if expected and (isinstance(exc, OSError) or exc.code in {"SOURCE_MISSING", "SOURCE_CHANGED", "CODE_CHANGED"}):
+        except (OSError, UnicodeError, NodeError, context.modules["validation"].ContractError) as exc:
+            code = getattr(exc, "code", type(exc).__name__)
+            if tolerate_errors and code in {"SOURCE_CHANGED", "CODE_CHANGED", "INPUT_CHANGED", "CONFIG_CHANGED", "KNOWLEDGE_CHANGED", "STALE_RULES"}:
+                raise _source_changed("Selected input changed during material capture", [capture_request.get("source_path", capture_request.get("relative_path"))]) from exc
+            missing_primary = code == "SOURCE_MISSING" and (
+                not tolerate_errors or getattr(exc, "path", None) == capture_request.get("source_path", capture_request.get("relative_path")))
+            if expected and (isinstance(exc, OSError) or missing_primary or code in {"SOURCE_CHANGED", "CODE_CHANGED"}):
                 raise _source_changed("Selected original changed after its inventory observation", [capture_request.get("source_path", capture_request.get("relative_path"))]) from exc
+            if tolerate_errors and code not in {"SOURCE_INTEGRITY_ERROR", "OPERATION_CONFLICT", "MATERIAL_IDENTITY_CONFLICT"}:
+                if "target_id" in origin:
+                    observation = {"unit_id": origin["target_id"], "target_id": origin["target_id"],
+                                   "origin": "explicit_target", "source_kind": capture_request["kind"],
+                                   "source_id": capture_request["source_id"], "status": "unavailable",
+                                   "path": capture_request.get("source_path", capture_request.get("relative_path")),
+                                   "observed_fingerprint": expected}
+                    if capture_request.get("repo_id"):
+                        observation["repo_id"] = capture_request["repo_id"]
+                    _merge(material_units, [observation], "unit_id")
+                gaps.append({**origin, "code": "CURRENT_ORIGINAL_UNAVAILABLE", "error_code": code,
+                             "path": capture_request.get("source_path", capture_request.get("relative_path")),
+                             "reason": str(exc)})
+                continue
             raise
         bundle = context.record(captured["bundle_ref"], "source_bundle")
         if expected and bundle["snapshots"][0]["sha256"] != expected:
@@ -318,7 +356,18 @@ def prepare(context):
                            "observed_fingerprint": snapshot["sha256"], "snapshot_id": snapshot["snapshot_id"]}
             if capture_request.get("repo_id"):
                 observation["repo_id"] = capture_request["repo_id"]
-            _merge(material_units, [observation], "unit_id")
+            previous_unit = material_units.get(observation["unit_id"])
+            if (tolerate_errors and previous_unit and previous_unit.get("status") == "unavailable"
+                    and all(previous_unit.get(key) == observation.get(key)
+                            for key in ("target_id", "source_kind", "source_id", "path", "repo_id"))):
+                # A failed attempt adopted no snapshot. Only this exact target
+                # may replace that debt with newly captured, fixed evidence.
+                material_units[observation["unit_id"]] = observation
+            else:
+                _merge(material_units, [observation], "unit_id")
+        if tolerate_errors:
+            gaps[:] = [gap for gap in gaps if not (gap.get("code") == "CURRENT_ORIGINAL_UNAVAILABLE"
+                       and all(gap.get(key) == value for key, value in origin.items()))]
         bundles.append({**origin, "bundle_ref": captured["bundle_ref"], "bundle_digest": bundle["digest"]})
         gaps.extend({**origin, "code": "EXTRACTION_LIMITATION", "reason": text} for text in bundle.get("limitations", []))
         incoming.append((captured["bundle_ref"], bundle, capture_request.get("kind") == "code"))

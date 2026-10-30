@@ -6,6 +6,8 @@
 
 `inspect-context`: `operation_id`. Reads exact adopted sources and existing restrictions without advancing state. A `historical` Claim whose exact old source and locator resolve successfully does not acquire a current-maintenance obligation merely because today's source bytes differ or are unavailable. Source-bound `source_changed`, `code_changed` and `code_source_changed` events likewise do not impose current freshness on that recovered history; their durable state is retained. Unrecoverable old evidence, semantic/applicability restrictions and unbound broad restrictions remain affected. Current Claims keep their existing checks. For guidance code sources declaring code_ref, separately inspect actual navigation; pure source drift with resolved navigation does not create a navigation-repair obligation. Real affected cards still propagate through `requires`/`derived_from`, not ordinary links. This uses source facts, never earlier skip or review results. `audit-references` separately retains historical/current byte-difference observations.
 
+For an explicitly deprecated card, exact recovery of its old adopted evidence also removes a pure current-source freshness obligation. Missing or corrupt old evidence, unsafe source mappings and durable semantic/applicability restrictions remain affected. This permits a published retirement to settle on the next unchanged scan without erasing history or treating an unreadable source as a deletion.
+
 For configured dbox documents, `source_observations` separately reports the
 logical source and its actual current access status. Missing configuration or an
 unreadable root is `source_current_unavailable` with the source diagnostic code;

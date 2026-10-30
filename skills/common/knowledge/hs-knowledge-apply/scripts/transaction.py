@@ -208,6 +208,7 @@ def validate_journal(ctx, journal, op):
     request = {
         "operation_id": op,
         "view_ref": journal.get("view_ref"),
+        "ingest_record_ref": journal.get("ingest_record_ref"),
     }
     view = checked_view(ctx, request)
     # Upstream reports are retained as observations, not recovery dependencies.
@@ -584,6 +585,7 @@ def execute(ctx, request, action="run", *, safety_only=False):
             request = {
                 "operation_id": op,
                 "view_ref": journal["view_ref"],
+                "ingest_record_ref": journal.get("ingest_record_ref"),
             }
             view = checked_view(ctx, request)
             if view["digest"] != journal["view_digest"]:

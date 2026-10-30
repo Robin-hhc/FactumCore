@@ -14,8 +14,9 @@ NEW_ACTIONS = {"batch", "index-build", "index-verify", "index-activate", "regres
 class _BatchTransactionContext:
     """Use the new public operation-ID contract without changing legacy run."""
 
-    def __init__(self, original, runtime):
+    def __init__(self, original, runtime, *, record_only_batch=False):
         self.original, self.runtime = original, runtime
+        self.record_only_batch = record_only_batch
 
     def __getattr__(self, name):
         return getattr(self.original, name)
@@ -110,7 +111,7 @@ def execute(ctx, request, action="run"):
 
     def transact(mode):
         # This keyword is chosen by the new action, never from request JSON.
-        return transaction_execute(_BatchTransactionContext(ctx, runtime), request, mode, safety_only=True)
+        return transaction_execute(_BatchTransactionContext(ctx, runtime, record_only_batch=True), request, mode, safety_only=True)
 
     try:
         data, phase = modules["ingest_execution"].execute(shared, transact=transact if action == "batch" else None)

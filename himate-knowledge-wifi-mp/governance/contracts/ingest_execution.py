@@ -209,6 +209,13 @@ def _source_execution(ctx, manifest, generation=None):
                 or intent.get("view_ref") != manifest.get("trace", {}).get("view_ref")
                 or intent.get("operation_id") != manifest["operation_id"]):
             raise NodeError("EXECUTION_INPUTS_UNAVAILABLE", "Original batch intent does not match the publication")
+        original_inputs = {**intent.get("index_inputs", {}), "channel": intent.get("channel"),
+                           "expected_active": intent.get("expected_active")}
+        published_inputs = {key: value for key, value in manifest.get("index_inputs", {}).items()
+                            if key != "input_snapshot"}
+        if (manifest.get("published_view", {}).get("target_queries") != intent.get("cases")
+                or published_inputs != original_inputs):
+            raise NodeError("BATCH_INPUT_CHANGED", "Publication replaces the original frozen queries or execution baseline")
         observations.append(intent.get("source_execution_files", {} if not scope else None))
     if generation is not None:
         observations.append(input_snapshot.source_execution_files(generation.get("input_snapshot")))

@@ -341,6 +341,14 @@ def _publish_registered_objects(context, entries, snapshots):
             raise NodeError("SOURCE_INTEGRITY_ERROR", "Registered evidence readback differs", ref)
 
 
+def _current_raw(context, reference, binding):
+    resources = context.modules["source_resources"]
+    if resources.is_dbox_path(reference):
+        resources.validate_dbox_binding(binding)
+        return resources.read_dbox(context.root, reference, expected_binding=binding)["data"]
+    return fixed_bytes(context.root, reference, ["docs-raw"])
+
+
 def publish_changes(context, proposals):
     """Publish frozen P7 transitions; caller already holds the cooperative lock.
 
@@ -389,7 +397,8 @@ def publish_changes(context, proposals):
                 "locator": {"kind": "bytes", "start": 0, "end": snapshot["bytes"]}})
             current = resolved.get("current_source_matches") is True and resolved.get("resource") == resource
         elif resource.get("kind") in {"raw", "attachment"}:
-            current_raw = fixed_bytes(context.root, resource["path"], ["docs-raw"])
+            entry = (view.get("input_snapshot") or {}).get("current_files", {}).get(resource["path"], {})
+            current_raw = _current_raw(context, resource["path"], entry.get("dbox_binding"))
             current = sha(current_raw) == snapshot["sha256"] and len(current_raw) == snapshot["bytes"]
         else:
             raise NodeError("INVALID_SOURCE_KIND", "Unsupported published source transition")
@@ -441,7 +450,7 @@ def register(context, *, code=False):
                     "INVALID_SOURCE_KIND", "Use register-code-change for code"
                 )
             current = (
-                sha(fixed_bytes(context.root, resource["path"], ["docs-raw"]))
+                sha(_current_raw(context, resource["path"], bundle.get("dbox_binding")))
                 == snapshot["sha256"]
             )
         if not current:
@@ -772,7 +781,16 @@ def inspect_context(context, *, source_ids=None):
                         details = (navigation or {}).get("reason", "Current symbolic navigation is unavailable")
                 # A recovered historical snapshot need not match today's file.
                 # Keep the cached resolver fact shared across all Claim usages.
-                if reason and not (claim["usage"] == "historical"
+                # Retirement removes current-location duties only after exact
+                # old text was recovered. Invalid/unsafe mappings, lost fixed
+                # evidence and persisted restrictions remain visible.
+                retired_freshness = (
+                    card["metadata"].get("lifecycle") == "deprecated"
+                    and resolved is not None and resolved.get("text") is not None
+                    and (reason in {"source_changed", "code_navigation_missing", "code_navigation_ambiguous"}
+                         or (reason == "source_current_unavailable" and details in {
+                             "DBOX_CONFIG_REQUIRED", "DBOX_ROOT_UNAVAILABLE", "SOURCE_MISSING", "SOURCE_READ_FAILED"})))
+                if reason and not retired_freshness and not (claim["usage"] == "historical"
                                    and reason in {"source_changed", "source_current_unavailable"}):
                     reasons.append({"reason": reason, "source_id": source["source_id"], "details": details})
             for block in persisted.get("blocked_claims", []):

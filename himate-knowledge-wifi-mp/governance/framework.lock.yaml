@@ -1,6 +1,6 @@
 schema_version: '2.0'
 contract_family: aiot-wifi
-tool_version: 0.9.0
+tool_version: 0.9.1
 files:
   contracts/__init__.py:
     path: governance/contracts/__init__.py
@@ -73,7 +73,7 @@ files:
     sha256: 84a560701572503cddff0f315b965023a948a5713f6a1842194699b22c3e3b8e
   contracts/checks.py:
     path: governance/contracts/checks.py
-    sha256: 93e9db9aaba62b43bbf1d7572223c6024bea6959a1dfaa821d5049292759686a
+    sha256: 8e57d30a4a885d2f83ae0f01f0211229945da2945c2b5800645a71546b39e66a
   contracts/indexing.py:
     path: governance/contracts/indexing.py
     sha256: 35e5a612b27e2768c827b836f18dbe663ed23071419e07cf5a4a10fa66a4348c
@@ -91,7 +91,7 @@ files:
     sha256: af600f9e6f6901279e97079d47b69edd7f8e80fd49c6722284648e0ff50c15ff
   contracts/ingest_execution.py:
     path: governance/contracts/ingest_execution.py
-    sha256: 92b977e855d26add577b8d26d05cc173b2003b2d2cbb312e8b1fb6f24658b439
+    sha256: 6323c10e892ae9c9d846876802a15f03860c74e276126730e2ab9ce56ca13157
   contracts/input_snapshot.py:
     path: governance/contracts/input_snapshot.py
     sha256: 2aaef99ded549c206a4f9bd70ca837faa0170f566283d9c98d929780e2739e00
@@ -100,7 +100,7 @@ files:
     sha256: 0314816e40354a83dd55b86c72514645b85f7a8c10a5ab6f9846ef113ee19fc3
   contracts/maintenance.py:
     path: governance/contracts/maintenance.py
-    sha256: 1d9375b5aacec9b12f6e6f7091f3ffbea7e840242e94df2206e9a1533861fe29
+    sha256: ae933c2237808b14e4a8d1f2b4f97e33c1340ba56e9c6c3b12113355329133a2
   contracts/production.py:
     path: governance/contracts/production.py
     sha256: 0390e693c19cf80a338f6b0e5f1c1a4358b36bcd86daebc50854f86d1dd5b66d
@@ -136,7 +136,7 @@ files:
     sha256: 6c81386d3a3ba677ad78a6c2f718bae580810f21ea83b3a9150b05caa26db137
   contracts/publication.py:
     path: governance/contracts/publication.py
-    sha256: b942039f6ca50507d306a4019d30c27965e806cbdb997cff08eb5ad7df3033cb
+    sha256: 9f6d884a1f964fa6458a6e6f50d0109974b9ec2fece187c9f08d6acc6e6cf0fc
   contracts/candidate_queries.py:
     path: governance/contracts/candidate_queries.py
     sha256: ea9c518eeff8ce7ee367a1d817956d464675909b3100202ebe9c30e285252630

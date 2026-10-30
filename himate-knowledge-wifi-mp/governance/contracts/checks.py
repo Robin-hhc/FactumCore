@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 from urllib.parse import unquote, urlsplit
 
-from . import knowledge, records, source_resources, validation as v
+from . import knowledge, records, source_resources, publication, validation as v
 
 CHECKS = (
     ("view.inputs", "view"), ("format.cards", "format"),
@@ -20,7 +20,7 @@ CHECKS = (
 STATUSES = {"passed", "failed", "incomplete", "not_applicable"}
 
 
-def _record_resolver(cards, rules, inputs, root, identity, *, staged_objects=None):
+def _record_resolver(cards, rules, inputs, root, identity, *, staged_objects=None, record_files=None):
     """Fixed data-only current/archive/Git resolver; never a JSON callback."""
     current = {key: card for card in cards.values() for key in (card["metadata"]["id"], card["path"])}
     declared = inputs.get("historical_card_objects", {})
@@ -109,6 +109,70 @@ def _record_resolver(cards, rules, inputs, root, identity, *, staged_objects=Non
 
     snapshots = {row["snapshot_id"]: row for row in (rules.get("source_lock") or {}).get("snapshots", [])}
 
+    def published_card(record, target, logical_id):
+        """Use one record-bound publication, never guess from archived bodies."""
+        from types import SimpleNamespace
+        reference = record.get("publication_ref")
+        if reference is None or record.get("batch_kind") != "content":
+            return None
+        expected_ref = publication.manifest_ref(record["operation_id"])
+        if reference != expected_ref:
+            raise v.ContractError("RECORD_PUBLICATION_MISMATCH", "Processing record names another publication")
+        context = SimpleNamespace(root=root, rules=rules, modules={"records": records, "validation": v})
+        try:
+            manifest = publication.read_manifest(context, reference, verify_files=False)
+        except FileNotFoundError as exc:
+            raise v.ContractError("RECORD_HISTORY_UNAVAILABLE", "The exact record publication is unavailable", reference) from exc
+        if (record.get("publication_protocol") is not None
+                and record["publication_protocol"] != manifest.get("protocol_version")):
+            raise v.ContractError("RECORD_PUBLICATION_MISMATCH", "Publication protocol differs from its original processing record", reference)
+        # Older publications did not retain the original digest preimage. Keep
+        # their existing explicit-pin/current/archive/Git rules; matching header
+        # strings alone must never grant a newly invented historical body pin.
+        if manifest.get("content_basis") is None:
+            return None
+        processing = manifest.get("processing_record") or {}
+        target_path = record.get("target_path")
+        trace = manifest.get("trace", {})
+        if (manifest.get("operation_id") != record["operation_id"]
+                or manifest.get("rules_digest") != record.get("rules_digest")
+                or manifest.get("reviewed_view_digest") != record.get("content_view_digest")
+                or manifest.get("content_digest") != record.get("content_digest")
+                or processing.get("path") != target_path
+                or sum(item == processing for item in manifest.get("files", [])) != 1
+                or ("view_digest" in trace and trace["view_digest"] != record.get("content_view_digest"))
+                or ("view_ref" in trace and trace["view_ref"] != record.get("view_ref"))):
+            raise v.ContractError("RECORD_PUBLICATION_MISMATCH", "Historical publication does not bind this processing record", reference)
+        checked = v.safe_path(root, target_path, ["logs/ingest"])
+        raw_record = (record_files or {}).get(target_path)
+        if raw_record is None:
+            raw_record = _read(checked)
+        if (v.load_yaml(raw_record) != record or v.sha256_bytes(raw_record) != processing.get("sha256")
+                or len(raw_record) != processing.get("bytes")):
+            raise v.ContractError("RECORD_PUBLICATION_MISMATCH", "Historical processing-record bytes differ", target_path)
+        found = []
+        for row in manifest.get("published_view", {}).get("writes", []):
+            path = row.get("path", "")
+            if (not path.startswith("knowledge/") or not path.endswith(".md")
+                    or PurePosixPath(path).name in {"index.md", "AGENTS.md", "README.md"}):
+                continue
+            v.safe_path(root, path, ["knowledge"])
+            try:
+                raw = base64.b64decode(row["bytes_b64"], validate=True)
+                candidate = parse(raw, path, row["final_digest"])
+            except (KeyError, ValueError) as exc:
+                raise v.ContractError("HISTORICAL_CARD_CHANGED", "Frozen published card bytes differ", path) from exc
+            if not any(item.get("path") == path and item.get("sha256") == candidate["sha256"]
+                       and item.get("bytes") == len(raw) for item in manifest.get("files", [])):
+                raise v.ContractError("HISTORICAL_CARD_CHANGED", "Frozen card is absent from its publication set", path)
+            if candidate["metadata"]["id"] in {target, logical_id} or path == target:
+                found.append(candidate)
+        if not found:
+            return None
+        if len(found) != 1:
+            raise v.ContractError("RECORD_HISTORY_UNAVAILABLE", "The record publication has no unique referenced card", str(target))
+        return found[0]
+
     def resolve(reference, record, disposition=None):
         if "record_version_resolver" in inputs:
             raise v.ContractError("INVALID_RECORD_INPUT", "JSON callbacks are not supported; provide exact historical_card_objects")
@@ -159,6 +223,17 @@ def _record_resolver(cards, rules, inputs, root, identity, *, staged_objects=Non
                     continue
                 if card_id in aliases:
                     required_claims.add(claim_id)
+        published_candidate = published_card(record, target, logical_id)
+        if published_candidate is not None:
+            if expected is not None and expected != published_candidate["sha256"]:
+                raise v.ContractError("CARD_VERSION_MISMATCH", "Explicit card pin differs from its record publication", str(target))
+            if ref.get("path") is not None and ref["path"] != published_candidate["path"]:
+                raise v.ContractError("CARD_VERSION_MISMATCH", "Explicit card path differs from its record publication", str(target))
+            expected = published_candidate["sha256"]
+            path = published_candidate["path"]
+            logical_id = published_candidate["metadata"]["id"]
+        # An exact publication pin selects the authored historical body.
+        # Collective source adoption is still validated over the record card set.
         adopted_sources = {}
         if expected is None:
             units = {row["unit_id"]: row for row in record.get("inventory", {}).get("units", [])}
@@ -223,6 +298,10 @@ def _record_resolver(cards, rules, inputs, root, identity, *, staged_objects=Non
                 raise v.ContractError("HISTORICAL_CARD_CHANGED", exc.message, published) from exc
             else:
                 selected = prefer(parse(raw, path, expected), archive=True)
+                if selected is not None:
+                    return selected
+            if published_candidate is not None:
+                selected = prefer(published_candidate)
                 if selected is not None:
                     return selected
         for candidate in archive_objects(path):
@@ -591,7 +670,7 @@ def run(view, rules, inputs=None, scope=None, *, query_context=None):
                 report["code_check_status"] = "incomplete" if getattr(exc, "code", "").endswith("UNAVAILABLE") else "failed"
 
     record_resolver = _record_resolver(cards, {**rules, "source_lock": lock}, inputs, root, report["object"],
-                                       staged_objects=(candidate or {}).get("staged_objects", []))
+                                       staged_objects=(candidate or {}).get("staged_objects", []), record_files=files)
     formal_records, record_paths = [], {}
     for ref, raw in files.items():
         if ref.startswith("logs/ingest/") and selected(ref):

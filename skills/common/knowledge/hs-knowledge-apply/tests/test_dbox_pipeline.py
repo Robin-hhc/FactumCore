@@ -106,7 +106,7 @@ def test_dbox_public_journey_retains_portable_evidence_and_cleans_only_stage(tmp
     result = batch(pipeline, request)
     assert result["data"]["batch_complete"] is True, result
     manifest = pipeline.record(result["data"]["publication_ref"])
-    assert manifest["protocol_version"] == "1.1"
+    assert manifest["protocol_version"] == "1.2"
     assert [row["path"] for row in manifest["dbox_execution_scope"]] == ["docs-raw/sources/dbox/manual.md"]
     assert all(row.get("kind") != "external_raw" for row in manifest["index_inputs"]["input_snapshot"]["current_files"].values())
     assert local.read_bytes() == local_bytes and (source / "manual.md").read_bytes() == original

@@ -43,7 +43,11 @@ def _preview_dispositions(context, request, scan, semantic, view, preview):
                 raise NodeError("PLAN_RECORD_ACTION_REQUIRED", "P3 must freeze record_action from this unit's actual content decisions", identity)
             if not isinstance(planned.get("card_refs"), list) or not isinstance(planned.get("claim_refs"), list):
                 raise NodeError("PLAN_RECORD_REFS_REQUIRED", "P3 must freeze the actual card and Claim references", identity)
-            progress, adopted = "completed", observation.get("observed_fingerprint")
+            adopted = observation.get("observed_fingerprint")
+            withdrawn = (action == "deprecate" and scan.get("complete") is True
+                         and observation.get("change") == "missing" and not observation.get("read_error")
+                         and adopted is None)
+            progress = "withdrawn" if withdrawn else "completed"
         elif outcome in {"skip", "defer", "failed", "uncovered"}:
             action, adopted = outcome, None
             progress = "skipped" if outcome == "skip" else "blocked"

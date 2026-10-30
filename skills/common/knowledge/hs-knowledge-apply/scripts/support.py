@@ -368,7 +368,8 @@ def checked_view(ctx, request):
         if digest(content) != row.get("final_digest"):
             raise Invalid("final byte digest mismatch")
     if not view.get("writes") and not view.get("deletes"):
-        if not (view.get("review_mode") == "record_only" and view.get("batch_kind") == "record_only" and view.get("ingest_record_ref")):
+        record_ref = request.get("ingest_record_ref") if getattr(ctx, "record_only_batch", False) else view.get("ingest_record_ref")
+        if not (view.get("review_mode") == "record_only" and view.get("batch_kind") == "record_only" and record_ref):
             raise Invalid("empty final view")
     return view
 

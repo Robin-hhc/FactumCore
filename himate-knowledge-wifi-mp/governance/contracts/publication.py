@@ -11,7 +11,7 @@ from .runtime import NodeError, canonical, digest, fixed_bytes, identifier, safe
 from . import staging
 
 
-PROTOCOL = "1.1"
+PROTOCOL = "1.2"
 PLAN_PROTOCOL = "1.0"
 
 
@@ -201,6 +201,12 @@ def publish_manifest(ctx, view, plan=None, *, processing_record=None, event_refs
     if safe(ctx.root, state_ref).is_file() and state_ref not in {row["path"] for row in files}:
         files.append(_file(ctx, state_ref, kind="maintenance_state"))
     projection = _projection(view)
+    content_basis = {"payloads": copy.deepcopy(plan["payloads"]), "deletes": copy.deepcopy(plan["deletes"]),
+                     "source_refs": copy.deepcopy(view.get("source_refs", [])),
+                     "dispositions": copy.deepcopy(plan["dispositions"]),
+                     "batch_kind": view.get("batch_kind", "content")}
+    if digest(content_basis) != plan["content_digest"]:
+        raise NodeError("PUBLICATION_PLAN_CHANGED", "Formal content basis differs from the frozen plan")
     index_inputs = copy.deepcopy(index_inputs) if index_inputs is not None else {key: copy.deepcopy(ctx.request[key]) for key in
                     ("channel", "code_contexts", "code_evidence", "knowledge_commit", "publication_receipt_ref", "expected_active")
                     if key in ctx.request}
@@ -217,6 +223,7 @@ def publish_manifest(ctx, view, plan=None, *, processing_record=None, event_refs
         files.append(_file(ctx, applied_ref, kind="apply_result"))
     manifest = ctx.seal({"purpose": "knowledge_publication", "protocol_version": PROTOCOL,
         "published": True, "content_digest": plan["content_digest"],
+        "content_basis": content_basis,
         "publication_plan_digest": plan["publication_plan_digest"],
         "reviewed_view_digest": view["digest"], "batch_kind": view.get("batch_kind", "content"),
         "files": files, "deletes": copy.deepcopy(plan["deletes"]),
@@ -257,7 +264,8 @@ def publish_processing_record(ctx, view, reference, *, expected_digest=None):
     result["progress"] = {**pending.get("progress", {}), "apply": {
         "status": result["status"], "operation_id": ctx.operation, "view_digest": view["digest"]}}
     result.pop("acceptance", None)
-    result.update(publication_ref=manifest_ref(ctx.operation), content_digest=view["publication_plan"]["content_digest"])
+    result.update(publication_ref=manifest_ref(ctx.operation), publication_protocol=PROTOCOL,
+                  content_digest=view["publication_plan"]["content_digest"])
     result = ctx.modules["records"].seal(result)
     ctx.modules["records"].validate_ingest_record(result, view=view, rules=ctx.rules)
     raw = canonical(result) + b"\n"
@@ -298,7 +306,7 @@ def _read(ctx, ref, purpose):
     value = json.loads(fixed_bytes(ctx.root, ref, ["logs/publications"]), object_pairs_hook=unique)
     ctx.modules["records"].verify(value)
     ctx.modules["validation"].validate_shape("artifact_manifest", value, ctx.rules)
-    if value.get("purpose") != purpose or value.get("protocol_version") not in {"1.0", PROTOCOL}:
+    if value.get("purpose") != purpose or value.get("protocol_version") not in {"1.0", "1.1", PROTOCOL}:
         raise NodeError("INVALID_PUBLICATION", "Unsupported publication record", ref)
     return value
 
@@ -310,12 +318,52 @@ def read_manifest(ctx, reference=None, *, operation_id=None, verify_files=False)
             or digest(value.get("published_view")) != value.get("published_view_digest")):
         raise NodeError("INVALID_PUBLICATION", "Manifest identity or business projection differs", ref)
     from . import input_snapshot
-    if value["protocol_version"] == PROTOCOL:
+    if value["protocol_version"] in {"1.1", PROTOCOL}:
         input_snapshot.validate_execution_scope(value.get("dbox_execution_scope"))
     elif "dbox_execution_scope" in value:
         raise NodeError("INVALID_PUBLICATION", "Legacy publication format cannot carry current external scope", ref)
     if input_snapshot.source_execution_files(value.get("index_inputs", {}).get("input_snapshot")):
         raise NodeError("INVALID_PUBLICATION", "Public index inputs contain private external execution bindings", ref)
+    basis = value.get("content_basis")
+    if value["protocol_version"] == "1.2" and basis is None:
+        raise NodeError("INVALID_PUBLICATION", "Current publications require their frozen content basis", ref)
+    if basis is not None:
+        if (not isinstance(basis, dict) or set(basis) != {
+                "payloads", "deletes", "source_refs", "dispositions", "batch_kind"}
+                or digest(basis) != value.get("content_digest")
+                or any(not isinstance(basis[key], list)
+                       for key in ("payloads", "deletes", "source_refs", "dispositions"))):
+            raise NodeError("INVALID_PUBLICATION", "Frozen content basis does not match its original content digest", ref)
+        payloads = {row.get("path"): row for row in basis["payloads"] if isinstance(row, dict)}
+        if (len(payloads) != len(basis["payloads"])
+                or any(not isinstance(path, str) or not path for path in payloads)):
+            raise NodeError("INVALID_PUBLICATION", "Frozen payloads need unique paths", ref)
+        projection = value["published_view"]
+        writes = projection.get("writes", [])
+        expected_writes = {row["path"] for row in payloads.values() if row.get("kind") == "content"}
+        if (not isinstance(writes, list) or any(not isinstance(row, dict) for row in writes)
+                or len(writes) != len({row.get("path") for row in writes})
+                or {row.get("path") for row in writes} != expected_writes):
+            raise NodeError("PUBLICATION_BYTES_CHANGED", "Published write set differs from its original content identity", ref)
+        if (sorted(basis["deletes"], key=lambda row: row["path"])
+                != sorted(projection.get("deletes", []), key=lambda row: row["path"])
+                or basis["source_refs"] != projection.get("source_refs", [])
+                or basis["batch_kind"] != projection.get("batch_kind", "content")):
+            raise NodeError("INVALID_PUBLICATION", "Published projection differs from its frozen content basis", ref)
+        if (value.get("batch_kind") != basis["batch_kind"]
+                or sorted(value.get("deletes", []), key=lambda row: row["path"])
+                   != sorted(basis["deletes"], key=lambda row: row["path"])):
+            raise NodeError("INVALID_PUBLICATION", "Manifest execution fields differ from its frozen content basis", ref)
+        for row in writes:
+            raw = _raw_write(row)
+            expected = payloads.get(row["path"], {})
+            if sha(raw) != expected.get("sha256") or len(raw) != expected.get("bytes"):
+                raise NodeError("PUBLICATION_BYTES_CHANGED", "Published body differs from its original content identity", row["path"])
+        for expected in payloads.values():
+            matches = [row for row in value.get("files", []) if row.get("path") == expected["path"]]
+            if (len(matches) != 1 or any(matches[0].get(key) != expected.get(key)
+                                         for key in ("sha256", "bytes", "kind"))):
+                raise NodeError("PUBLICATION_BYTES_CHANGED", "Published payload differs from its frozen identity", expected["path"])
     for row in value.get("files", []):
         safe(ctx.root, row["path"], ["knowledge", "index.md", "governance/sources.lock.yaml", "logs"])
         if verify_files:

@@ -81,6 +81,78 @@ def test_replacing_one_card_refreshes_its_whole_reference_set(tmp_path):
         assert catalog.cards_for("second") == []
 
 
+def test_patrol_refreshes_a_replaced_card_identity_without_advancing_sources(tmp_path):
+    catalog_type, library = module("catalog").Catalog, module("library")
+    for directory in ("docs-raw", "knowledge", "governance"):
+        (tmp_path / directory).mkdir()
+    for name in ("a", "b"):
+        (tmp_path / "docs-raw" / f"{name}.md").write_text(
+            f"# {name}\n\nA documented requirement.\n", encoding="utf-8")
+    hashes = {}
+    with catalog_type(tmp_path) as catalog:
+        for name in ("a", "b"):
+            identity = f"doc-{name}"
+            catalog.register("raw", f"docs-raw/{name}.md", source_id=identity)
+            hashes[identity] = module("ingest").sha((tmp_path / "docs-raw" / f"{name}.md").read_bytes())
+            catalog.mark_processed(identity, hashes[identity])
+
+    def replace(identity, doc_id):
+        (tmp_path / "knowledge/rule.md").write_text(
+            f"---\nid: {identity}\ndoc_ref:\n- doc_id: {doc_id}\n"
+            "  line_start: 1\n  line_end: 3\ncode_ref: []\n---\n# Rule\nA requirement.\n",
+            encoding="utf-8",
+        )
+
+    replace("former-rule", "doc-a")
+    indexed, phase = library.patrol(tmp_path, "reindex", {})
+    assert phase == "reindexed" and indexed["cards"] == 1
+    registry_before = (tmp_path / "governance/sources.lock.yaml").read_bytes()
+
+    # Another producer may publish a replacement identity at this same path;
+    # after a pull, the local SQLite cache still contains the former card.
+    replace("new-rule", "doc-b")
+    planned, phase = library.patrol(tmp_path, "plan", {})
+    assert phase == "needs_reindex", planned
+    with catalog_type(tmp_path) as catalog:
+        assert catalog.get_card("former-rule") is None
+        assert catalog.cards_for("doc-a") == []
+        assert [card["id"] for card in catalog.cards_for("doc-b")] == ["new-rule"]
+        assert [source["id"] for source in catalog.files_for("new-rule")] == ["doc-b"]
+
+    indexed, phase = library.patrol(tmp_path, "reindex", {})
+    assert phase == "reindexed" and indexed["cards"] == 1
+    completed, phase = library.patrol(tmp_path, "complete", {})
+    assert phase == "completed" and completed["remaining"] == 0
+    assert (tmp_path / "governance/sources.lock.yaml").read_bytes() == registry_before
+    with catalog_type(tmp_path) as catalog:
+        assert {identity: catalog.get_file(identity)["processed_hash"] for identity in hashes} == hashes
+        assert [card["id"] for card in catalog.all_cards()] == ["new-rule"]
+    assert not (tmp_path / ".build").exists()
+
+
+@pytest.mark.parametrize("replace_known", [False, True], ids=["retained-card", "replaced-card"])
+def test_patrol_refresh_still_rejects_duplicate_formal_identities(tmp_path, replace_known):
+    catalog_type = module("catalog").Catalog
+    (tmp_path / "knowledge").mkdir()
+    with catalog_type(tmp_path) as catalog:
+        catalog.register("raw", "docs-raw/spec.md", source_id="doc-spec")
+
+    def content(identity):
+        return (f"---\nid: {identity}\ndoc_ref:\n- doc_id: doc-spec\n"
+                "  line_start: 1\n  line_end: 3\ncode_ref: []\n---\n# Rule\nA requirement.\n")
+
+    original = tmp_path / "knowledge/rule.md"
+    original.write_text(content("old-rule"), encoding="utf-8")
+    with catalog_type(tmp_path) as catalog:
+        assert catalog.get_card("old-rule") is not None
+    identity = "new-rule" if replace_known else "old-rule"
+    if replace_known:
+        original.write_text(content(identity), encoding="utf-8")
+    (tmp_path / "knowledge/duplicate.md").write_text(content(identity), encoding="utf-8")
+    with pytest.raises(ValueError, match="DUPLICATE_CARD_ID"):
+        module("library").patrol(tmp_path, "plan", {})
+
+
 def test_no_card_success_and_handled_deletion_are_distinct_from_unprocessed(tmp_path):
     catalog_type = module("catalog").Catalog
     with catalog_type(tmp_path) as catalog:

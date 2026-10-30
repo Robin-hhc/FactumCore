@@ -10,7 +10,7 @@ files:
     sha256: 6a09afbe32f611b67da7e59c8168f9c91ce06612c7b6710a9213d30325932f3f
   contracts/catalog.py:
     path: governance/contracts/catalog.py
-    sha256: b5d6bae5ff1d89786ce6bec241fd0147201570c719bd6dc300cf8fb98aecc4c5
+    sha256: b1c4f2141fb54636cec83306258dea27693c16fec81fe13df036eead4029cb12
   contracts/code_symbols.py:
     path: governance/contracts/code_symbols.py
     sha256: 2191a9da141331dc89a575666e82bca7090475ff7fcf692e993fcdcd1882b027

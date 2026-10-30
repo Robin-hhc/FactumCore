@@ -356,7 +356,9 @@ class Catalog:
             old = self.connection.execute("SELECT path FROM cards WHERE id=?", (card["id"],)).fetchone()
             if old and old["path"] != card["path"] and old["path"] in present:
                 raise ContractError("DUPLICATE_CARD_ID", card["id"])
-        self.remove_cards([row["id"] for path, row in known.items() if path not in present])
+        changed_ids = {card["path"]: card["id"] for card in changed}
+        self.remove_cards([row["id"] for path, row in known.items()
+                           if path not in present or path in changed_ids and row["id"] != changed_ids[path]])
         self.refresh_cards(changed)
 
     def rebuild(self):

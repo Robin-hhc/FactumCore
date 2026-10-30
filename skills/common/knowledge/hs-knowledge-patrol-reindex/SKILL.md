@@ -5,10 +5,12 @@ description: 处理巡检 needs_index 分支，构建并核验派生索引、查
 
 # L3 修复巡检索引
 
-仅在本轮计划为 `needs_index`、没有内容修订待办时使用。在实际 K 执行：
+仅在本轮计划为 `needs_index`、没有内容修订待办时使用。
 
-```text
-python K/knowledge.py patrol reindex --input REQUEST.json --json
+复用已知知识根和执行端；缺位置时读当前工作区 `AGENTS.md`、`config.yml`，必要时询问用户。首次读知识根 `AGENTS.md`；以下在该目录执行，POSIX 用 `sh ./knowledge.sh`。
+
+```powershell
+.\knowledge.cmd patrol reindex --input REQUEST.json --json
 ```
 
 请求提供原 `plan_ref`，可选 `plan_digest`、实际 `index_inputs` 和 `cases`。脚本构建并完整校验索引，执行适用查询、同代读取和激活；读取本次实际结果及引用。

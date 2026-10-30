@@ -14,7 +14,9 @@ nodes:
   owner: coder
   skill: hs-knowledge-patrol-sync
   prompt: |-
-    使用 hs-knowledge-patrol-sync 调用 python K/knowledge.py patrol sync，仅采用控制端明确配置的同步请求；内部MM按Skill指引在执行端解析实际工作区根。
+    复用已确定的项目与执行端；否则从当前工作区读取实际 AGENTS.md 和 config.yml，确定知识根。
+    位置缺失或不唯一时先询问用户；读知识根 AGENTS.md，在数据所在端该目录调用仓内启动器，并将项目、知识根及执行端信息交给后续节点。
+    使用 hs-knowledge-patrol-sync 执行同步，仅采用控制端明确配置的同步请求；内部MM按Skill指引在执行端解析实际工作区根。
     synced 或未配置的 skipped 进入 L2 计划；失败保留诊断。同步后结束本 CLI，下一节点必须用新进程重载实际运行实现、配置与规则。
   exits:
   - id: synced
@@ -31,7 +33,7 @@ nodes:
   owner: coder
   skill: hs-knowledge-patrol-plan
   prompt: |-
-    使用 hs-knowledge-patrol-plan 调用 python K/knowledge.py patrol plan，保存实际 plan_ref、source_request、统计与缺口。
+    使用 hs-knowledge-patrol-plan 固定巡检待办，保存实际 plan_ref、source_request、统计与缺口。
     按 needs_ingest、needs_index、unchanged 分别进入 P1 备料、L3 索引或 L4 完成核验；blocked 结束本轮并交付真实原因与确切续办请求，不推进成功基线。
   exits:
   - id: needs_ingest
@@ -56,7 +58,7 @@ nodes:
   owner: coder
   skill: hs-knowledge-source
   prompt: |-
-    使用 hs-knowledge-source 调用 python K/knowledge.py source prepare，完整采用巡检计划返回的 source_request。
+    使用 hs-knowledge-source 的 prepare 动作，完整采用巡检计划返回的 source_request。
     保留新增raw与待修卡材料的并集，以及明确空 unit_ids 和代码 targets；不改跑 run 或重新扫描。
     prepared 携实际 material_ref、scan_ref及 gaps 交 P2；输入漂移或运行故障保留本轮计划与诊断。
   exits:
@@ -71,7 +73,7 @@ nodes:
   skill: hs-knowledge-change-plan
   prompt: |-
     使用 hs-knowledge-change-plan 阅读本批材料，比较新旧事实并决定卡、Claim及各单元处置。
-    汇总完整决定与查询预期后，一次调用 python K/knowledge.py change-plan --action plan；计划保存后不追加或覆盖。
+    汇总完整决定与查询预期后，按该 Skill 一次调用 plan；计划保存后不追加或覆盖。
     content_planned 交 P3；缺材料回来源节点定向 prepare。保留明确欠账与未覆盖范围，不以检索无命中直接决定新建。
   exits:
   - id: content_planned
@@ -88,7 +90,7 @@ nodes:
   owner: coder
   skill: hs-knowledge-view-materialize
   prompt: |-
-    使用 hs-knowledge-view-materialize 按本批计划组织完整候选，调用 python K/knowledge.py view-materialize --json。
+    使用 hs-knowledge-view-materialize 按本批计划组织并保存完整候选。
     传实际 semantic_plan_ref 和 material_ref；返工采用 Skill 规定的前序候选引用及新操作，保留旧工件。
     ready 携真实 view_ref 交 P4；缺材料回来源节点，作者决定不完整回 P2。此步不替代独立内容审阅。
   exits:
@@ -111,7 +113,7 @@ nodes:
   skill: hs-knowledge-review
   prompt: |-
     由独立 reviewer 使用 hs-knowledge-review 审阅本批原文、旧卡、作者计划、处置与完整候选。
-    调用 python K/knowledge.py review，传真实 view_ref、审阅范围和 findings；代码依据按所选用途提供必要材料。
+    按该 Skill 调用完整 review，传真实 view_ref、审阅范围和 findings；代码依据按所选用途提供必要材料。
     独立审阅与适用固定检查、候选原冻结查询及同代精读均完成且无阻断，才 passed 交 P5。
     缺材料回来源节点，判断问题回 P2，稿件问题回 P3；新稿重新审阅。运行故障留本节点，不补记未执行项为通过。
   exits:
@@ -137,7 +139,7 @@ nodes:
   owner: coder
   skill: hs-knowledge-record
   prompt: |-
-    使用 hs-knowledge-record 调用 python K/knowledge.py record --json，传本轮 operation_id 和实际 view_ref。
+    使用 hs-knowledge-record 转写处理记录，传本轮 operation_id 和实际 view_ref。
     读取真实 ingest_record_ref 与 recorded 结果后交 P6。只机械转写已定处置，不重做作者判断、扫描或审阅；正式记录由 P6 发布。
   exits:
   - id: recorded
@@ -150,7 +152,7 @@ nodes:
   owner: coder
   skill: hs-knowledge-apply
   prompt: |-
-    使用 hs-knowledge-apply 调用 python K/knowledge.py apply --action batch，采用本轮实际 view_ref 与 ingest_record_ref。
+    使用 hs-knowledge-apply 的 batch 动作，采用本轮实际 view_ref 与 ingest_record_ref。
     按真实结果完成发布、适用检索收尾和本批可删暂存清理；batch_complete 为 true 才选择完成出口。
     已发布但未收尾时保留原批次，按实际缺项续办，不新起操作重复发布。内容批返回 completed，纯记录批返回 recorded；Git提交与CI不属于本节点。
   exits:
@@ -168,7 +170,7 @@ nodes:
   owner: coder
   skill: hs-knowledge-patrol-reindex
   prompt: |-
-    使用 hs-knowledge-patrol-reindex 调用 python K/knowledge.py patrol reindex，消费本轮原 plan_ref。
+    使用 hs-knowledge-patrol-reindex 修复派生索引，消费本轮原 plan_ref。
     只维护派生索引，读取 indexed 的真实结果后交 L4 完成核验；需要内容修订时不能用重建索引替代。失败保留原计划与诊断。
   exits:
   - id: indexed
@@ -181,7 +183,7 @@ nodes:
   owner: coder
   skill: hs-knowledge-patrol-complete
   prompt: |-
-    使用 hs-knowledge-patrol-complete 调用 python K/knowledge.py patrol complete，采用原 plan_ref 以及本轮实际发布/完成引用。
+    使用 hs-knowledge-patrol-complete 核验完成情况，采用原 plan_ref 以及本轮实际发布/完成引用。
     读取真实 completed 或 pending 结果、原因和报告。只有脚本完成核验后才报告成功基线已推进；欠账、漂移及P6或清理未完保持 pending 并结束本轮，续办交明确修复任务，不手改水位。
   exits:
   - id: completed

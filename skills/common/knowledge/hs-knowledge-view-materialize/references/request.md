@@ -14,11 +14,11 @@
 
 材料已经绑定 `bundle_ref` 时从实际材料解析，勿重新捕获。P2 的原查询随计划保留，不在 P3 改写。
 
-代码门禁稿采用 P1 材料绑定的完整 `project_context`，无需手写文件清单或工具身份；E0 discovery 不能直接替代。缺少所需源码时先回 P1 定向备料；显式旧上下文不完整时保留真实缺口，不在 P3 修改绑定或补造通过记录。
+代码门禁稿采用 P1 材料绑定的完整 `project_context`，无需手写文件清单或工具身份。缺少所需源码时先回 P1 定向备料；显式旧上下文不完整时保留真实缺口，不在 P3 修改绑定或补造通过记录。
 
 ### 简单卡稿与显式动作
 
-`create/update/defer` 可用 `cards: {CardID: draft_ref}`，或卡稿输入列表；稿件引用指向 K 内 `.build/` 的完整 Markdown 文件。
+`create/update/defer` 可用 `cards: {CardID: draft_ref}`，或卡稿输入列表；稿件引用指向 知识根内 `.build/` 的完整 Markdown 文件。
 
 合并、拆分、退役须显式提供 `decisions`。每项使用 `candidate_id/decision/reason/card_inputs`，按动作补充 `replaces`、`claim_mapping`、`retired_claim_ids`、`related_card_inputs`；暂缓说明 `owner/next_step`。`card_inputs` 可为稿件引用字符串，或含 `path`、可选 `target_path` 的对象。
 
@@ -44,8 +44,8 @@ CodeGraph 仅辅助定位，实际代码和适用条件仍来自本次材料；�
 
 ## 修订
 
-```text
-python K/knowledge.py view-materialize --action revise --input REQUEST.json --json
+```powershell
+.\knowledge.cmd view-materialize --action revise --input REQUEST.json --json
 ```
 
 使用新 `operation_id`、实际 `previous_view_ref`、非空 `revision_reason`，其余作者输入与正常成稿一致。

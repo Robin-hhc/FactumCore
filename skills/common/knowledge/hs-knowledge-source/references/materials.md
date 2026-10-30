@@ -8,14 +8,14 @@
 |---|---|
 | 固定扫描清单 | `scan_ref`，可选 `unit_ids`；省略单元选择时采用非 `unchanged` 单元 |
 | 明确 raw 目标 | `targets` 中提供 `source_path`，可附 `source_id/attachments/version/context_ref/expected_fingerprint` |
-| 明确代码目标 | `targets` 中提供 `kind:"code"`、`repo_id`、`relative_path`，可附 `source_id/text_encoding/version/context_ref` |
+| 明确代码目标 | `targets` 中提供 `kind:"code"`、`module_path` 或 `repo_id`、`relative_path`，可附 `source_id/text_encoding/version/context_ref` |
 | 明确卡片、主题或代码包 | `candidate_card_ids`、`topics`、`code_bundle_refs`；代码包必须是本次授权范围内的当前代码 |
 
-`source_path` 相对 K；代码 `repo_id` 使用项目发现返回的实际模块身份，`relative_path` 相对该模块。`code_bundle_refs` 可为引用字符串或 `{bundle_ref,bundle_digest}`。使用本次返回的身份和引用，不猜机器路径或另建来源登记。
+`source_path` 相对知识根；代码用配置 `modules[].path` 作为 `module_path`，`relative_path` 相对该模块。已有材料／巡检或旧配置可沿用 `repo_id`，同时提供时须指向同一模块。`code_bundle_refs` 可为引用字符串或 `{bundle_ref,bundle_digest}`。使用本次返回的身份和引用，不猜机器路径或另建来源登记。
 
 输出 `prepared` 包含 `material_ref/material_digest`、`bundle_ref`、适用的 `scan_ref` 和 `gaps`。材料保存新旧原文、完整候选旧卡、定位、采用版本和缺口；候选关联只是阅读线索，由 P2 决定是否修改。独立目标不伪造全库扫描、变化分类或完整性。
 
-备料采用代码时，脚本按实际配置、入口及本批文件生成完整 `project_context`，随材料返回 `context_ref/context_digest`；只收集采用文件，不扫描全仓。E0 的 discovery 可作为发现输入，完整代码上下文由 P1 另存，旧记录保留。显式完整上下文沿用并核对，不自动替换；纯文档不需要代码上下文。
+备料采用代码时，脚本按实际配置、入口及本批文件生成完整 `project_context`，随材料返回 `context_ref/context_digest`；只收集采用文件，不扫描全仓。显式完整上下文沿用并核对，不自动替换；纯文档不需要代码上下文。
 
 ## 补料与返工
 
@@ -39,7 +39,7 @@
 
 ### capture：独立捕获
 
-raw 请求使用 `source_path/source_id`；代码请求使用 `kind:"code"/repo_id/relative_path/source_id`。可选 `version` 仅记录明确提供的版本线索，缺失保持未知。
+raw 请求使用 `source_path/source_id`；代码请求使用 `kind:"code"`、`module_path` 或 `repo_id`、`relative_path/source_id`。可选 `version` 仅记录明确提供的版本线索，缺失保持未知。
 
 支持非空 UTF-8 MD/TXT、具有文字层的 PDF、DOCX 段落和表格；图片等未解释内容保留限制。代码的 `text_encoding` 可明确为 `utf-8` 或 `gb18030`，不猜编码、不转写原文件。代码模块按根 `config.yml` 的真实映射授权，标签或符号定位不能证明宏、构建或当前产品适用性。
 
@@ -48,12 +48,14 @@ raw 请求使用 `source_path/source_id`；代码请求使用 `kind:"code"/repo_
 - `resolve`：给出确切 `bundle_ref`。
 - `resolve-source`：给出 `source_ref:{evidence_ref,source_id,snapshot_id,locator}`，可附确切 `bundle_ref`；未提供包时读取正式登记的指定快照。
 
+未发布材料传本次 `bundle_ref`。`locator` 选择原文片段，不能直接复制快照的 `locator_map`：MD/TXT/文本代码如 `{"kind":"lines","start":1,"end":2}`，PDF 如 `{"kind":"pages","start":1,"end":2}`，DOCX 段落如 `{"kind":"paragraphs","start":1,"end":2}`，表格行如 `{"kind":"table_row","table":1,"row":1}`；数值按实际位置填写。
+
 使用返回的 `original_ref`、`text`、定位和限制。`current_source_matches` 单独说明当前授权文件是否仍匹配，可能为 true、false 或 null；历史恢复成功不证明当前适用。
 
 CLI 可从固定保留对象、确切本地 Git 对象或登记路径的匹配字节恢复原版，并核对提取与定位。缺旧版就保留缺口，不拿新版、同名文件或其他执行目录顶替。MD/TXT/文本代码按行，PDF 按页，DOCX 按段落／表格行解释；不透明附件不产生解释文本，字节定位也不冒充语义证据。
 
 ## 原件与输出边界
 
-原件只读，材料与请求／响应使用本次 K 下的操作暂存。dbox 是逻辑来源目录，私人映射只留执行端；附件不得越出实际来源根或跟随链接。需要旧规则、旧版本或来源恢复时只采用明确引用，不搜索“最近一次”私有执行。
+原件只读，材料与请求／响应使用本次 知识根下的操作暂存。dbox 是逻辑来源目录，私人映射只留执行端；附件不得越出实际来源根或跟随链接。需要旧规则、旧版本或来源恢复时只采用明确引用，不搜索“最近一次”私有执行。
 
 已有 `sources[].code_ref` 随旧材料保留，新代码引用由 P3 作者依据实际源码填写。此处不替作者判断 Claim，不运行整库质量检查，也不写正式卡、来源锁、处理记录或索引。

@@ -19,13 +19,13 @@ from support import contracts as _runtime_fixture
 REPO = _runtime_fixture.ROOT
 copy_runtime = _runtime_fixture.copy_runtime
 PUBLIC_SKILLS = tuple("hs-knowledge-" + name for name in (
-    "apply", "change-plan", "explore", "review", "maintain", "query",
+    "apply", "change-plan", "review", "maintain", "query",
     "source", "record", "view-materialize", "patrol-sync", "patrol-plan",
     "patrol-reindex", "patrol-complete"))
 RETIRED_SKILLS = tuple("hs-knowledge-" + name for name in (
     "candidate-inspect", "candidate-revise", "governance-handoff", "index-build", "local-check",
     "merge-check", "publish-handoff", "query-regression", "recover", "source-capture",
-    "source-scan", "source-prepare", "lint"))
+    "source-scan", "source-prepare", "lint", "explore"))
 
 
 def target_call(slug, request, action=None):

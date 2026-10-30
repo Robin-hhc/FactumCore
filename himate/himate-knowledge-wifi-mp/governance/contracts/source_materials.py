@@ -69,7 +69,7 @@ def _target_request(context, supplied, lock):
     if kind not in {"raw", "code"}:
         raise NodeError("INVALID_SOURCE_TARGET", "Explicit target kind is raw or code")
     allowed = {"kind", "source_id", "version", "context_ref", "expected_fingerprint", "target_id"}
-    allowed |= {"source_path", "attachments"} if kind == "raw" else {"repo_id", "relative_path", "text_encoding"}
+    allowed |= {"source_path", "attachments"} if kind == "raw" else {"repo_id", "module_path", "relative_path", "text_encoding"}
     if set(supplied) - allowed:
         raise NodeError("INVALID_SOURCE_TARGET", "Explicit target contains unsupported fields", ",".join(sorted(set(supplied) - allowed)))
     request = {key: value for key, value in supplied.items() if key not in {"target_id", "expected_fingerprint"}}
@@ -88,6 +88,11 @@ def _target_request(context, supplied, lock):
         path = request.get("relative_path")
         if not isinstance(path, str) or not path:
             raise NodeError("INVALID_SOURCE_TARGET", "Code target requires relative_path")
+        if "module_path" in request:
+            _, registered, *_ = context.modules["source_operations"].authorized_repo(
+                context, request.get("repo_id"), module_path=request.pop("module_path"),
+            )
+            request["repo_id"] = registered["repo_id"]
         matches = [row["source_id"] for row in lock["resources"]
                    if row.get("kind") == "code" and row.get("path") == path and row.get("repo_id") == request.get("repo_id")]
         fallback = "code:" + digest({"repo_id": request.get("repo_id"), "path": path})[:32]

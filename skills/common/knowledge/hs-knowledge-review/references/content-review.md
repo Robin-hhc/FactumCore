@@ -2,7 +2,7 @@
 
 ## P4 请求
 
-调用 `python K/knowledge.py review --input REQUEST.json --json`。使用本次真实引用：
+调用 `.\knowledge.cmd review --input REQUEST.json --json`。使用本次真实引用：
 
 | 字段 | 填写方式 |
 |---|---|
@@ -38,4 +38,4 @@ CLI 自动核计划、扫描、视图及返工绑定。新稿采用新视图；�
 
 ## 独立审阅记录
 
-`knowledge lint --action record-review` 使用上面的实际审阅范围、理由、`findings` 与 `semantic_plan_ref`，可加 `view_ref`。它只保存 `content_review_ref`、`review_status` 和抽样事实，不能表示完整 P4 已通过。
+`.\knowledge.cmd lint --action record-review` 使用上面的实际审阅范围、理由、`findings` 与 `semantic_plan_ref`，可加 `view_ref`。它只保存 `content_review_ref`、`review_status` 和抽样事实，不能表示完整 P4 已通过。

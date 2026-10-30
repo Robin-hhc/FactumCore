@@ -6,7 +6,7 @@
 
 在 `review` 的 `code_review` 对象中提供 `context_ref` 和 `semantic_report_ref`。本轮 `operation_id` 与确切 `view_ref` 由 P4 传入。代码／混合稿核本次代码门禁卡，同时绑定完整候选。
 
-`context_ref` 采用 P1 材料绑定的项目配置、入口和实际代码文件清单；E0 discovery 不能冒充完整代码上下文。核实际配置、采用文件 SHA-256、规则及工具身份，不以自动生成代替内容复核。模块工作区按配置范围和文件指纹核验，版本或 Git 身份未知不妨碍有依据的静态检查。
+`context_ref` 采用 P1 材料绑定的项目配置、入口和实际代码文件清单。核实际配置、采用文件 SHA-256、规则及工具身份，不以自动生成代替内容复核。模块工作区按配置范围和文件指纹核验，版本或 Git 身份未知不妨碍有依据的静态检查。
 
 ## 逐 Claim 技术判断
 
@@ -32,7 +32,7 @@
 
 本次独立代码核验读 `code_review.check_status` 及其真实检查记录。顶层 `code_check_status` 只描述固定检查中 current Claim 的代码 checkout 分支；全为 guidance 时可为 `not_applicable`，不表示独立代码审阅没有执行。
 
-每个活动卡的 code 来源均需 `sources[].code_ref`，包括未被 Claim 采用的来源。缺失报 `CODE_REF_REQUIRED`；supported 写法以 K 的 `governance/specs/cards.md` 为准，不用 file/range 兜底。
+每个活动卡的 code 来源均需 `sources[].code_ref`，包括未被 Claim 采用的来源。缺失报 `CODE_REF_REQUIRED`；supported 写法以知识根的 `governance/specs/cards.md` 为准，不用 file/range 兜底。
 
 实际内容是否遗漏必要代码入口由 reviewer 判断。`resolved` 仅表示符号可定位；missing／ambiguous／unavailable 按实际结果保留，不能猜宏分支，也不能替代来源字节、Claim 语义及构建条件核验。历史恢复与 deprecated 卡沿用既有四字段来源兼容。
 
@@ -44,4 +44,4 @@
 | `code-recheck` | 对应当前代码材料与报告，复查当前依据；不执行合入 |
 | `verify-evidence` | 原操作 `operation_id`、确切 `view_ref`、`proof_ref` 及 `purpose`（current 或 historical）；分别复查当前字节或固定旧证据 |
 
-独立动作使用 `knowledge lint --action <动作>`，只完成所选检查，不表示完整 P4、真实 CI 或产品运行验收。旧报告保持原字节，不补签或改历史身份。
+独立动作使用 `.\knowledge.cmd lint --action <动作>`，只完成所选检查，不表示完整 P4、真实 CI 或产品运行验收。旧报告保持原字节，不补签或改历史身份。

@@ -4,7 +4,7 @@
 
 ## 独立索引动作
 
-调用 `python K/knowledge.py apply --action ACTION --input REQUEST.json --json`：
+调用 `.\knowledge.cmd apply --action ACTION --input REQUEST.json --json`：
 
 | 动作 | 关键业务输入 | 作用 |
 |---|---|---|

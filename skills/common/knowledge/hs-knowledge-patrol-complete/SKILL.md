@@ -5,10 +5,10 @@ description: 用原巡检计划及真实发布结果核验完成情况，按实�
 
 # L4 核验巡检完成
 
-在实际 K 执行：
+复用已知知识根和执行端；缺位置时读当前工作区 `AGENTS.md`、`config.yml`，必要时询问用户。首次读知识根 `AGENTS.md`；以下在该目录执行，POSIX 用 `sh ./knowledge.sh`。
 
-```text
-python K/knowledge.py patrol complete --input REQUEST.json --json
+```powershell
+.\knowledge.cmd patrol complete --input REQUEST.json --json
 ```
 
 请求提供原 `plan_ref`；处理过入库时另给实际 `batch_operation_id`、`publication_ref` 或 `completion_ref`。脚本核原扫描覆盖、真实发布闭包、当前输入、限制、索引及清理，不采信请求自报的 passed。

@@ -17,11 +17,8 @@ from test_deploy import (
 def source_with_combined_record(source):
     """An eight-package synthetic release with record still inside source."""
     packages = source / "skills/common/knowledge"
-    former = packages / "hs-knowledge-new-0"
     package = packages / "hs-knowledge-source"
-    assert former.resolve().is_relative_to(source.resolve())
-    assert package.resolve().is_relative_to(source.resolve()) and not package.exists()
-    former.rename(package)
+    assert package.resolve().is_relative_to(source.resolve()) and package.is_dir()
     put(package, "SKILL.md", "---\nname: hs-knowledge-source\ndescription: fixture source and record\n---\n")
     contract = yaml.safe_load((package / "artifacts/result.yaml").read_bytes())
     contract.update(id="hs-knowledge-source-record-result", required=True,

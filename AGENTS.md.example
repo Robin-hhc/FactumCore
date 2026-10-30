@@ -17,7 +17,7 @@
 | `himate/himate-knowledge-wifi-mp/` | 默认领域根；实际位置由 `config.yml` 的 `knowledge_roots` 指定，原件、契约、知识及本地运行支撑按其 AGENTS 分层 |
 | `himate/himate-knowledge-wifi-mp/docs-llm-wiki/` | 共享架构、概要与详细设计、使用说明；本项目 `sdd/` 与 `task.md` 仅本地维护，不在仓根另建文档目录 |
 
-知识库相关任务从已安装的 `hs-knowledge-explore` 指引进入，实际命令由知识根内的 `knowledge.py`／`knowledge.cmd`／`knowledge.sh` 执行；用法见该根的共享使用说明。
+文档入库使用 `hs-knowledge-ingest` Workflow，巡检使用 `hs-knowledge-lint` Workflow，检索使用 `hs-knowledge-query` Skill，实际命令由知识根内的 `knowledge.py`／`knowledge.cmd`／`knowledge.sh` 执行；用法见该根的共享使用说明。
 
 ## 构建、运行与测试
 

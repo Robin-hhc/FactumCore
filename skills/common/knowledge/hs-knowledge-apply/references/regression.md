@@ -4,8 +4,8 @@
 
 ## 请求
 
-```text
-python K/knowledge.py apply --action regression --input REQUEST.json --json
+```powershell
+.\knowledge.cmd apply --action regression --input REQUEST.json --json
 ```
 
 ```json

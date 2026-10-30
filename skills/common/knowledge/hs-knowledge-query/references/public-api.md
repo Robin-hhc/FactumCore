@@ -2,7 +2,7 @@
 
 ## 搜索请求
 
-`query` 默认执行 `search`；也可使用 `python K/knowledge.py search "关键词" --purpose guidance --json`。复杂范围用 `--input` 提供 JSON：
+`query` 默认执行 `search`；也可使用 `.\knowledge.cmd search "关键词" --purpose guidance --json`。复杂范围用 `--input` 提供 JSON：
 
 ```json
 {"query":"问题关键词","purpose":"guidance","context":{},"top_k":5}
@@ -25,8 +25,8 @@
 
 用原搜索的 `receipt_ref` 和命中 `card_id`：
 
-```text
-python K/knowledge.py read CARD_ID --receipt SEARCH_RECEIPT --json
+```powershell
+.\knowledge.cmd read CARD_ID --receipt SEARCH_RECEIPT --json
 ```
 
 或以 `query --action read --input` 传 `{"receipt_ref":"实际搜索回执","card_id":"实际命中ID"}`。省略的 channel／purpose／context／generation 沿用原搜索；显式冲突被拒绝。可选 `claim_ids` 仅能是原命中合格 Claim 的非空子集。
@@ -35,7 +35,7 @@ python K/knowledge.py read CARD_ID --receipt SEARCH_RECEIPT --json
 
 ## 卡与返回字段
 
-`search` 返回卡身份、合格 `claim_ids`、允许显示的标题／摘要、分数和 `receipt_ref`；`read` 返回该次合格 Claim 正文。`path` 是相对 K 的逻辑卡路径，`card_ref` 指向所选代次的确切卡。逻辑路径可能已经是新版，回答原搜索时使用原回执与同代内容。
+`search` 返回卡身份、合格 `claim_ids`、允许显示的标题／摘要、分数和 `receipt_ref`；`read` 返回该次合格 Claim 正文。`path` 是相对知识根的逻辑卡路径，`card_ref` 指向所选代次的确切卡。逻辑路径可能已经是新版，回答原搜索时使用原回执与同代内容。
 
 返回的 `source_links` 提供来源地址，未内嵌原件全文或原始字节。打开完整卡或链接不扩大原查询用途及合格 Claim 集合。
 
@@ -47,13 +47,13 @@ python K/knowledge.py read CARD_ID --receipt SEARCH_RECEIPT --json
 
 | base | 路径基准 |
 |---|---|
-| `knowledge_root` | 实际 K |
+| `knowledge_root` | 实际 知识根 |
 | `workspace` | 实际 config.yml 选定的项目根 |
 | `repository` | `repo_id` 对应的已配置仓／模块范围 |
 | `git` | 确切本地 commit 的仓内路径；代码另带 repo_id，raw省略时用项目Git |
-| `absolute` | 执行端实际可读的 dbox 原生绝对路径，不拼到 K 下 |
+| `absolute` | 执行端实际可读的 dbox 原生绝对路径，不拼到 知识根下 |
 
-K 的父目录不一定是项目根。页、段落、表格行与源码行段按原件格式读取，不能把 PDF 页号当提取文本行号。需要完整旧版解析时，使用卡内确切来源绑定与 source 的恢复能力。
+知识根的父目录不一定是项目根。页、段落、表格行与源码行段按原件格式读取，不能把 PDF 页号当提取文本行号。需要完整旧版解析时，使用卡内确切来源绑定与 source 的恢复能力。
 
 代码链接的 `navigation_status` 为 resolved／missing／ambiguous／unavailable；未声明符号的旧来源可为 not_applicable。只用实际返回的当前路径与定位：缺当前文件时为 null，歧义地址没有定位。`current_source_matches` 表示当前整文件是否匹配固定证据，缺当前地址时为 null；符号存在不等于 Claim 当前仍成立。
 

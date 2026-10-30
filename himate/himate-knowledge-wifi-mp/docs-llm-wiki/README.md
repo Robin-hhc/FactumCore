@@ -1,6 +1,6 @@
 # HiMate 设计与使用入口
 
-本页提供阅读与任务路由。第一次使用从[使用说明](使用说明.md)开始；已有部署及项目上下文时，直接使用对应能力，缺少入口信息才按已安装 `hs-knowledge-explore` 的指引做只读发现。
+本页提供阅读与任务路由。第一次使用从[使用说明](使用说明.md)开始；已有部署及项目上下文时，直接使用对应能力，缺少入口时从当前工作区的实际 `AGENTS.md` 和 `config.yml` 确认，必要信息不明确时询问用户。
 
 ```mermaid
 flowchart LR
@@ -21,7 +21,7 @@ flowchart LR
 
 ## 能力与任务入口
 
-当前公开能力为十三个 `hs-knowledge-` Skill 和 ingest、lint 两个 Workflow。Skill 指引 Agent 选择任务和调用仓内 CLI，Workflow 管理顺序与角色，CLI 执行固定步骤；内容判断和独立审阅由 Agent 与实际宿主完成。能力选择和公开动作以已安装 `hs-knowledge-explore` 为入口。
+当前公开能力为十二个 `hs-knowledge-` Skill 和 ingest、lint 两个 Workflow。Skill 指引 Agent 选择任务和调用仓内 CLI，Workflow 管理顺序与角色，CLI 执行固定步骤；内容判断和独立审阅由 Agent 与实际宿主完成。按下表直接选择业务入口；Workflow在首节点确认执行位置，Skill也可独立调用。
 
 | 任务 | 使用哪个入口 | 设计或操作 |
 |---|---|---|

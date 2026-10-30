@@ -2,11 +2,11 @@
 
 ## 通用调用
 
-```text
-python K/knowledge.py source --action ACTION --input REQUEST.json --json
+```powershell
+.\knowledge.cmd source --action ACTION --input REQUEST.json --json
 ```
 
-K 是实际执行端的知识根；可显式传 `--knowledge-root K`、`--output RESPONSE.json`。请求使用本次 `operation_id`；当前规则锁默认加载，只有需要固定版本时才传 `--rules-digest`。动作由 CLI 参数选择，不在 JSON 中另写动作。
+在实际知识根内执行；需要时显式传 `--knowledge-root <实际知识根绝对路径>`、`--output RESPONSE.json`。请求使用本次 `operation_id`；当前规则锁默认加载，只有需要固定版本时才传 `--rules-digest`。动作由 CLI 参数选择，不在 JSON 中另写动作。
 
 ## 正常观察与备料
 
@@ -14,7 +14,7 @@ K 是实际执行端的知识根；可显式传 `--knowledge-root K`、`--output
 
 | 请求项 | 用途 |
 |---|---|
-| `source` | 可选 `string`，限定相对 K 的一个 raw 文件或目录 |
+| `source` | 可选 `string`，限定相对知识根的一个 raw 文件或目录 |
 | `unit_ids` | 明确选择实际库存单元，不重新编造单元 |
 | `candidate_card_ids`、`topics` | 明确修卡或找卡线索；主题不自行扩大扫描范围 |
 | `targets`、`code_bundle_refs` | 明确需要的原文或当前代码材料，格式见[材料输入](materials.md#材料输入) |
@@ -41,7 +41,7 @@ K 是实际执行端的知识根；可显式传 `--knowledge-root K`、`--output
 {"operation_id":"configure-dbox","path":"ACTUAL_ABSOLUTE_DIRECTORY"}
 ```
 
-把示例目录换成实际地址。配置固定保存在 `K/docs-raw/sources/dbox.local.yml`，包含 `schema_version: '1.0'` 和 `path`；私人文件不入库。CLI 核对目录和忽略保护后保存，同地址保留原字节。配置成功只证明根目录可用，不等于文档已扫描或入库。正常 `run` 不隐式配置或安装环境。
+把示例目录换成实际地址。配置固定保存在 `docs-raw/sources/dbox.local.yml`，包含 `schema_version: '1.0'` 和 `path`；私人文件不入库。CLI 核对目录和忽略保护后保存，同地址保留原字节。配置成功只证明根目录可用，不等于文档已扫描或入库。正常 `run` 不隐式配置或安装环境。
 
 ### scan：只观察
 

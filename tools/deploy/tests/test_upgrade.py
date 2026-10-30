@@ -168,7 +168,7 @@ def test_all_fixed_legacy_packages_are_removed_without_markers(source, targets):
     retired = (
         "source-scan", "source-prepare", "candidate-inspect", "candidate-revise",
         "governance-handoff", "index-build", "local-check", "merge-check", "publish-handoff",
-        "query-regression", "recover", "source-capture", "confirmation-prepare", "confirmation-record",
+        "query-regression", "recover", "source-capture", "confirmation-prepare", "confirmation-record", "lint", "explore",
     )
     packages = [targets["skills_root"] / ("hs-knowledge-" + name) for name in retired]
     for package in packages:
@@ -180,6 +180,30 @@ def test_all_fixed_legacy_packages_are_removed_without_markers(source, targets):
     assert (code, report["status"]) == (0, "deployed")
     assert all(not package.exists() for package in packages)
     assert report["delete_count"] == len(retired)
+
+
+def test_unreceipted_explore_skill_and_its_resources_are_retired(source, targets):
+    assert not (source / "skills/common/knowledge/hs-knowledge-explore").exists()
+    skills = targets["skills_root"]
+    stale = [
+        put(skills, "hs-knowledge-explore/SKILL.md", b"old routing instruction"),
+        put(skills, "hs-knowledge-explore/references/public-api.md", b"old discovery reference"),
+        put(skills, "hs-knowledge-explore/artifacts/result.yaml", b"old host declaration"),
+    ]
+    unrelated = put(skills, "hs-workspace-explore/SKILL.md", b"another capability owner")
+    assert not (skills / ".factum-knowledge-deploy.json").exists()
+
+    code, report = cli(source, targets)
+
+    assert (code, report["status"]) == (0, "deployed")
+    assert not (skills / "hs-knowledge-explore").exists()
+    assert unrelated.read_bytes() == b"another capability owner"
+    assert {str(path) for path in stale} <= {
+        row["path"] for row in report["files"] if row["action"] == "delete"
+    }
+    assert "hs-knowledge-explore" not in report["packages"]["skills"]
+    assert (targets["workflows_root"] / "hs-knowledge-ingest/workflow.yaml").is_file()
+    assert (targets["workflows_root"] / "hs-knowledge-lint/workflow.yaml").is_file()
 
 
 @pytest.mark.parametrize("kind", ["skill", "workflow"])
@@ -374,9 +398,9 @@ def test_junction_inside_pruning_scope_is_rejected_before_any_change(source, tar
     result = subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(external)], capture_output=True, check=False)
     if result.returncode:
         pytest.skip("Windows junction creation unavailable")
-    installed = targets["skills_root"] / "hs-knowledge-explore/SKILL.md"
+    installed = targets["skills_root"] / "hs-knowledge-source/SKILL.md"
     original = installed.read_bytes()
-    put(source, "skills/common/knowledge/hs-knowledge-explore/SKILL.md", original + b"new pending version\n")
+    put(source, "skills/common/knowledge/hs-knowledge-source/SKILL.md", original + b"new pending version\n")
     try:
         code, report = cli(source, targets)
         assert (code, report["status"]) == (3, "failed")

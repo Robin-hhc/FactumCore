@@ -30,7 +30,7 @@
 `test_clean_clone.py` 使用隔离合成资料完成 ingest，只提交共享资产，再执行真实 Git clone；消费副本没有生产端的 `.build/`、`artifacts/`、事务日志及旧原件／提取缓存，保留正式 `logs/evidence/published/` 和 `logs/publications/` 闭包，须重新通过正式库检查、索引验证与激活、query／read 和增量扫描。`test_git_asset_boundary.py` 另用 Git 自身检查忽略规则，区分本机缓存与必须可提交的处理记录、使用限制和显式材料。该场景验证跨工作区数据闭包，不证明另一账号权限、实际宿主或部署机文件系统的持久化行为。
 
 
-当前公开集合为13个Skill，按阶段隔离加分类领域测试组织。P1—P6六个节点依次为：prepare_sources、plan_change、materialize_view、lint_view、record_ingest、apply_view；P1在来源节点正常调用一次run，返工直接prepare；P5使用独立record Skill及knowledge record命令，复用既有记录算法。P4由review Skill与knowledge review承接，是唯一reviewer，其余为coder；治理四步分别绑定patrol-sync/plan/reindex/complete，maintain没有Workflow scope。validate_design.py逐项核对能力集合、节点／owner／转移、布局及真实产物node/exit范围；历史空目录不视为active Skill，旧有SKILL.md的来源包必须迁移删除后才能通过。
+当前公开集合为12个Skill，按执行实现隔离加分类领域测试组织；8个底层运行阶段含显式诊断/兼容explore，测试组名称不表示存在对应Skill。P1—P6六个节点依次为：prepare_sources、plan_change、materialize_view、lint_view、record_ingest、apply_view；P1在来源节点正常调用一次run，返工直接prepare；P5使用独立record Skill及knowledge record命令，复用既有记录算法。P4由review Skill与knowledge review承接，是唯一reviewer，其余为coder；治理四步分别绑定patrol-sync/plan/reindex/complete，maintain没有Workflow scope。validate_design.py逐项核对能力集合、节点／owner／转移、布局及真实产物node/exit范围；历史空目录不视为active Skill，旧有SKILL.md的来源包必须迁移删除后才能通过。
 
 P1内扫描与备料的独立测试分别验证观察不备料、固定清单／显式目标备料、定向补料及漂移回P1。P2保留语义／六决策oracle，P3验证实际字节和旧Claim去向，P4独立审阅与完整质量检查及代码证据绑定。stages/apply/承接安全事务、恢复、独立index/regression/submission及真实公开batch，stages/lint/承接原local/merge代码业务oracle，stages/maintain/保事件pending／恢复／advance及只读audit。旧兄弟CLI的缺安装和子调用超时包装随架构消除，保留其业务失败不冒称通过、停点和原字节保护断言。
 

@@ -16,7 +16,6 @@ import yaml
 
 
 SKILLS = (
-    'hs-knowledge-explore',
     'hs-knowledge-source',
     'hs-knowledge-change-plan',
     'hs-knowledge-view-materialize',
@@ -31,7 +30,6 @@ SKILLS = (
     'hs-knowledge-patrol-complete',
 )
 ARTIFACT_SCOPE = {
-    'hs-knowledge-explore': ([], []),
     'hs-knowledge-source': (['prepare_sources'], ['prepared', 'unchanged']),
     'hs-knowledge-change-plan': (['plan_change'], ['content_planned']),
     'hs-knowledge-view-materialize': (['materialize_view'], ['ready']),

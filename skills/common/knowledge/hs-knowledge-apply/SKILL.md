@@ -9,12 +9,12 @@ description: 将已确定的知识批次及处理记录安全落位，完成索�
 
 P6 发布本批已经确定的字节和处理事实，完成适用检索收尾。接收本次 `view_ref` 和 P5 的 `ingest_record_ref`；不重判内容、不重新生成稿件或重复 P4 质量审阅。
 
-K 是已确认的实际知识根，在数据所在执行端调用仓内 CLI；入口不明时先用 `hs-knowledge-explore` 定位。
+复用已知知识根和执行端；缺位置时读当前工作区 `AGENTS.md`、`config.yml`，必要时询问用户。首次读知识根 `AGENTS.md`；以下在该目录执行，POSIX 用 `sh ./knowledge.sh`。
 
 ## 正常入库
 
-```text
-python K/knowledge.py apply --action batch --input REQUEST.json --json
+```powershell
+.\knowledge.cmd apply --action batch --input REQUEST.json --json
 ```
 
 REQUEST.json 传 `operation_id`、本批实际 `view_ref` 和 `ingest_record_ref`。CLI 在一次调用中执行：

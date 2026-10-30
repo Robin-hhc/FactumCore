@@ -9,7 +9,7 @@ description: 按已定内容计划保存完整候选稿、来源登记及处置�
 
 按本次 `semantic_plan_ref` 和它采用的材料，写出完整卡片并一次保存可审阅的候选视图。P3 落实作者决定；结论或归卡尚不明确时回 P2，缺原文或代码材料时回 source。
 
-K 是实际执行端的知识根；已有上下文直接复用，入口不明时用 `hs-knowledge-explore` 定位。
+复用已知知识根和执行端；缺位置时读当前工作区 `AGENTS.md`、`config.yml`，必要时询问用户。首次读知识根 `AGENTS.md`；以下在该目录执行，POSIX 用 `sh ./knowledge.sh`。
 
 ## 成稿与保存
 
@@ -17,8 +17,8 @@ K 是实际执行端的知识根；已有上下文直接复用，入口不明时
 2. 保留实际来源、快照、定位及 Claim 引用。活动卡引用代码时，根据本次源码填写支持的 `code_ref`；纯文档不添加虚构代码入口，旧快照定位不随当前行号改写。
 3. 用实际稿件引用构造请求，一次保存本批卡、导航、来源锁、处置预览和输入绑定。字段与六类动作见[成稿请求](references/request.md#成稿请求)。
 
-```text
-python K/knowledge.py view-materialize --input REQUEST.json --json
+```powershell
+.\knowledge.cmd view-materialize --input REQUEST.json --json
 ```
 
 `ready` 时将真实 `view_ref` 及相关引用交 P4。正式知识此时不变；仅记录批也有明确空写集和处置预览。

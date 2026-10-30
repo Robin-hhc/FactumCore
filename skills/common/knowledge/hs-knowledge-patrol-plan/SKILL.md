@@ -5,10 +5,12 @@ description: 固定本轮 raw、登记代码及知识库的实际变化，生成
 
 # L2 生成巡检待办
 
-在数据所在 K 用新 `operation_id` 启动 CLI，重新加载同步后的实际实现、配置和规则：
+复用已知知识根和执行端；缺位置时读当前工作区 `AGENTS.md`、`config.yml`，必要时询问用户。首次读知识根 `AGENTS.md`；以下在该目录执行，POSIX 用 `sh ./knowledge.sh`。
 
-```text
-python K/knowledge.py patrol plan --input REQUEST.json --json
+用新 `operation_id` 启动 CLI，重新加载同步后的实际实现、配置和规则：
+
+```powershell
+.\knowledge.cmd patrol plan --input REQUEST.json --json
 ```
 
 读取本次 `plan_ref/plan_digest`、`scan_ref`、`source_request`、统计及报告。脚本比较 raw、直接登记代码与成功基线；保留实际用途、材料缺口和历史降级说明，不另行猜测影响范围。

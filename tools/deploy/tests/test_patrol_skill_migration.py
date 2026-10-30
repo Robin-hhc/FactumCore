@@ -37,10 +37,9 @@ def declaration(package, identity, nodes, exits):
 
 def combined_release(source):
     packages = source / "skills/common/knowledge"
-    for index, name in enumerate(("source", "change-plan", "view-materialize", "lint", "record", "apply")):
+    for index, name in enumerate(("change-plan", "view-materialize", "lint", "record", "apply", "maintain")):
         rename_package(packages, "hs-knowledge-new-" + str(index), "hs-knowledge-" + name)
     maintain = packages / "hs-knowledge-maintain"
-    shutil.copytree(packages / "hs-knowledge-query", maintain)
     put(maintain, "SKILL.md", "---\nname: hs-knowledge-maintain\n---\nAll patrol tasks.\n")
     result = declaration(packages / "hs-knowledge-lint", "hs-knowledge-lint-result", ["lint_view"],
                          ["passed", "needs_material", "needs_plan", "needs_revision"])
@@ -119,7 +118,7 @@ def test_review_rename_and_four_patrol_packages_upgrade_or_rollback_together(
         assert all_target_bytes(targets) == before
         return
     assert (code, report["status"]) == (0, "deployed")
-    assert len(report["packages"]["skills"]) == 13
+    assert len(report["packages"]["skills"]) == 12
     assert selected.read_bytes() == original
     assert not (targets["skills_root"] / "hs-knowledge-lint").exists()
     assert (targets["workflows_root"] / "hs-knowledge-lint/workflow.yaml").is_file()

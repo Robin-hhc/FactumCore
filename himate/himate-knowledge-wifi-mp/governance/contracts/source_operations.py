@@ -450,7 +450,7 @@ def git_read(root, arguments, *, optional=False, authorized_root=None):
     return result.stdout
 
 
-def authorized_repo(context, repo_id, receipt=None):
+def authorized_repo(context, repo_id, receipt=None, *, module_path=None):
     try:
         config_path = context.modules["validation"].workspace_config_path(
             context.root
@@ -483,6 +483,18 @@ def authorized_repo(context, repo_id, receipt=None):
             "Protected and declared code policies differ",
             blocked=True,
         )
+    if module_path is not None:
+        if not isinstance(module_path, str) or not module_path:
+            raise NodeError("CODE_MODULE_UNKNOWN", "module_path must name an actual configured module", blocked=True)
+        modules = [row for row in config.get("modules", []) if row["path"] == module_path]
+        selected = [row for row in config["repos"] if len(modules) == 1
+                    and row.get("workspace_path") == modules[0]["workspace_path"]]
+        if config.get("mapping_kind") != "modules" or len(selected) != 1:
+            raise NodeError("CODE_MODULE_UNKNOWN", "module_path must uniquely match config.modules[].path", module_path, blocked=True)
+        selected_id = selected[0]["repo_id"]
+        if repo_id is not None and repo_id != selected_id:
+            raise NodeError("CODE_MODULE_MISMATCH", "repo_id and module_path select different modules", module_path, blocked=True)
+        repo_id = selected_id
     rows = [row for row in config["repos"] if row["repo_id"] == repo_id]
     root_value = policy.get("repo_roots", {}).get(repo_id)
     if (
@@ -717,8 +729,9 @@ def capture_code(context):
         raise NodeError("INVALID_SOURCE_ID", "Explicit logical source ID required")
     receipt = context.record(request["context_ref"], "project_context") if request.get("context_ref") else None
     root, registered, config, item, config_digest = authorized_repo(
-        context, repo_id, receipt
+        context, repo_id, receipt, module_path=request.get("module_path")
     )
+    repo_id = registered["repo_id"]
     safe(root, relative)
     if not context.modules["validation"].workspace_file_allowed(config, repo_id, relative):
         raise NodeError(

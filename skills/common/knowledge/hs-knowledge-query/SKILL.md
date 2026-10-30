@@ -9,21 +9,21 @@ description: 按问题用途和适用范围检索正式知识，使用搜索回�
 
 根据用户问题取得合格知识与可追溯依据。输入是问题、已知用途和真实适用范围；交付答案、卡／Claim 引用以及尚未解决的缺口。
 
-K 是已确认的实际知识根，在数据所在执行端调用仓内 CLI；入口不明时先用 `hs-knowledge-explore` 定位。
+复用已知知识根和执行端；缺位置时读当前工作区 `AGENTS.md`、`config.yml`，必要时询问用户。首次读知识根 `AGENTS.md`；以下在该目录执行，POSIX 用 `sh ./knowledge.sh`。
 
 ## 执行
 
 1. 选择 `purpose`：机制／设计背景用 `guidance`，当前适用结论用 `current`，当前实现事实用 `implementation`，旧版本用 `historical`。按问题与已核材料填写 `context`，不为凑命中猜条件或照抄卡的适用范围。
 2. 用明确关键词搜索。下面以背景问题为例，其他用途按第 1 步选择：
 
-   ```text
-   python K/knowledge.py search "问题关键词" --purpose guidance --json
+   ```powershell
+   .\knowledge.cmd search "问题关键词" --purpose guidance --json
    ```
 
 3. 选择与问题相关的命中，用原搜索的 `receipt_ref` 和命中的 `card_id` 精读：
 
-   ```text
-   python K/knowledge.py read CARD_ID --receipt SEARCH_RECEIPT --json
+   ```powershell
+   .\knowledge.cmd read CARD_ID --receipt SEARCH_RECEIPT --json
    ```
 
    用实际命中的 ID 和返回的搜索回执替换占位符。`read` 沿用原搜索的用途、范围和代次，只读取该次合格 Claim；不能因直接打开卡文件而扩大引用范围。需要复杂范围时用 `--input` 提供 `query`、`purpose`、`context`，详见[搜索与精读 API](references/public-api.md)。

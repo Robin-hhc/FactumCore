@@ -118,7 +118,7 @@ def test_interactive_prompts_accept_three_paths(distribution, tmp_path):
     result = subprocess.run(command, input="\n".join(map(str, paths)) + "\n", capture_output=True,
                             text=True, encoding="utf-8-sig", timeout=40)
     assert result.returncode == 0, result.stderr
-    assert (paths[0] / "hs-knowledge-explore/SKILL.md").is_file()
+    assert (paths[0] / "hs-knowledge-source/SKILL.md").is_file()
     assert (paths[1] / "hs-knowledge-ingest/workflow.yaml").is_file()
     assert (paths[2] / "config.yml").is_file()
 

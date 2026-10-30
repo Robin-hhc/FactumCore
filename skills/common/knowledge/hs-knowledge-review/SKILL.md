@@ -9,7 +9,7 @@ description: 独立审阅 ingest 候选计划与稿件并执行 P4 质量检查�
 
 P4 核对作者结论、完整稿件及证据，报告问题和返工位置。接收本次 `view_ref`、对应的 P2 计划、P1 阅读材料及独立审阅任务；不替作者改稿或发布知识。
 
-K 是已确认的实际知识根，在数据所在执行端调用仓内 CLI；入口不明时先用 `hs-knowledge-explore` 定位。
+复用已知知识根和执行端；缺位置时读当前工作区 `AGENTS.md`、`config.yml`，必要时询问用户。首次读知识根 `AGENTS.md`；以下在该目录执行，POSIX 用 `sh ./knowledge.sh`。
 
 ## P4 执行
 
@@ -17,8 +17,8 @@ K 是已确认的实际知识根，在数据所在执行端调用仓内 CLI；�
 2. 按[审阅请求](references/content-review.md#p4-请求)填写实际样本、理由和 `findings`。代码或混合稿另按[代码依据](references/code-evidence.md)准备 `code_review`；纯文档不补造代码依据。
 3. 调用一次完整审阅：
 
-   ```text
-   python K/knowledge.py review --input REQUEST.json --json
+   ```powershell
+   .\knowledge.cmd review --input REQUEST.json --json
    ```
 
 CLI 保存实际审阅声明；内容审阅无阻断后，执行一次完整候选固定检查。内容批还用同次临时索引执行 P2 原冻结查询及同候选精读。读取报告的检查状态和逐例预期／实际结果，不能把“索引可构建”当作查询已通过。

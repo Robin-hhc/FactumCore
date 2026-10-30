@@ -18,7 +18,7 @@ powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 
 dbox仅分发知识根下的 `docs-raw/sources/dbox.example.yml` 与同目录精确 `.gitignore`，不分发私人 `dbox.local.yml` 或整个资料目录；已有local地址保持原字节，自定义ignore只安全补精确项。部署JSON的 `source_setup.status: pending_execution_host`、`configuration_checked: false` 表示来源尚待实际执行端配置。Windows `deployed`不代表SSH服务器目录可用。
 
-首次来源准备须在真正执行ingest的机器调用仓内source命令，输入 `{"operation_id":"configure-dbox-unique","path":"ACTUAL_DBOX_DIRECTORY"}`，用该端绝对目录替换占位。调用格式为 `python K/knowledge.py source --action configure --input REQUEST.json --output RESPONSE.json`。动作由CLI参数选择；这会验证并保存固定 `dbox.local.yml`，不复制部署私有源码到Linux，不递归资料。无path只检查现有配置，同地址保留字节，显式换地址无需重装能力。详细格式与错误边界见实际知识根使用说明的“首次配置 dbox 资料目录”；日常run不自动重跑配置。
+首次来源准备须在真正执行ingest的机器进入实际知识根，调用仓内source命令，输入 `{"operation_id":"configure-dbox-unique","path":"ACTUAL_DBOX_DIRECTORY"}`，用该端绝对目录替换占位。Windows调用 `.\knowledge.cmd source --action configure --input REQUEST.json --output RESPONSE.json`；POSIX将启动器换成 `sh ./knowledge.sh`。动作由CLI参数选择；这会验证并保存固定 `dbox.local.yml`，不复制部署私有源码到Linux，不递归资料。无path只检查现有配置，同地址保留字节，显式换地址无需重装能力。详细格式与错误边界见实际知识根使用说明的“首次配置 dbox 资料目录”；日常run不自动重跑配置。
 
 本机需有 Python 3.10–3.12。脚本尝试 `py`、`python3`、`python`；找不到时可输入实际解释器路径或使用 `-Python`，不会自动下载 Python。运行包按知识根 `runtime/requirements.lock.txt` 检查，缺失时由交互选择是否安装；自动化调用只有显式添加 `-InstallDependencies` 才会安装。安装使用选中的同一解释器。
 
@@ -50,7 +50,7 @@ Skill ZIP只含指引、参考和上述生成的宿主适配文本，不含scrip
 
 两个安装根各保存 `.factum-knowledge-deploy.json`，记录本分发上次安装的包名，用于下一次清退；它不含机器路径，不参与业务运行，不是能力注册或项目绑定。管理范围是本版包、上次清单里的包和脚本内明确列出的历史知识包。旧版无清单时也可清理 source-scan、source-prepare 等已知退役包；未知包即使同样以 `hs-knowledge-` 开头也保留，并在 JSON 的 `unmanaged_packages` 列出。不要随意删除部署清单；清单损坏时停止升级，不猜测清理范围。
 
-知识库采用分区更新，不能把整个 K 删除再复制：
+知识库采用分区更新，不能把整个知识根删除再复制：
 
 | 范围 | 更新方式 |
 |---|---|
@@ -77,6 +77,6 @@ python -m pytest tools/deploy/tests -q
 
 这些用例使用隔离合成目录；实际 Samba、OpenFlow 加载和服务器环境需要另行核验。
 
-日常在K内用Windows `.\knowledge.cmd`、POSIX `sh ./knowledge.sh` 或明确的 `python K/knowledge.py`；一次注册后可用裸knowledge。Samba远端由宿主已有SSH在服务器原生K目录执行同一CLI，不自动连接、不猜驱动器映射，服务器无需安装或逐次上传Skill脚本。每个执行端首次分别准备Python与 `K/runtime/requirements.lock.txt` 依赖；`python K/knowledge.py doctor`只读核对实际环境，不自动安装。统一入口不等于SMB提速，实际收益须按执行端实测。
+日常先从当前工作区的实际 `AGENTS.md` 和 `config.yml` 确定知识根，再在该目录用Windows `.\knowledge.cmd`、POSIX `sh ./knowledge.sh`；一次注册后可用裸knowledge。Samba远端由宿主已有SSH在服务器原生知识根执行同一CLI，不自动连接、不猜驱动器映射，服务器无需安装或逐次上传Skill脚本。每个执行端首次分别准备Python与知识根下 `runtime/requirements.lock.txt` 依赖；`doctor`只读核对实际环境，不自动安装。统一入口不等于SMB提速，实际收益须按执行端实测。
 
-分发从实际包发现十三项能力。P4使用 `hs-knowledge-review` 与 `knowledge review`；升级移除旧 `hs-knowledge-lint` Skill，保留同名治理 Workflow，审阅结果仍使用原宿主ID。治理 Workflow 的同步、计划、索引修复、完成核验分别绑定四个 `hs-knowledge-patrol-*` Skill，maintain仅保留独立维护。P5继续使用 `hs-knowledge-record` 与 `knowledge record`，升级移除source包内旧受管record声明并保留原记录ID。业务记录、旧工具身份和历史工件不改写。
+分发从实际包发现十二项能力，升级清退旧 `hs-knowledge-explore` Skill及其受管资源，Workflow在入口定位项目和知识根。底层explore命令保留显式诊断及旧调用兼容，不作为业务前置。P4使用 `hs-knowledge-review` 与 `knowledge review`；升级移除旧 `hs-knowledge-lint` Skill，保留同名治理 Workflow，审阅结果仍使用原宿主ID。治理 Workflow 的同步、计划、索引修复、完成核验分别绑定四个 `hs-knowledge-patrol-*` Skill，maintain仅保留独立维护。P5继续使用 `hs-knowledge-record` 与 `knowledge record`，升级移除source包内旧受管record声明并保留原记录ID。业务记录、旧工具身份和历史工件不改写。

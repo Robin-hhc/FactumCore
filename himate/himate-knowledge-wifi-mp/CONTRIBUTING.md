@@ -2,7 +2,7 @@
 
 先读 [AGENTS.md](AGENTS.md) 与[设计入口](docs-llm-wiki/README.md)。架构设计说明职责和链路，概要设计说明流程判断，详细设计说明节点内的文件分工。项目自身的实现需求、任务、测试与验证记录保存在本地 `docs-llm-wiki/sdd/` 和 `docs-llm-wiki/task.md`，由 Git 忽略，不随仓库分发。修改实现时参考本地已有的适用工件，并按共享设计和实际代码验证；历史工件保留原字节。
 
-WiFi 原件、知识和治理默认位于 `repo/himate/himate-knowledge-wifi-mp/`；已有业务项目按根 `config.yml` 的确切映射定位 K。根 `AGENTS.md` 由业务仓维护，本开发仓仅本地保存；共享 `AGENTS.md.example` 只提供四项位置说明和 explore 入口指针，部署时合并到已有业务文件。Skill／Workflow 的开发分发源码在项目根对应目录，实际能力安装在 Agent 自己的目录，由 harness 使用。全库能力介绍与路由归 `hs-knowledge-explore`；首次部署或本机依赖缺项时按[使用说明](docs-llm-wiki/使用说明.md#2-首次环境安装)运行分发仓根 `deploy.ps1`，缺上下文时才调用只读发现，不另建私有运行环境或要求用户登记能力。目标代码仓在远端时，通过 OpenFlow／宿主已有 SSH MCP 在实际执行端运行脚本和仓库操作，核对当地项目根、全局 Python 与已安装能力。ingest完成生产与本地入库，review提供独立审阅和检查指引，lint Workflow负责增量治理；不建立额外领域目录或嵌套 `.git`。Git 在项目根 `repo/` 执行。
+WiFi 原件、知识和治理默认位于 `repo/himate/himate-knowledge-wifi-mp/`；已有业务项目按根 `config.yml` 的确切映射定位 K。根 `AGENTS.md` 由业务仓维护，本开发仓仅本地保存；共享 `AGENTS.md.example` 只提供四项位置说明和日常业务入口，部署时合并到已有业务文件。Skill／Workflow 的开发分发源码在项目根对应目录，实际能力安装在 Agent 自己的目录，由 harness 使用。任务直接使用对应业务Workflow或Skill，首节点确认实际位置；首次部署或本机依赖缺项时按[使用说明](docs-llm-wiki/使用说明.md#2-首次环境安装)运行分发仓根 `deploy.ps1`，位置缺项时先读当前工作区实际入口和配置，必要时询问用户，不另建私有运行环境或要求用户登记能力。目标代码仓在远端时，通过 OpenFlow／宿主已有 SSH MCP 在实际执行端运行脚本和仓库操作，核对当地项目根、全局 Python 与已安装能力。ingest完成生产与本地入库，review提供独立审阅和检查指引，lint Workflow负责增量治理；不建立额外领域目录或嵌套 `.git`。Git 在项目根 `repo/` 执行。
 
 原始文档放 `docs-raw/{conventions,chips,storys,specs,protocols,troubleshooting}/`，保留原件及必要附件；`sources/` 的 URL 更新暂不接入。知识卡经候选和确切最终视图治理后进入 `knowledge/`。纯文档经独立 Agent 内容复核和完整固定检查后 stable，免代码实现核验。用户可在执行中退回或入库后要求修订。代码卡本地只读检查通过后 stable，上库固定 CI 校验格式、索引及来源／代码引用一致性；检查不修卡、锁、链接或源码。
 

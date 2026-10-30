@@ -2,8 +2,8 @@
 
 只在明确的维护请求下选择动作；日常增量治理使用 `hs-knowledge-lint` Workflow，只读引用报告见[audit](audit.md)。
 
-```text
-python K/knowledge.py maintain --action <动作> --input REQUEST.json --json
+```powershell
+.\knowledge.cmd maintain --action <动作> --input REQUEST.json --json
 ```
 
 | 动作 | 输入 | 用途 |

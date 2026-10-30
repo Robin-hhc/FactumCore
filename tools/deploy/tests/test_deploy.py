@@ -113,7 +113,7 @@ def make_source(root: Path, skill_count: int = 8) -> Path:
         ),
     )
     pins = "PyYAML==" + importlib.metadata.version("PyYAML") + "\n"
-    names = ["hs-knowledge-explore", "hs-knowledge-query"] + [
+    names = ["hs-knowledge-source", "hs-knowledge-query"] + [
         "hs-knowledge-new-" + str(i) for i in range(skill_count - 2)
     ]
     for name in names:
@@ -522,7 +522,7 @@ def test_overlapping_source_or_destination_roots_are_rejected(source, targets, r
 
 def test_entire_write_set_is_preflighted_before_updating_early_files(source, targets):
     assert cli(source, targets)[0] == 0
-    selected = source / "skills/common/knowledge/hs-knowledge-explore/SKILL.md"
+    selected = source / "skills/common/knowledge/hs-knowledge-source/SKILL.md"
     selected.write_bytes(selected.read_bytes() + b"new early bytes\n")
     # Conflicting directories within managed packages are valid layout upgrades.
     # A mixed-area file cannot authorize deleting an unrelated directory instead.
@@ -678,7 +678,7 @@ def test_mid_write_failure_restores_existing_bytes_and_removes_new_files(
 ):
     if already_deployed:
         assert cli(source, targets)[0] == 0
-        for name in ("hs-knowledge-explore", "hs-knowledge-query"):
+        for name in ("hs-knowledge-source", "hs-knowledge-query"):
             selected = source / "skills/common/knowledge" / name / "SKILL.md"
             selected.write_bytes(selected.read_bytes() + b"changed bytes\n")
         put(targets["skills_root"], "unrelated-package/private.bin", b"owned by another task")

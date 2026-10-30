@@ -105,12 +105,25 @@ def test_layout_rejects_unknown_canvas_nodes(tmp_path, workflow):
 
 def test_public_capabilities_separate_review_and_each_patrol_task():
     assert set(validator_module().SKILLS) == {
-        "hs-knowledge-explore", "hs-knowledge-source",
+        "hs-knowledge-source",
         "hs-knowledge-change-plan", "hs-knowledge-view-materialize", "hs-knowledge-review",
         "hs-knowledge-record", "hs-knowledge-apply", "hs-knowledge-query", "hs-knowledge-maintain",
         "hs-knowledge-patrol-sync", "hs-knowledge-patrol-plan",
         "hs-knowledge-patrol-reindex", "hs-knowledge-patrol-complete",
     }
+
+
+def test_removed_explore_skill_cannot_reappear_as_an_active_package(tmp_path):
+    module = validator_module()
+    source = fixture_packages(tmp_path / "fixture")
+    package = source / "skills/common/knowledge/hs-knowledge-explore"
+    package.mkdir(parents=True, exist_ok=True)
+    (package / "SKILL.md").write_text(
+        "---\nname: hs-knowledge-explore\ndescription: old routing skill\n---\n# Old router\n",
+        encoding="utf-8",
+    )
+    assert any("active Skill set mismatch" in error and "hs-knowledge-explore" in error
+               for error in module.validate(source))
 
 
 @pytest.mark.parametrize("node_id", ["sync_workspace", "plan_patrol", "refresh_index", "complete_patrol"])
@@ -348,23 +361,23 @@ def test_design_validation_checks_package_contracts_and_owners(tmp_path):
 
 @pytest.mark.parametrize("metadata,diagnostic", [
     ("name: wrong\ndescription: fixture", "missing or inconsistent Skill identity"),
-    ("name: hs-knowledge-explore\ndescription: ''", "missing or inconsistent Skill identity"),
-    ("name: hs-knowledge-explore\nname: duplicate\ndescription: fixture", "duplicate YAML key"),
+    ("name: hs-knowledge-source\ndescription: ''", "missing or inconsistent Skill identity"),
+    ("name: hs-knowledge-source\nname: duplicate\ndescription: fixture", "duplicate YAML key"),
 ])
 def test_node_skill_rejects_invalid_metadata(tmp_path, metadata, diagnostic):
     module = validator_module()
     source = fixture_packages(tmp_path / "fixture")
-    path = source / "skills/common/knowledge/hs-knowledge-explore/SKILL.md"
+    path = source / "skills/common/knowledge/hs-knowledge-source/SKILL.md"
     path.write_text("---\n" + metadata + "\n---\n# Fixture\n", encoding="utf-8")
-    assert any("hs-knowledge-explore" in error and diagnostic in error
+    assert any("hs-knowledge-source" in error and diagnostic in error
                for error in module.validate(source))
 
 
 def test_node_skill_requires_entry_document(tmp_path):
     module = validator_module()
     source = fixture_packages(tmp_path / "fixture")
-    (source / "skills/common/knowledge/hs-knowledge-explore/SKILL.md").unlink()
-    assert any("hs-knowledge-explore" in error and "SKILL.md" in error
+    (source / "skills/common/knowledge/hs-knowledge-source/SKILL.md").unlink()
+    assert any("hs-knowledge-source" in error and "SKILL.md" in error
                for error in module.validate(source))
 
 

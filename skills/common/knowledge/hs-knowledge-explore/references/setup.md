@@ -14,7 +14,11 @@ powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 
 三份 ZIP 在本机临时生成；知识 ZIP 整体复制到项目根内本批暂存位置，再由 Windows 直接在目标路径解压并逐文件回读核对 SHA-256。映射共享盘仍有小文件写入开销，这不代表服务器本地解压，也不证明服务器 Python 或依赖可用。
 
-已有项目的配置、根 `AGENTS.md`、原件、卡及导航、来源锁和正式记录保留；治理规则和 `framework.lock.yaml` 成套更新。脚本不改宿主 SSH／MCP／权限开关，不安装或初始化 CodeGraph。完成后重启 OpenFlow、核对能力列表，并用新任务验证；已有 Workflow 副本不自动升级。
+再次运行同一命令即可升级。受管能力包精确同步并清除过时文件／退役包，包内手工新增内容也会删除；安装根的 `.factum-knowledge-deploy.json` 只记上次部署包名，不参与业务运行。未知包即使同前缀也保留；无清单的旧部署仅接管本版与已知历史包，不清空共用安装根。
+
+知识库只精确同步 `governance/{contracts,schemas,specs,templates}/` 四个纯框架子树，规则和 `framework.lock.yaml` 成套更新；共享文档按明确文件清单替换，不清空整个治理或文档目录。已有项目配置、根 `AGENTS.md`、原件、卡及导航、来源锁、dbox 私人配置、全部日志、`.build/`、`artifacts/` 与本机文档保留。不要把“不上库”或“可重建”当作允许部署清空。
+
+升级前停用相关宿主任务、结束业务写入，已知未完事务先用原版本处理；可用 `-Plan` 核对更新／删除／目录移除计划。受控失败尝试回滚，冲突则保留备份并报告失败。脚本不改宿主 SSH／MCP／权限开关，不安装或初始化 CodeGraph。完成后重启 OpenFlow、核对能力列表，并用新任务验证；已有 Workflow 副本不自动升级。
 
 ## dbox 首次来源配置
 

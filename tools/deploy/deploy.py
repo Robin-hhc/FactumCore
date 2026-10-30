@@ -30,6 +30,18 @@ import zipfile
 
 
 KNOWLEDGE = "himate-knowledge-wifi-mp"
+RECEIPT = ".factum-knowledge-deploy.json"
+FRAMEWORK_TREES = ("contracts", "schemas", "specs", "templates")
+# Exact historical knowledge IDs only. Core skills that moved to other groups
+# (hs-codegraph-setup, hs-workspace-explore) are deliberately not retired here.
+LEGACY_SKILLS = {
+    "hs-knowledge-" + name for name in (
+        "source-scan", "source-prepare", "candidate-inspect", "candidate-revise",
+        "governance-handoff", "index-build", "local-check", "merge-check",
+        "publish-handoff", "query-regression", "recover", "source-capture",
+        "confirmation-prepare", "confirmation-record",
+    )
+}
 SHARED_DOCS = (
     "AGENTS.md", "README.md", "HiMate知识库架构设计.md", "知识库详细设计.md",
     "知识库关键点.md", "使用说明.md",
@@ -490,6 +502,139 @@ def _current(path):
     return path.read_bytes() if _exists(path) else None
 
 
+def _tree_state(root):
+    """Inventory an owned target without the source-distribution exclusions."""
+    _check_chain(root)
+    files, directories = {}, set()
+    if _exists(root):
+        pending = [root]
+        while pending:
+            directory = pending.pop()
+            directories.add(directory.relative_to(root).as_posix())
+            for path in sorted(directory.iterdir()):
+                _relative(path.relative_to(root).as_posix())
+                info = path.lstat()
+                if stat.S_ISDIR(info.st_mode):
+                    _check_chain(path)
+                    pending.append(path)
+                else:
+                    _check_chain(path, True)
+                    files[path.relative_to(root).as_posix()] = path.read_bytes()
+    return {"files": files, "directories": directories}
+
+
+def _tree_key(state):
+    return ({name.casefold(): data for name, data in state["files"].items()},
+            {name.casefold() for name in state["directories"]})
+
+
+def _expected_tree(files):
+    directories = {"."} if files else set()
+    for name in files:
+        directories.update(parent.as_posix() for parent in PurePosixPath(name).parents)
+    return {"files": files, "directories": directories}
+
+
+def _package_ownership(root, kind, names):
+    """Receipts are deployment bookkeeping, never a runtime registration."""
+    if any(not re.fullmatch(r"hs-knowledge-[a-z0-9]+(?:-[a-z0-9]+)*", name) for name in names):
+        raise DeploymentError("Package names must be portable knowledge IDs")
+    path = root / RECEIPT
+    before = _current(path)
+    previous = []
+    if before is not None:
+        def unique(pairs):
+            value = {}
+            for key, item in pairs:
+                if key in value:
+                    raise DeploymentError("Duplicate deployment receipt key")
+                value[key] = item
+            return value
+        try:
+            value = json.loads(before.decode("utf-8"), object_pairs_hook=unique)
+            previous = value["packages"]
+            if (set(value) != {"schema_version", "owner", "kind", "packages"}
+                    or value["schema_version"] != "1.0" or value["owner"] != "factumcore-knowledge"
+                    or value["kind"] != kind or not isinstance(previous, list)):
+                raise DeploymentError("Invalid deployment receipt identity: " + str(path))
+            if (any(not isinstance(name, str) or not re.fullmatch(r"hs-knowledge-[a-z0-9]+(?:-[a-z0-9]+)*", name)
+                    for name in previous) or len(set(previous)) != len(previous)):
+                raise DeploymentError("Invalid deployment receipt package names: " + str(path))
+        except (ValueError, KeyError, TypeError, UnicodeError) as exc:
+            raise DeploymentError("Invalid deployment receipt: " + str(path)) from exc
+    owned = set(names) | set(previous) | (LEGACY_SKILLS if kind == "skills" else set())
+    unknown = []
+    if _exists(root):
+        unknown = [item.name for item in sorted(root.iterdir())
+                   if item.name.casefold().startswith("hs-knowledge-") and item.name not in owned]
+    data = (json.dumps({"schema_version": "1.0", "owner": "factumcore-knowledge", "kind": kind,
+                        "packages": sorted(names)}, ensure_ascii=True, sort_keys=True, indent=2) + "\n").encode("utf-8")
+    row = {"path": path, "data": data, "before": before, "kind": "receipt", "relative": RECEIPT,
+           "action": "unchanged" if before == data else "write"}
+    return owned, unknown, row
+
+
+def _mirror_scopes(skills_root, workflows_root, project_root, knowledge_root, payloads, packages):
+    scopes, receipts, unknown = [], [], {}
+    for kind, root in (("skills", skills_root), ("workflows", workflows_root)):
+        owned, unknown[kind], receipt = _package_ownership(root, kind, packages[kind])
+        receipts.append(receipt)
+        for name in sorted(owned):
+            prefix = name + "/"
+            files = {rel[len(prefix):]: data for rel, data in payloads[kind].items() if rel.startswith(prefix)}
+            path = root / name
+            if files or _exists(path):
+                scopes.append({"root": path, "anchor": root, "kind": kind,
+                               "before": _tree_state(path), "after": _expected_tree(files)})
+    for name in FRAMEWORK_TREES:
+        path = knowledge_root / "governance" / name
+        prefix = path.relative_to(project_root).as_posix() + "/"
+        files = {rel[len(prefix):]: data for rel, data in payloads["knowledge"].items() if rel.startswith(prefix)}
+        if files or _exists(path):
+            scopes.append({"root": path, "anchor": project_root, "kind": "knowledge",
+                           "before": _tree_state(path), "after": _expected_tree(files)})
+    return scopes, receipts, unknown
+
+
+def _mirror_removals(scopes):
+    deletes, directories = [], []
+    for scope in scopes:
+        expected_files, expected_dirs = _tree_key(scope["after"])
+        for relative, data in scope["before"]["files"].items():
+            if relative.casefold() not in expected_files:
+                path = scope["root"] / relative
+                deletes.append({"path": path, "before": data, "data": None, "action": "delete",
+                                "kind": scope["kind"], "relative": path.relative_to(scope["anchor"]).as_posix()})
+        for relative in scope["before"]["directories"]:
+            if relative.casefold() not in expected_dirs:
+                directories.append(scope["root"] / relative)
+    return deletes, sorted(directories, key=lambda path: (-len(path.parts), str(path)))
+
+
+def _planned_before(path, scopes):
+    for scope in scopes:
+        if path.is_relative_to(scope["root"]):
+            relative = path.relative_to(scope["root"]).as_posix().casefold()
+            if os.name == "nt" and len(str(path)) >= 260:
+                raise DeploymentError("Target path exceeds the supported Windows path length: " + str(path))
+            return _tree_key(scope["before"])[0].get(relative)
+    return _current(path)
+
+
+def _verify_trees(scopes, version):
+    for scope in scopes:
+        if _tree_key(_tree_state(scope["root"])) != _tree_key(scope[version]):
+            raise DeploymentError("Managed target tree changed (" + version + "): " + str(scope["root"]))
+
+
+def _remove_file(path, expected_before):
+    if _current(path) != expected_before:
+        raise DeploymentError("Concurrent target change before deletion: " + str(path))
+    path.unlink()
+    if _exists(path):
+        raise DeploymentError("Deleted target failed read-back: " + str(path))
+
+
 def _make_directories(path, created):
     _check_chain(path)
     missing = []
@@ -563,15 +708,15 @@ def _deployment_mutex(roots):
             kernel.CloseHandle(handle)
 
 
-def _install(writes, archives, project_root, guards=(), roots=()):
+def _install(writes, archives, project_root, guards=(), roots=(), scopes=(), directories=()):
     with _deployment_mutex(roots) as protection:
-        report = _install_locked(writes, archives, project_root, guards)
+        report = _install_locked(writes, archives, project_root, guards, scopes, directories)
         report["concurrency_protection"] = protection
         return report
 
 
-def _install_locked(writes, archives, project_root, guards=()):
-    changed, created, conflicts = [], [], []
+def _install_locked(writes, archives, project_root, guards=(), scopes=(), directories=()):
+    changed, deleted, removed_dirs, created, conflicts = [], [], [], [], []
     stage = project_root / (".factum-deploy-" + uuid.uuid4().hex)
     report = {"rollback_conflicts": [], "stage_cleanup_pending": False}
     local = Path(tempfile.mkdtemp(prefix="factum-deploy-"))
@@ -582,17 +727,20 @@ def _install_locked(writes, archives, project_root, guards=()):
         backups = local / "backups"
         backups.mkdir()
         for index, row in enumerate(writes):
-            if row["before"] is not None and row["action"] == "write":
+            if row["before"] is not None and row["action"] in {"write", "delete"}:
                 (backups / str(index)).write_bytes(row["before"])
         manifest = [{"path": str(row["path"]), "backup": str(index) if row["before"] is not None else None,
                      "before_sha256": digest(row["before"]) if row["before"] is not None else None,
-                     "installed_sha256": digest(row["data"])}
-                    for index, row in enumerate(writes) if row["action"] == "write"]
+                     "installed_sha256": digest(row["data"]) if row["data"] is not None else None,
+                     "action": row["action"]}
+                    for index, row in enumerate(writes) if row["action"] in {"write", "delete"}]
+        manifest += [{"path": str(path), "action": "remove_directory"} for path in directories]
         (local / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=True), encoding="utf-8")
         try:
             for path, baseline in guards:
                 if _current(path) != baseline:
                     raise DeploymentError("Project configuration changed during deployment: " + str(path))
+            _verify_trees(scopes, "before")
             _make_directories(project_root, created)
             stage.mkdir()
             shared_zip = stage / "knowledge.zip"
@@ -602,9 +750,27 @@ def _install_locked(writes, archives, project_root, guards=()):
             if digest(shared_bytes) != digest(archives["knowledge"]):
                 raise DeploymentError("Copied knowledge ZIP digest mismatch")
             # Read the archive on the selected project/share before installing it.
-            expected = {row["relative"]: row["data"] for row in writes if row["kind"] == "knowledge"}
+            expected = {row["relative"]: row["data"] for row in writes
+                        if row["kind"] == "knowledge" and row["action"] != "delete"}
             extracted = _archive_payload(shared_bytes, expected)
+            # Remove obsolete layout first, including files becoming directories.
+            # Only individually inventoried paths are unlinked/rmdir'd.
             for row in writes:
+                if row["action"] == "delete":
+                    retain_backups = True
+                    deleted.append(row)
+                    _remove_file(row["path"], row["before"])
+            for directory in directories:
+                _check_chain(directory)
+                removed_dirs.append(directory)
+                retain_backups = True
+                directory.rmdir()
+            # Receipts are committed only after the complete framework verifies.
+            ordinary = [row for row in writes if row["kind"] != "receipt" and row["action"] != "delete"]
+            receipts = [row for row in writes if row["kind"] == "receipt"]
+            for row in ordinary + receipts:
+                if row["kind"] == "receipt":
+                    _verify_trees(scopes, "after")
                 path = row["path"]
                 if _current(path) != row["before"]:
                     raise DeploymentError("Concurrent target change before write: " + str(path))
@@ -617,26 +783,46 @@ def _install_locked(writes, archives, project_root, guards=()):
                 _write_atomic(path, data, row["before"])
                 if _current(path) != row["data"]:
                     raise DeploymentError("Installed bytes failed read-back: " + str(path))
+            _verify_trees(scopes, "after")
         except BaseException as exc:
-            for row in reversed(changed):
+            def restore(row, installed):
                 path = row["path"]
                 try:
                     current = _current(path)
                     if current == row["before"]:
-                        continue
-                    if current != row["data"]:
+                        return
+                    if current != installed:
                         conflicts.append(str(path))
-                        continue
+                        return
                     if row["before"] is None:
-                        if _current(path) != row["data"]:
-                            raise DeploymentError("Concurrent target change before rollback removal: " + str(path))
-                        path.unlink()
+                        _remove_file(path, installed)
                     else:
-                        _write_atomic(path, row["before"], row["data"])
+                        _make_directories(path.parent, [])
+                        _write_atomic(path, row["before"], installed)
                         if _current(path) != row["before"]:
                             conflicts.append(str(path))
                 except BaseException:
                     conflicts.append(str(path))
+            for row in reversed(changed):
+                restore(row, row["data"])
+            # Undo new directories before restoring old directory/file shapes.
+            for directory in reversed(created):
+                try:
+                    _check_chain(directory)
+                    directory.rmdir()
+                except (OSError, DeploymentError):
+                    pass
+            for directory in sorted(removed_dirs, key=lambda path: len(path.parts)):
+                try:
+                    _make_directories(directory, [])
+                except BaseException:
+                    conflicts.append(str(directory))
+            for row in reversed(deleted):
+                restore(row, None)
+            try:
+                _verify_trees(scopes, "before")
+            except BaseException as conflict:
+                conflicts.append(str(conflict))
             retain_backups = bool(conflicts)
             report.update(status="failed", diagnostics=[type(exc).__name__ + ": " + (str(exc) or "Deployment interrupted")], rollback_conflicts=conflicts,
                           rolled_back=not conflicts)
@@ -667,7 +853,7 @@ def _install_locked(writes, archives, project_root, guards=()):
             report["backup_manifest"] = str(local / "manifest.json")
     except BaseException as exc:
         # A second interrupt during rollback/cleanup must not erase recovery data.
-        retain_backups = bool(changed)
+        retain_backups = bool(changed or deleted or removed_dirs)
         report.update(status="failed", diagnostics=[type(exc).__name__ + ": " + (str(exc) or "Deployment interrupted")],
                       rolled_back=False)
         if retain_backups:
@@ -728,6 +914,11 @@ def deploy(source_root, skills_root, workflows_root, project_root, plan=False, i
     report["packages"] = {"skills": skill_names, "workflows": workflow_names}
     report["framework_files_verified"] = governed_count
     payloads = {"skills": skills, "workflows": workflows, "knowledge": knowledge}
+    scopes, receipts, unknown = _mirror_scopes(
+        skills_root, workflows_root, project_root, knowledge_root, payloads, report["packages"])
+    deletes, directories = _mirror_removals(scopes)
+    report["unmanaged_packages"] = unknown
+    guards += [(row["path"], row["before"]) for row in receipts]
     archives = {name: _archive(payload) for name, payload in payloads.items()}
     report["archives"] = [{"name": name + ".zip", "sha256": digest(data),
                            "bytes": len(data), "files": len(payloads[name])} for name, data in archives.items()]
@@ -735,21 +926,27 @@ def deploy(source_root, skills_root, workflows_root, project_root, plan=False, i
     writes, seen = [], set()
     for kind, root in (("skills", skills_root), ("workflows", workflows_root), ("knowledge", project_root)):
         for rel, data in _archive_payload(archives[kind], payloads[kind]).items():
-            path = _check_chain(root / rel, True)
+            path = root / rel
             key = str(path).casefold()
             if key in seen:
                 raise DeploymentError("Duplicate target path: " + str(path))
             seen.add(key)
-            before = _current(path)
+            before = _planned_before(path, scopes)
             preserve = kind == "knowledge" and rel in initial and before is not None
             writes.append({"path": path, "data": data, "before": before, "kind": kind, "relative": rel,
                            "action": "preserve" if preserve else "unchanged" if before == data else "write"})
+    writes += deletes + receipts
     report["files"] = [{"path": str(row["path"]), "action": row["action"],
-                        "sha256": digest(row["data"])} for row in writes]
+                        "sha256": digest(row["data"]) if row["data"] is not None else None,
+                        "before_sha256": digest(row["before"]) if row["before"] is not None else None}
+                       for row in writes]
+    report["directories"] = [{"path": str(path), "action": "remove"} for path in directories]
     report["write_count"] = sum(row["action"] == "write" for row in writes)
+    report["delete_count"] = len(deletes)
+    report["remove_directory_count"] = len(directories)
     if plan:
         return report
-    result = _install(writes, archives, project_root, guards, targets)
+    result = _install(writes, archives, project_root, guards, targets, scopes, directories)
     report.update(result)
     if report["status"] != "failed":
         report["status"] = "deployed"

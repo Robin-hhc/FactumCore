@@ -378,16 +378,22 @@ def test_cli_repeat_update_preserves_project_and_business_bytes(source, targets)
     put(targets["skills_root"], "unrelated-package/custom.txt", b"other package")
     put(targets["skills_root"], "hs-knowledge-query/local-helper.txt", b"unknown file")
     before = all_target_bytes(targets)
-    assert cli(source, targets)[0] == 0
+    code, report = cli(source, targets)
+    assert (code, report["status"]) == (0, "deployed")
+    assert report["delete_count"] == 1
+    before["skills_root"].pop("hs-knowledge-query/local-helper.txt")
     assert all_target_bytes(targets) == before
-    replacement = b"print('updated without deleting unknown files')\n"
+    replacement = b"print('updated framework bytes')\n"
     put(source, "skills/common/knowledge/hs-knowledge-query/scripts/cli.py", replacement)
     code, report = cli(source, targets)
     assert (code, report["status"]) == (0, "deployed")
     assert (targets["skills_root"] / "hs-knowledge-query/scripts/cli.py").read_bytes() == replacement
     assert all((project / name).read_bytes() == data for name, data in keep.items())
     assert (targets["skills_root"] / "unrelated-package/custom.txt").read_bytes() == b"other package"
-    assert (targets["skills_root"] / "hs-knowledge-query/local-helper.txt").read_bytes() == b"unknown file"
+    assert not (targets["skills_root"] / "hs-knowledge-query/local-helper.txt").exists()
+    code, repeated = cli(source, targets)
+    assert (code, repeated["status"]) == (0, "deployed")
+    assert (repeated["write_count"], repeated["delete_count"], repeated["remove_directory_count"]) == (0, 0, 0)
 
 
 def test_existing_yaml_nested_knowledge_root_is_used_without_overwrite(source, targets):
@@ -458,7 +464,9 @@ def test_entire_write_set_is_preflighted_before_updating_early_files(source, tar
     assert cli(source, targets)[0] == 0
     selected = source / "skills/common/knowledge/hs-knowledge-explore/SKILL.md"
     selected.write_bytes(selected.read_bytes() + b"new early bytes\n")
-    blocked = targets["workflows_root"] / "hs-knowledge-lint/README.md"
+    # Conflicting directories within managed packages are valid layout upgrades.
+    # A mixed-area file cannot authorize deleting an unrelated directory instead.
+    blocked = targets["project_root"] / DOMAIN / "check.py"
     blocked.unlink()
     blocked.mkdir()
     put(blocked, "owned.txt", b"preserve conflicting directory")

@@ -14,7 +14,7 @@ powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 | Workflow 模板安装根 | `~\.openflow\config\workflow-templates` |
 | 代码仓／知识项目根 | `Y:\thursday\work_code` |
 
-第三项是项目根，不是知识子目录。已有 `config.yml` 时沿用其中安全的 `knowledge_roots.wifi`；新项目默认使用 `himate-knowledge-wifi-mp/`，模块列表为空，等待维护者按真实代码填写。`~` 按当前 Windows 用户目录展开；OpenFlow 使用自定义用户根时，请相应修改安装路径。
+第三项是项目根，不是知识子目录。分发源码位于 `repo/himate/himate-knowledge-wifi-mp/`；新项目默认安装到同样的 `himate/himate-knowledge-wifi-mp/`，模块列表为空，等待维护者按真实代码填写。已有 `config.yml` 时沿用其中安全的 `knowledge_roots.wifi`，包括原平铺路径或其他多级目录，保留配置与业务记录原字节，不自动搬迁已部署知识库；`himate/` 下其他组的目录也不在更新范围。`~` 按当前 Windows 用户目录展开；OpenFlow 使用自定义用户根时，请相应修改安装路径。
 
 dbox仅分发知识根下的 `docs-raw/sources/dbox.example.yml` 与同目录精确 `.gitignore`，不分发私人 `dbox.local.yml` 或整个资料目录；已有local地址保持原字节，自定义ignore只安全补精确项。部署JSON的 `source_setup.status: pending_execution_host`、`configuration_checked: false` 表示来源尚待实际执行端配置。Windows `deployed`不代表SSH服务器目录可用。
 
@@ -40,7 +40,9 @@ dbox仅分发知识根下的 `docs-raw/sources/dbox.example.yml` 与同目录精
 
 将 `PATH_TO_PYTHON`、`SKILLS_ROOT`、`WORKFLOWS_ROOT` 替换为实际路径。`-SourceRoot` 可指定完整分发源码根。路径中的空格请加引号；运行前确认映射盘在当前 PowerShell 用户会话可访问。
 
-Skill ZIP只含SKILL.md、references和artifacts文本资源，不含scripts、requirements或测试；执行实现与独立运行锁完整进入知识ZIP。旧受管Skill脚本按现有整包镜像策略清退，项目中的个人配置、原件、来源与运行数据保持原保留策略。
+Skill源包以 `SKILL.md` 与 `references/` 为主体，`artifacts/` 仅保存宿主产物YAML声明。写作／复核指南与模板的唯一源码在 `references/results/`；声明中的安全相对路径仍表示宿主安装包的 `artifacts/` 视图。打包时按声明从唯一参考源物化该视图，保留原声明身份、节点／出口和模板引用，不在源码中维护第二份Markdown。缺失资源、旧目录重复正文、非法引用或二进制内容会在写目标前阻断。
+
+Skill ZIP只含指引、参考和上述生成的宿主适配文本，不含scripts、requirements或测试；执行实现与独立运行锁完整进入知识ZIP。旧受管Skill脚本按现有整包镜像策略清退，项目中的个人配置、原件、来源与运行数据保持原保留策略。包内兼容视图的字节保持不等于已经完成真实OpenFlow宿主装载验收，后者仍在实际宿主单列验证。
 
 程序在本机临时目录生成 Skill、Workflow 和知识项目 ZIP。知识 ZIP 整体复制到项目内本次专用暂存目录，校验摘要后由 Windows 在该处解压，再安装明确清单内的文件并回读核验。对于 Samba 映射盘，这仍涉及逐文件的网络写入；不等于服务器本地解压，不保证速度收益。
 

@@ -22,7 +22,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[3]
 BACKEND = ROOT / "tools" / "deploy" / "deploy.py"
-DOMAIN = "himate-knowledge-wifi-mp"
+DOMAIN = "himate/himate-knowledge-wifi-mp"
 
 
 def put(root: Path, name: str, data: str | bytes) -> Path:
@@ -122,8 +122,12 @@ def make_source(root: Path, skill_count: int = 8) -> Path:
         put(package, "scripts/cli.py", "print('synthetic')\n")
         put(package, "references/request.md", "Synthetic request.\n")
         put(package, "references/execution.md", "Synthetic execution guide.\n")
-        put(package, "artifacts/result.yaml", "version: 1\n")
-        put(package, "artifacts/templates/result.md", "# Synthetic result\n")
+        put(package, "artifacts/result.yaml", (
+            "template: templates/result.md\nwriting_guide: writing-guide.md\nreview_guide: review-guide.md\n"
+        ))
+        put(package, "references/results/templates/result.md", "# Synthetic result\n")
+        put(package, "references/results/writing-guide.md", "# Write actual evidence\n")
+        put(package, "references/results/review-guide.md", "# Review actual evidence\n")
         put(package, "requirements.lock.txt", pins)
         put(package, "requirements-dev.lock.txt", "# Legacy developer lock; not distributed\n")
         put(package, "tests/private.txt", b"do not distribute tests")
@@ -366,11 +370,14 @@ def test_actual_cli_discovers_active_packages_and_preserves_distribution_files(
             "references/execution.md",
             "references/request.md",
             "artifacts/result.yaml",
-            "artifacts/templates/result.md",
+            "references/results/templates/result.md",
         ):
             assert actual[relative] == (
                 source / "skills/common/knowledge" / name / relative
             ).read_bytes()
+        assert actual["artifacts/templates/result.md"] == (
+            source / "skills/common/knowledge" / name / "references/results/templates/result.md"
+        ).read_bytes()
         assert not any(
             part in {"tests", "__pycache__", "config.env", ".env"}
             for relative in actual
@@ -394,7 +401,7 @@ def test_cli_repeat_update_preserves_project_and_business_bytes(source, targets)
     project = targets["project_root"]
     keep = {
         "AGENTS.md": b"# Existing project rules\r\n",
-        "config.yml": b"knowledge_roots:\n  wifi: himate-knowledge-wifi-mp\n",
+        "config.yml": f"knowledge_roots:\n  wifi: {DOMAIN}\n".encode(),
         f"{DOMAIN}/governance/sources.lock.yaml": b"sources: [existing-business]\n",
         f"{DOMAIN}/docs-raw/specs/customer.md": b"raw original\x00",
         f"{DOMAIN}/knowledge/entity/customer.md": b"customer card\r\n",
@@ -424,19 +431,44 @@ def test_cli_repeat_update_preserves_project_and_business_bytes(source, targets)
     assert (repeated["write_count"], repeated["delete_count"], repeated["remove_directory_count"]) == (0, 0, 0)
 
 
-def test_existing_yaml_nested_knowledge_root_is_used_without_overwrite(source, targets):
+@pytest.mark.parametrize("relative", ["himate-knowledge-wifi-mp", "nested/domain", "himate/another-group"])
+def test_existing_yaml_nested_knowledge_root_is_used_without_overwrite(source, targets, relative):
     project = targets["project_root"]
-    config = b"# Existing YAML, not a text-pattern config\nknowledge_roots: {wifi: nested/domain}\nmodules: []\n"
+    config = ("# Existing YAML, not a text-pattern config\nknowledge_roots: {wifi: "
+              + relative + "}\nmodules: []\n").encode()
     put(project, "config.yml", config)
     put(project, "AGENTS.md", b"existing entry")
-    put(project, "nested/domain/knowledge/custom.md", b"customer knowledge")
+    knowledge = project / relative
+    put(knowledge, "knowledge/custom.md", b"customer knowledge")
+    put(knowledge, "logs/publications/existing.json", b"existing publication\r\n")
     code, report = cli(source, targets)
     assert (code, report["status"]) == (0, "deployed")
     assert (project / "config.yml").read_bytes() == config
     assert (project / "AGENTS.md").read_bytes() == b"existing entry"
-    assert (project / "nested/domain/governance/contracts/example.py").is_file()
-    assert (project / "nested/domain/knowledge/custom.md").read_bytes() == b"customer knowledge"
+    assert (knowledge / "governance/contracts/example.py").is_file()
+    assert (knowledge / "knowledge/custom.md").read_bytes() == b"customer knowledge"
+    assert (knowledge / "logs/publications/existing.json").read_bytes() == b"existing publication\r\n"
+    assert Path(report["targets"]["knowledge_root"]) == knowledge
     assert not (project / DOMAIN).exists()
+    code, repeated = cli(source, targets)
+    assert (code, repeated["status"]) == (0, "deployed")
+    assert (repeated["write_count"], repeated["delete_count"], repeated["remove_directory_count"]) == (0, 0, 0)
+
+
+def test_new_project_defaults_to_nested_himate_root_and_preserves_siblings(source, targets):
+    project = targets["project_root"]
+    unrelated = put(project, "himate/unrelated-group/owned.txt", b"other group\r\n")
+    code, report = cli(source, targets)
+    assert (code, report["status"]) == (0, "deployed")
+    assert DOMAIN == "himate/himate-knowledge-wifi-mp"
+    assert Path(report["targets"]["knowledge_root"]) == project / DOMAIN
+    assert yaml.safe_load((project / "config.yml").read_bytes())["knowledge_roots"] == {"wifi": DOMAIN}
+    assert (project / DOMAIN / "knowledge.py").is_file()
+    assert not (project / "himate-knowledge-wifi-mp").exists()
+    assert unrelated.read_bytes() == b"other group\r\n"
+    code, repeated = cli(source, targets)
+    assert (code, repeated["status"]) == (0, "deployed")
+    assert (repeated["write_count"], repeated["delete_count"], repeated["remove_directory_count"]) == (0, 0, 0)
 
 
 @pytest.mark.parametrize("config", ["[broken", "knowledge_roots: {}", "knowledge_roots: {wifi: ../outside}", "knowledge_roots: {wifi: 'nested/../../outside'}"])

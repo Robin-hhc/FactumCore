@@ -8,7 +8,7 @@
 powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 ```
 
-脚本询问 Skill、Workflow 和知识项目根三条路径。第三条是项目根，不是知识根：已有 `config.yml` 时沿用其中 `knowledge_roots.wifi`，允许安全嵌套；没有配置时使用项目根下的 `himate-knowledge-wifi-mp/`。完整默认值、参数和保留策略见实际知识根 `docs-llm-wiki/使用说明.md` 的“首次环境安装”。
+脚本询问 Skill、Workflow 和知识项目根三条路径。第三条是项目根，不是知识根：已有 `config.yml` 时沿用其中 `knowledge_roots.wifi`，允许安全嵌套；没有配置时使用项目根下的 `himate/himate-knowledge-wifi-mp/`。完整默认值、参数和保留策略见实际知识根 `docs-llm-wiki/使用说明.md` 的“首次环境安装”。
 
 脚本选择本机已有 Python 3.10–3.12；找不到时由用户先安装，或用 `-Python` 指定实际解释器，不自动下载 Python。默认核对该解释器的K/runtime/requirements.lock.txt 运行锁，交互模式发现缺包时询问是否修复；非交互修复须显式提供 `-InstallDependencies`。安装和后续部署使用同一个解释器。只看计划使用 `-Plan`，自动化可显式指定 `-SkillsRoot`、`-WorkflowsRoot`、`-ProjectRoot` 和 `-NonInteractive`。
 

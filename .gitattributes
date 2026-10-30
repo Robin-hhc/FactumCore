@@ -1,11 +1,11 @@
 # Preserve verified hashes of domain rules and capability packages.
 # Line-ending normalization would invalidate the byte-pinned framework and snapshots.
-/himate-knowledge-wifi-mp/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+/himate/himate-knowledge-wifi-mp/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
 /config.yml -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
 /AGENTS.md.example -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
 /skills/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
 /workflows/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
 
 # Preserve approved design bytes.
-/himate-knowledge-wifi-mp/docs-llm-wiki/HiMate知识库架构设计.md -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
-/himate-knowledge-wifi-mp/docs-llm-wiki/知识库详细设计.md -text
+/himate/himate-knowledge-wifi-mp/docs-llm-wiki/HiMate知识库架构设计.md -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+/himate/himate-knowledge-wifi-mp/docs-llm-wiki/知识库详细设计.md -text

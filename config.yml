@@ -3,7 +3,7 @@
 schema_version: '2.0'
 workspace_id: himate-wifi-v1
 knowledge_roots:
-  wifi: himate-knowledge-wifi-mp
+  wifi: himate/himate-knowledge-wifi-mp
 # 相对本 config.yml；main/ 可包含多个实际代码模块目录。
 code_root: main
 # 登记真实已拉取的模块。path 相对 code_root；chips、sides、features、description 按实际填写。

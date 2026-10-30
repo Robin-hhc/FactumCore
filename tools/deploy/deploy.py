@@ -29,7 +29,9 @@ import uuid
 import zipfile
 
 
-KNOWLEDGE = "himate-knowledge-wifi-mp"
+# Distribution source and the default for new projects. Existing projects keep
+# the independently validated knowledge_roots.wifi path from their config.
+KNOWLEDGE = "himate/himate-knowledge-wifi-mp"
 RECEIPT = ".factum-knowledge-deploy.json"
 FRAMEWORK_TREES = ("contracts", "schemas", "specs", "templates")
 # Exact historical knowledge IDs only. Core skills that moved to other groups
@@ -327,6 +329,50 @@ def _yaml_load(data, label):
         return yaml.load(data, Loader=UniqueSafeLoader)
     except yaml.YAMLError as exc:
         raise DeploymentError("Invalid YAML in " + label + ": " + str(exc)) from exc
+
+
+def _skill_payload(source):
+    """Build the host's result view from one canonical reference source.
+
+    The declaration's resource paths retain their installed ``artifacts/``
+    meaning. Development Markdown lives only under ``references/results/``;
+    materializing that view never changes a declaration or trusts traversal.
+    """
+    payload, names = _package_payload(source, "SKILL.md", lambda rel:
+        rel.as_posix() == "SKILL.md"
+        or rel.parts[0] == "references" and rel.suffix.casefold() in {".md", ".yaml", ".yml", ".json", ".txt"}
+        or rel.parts[0] == "artifacts" and rel.suffix.casefold() in {".yaml", ".yml"})
+    materialized = {}
+    for name in names:
+        for relative, _ in _tree_files(source / name):
+            rel = PurePosixPath(relative)
+            if rel.parts[0] == "artifacts" and rel.suffix.casefold() == ".md":
+                raise DeploymentError("Result Markdown must have one source under references/results: " + name + "/" + relative)
+        prefix = name + "/artifacts/"
+        declarations = [(key, data) for key, data in payload.items() if key.startswith(prefix)]
+        for key, data in declarations:
+            declaration = _yaml_load(data, key)
+            if not isinstance(declaration, dict):
+                raise DeploymentError("Artifact declaration must be a mapping: " + key)
+            for field in ("template", "writing_guide", "review_guide"):
+                resource = declaration.get(field)
+                if not isinstance(resource, str):
+                    raise DeploymentError("Artifact declaration is missing " + field + ": " + key)
+                relative = _relative(resource)
+                if relative.suffix.casefold() != ".md" or _excluded(relative.parts):
+                    raise DeploymentError("Artifact resource must be a safe Markdown reference: " + key)
+                canonical = name + "/references/results/" + relative.as_posix()
+                if canonical not in payload:
+                    raise DeploymentError("Missing canonical artifact resource: " + canonical)
+                target = prefix + relative.as_posix()
+                if target in materialized:
+                    if materialized[target] != payload[canonical]:
+                        raise DeploymentError("Conflicting generated artifact resource: " + target)
+                    continue
+                _put(materialized, target, payload[canonical])
+    for key, data in materialized.items():
+        _put(payload, key, data)
+    return payload, names
 
 
 def validate_metadata(skills, workflows, skill_names, workflow_names):
@@ -959,9 +1005,7 @@ def deploy(source_root, skills_root, workflows_root, project_root, plan=False, i
     if report["missing"]:
         report["status"] = "missing_dependencies"
         return report
-    skills, skill_names = _package_payload(source_root / "skills/common/knowledge", "SKILL.md", lambda rel:
-        rel.as_posix() == "SKILL.md" or rel.parts[0] in {"references", "artifacts"}
-        and rel.suffix.casefold() in {".md", ".yaml", ".yml", ".json", ".txt"})
+    skills, skill_names = _skill_payload(source_root / "skills/common/knowledge")
     workflows, workflow_names = _package_payload(source_root / "workflows/common/knowledge", "workflow.yaml",
                                                lambda rel: rel.as_posix() in {"workflow.yaml", "layouts.yaml", "README.md"})
     validate_metadata(skills, workflows, skill_names, workflow_names)

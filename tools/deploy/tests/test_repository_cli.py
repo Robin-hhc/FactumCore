@@ -12,6 +12,69 @@ from test_deploy import (
 )
 
 
+def test_canonical_result_references_materialize_the_host_view(source, targets):
+    package = source / "skills/common/knowledge/hs-knowledge-query"
+    (package / "artifacts/templates/result.md").unlink(missing_ok=True)
+    expected = b"# Canonical result\r\nSingle source.\r\n"
+    put(package, "references/results/templates/result.md", expected)
+    put(package, "references/results/writing.md", "# Write the actual result\n")
+    put(package, "references/results/review.md", "# Review actual evidence\n")
+    put(package, "artifacts/result.yaml", (
+        "template: templates/result.md\nwriting_guide: writing.md\nreview_guide: review.md\n"
+    ))
+    code, result = cli(source, targets)
+    assert (code, result["status"]) == (0, "deployed")
+    installed = targets["skills_root"] / "hs-knowledge-query"
+    assert (installed / "artifacts/templates/result.md").is_file()
+    assert (installed / "artifacts/templates/result.md").read_bytes() == expected
+    assert (installed / "references/results/templates/result.md").read_bytes() == expected
+    assert not (package / "artifacts/templates/result.md").exists()
+
+
+@pytest.mark.parametrize("problem", ["missing", "duplicate", "conflict", "binary", "escape", "absolute", "missing-field"])
+def test_invalid_result_resource_cannot_write_targets(source, targets, problem):
+    package = source / "skills/common/knowledge/hs-knowledge-query"
+    canonical = package / "references/results/templates/result.md"
+    if problem == "missing":
+        canonical.unlink()
+    elif problem in {"duplicate", "conflict"}:
+        data = canonical.read_bytes() if problem == "duplicate" else b"conflicting legacy source\n"
+        put(package, "artifacts/templates/result.md", data)
+    elif problem == "binary":
+        canonical.write_bytes(b"\xff\0binary result")
+    else:
+        import yaml
+
+        path = package / "artifacts/result.yaml"
+        value = yaml.safe_load(path.read_bytes())
+        if problem == "missing-field":
+            value.pop("template")
+        else:
+            value["template"] = "../outside.md" if problem == "escape" else str(canonical.absolute())
+        path.write_text(yaml.safe_dump(value), encoding="utf-8")
+    code, result = cli(source, targets)
+    assert (code, result["status"]) == (3, "failed")
+    assert_no_targets(targets)
+
+
+def test_shared_result_resources_and_updates_keep_host_declarations_unchanged(source, targets):
+    package = source / "skills/common/knowledge/hs-knowledge-query"
+    original = (package / "artifacts/result.yaml").read_bytes()
+    put(package, "artifacts/another-result.yaml", original)
+    before = tree(source / DOMAIN)
+    assert cli(source, targets)[0] == 0
+    expected = b"# Actual revised result\r\n"
+    put(package, "references/results/templates/result.md", expected)
+    assert cli(source, targets)[0] == 0
+    installed = targets["skills_root"] / "hs-knowledge-query"
+    assert (installed / "artifacts/templates/result.md").read_bytes() == expected
+    assert (installed / "references/results/templates/result.md").read_bytes() == expected
+    assert (installed / "artifacts/result.yaml").read_bytes() == original
+    assert (installed / "artifacts/another-result.yaml").read_bytes() == original
+    assert tree(source / DOMAIN) == before
+    assert cli(source, targets)[1]["write_count"] == 0
+
+
 def test_repository_cli_and_runtime_are_distributed_but_skill_scripts_are_not(source, targets):
     files = write_runtime(source)
     put(source / DOMAIN, "runtime/__pycache__/private.pyc", b"do not distribute")
@@ -62,7 +125,7 @@ def test_runtime_lock_replaces_obsolete_skill_dependency_lock(source, targets):
     assert result["environment"]["status"] == "ready"
 
 
-@pytest.mark.parametrize("asset", ["references/request.md", "artifacts/templates/result.md"])
+@pytest.mark.parametrize("asset", ["references/request.md", "references/results/templates/result.md"])
 def test_nontext_instruction_resources_cannot_be_distributed(source, targets, asset):
     put(source / "skills/common/knowledge/hs-knowledge-query", asset, b"\xff\x00binary resource")
     code, result = cli(source, targets)

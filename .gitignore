@@ -17,8 +17,8 @@ config.local.yml
 *.env
 
 # Project development artifacts stay local; shared design and usage remain versioned.
-/himate-knowledge-wifi-mp/docs-llm-wiki/sdd/
-/himate-knowledge-wifi-mp/docs-llm-wiki/task.md
+/himate/himate-knowledge-wifi-mp/docs-llm-wiki/sdd/
+/himate/himate-knowledge-wifi-mp/docs-llm-wiki/task.md
 
 # Business sources are registered separately; keep the slot only.
 /main/*
@@ -26,20 +26,20 @@ config.local.yml
 **/.codegraph/
 
 # Domain runtime products: publish empty slots, never generated contents.
-/himate-knowledge-wifi-mp/.build/*
-!/himate-knowledge-wifi-mp/.build/.gitkeep
-/himate-knowledge-wifi-mp/artifacts/*
-!/himate-knowledge-wifi-mp/artifacts/.gitkeep
+/himate/himate-knowledge-wifi-mp/.build/*
+!/himate/himate-knowledge-wifi-mp/.build/.gitkeep
+/himate/himate-knowledge-wifi-mp/artifacts/*
+!/himate/himate-knowledge-wifi-mp/artifacts/.gitkeep
 
 # Keep ingest records, applicability events and explicit verification materials
 # versionable; copied source caches and machine transaction state stay local.
-/himate-knowledge-wifi-mp/logs/evidence/objects/
-/himate-knowledge-wifi-mp/logs/evidence/checked-code/
-/himate-knowledge-wifi-mp/logs/evidence/extractions/
-/himate-knowledge-wifi-mp/logs/evidence/locators/
-/himate-knowledge-wifi-mp/logs/operations/*
-!/himate-knowledge-wifi-mp/logs/operations/.gitkeep
-/himate-knowledge-wifi-mp/logs/patrol/
+/himate/himate-knowledge-wifi-mp/logs/evidence/objects/
+/himate/himate-knowledge-wifi-mp/logs/evidence/checked-code/
+/himate/himate-knowledge-wifi-mp/logs/evidence/extractions/
+/himate/himate-knowledge-wifi-mp/logs/evidence/locators/
+/himate/himate-knowledge-wifi-mp/logs/operations/*
+!/himate/himate-knowledge-wifi-mp/logs/operations/.gitkeep
+/himate/himate-knowledge-wifi-mp/logs/patrol/
 
 # Retired independent checkout, if still present locally.
 /aiot-knowledge/

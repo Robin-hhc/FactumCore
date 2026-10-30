@@ -34,6 +34,6 @@ ingest 的 P5 显式使用 `--action review`。宿主安排独立 reviewer 读�
 
 报告对象绑定精确视图、规则、范围与输入；各固定检查明确 passed、failed、incomplete 或 not_applicable。退出 0 表示所选范围完整执行且无阻断；1 表示有阻断问题；2 表示输入、规则、运行或报告不可用。发现问题交回 ingest 的 P2／P3／P4 修订后重检；独立调用到报告为止。纯文档免代码语义门禁，已声明 code_ref 的导航检查仍适用；缺必需材料必须未完成。格式合规不证明语义或真人同意。
 
-结果模板见 `artifacts/templates/result.md`。CI 从可信基线直接复用 contracts/checks，不调用 Agent、Workflow、安装 catalog 或此 Skill 的宿主编排。
+结果模板见 `references/results/templates/result.md`。CI 从可信基线直接复用 contracts/checks，不调用 Agent、Workflow、安装 catalog 或此 Skill 的宿主编排。
 
 P5的报告、临时索引、来源／代码核验副本和请求／输出只写本次stage，读取确切view及冻结映射，不提前发布正式evidence或事件。独立lint可写自己的新stage报告；不改／清其它任务stage或正式业务状态。两节点lint Workflow只检查和报告，不执行P7清理。清后formal lint从正式依据闭包恢复，不硬读生产者旧view。

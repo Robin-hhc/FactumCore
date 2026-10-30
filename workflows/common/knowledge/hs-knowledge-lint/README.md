@@ -15,6 +15,6 @@ current 的整文件证据改变需交作者复核，即使只是函数前插行
 
 实现位于已安装 maintain 和受锁公共 contracts，Workflow 只分发 YAML、布局和本文。原独立 ingest 不变。观察日志／库存位于本机 `K/logs/patrol/<操作>/`，成功水位位于 `K/.build/runtime/patrol-state.json`，均忽略于 Git；P7 不删除完成核验所需的巡检观察。旧证据、旧定位及正式历史不覆盖。Git 提交、推送和 CI 合入保持后续独立操作。
 
-外部调度前需在内部验收实际 MM 配置、同步覆盖仓、权限、宿主新进程规则重载及 reviewer 隔离。这里的脚本和合成测试不证明真实 OpenFlow 调度或业务知识准确性。详细流程、分支和接口见领域[详细设计 §3.1](../../../../himate-knowledge-wifi-mp/docs-llm-wiki/知识库详细设计.md#31-lint-的检查流程)；安装后从实际知识根文档读取。
+外部调度前需在内部验收实际 MM 配置、同步覆盖仓、权限、宿主新进程规则重载及 reviewer 隔离。这里的脚本和合成测试不证明真实 OpenFlow 调度或业务知识准确性。详细流程、分支和接口见领域[详细设计 §3.1](../../../../himate/himate-knowledge-wifi-mp/docs-llm-wiki/知识库详细设计.md#31-lint-的检查流程)；安装后从实际知识根文档读取。
 
 节点在实际执行端调用知识根 `python K/knowledge.py <阶段> --action <动作>`；巡检同步使用 `patrol sync`，后续 `patrol plan` 必须新起 CLI 进程重新加载同步后的运行实现与规则。Skill 只提供指令与文本契约，不携带脚本。CLI不调用模型，作者判断与P5独立reviewer仍由宿主安排。

@@ -66,6 +66,6 @@ CodeGraph MCP 由 harness 提供，图谱查询以实际可调用能力为准；
 
 按目标能力的实际结果报告已完成内容、业务文件引用和未解决缺口。只做发现时报告项目上下文及缺口；业务任务已获授权且条件具备时，继续完成对应任务，不以发现成功或路由成功结束。
 
-产物展示规则见 [writing-guide](artifacts/writing-guide.md)，复核见 [review-guide](artifacts/review-guide.md)。
+产物展示规则见 [writing-guide](references/results/writing-guide.md)，复核见 [review-guide](references/results/review-guide.md)。
 
 新Workflow从正式状态和当前输入开始，使用新operation；不搜索最近draft或旧操作替用户续办。同Workflow明确引用的返工仍可继续，真正未完writer仍受写安全保护。项目上下文和helper环境是派生产物，不进入P7单批清理集合。

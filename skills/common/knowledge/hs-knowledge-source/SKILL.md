@@ -30,7 +30,7 @@ python K/knowledge.py source --input REQUEST.json --json
 
 请求可用 `source` 限定相对 K 的 raw 文件或目录；明确修卡时保留实际候选卡和补充目标。脚本完成扫描、变化分类、候选查找及材料保存，直接消费返回引用，不手工重建清单或摘要。
 
-- `prepared`：把实际 `scan_ref`、`material_ref` 和 `gaps` 交 P2。材料有缺口时由作者决定补料或欠账。
+- `prepared`：把实际 `scan_ref`、`material_ref` 和 `gaps` 交 P2；所选代码的上下文随材料自动固定。材料有缺口时由作者决定补料或欠账。
 - `unchanged`：本次观察完整且没有待办、维护事项、缺口或明确修订目标，结束本轮。此结果没有材料或待发布处理记录。
 - 调用失败：保留诊断、`stopped_stage` 和已返回引用。原失败重试沿用该操作的固定观察；新观察使用新操作。输入漂移按实际变化对象刷新，不能将所有诊断路径直接当作 raw 范围。
 

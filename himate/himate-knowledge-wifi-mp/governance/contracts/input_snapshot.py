@@ -92,6 +92,12 @@ def _path(ctx, reference, *, current=False, explicit_external=()):
     config_path, config = _configuration(ctx)
     if config_path is not None and absolute == config_path:
         return absolute, str(absolute)
+    if config_path is not None and absolute == config_path.parent / "AGENTS.md":
+        # The actual project entry is a fixed input, not workspace-wide access.
+        entry = ctx.modules["validation"].safe_path(config_path.parent, absolute.name)
+        if entry.is_symlink() or entry.resolve() != absolute:
+            raise NodeError("UNSAFE_PATH", "Project entry cannot be a path alias", reference)
+        return entry, str(absolute)
     if config is not None:
         validation = ctx.modules["validation"]
         for repo in config.get("repos", []):

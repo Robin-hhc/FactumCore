@@ -12,7 +12,7 @@ import difflib
 import yaml
 
 from .runtime import NodeError, digest, fixed_bytes, fork_context, safe, sha, write_bytes
-from . import staging, source_resources
+from . import code_context, staging, source_resources
 
 
 def _save_bytes(context, ref, raw):
@@ -431,8 +431,13 @@ def prepare(context):
     if len(config_digests) > 1:
         raise _source_changed("Explicit code materials were captured under different configurations", ["config.yml"])
     context_ref = request.get("context_ref") or (previous or {}).get("context_ref") or (next(iter(context_refs)) if len(context_refs) == 1 else None)
-    project_context = context.record(context_ref, "project_context") if context_ref else None
-    context_binding = {"context_ref": context_ref, "context_digest": project_context["digest"]} if project_context else {"context_ref": None}
+    if context_refs - {context_ref}:
+        raise NodeError("MATERIAL_INPUT_MISMATCH", "Code materials bind different explicit project contexts")
+    context_binding = code_context.prepare(
+        context, list(resources.values()), list(snapshots.values()), context_ref,
+        explicit=bool(request.get("context_ref") or (context_ref and context_ref in context_refs
+                      and not previous)),
+    )
     combined = context.seal({"resources": [resources[key] for key in sorted(resources)], "snapshots": [snapshots[key] for key in sorted(snapshots)],
                              "extractions": [extractions[key] for key in sorted(extractions)],
                              "staged_objects": staging.validate_entries(context.root, staged_objects),
@@ -487,6 +492,7 @@ def prepare(context):
     ref = context.base + "/materials/" + material["digest"] + "/material.json"
     context.save(ref, material)
     return {"material_ref": ref, "material_digest": material["digest"], "bundle_ref": bundle_ref,
+            **(context_binding if context_binding.get("context_ref") else {}),
             **({"scan_ref": scan_ref} if scan_ref else {}),
             **({"origin_scan_operation_id": scan["operation_id"]} if scan else {}),
             **({"previous_view_ref": request["previous_view_ref"]} if previous_view else {}), "gaps": gaps}, "prepared"

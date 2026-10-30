@@ -39,14 +39,27 @@ def historical_batch(harness, definitions=None):
         "repo_id": repo_id, "relative_path": "file.c", "source_id": "historical-code"}, action="capture")["data"]["bundle_ref"]
     code_bundle = harness.record(code_bundle_ref)
     code_snapshot = code_bundle["snapshots"][0]
+    target = {"target_id": "chip12-host", "chip": "chip12", "side": "host",
+              "build_profile": None, "features": [], "protocol_versions": [], "revision": None}
+    context = {"schema_version": "2.0", "record_kind": "project_context", "operation_id": "seed",
+        "rules_digest": harness.rules, "tool_identity": code_bundle["tool_identity"], "state": "context_loaded",
+        "workspace_id": "historical-context", "workspace_root": str(harness.base), "knowledge_root": str(harness.root),
+        "config_path": str(config_path), "config_digest": hashed(config_path.read_bytes()), "entries": [],
+        "target": target if any(usage == "current" for _, usage, _ in definitions) else None, "build_evidence": None,
+        "repos": {repo_id: {"repo_id": repo_id, "root": str(code), "kind": "export", "evidence_basis": "filesystem",
+            "workspace_path": "main/shared", "head": None, "identity": None, "dirty": None,
+            "files": {"file.c": hashed(original)}}}}
+    context["digest"] = hashed(canonical(context))
+    context_ref = harness.write(".build/operations/seed/source-context.json", canonical(context))
     material_ref = harness.run("source", {"operation_id": "seed", "scan_ref": scan_ref,
+        "context_ref": context_ref,
         "code_bundle_refs": [{"bundle_ref": code_bundle_ref, "bundle_digest": code_bundle["digest"]}]},
         "prepare")["data"]["material_ref"]
     material = harness.record(material_ref)
+    assert material["context_ref"] == context_ref
+    assert material["context_digest"] == context["digest"]
     bundle = harness.record(material["bundle_ref"])
     raw_snapshot = next(s for s in bundle["snapshots"] if s["source_id"] == unit["source_id"])
-    target = {"target_id": "chip12-host", "chip": "chip12", "side": "host",
-              "build_profile": None, "features": [], "protocol_versions": [], "revision": None}
     cases = [{"id": identity, "query": "Synthetic", "purpose": "implementation" if usage == "current" else usage,
               "required": [identity], "context": target} for identity, usage, _ in definitions]
     semantic_ref = harness.run("change-plan", {
@@ -60,16 +73,6 @@ def historical_batch(harness, definitions=None):
         "card_actions": [{"card_id": identity, "decision": "create", "author_id": "author",
             "unit_ids": [unit_id], "reason": "One bounded topic"} for identity, _, _ in definitions],
         "target_queries": cases}, "plan")["data"]["semantic_plan_ref"]
-    context = {"schema_version": "2.0", "record_kind": "project_context", "operation_id": "seed",
-        "rules_digest": harness.rules, "tool_identity": code_bundle["tool_identity"], "state": "context_loaded",
-        "workspace_id": "historical-context", "workspace_root": str(harness.base), "knowledge_root": str(harness.root),
-        "config_path": str(config_path), "config_digest": hashed(config_path.read_bytes()), "entries": [],
-        "target": target if any(usage == "current" for _, usage, _ in definitions) else None, "build_evidence": None,
-        "repos": {repo_id: {"repo_id": repo_id, "root": str(code), "kind": "export", "evidence_basis": "filesystem",
-            "workspace_path": "main/shared", "head": None, "identity": None, "dirty": None,
-            "files": {"file.c": hashed(original)}}}}
-    context["digest"] = hashed(canonical(context))
-    context_ref = harness.write(".build/operations/seed/source-context.json", canonical(context))
     decisions, claim_reviews = [], []
     for identity, usage, relation in definitions:
         _, header, body = harness.card(identity, {"snapshots": [raw_snapshot]}).decode().split("---", 2)

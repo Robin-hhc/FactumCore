@@ -14,7 +14,7 @@
 
 材料已经绑定 `bundle_ref` 时从实际材料解析，勿重新捕获。P2 的原查询随计划保留，不在 P3 改写。
 
-代码门禁稿须提供完整 `project_context`。若上游没有该输入，调用方需按 K 的 `governance/schemas/records.schema.json` 准备独立记录，固定实际配置、入口、模块和采用文件 SHA-256，保留未知构建条件，并注明真实生成者及工具身份；不修改 E0 记录或冒充 CLI 自动生成。当前 CLI 没有自动生成完整文件清单的动作，缺少该材料时明确交付缺口，不伪造通过记录。
+代码门禁稿采用 P1 材料绑定的完整 `project_context`，无需手写文件清单或工具身份；E0 discovery 不能直接替代。缺少所需源码时先回 P1 定向备料；显式旧上下文不完整时保留真实缺口，不在 P3 修改绑定或补造通过记录。
 
 ### 简单卡稿与显式动作
 
@@ -28,7 +28,11 @@
 
 按卡片规范保存 `evidence_ref/source_id/snapshot_id/locator` 和 `Claim.source_refs`。活动卡中的代码来源需要实际支持符号及必要消歧的 `code_ref`，不能用 file／range兜底；同文件多符号使用不同 `evidence_ref`。历史恢复和 deprecated 卡保留原兼容契约。
 
+原件位置通过正式来源字段和路径文字展示。本地 Markdown 链接须指向候选视图中的受管文件，不能用指向 raw 的相对链接代替来源绑定。
+
 CodeGraph 仅辅助定位，实际代码和适用条件仍来自本次材料；不保存内部图节点 ID、不推断宏或构建。纯文档无需虚构代码来源。P3 保存完整声明与字节，符号解析、证据支持和质量复核交 P4。
+
+无实际 Target 的静态源码结论使用 guidance／historical、unknown，`scope.contexts` 和 Claim 的 `context_ids` 均为空数组。`verification_requirements` 只填 `semantic-support/build-support/runtime-support` 中实际所需项，条件说明另写文字字段。
 
 ## 结果与交接
 

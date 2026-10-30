@@ -1,6 +1,8 @@
 """Public pure-contract behavior against isolated domain fixtures, no business originals."""
 
 from support.cards import card_data
+from support.stages.source import Harness
+from support.stages.source_code import setup_code
 import hashlib
 import importlib.util
 from pathlib import Path
@@ -191,9 +193,13 @@ def test_record_kind_requires_its_actual_payload(rules, kind):
         v.validate_shape(kind, {"schema_version": "2.0", "record_kind": kind}, rules)
 
 
-def test_six_targets_and_three_pairs_have_consistent_identities(rules):
+def test_six_targets_and_three_pairs_have_consistent_identities(rules, tmp_path):
+    fixture = Harness(tmp_path)
+    setup_code(fixture)
+
     def legacy_configuration():
-        normalized = v.normalize_workspace(v.load_yaml(DOMAIN.parent / "config.yml"), DOMAIN.parent)
+        configuration = v.workspace_config_path(fixture.root)
+        normalized = v.normalize_workspace(v.load_yaml(configuration), configuration.parent)
         # This test deliberately exercises the old public registration format.
         # The shipped module mapping is validated in test_workspace_mapping.py.
         fields = ("schema_version", "workspace_id", "knowledge_roots", "repos", "architecture",

@@ -6,7 +6,7 @@
 
 在 `review` 的 `code_review` 对象中提供 `context_ref` 和 `semantic_report_ref`。本轮 `operation_id` 与确切 `view_ref` 由 P4 传入。代码／混合稿核本次代码门禁卡，同时绑定完整候选。
 
-`context_ref` 指向本批已固定的项目配置、实际代码文件及采用材料；E0 项目发现的文件清单为空，不能冒充完整代码上下文。该输入由调用方按 K 的 `governance/schemas/records.schema.json` 的 `project_context` 契约准备，须有实际 `workspace_id/entries/config_digest`、采用文件 SHA-256、规则绑定及真实生成工具身份；它是待核验数据，不是通过凭据。模块工作区按配置范围和文件指纹核验，版本或 Git 身份未知不妨碍有依据的静态检查。
+`context_ref` 采用 P1 材料绑定的项目配置、入口和实际代码文件清单；E0 discovery 不能冒充完整代码上下文。核实际配置、采用文件 SHA-256、规则及工具身份，不以自动生成代替内容复核。模块工作区按配置范围和文件指纹核验，版本或 Git 身份未知不妨碍有依据的静态检查。
 
 ## 逐 Claim 技术判断
 

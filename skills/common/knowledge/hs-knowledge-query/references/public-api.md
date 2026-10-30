@@ -39,6 +39,8 @@ python K/knowledge.py read CARD_ID --receipt SEARCH_RECEIPT --json
 
 返回的 `source_links` 提供来源地址，未内嵌原件全文或原始字节。打开完整卡或链接不扩大原查询用途及合格 Claim 集合。
 
+命中同源背景卡不等于已有答题依据。相关主题未蒸馏时，可沿固定来源查找原文相关章节，不局限于卡内已提炼的段落；明确区分新增原文依据与已索引 Claim。原文仍不足时报告未覆盖范围，不从搜索词或分数推导答案。
+
 ## 来源地址与代码入口
 
 每条链接将固定 `evidence` 与可取得的 `current` 分开。按地址的 `base` 解释 `path`：

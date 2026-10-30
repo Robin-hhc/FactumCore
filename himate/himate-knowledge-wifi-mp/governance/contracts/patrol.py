@@ -184,6 +184,25 @@ def _retired_reference(ctx, card, source, row, observed):
     return row
 
 
+def _reviewable_navigation(row, observed, config):
+    """A changed readable file can reach authors without claiming symbol absence.
+
+    Only the parser's partial-syntax limitation is repairable at this seam.
+    Keep the original per-reference gap; permission, input drift, parser
+    availability and fixed old-evidence failures remain environment blockers.
+    """
+    navigation = row.get("code_navigation") or {}
+    expected_gap = {"code": "CODE_SYMBOL_UNAVAILABLE", "reason": navigation.get("reason")}
+    return (observed["observation"] == "available" and row["observation"] == "changed"
+            and row["effect"].endswith("needs_review")
+            and navigation.get("status") == "unavailable"
+            and navigation.get("code") == expected_gap["code"]
+            and navigation.get("partial_parse") is True
+            and navigation.get("sha256") == observed["current_sha256"]
+            and navigation.get("config_digest") == config["sha256"]
+            and row["gaps"] == [expected_gap])
+
+
 def _verify_candidates(ctx, planned, cards, config):
     """Claims alone do not cover metadata-only references or absent code_ref."""
     identities = set(planned["candidate_card_ids"])
@@ -281,6 +300,8 @@ def _write_report(ctx, plan, ref):
         position = (row.get("code_navigation") or {}).get("range")
         lines.append("- `" + row["card_id"] + "` / `" + row["evidence_ref"] + "`：" + row["effect"]
                      + "；`" + row["repo_id"] + ":" + row["path"] + "`；当前位置=" + canonical(position).decode() + "。")
+        if row["gaps"]:
+            lines += ["  - 引用待核 `" + gap["code"] + "`：" + gap["reason"] for gap in row["gaps"]]
     lines += ["", "## 欠账及恢复", ""]
     lines += ["- `" + gap["code"] + "`：" + gap["reason"].replace("\n", " ") for gap in plan["gaps"]]
     lines += ["- `" + gap["code"] + "` `" + gap["card_id"] + "`：" + gap["reason"]
@@ -362,7 +383,8 @@ def plan(ctx):
         row = reference_audit.reference_row(ctx, card, source, resource, lock, config, observed)
         row = _retired_reference(ctx, card, source, row, observed)
         references.append(row)
-        gaps.extend({**gap, "card_id": row["card_id"], "path": row["path"]} for gap in row["gaps"])
+        if not _reviewable_navigation(row, observed, config):
+            gaps.extend({**gap, "card_id": row["card_id"], "path": row["path"]} for gap in row["gaps"])
     inspection, _ = maintenance.inspect_context(fork_context(ctx, request={"operation_id": ctx.operation}, action="inspect-context"),
                                                source_ids=selected_ids)
     inspection = _retired_context(ctx, inspection, cards)

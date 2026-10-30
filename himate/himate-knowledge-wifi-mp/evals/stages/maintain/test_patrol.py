@@ -167,6 +167,80 @@ def test_direct_code_cases_are_classified_without_rewriting_old_locators(harness
     assert not (harness.root / ".build/runtime/patrol-state.json").exists()
 
 
+def test_changed_partially_parsed_symbol_is_handed_to_ingest_without_claiming_absence(harness):
+    repin(harness)
+    source, raw, _, _ = AUDIT.code_fixture(harness, ("guidance",), source_bytes=
+        b"int selected_fixture(void) { return 1; }\nint broken(int value { return 0; }\n")
+    source.write_bytes(raw.replace(b"selected_fixture", b"renamed_fixture"))
+    before = AUDIT.protected_bytes(harness)
+    result, planned = fixed_plan(harness)
+    assert result["phase"] == "needs_ingest", result
+    assert planned["complete"] is True and planned["gaps"] == []
+    row, = planned["references"]
+    assert row["code_navigation"]["status"] == "unavailable"
+    assert row["code_navigation"]["partial_parse"] is True
+    assert row["code_navigation"]["matches"] == []
+    assert row["gaps"] == [{"code": "CODE_SYMBOL_UNAVAILABLE", "reason":
+        "Source contains uncertain syntax for this symbol; uniqueness or absence cannot be established"}]
+    assert row["effect"] == "guidance_navigation_needs_review"
+    assert planned["candidate_card_ids"] == ["audit-guidance"]
+    target, = planned["source_request"]["targets"]
+    assert target["relative_path"] == "file.c"
+    assert target["expected_fingerprint"] == AUDIT.hashed(source.read_bytes())
+    scan = harness.record(planned["scan_ref"])
+    assert scan["current_context"]["affected_claims"][0]["reason"] == "code_navigation_unavailable"
+    prepared = source_call(harness, result["data"]["source_request"], "prepare")
+    material = harness.record(prepared["data"]["material_ref"])
+    assert material["current_code"] and len(material["candidates"]) == 1
+    assert {path: value for path, value in AUDIT.protected_bytes(harness).items()
+            if "logs/patrol/" not in path.replace("\\", "/")} == before
+    assert not (harness.root / ".build/runtime/patrol-state.json").exists()
+
+
+@pytest.mark.parametrize("fault", ["unreadable", "old-evidence", "unauthorized"])
+def test_partial_parser_handoff_never_hides_material_or_authorization_failures(harness, fault):
+    repin(harness)
+    source, raw, _, _ = AUDIT.code_fixture(harness, ("guidance",), source_bytes=
+        b"int selected_fixture(void) { return 1; }\nint broken(int value { return 0; }\n")
+    source.write_bytes(raw.replace(b"selected_fixture", b"renamed_fixture"))
+    if fault == "unreadable":
+        source.unlink()
+        source.mkdir()
+    elif fault == "old-evidence":
+        lock = yaml.safe_load((harness.root / "governance/sources.lock.yaml").read_bytes())
+        recovery = lock["snapshots"][0]["recovery"]
+        (harness.root / recovery.get("reference", recovery.get("path"))).unlink()
+    else:
+        configuration = harness.base / "config.yml"
+        value = yaml.safe_load(configuration.read_bytes())
+        value["modules"] = []
+        configuration.write_text(yaml.safe_dump(value), encoding="utf-8")
+    result, planned = fixed_plan(harness)
+    assert result["phase"] == "blocked", result
+    assert planned["complete"] is False and planned["gaps"]
+    assert not (harness.root / ".build/runtime/patrol-state.json").exists()
+
+
+@pytest.mark.parametrize("binding", ["sha256", "config_digest"])
+def test_partial_parser_handoff_requires_the_same_current_file_and_configuration(harness, monkeypatch, binding):
+    repin(harness)
+    source, raw, _, _ = AUDIT.code_fixture(harness, ("guidance",), source_bytes=
+        b"int selected_fixture(void) { return 1; }\nint broken(int value { return 0; }\n")
+    source.write_bytes(raw.replace(b"selected_fixture", b"renamed_fixture"))
+    context = AUDIT.operation_context(harness, {"operation_id": "binding-drift"}, "patrol-plan")
+    resources = AUDIT.public_module("source_resources")
+    original = resources.resolve_code_navigation
+
+    def other_binding(*args, **kwargs):
+        return {**original(*args, **kwargs), binding: "0" * 64}
+
+    monkeypatch.setattr(resources, "resolve_code_navigation", other_binding)
+    data, phase = AUDIT.public_module("patrol").execute(context)
+    assert phase == "blocked" and data["complete"] is False
+    assert any(row["code"] == "CODE_SYMBOL_UNAVAILABLE" for row in data["gaps"])
+    assert not (harness.root / ".build/runtime/patrol-state.json").exists()
+
+
 def pipeline(tmp_path):
     p = MANUAL.ManualPipeline(tmp_path)
     repin(p)
@@ -385,10 +459,12 @@ def test_unchanged_code_with_missing_code_ref_is_a_repair_candidate(harness):
     assert plan["structural_findings"][0]["code"] == "CODE_REF_REQUIRED"
 
 
-def test_metadata_only_broken_reference_cannot_be_hidden_by_real_record_only_skip(harness):
+@pytest.mark.parametrize("partial_parse", [False, True])
+def test_metadata_only_broken_reference_cannot_be_hidden_by_real_record_only_skip(harness, partial_parse):
     repin(harness)
     source, raw, _, _ = AUDIT.code_fixture(harness, ("guidance",), source_bytes=
-        b"int still_fixture(void) { return 1; }\nint selected_fixture(void) { return 2; }\n")
+        b"int still_fixture(void) { return 1; }\nint selected_fixture(void) { return 2; }\n"
+        + (b"int broken(int value { return 0; }\n" if partial_parse else b""))
     path = harness.root / "knowledge/rules/audit-guidance.md"
     _, header, body = path.read_text(encoding="utf-8").split("---", 2)
     metadata = yaml.safe_load(header)
@@ -419,9 +495,12 @@ def test_metadata_only_broken_reference_cannot_be_hidden_by_real_record_only_ski
 
 
 @pytest.mark.parametrize("retire", [False, True])
-def test_pure_code_symbol_repair_runs_real_p3_p7_and_completes(harness, retire):
+@pytest.mark.parametrize("partial_parse", [False, True])
+def test_pure_code_symbol_repair_runs_real_p3_p7_and_completes(harness, retire, partial_parse):
     repin(harness)
-    source, raw, _, _ = AUDIT.code_fixture(harness, ("guidance",))
+    source, raw, _, checkout = AUDIT.code_fixture(harness, ("guidance",), source_bytes=
+        b"int selected_fixture(void) { return 1; }\n"
+        + (b"int broken(int value { return 0; }\n" if partial_parse else b""))
     # This scenario repairs guidance navigation, with no current implementation
     # Claim or build/runtime assertion. Preserve its document-review contract.
     initial_path = harness.root / "knowledge/rules/audit-guidance.md"
@@ -435,6 +514,15 @@ def test_pure_code_symbol_repair_runs_real_p3_p7_and_completes(harness, retire):
         source.write_bytes(raw.replace(b"selected_fixture", b"renamed_fixture"))
     result, planned = fixed_plan(harness)
     assert result["phase"] == "needs_ingest", result
+    if partial_parse and not retire:
+        unresolved, = planned["references"]
+        assert unresolved["code_navigation"]["status"] == "unavailable"
+        assert unresolved["code_navigation"]["partial_parse"] is True
+        # The fixed checker used by P4 still rejects the old live reference;
+        # allowing material handoff does not turn uncertain navigation into pass.
+        fixed = harness.record(AUDIT.lint_report(harness, checkout))
+        assert any(row["code"] == "CODE_SYMBOL_UNAVAILABLE" for row in fixed["findings"])
+        assert fixed["complete"] is False
     scan_ref = result["data"]["scan_ref"]
     scan = harness.record(scan_ref)
     assert scan["units"] == []

@@ -55,7 +55,7 @@ def test_manual_document_scan_record_apply_index_query_keeps_business_checks(tmp
     })["data"]["ingest_record_ref"]
     assert "lint_ref" not in p.record(record_ref)
     assert {slug for slug, _ in staged_calls} >= {"knowledge-source",
-        "knowledge-change-plan", "knowledge-view-materialize", "knowledge-lint"}
+        "knowledge-change-plan", "knowledge-view-materialize", "knowledge-review"}
     assert ("knowledge-record", None) in staged_calls
     # A new operation cannot mistake the pending P5 record for published work.
     fresh = p.call("knowledge-source", {"operation_id": "fresh-before-p7"}, "scan")["data"]

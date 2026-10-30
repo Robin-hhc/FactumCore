@@ -1,6 +1,6 @@
 schema_version: '2.0'
 contract_family: aiot-wifi
-tool_version: 0.10.0
+tool_version: 0.11.0
 files:
   contracts/__init__.py:
     path: governance/contracts/__init__.py
@@ -94,7 +94,7 @@ files:
     sha256: 7a6d7a5e88aa2a0e403f8f72b505426a08f1a2469e61f854ddce6ec5d7be91bd
   contracts/input_snapshot.py:
     path: governance/contracts/input_snapshot.py
-    sha256: 2aaef99ded549c206a4f9bd70ca837faa0170f566283d9c98d929780e2739e00
+    sha256: c5bfc315e2dbba667d21ce32679a4bee65d03990efecc8133243484f3caaba1f
   contracts/legacy_runtime.py:
     path: governance/contracts/legacy_runtime.py
     sha256: 0314816e40354a83dd55b86c72514645b85f7a8c10a5ab6f9846ef113ee19fc3
@@ -121,7 +121,7 @@ files:
     sha256: c53269eb98ea4bd9f47e926361aad47de4a2c284fa086615f3dbfe3f6cc1dc0e
   contracts/source_materials.py:
     path: governance/contracts/source_materials.py
-    sha256: ef0bc5304bfefe2ae9f38a6e74e2425492fef28ca74a6cb56ee9db9018779725
+    sha256: ba558a8144c316f51827a05d1fc2aa8b03ead048926c4a3a2d5da6fa60915b50
   contracts/source_operations.py:
     path: governance/contracts/source_operations.py
     sha256: 3242387669acfcf062bb20ff9913de8a4a5b05fb3a29a0cf02f75c9f98d15c1e
@@ -142,7 +142,7 @@ files:
     sha256: 22786d2ba40540dc44667ebfb54069fec0cdb963a3f101bb88ffbb551e7dc345
   contracts/patrol.py:
     path: governance/contracts/patrol.py
-    sha256: 553bd2505f2994dfa781e25e615b610b3fdd488742efd5899cb81b6bcb4ba9ca
+    sha256: 37b0e097a89c61f7735e968ad1ef4b18ae368fdaf5f1409d7835b849ee8629ce
   contracts/patrol_git.py:
     path: governance/contracts/patrol_git.py
     sha256: e524b89c2bd38af916decd72f278f37e48fe8820f95697e60559ee172e7bd514
@@ -152,6 +152,9 @@ files:
   contracts/source_inventory.py:
     path: governance/contracts/source_inventory.py
     sha256: b1f1e12f4f1fc541ffbc87571bd54bd36d88745f3d7441e0e18bc8982d8c15e2
+  contracts/code_context.py:
+    path: governance/contracts/code_context.py
+    sha256: f8abe2130339434e99f1ff06168fe3bb33c17cbaaee89a6d536ad70695196403
 capabilities:
   checks: '1.0'
   indexing: '1.0'

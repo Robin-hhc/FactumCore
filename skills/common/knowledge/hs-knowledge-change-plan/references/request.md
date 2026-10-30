@@ -9,7 +9,7 @@
 | `material_ref` | 本次阅读材料引用，必填 |
 | `scan_ref` | 材料绑定的真实扫描，正常 Workflow 使用；独立材料目标不伪造全库扫描 |
 | `author_id` | 负责本批判断的作者标识，必填，不作身份认证 |
-| `units` | 实际来源单元各一次处置：`unit_id/outcome/reason` |
+| `units` | 有扫描时逐项覆盖 `scan.units`，无扫描时覆盖 `material.units`：`unit_id/outcome/reason`；补充代码目标作为证据，不另造扫描单元 |
 | `maintenance_units` | 实际受影响卡／Claim的独立处置，`unit_id` 为 `maintenance:<card>#<claim>` |
 | `claim_changes` | 逐 Claim 的明确比较，字段见下文 |
 | `card_actions` | 每个目标卡的明确动作，字段见下文 |

@@ -39,7 +39,7 @@ def test_combined_source_node_completes_real_six_node_public_chain(tmp_path):
     assert result["data"]["batch_complete"] is True
     assert result["data"]["activated"] is True
     assert calls == [("knowledge-source", "run"), ("knowledge-change-plan", "plan"),
-        ("knowledge-view-materialize", "run"), ("knowledge-lint", "review"),
+        ("knowledge-view-materialize", "run"), ("knowledge-review", None),
         ("knowledge-record", None), ("knowledge-apply", "batch")]
     assert not pipeline.skills.exists()
     hit = pipeline.call("knowledge-query", {"operation_id": "read-combined", "query": "combined rule"}, "search")["data"]

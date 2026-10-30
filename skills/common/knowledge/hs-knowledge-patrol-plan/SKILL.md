@@ -21,3 +21,5 @@ python K/knowledge.py patrol plan --input REQUEST.json --json
 | `blocked` | 结束本轮并报告原因及确切续办请求；续办交明确修复任务 |
 
 `source_request` 保留新增／未完成 raw、待修卡来源和代码目标的并集，包括明确空 `unit_ids`。不改跑 `source run`、丢弃选择字段或伪造 raw 单元。输入漂移保留原固定计划；已发布内容不能另起操作重复发布。
+
+已变且可读代码中的部分解析问题可作为待审事项交 ingest；引用仍保留 `unavailable` 和实际原因，不代表已修复。其它基础故障按实际 `blocked` 处理。

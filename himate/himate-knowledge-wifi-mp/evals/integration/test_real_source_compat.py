@@ -28,16 +28,18 @@ def test_exact_configured_git_original_survives_different_repository_owner(tmp_p
     repository.mkdir()
     knowledge = repository / "himate/himate-knowledge-wifi-mp"
     raw_path = knowledge / "docs-raw/protocols/input.txt"
+    knowledge_relative = knowledge.relative_to(repository).as_posix()
+    raw_relative = raw_path.relative_to(repository).as_posix()
     raw_path.parent.mkdir(parents=True)
     raw = b"Immutable registered original.\n"
     raw_path.write_bytes(raw)
-    (repository / "config.yml").write_text(yaml.safe_dump({"knowledge_roots": {"wifi": knowledge.name}}), encoding="utf-8")
+    (repository / "config.yml").write_text(yaml.safe_dump({"knowledge_roots": {"wifi": knowledge_relative}}), encoding="utf-8")
 
     def git(*arguments):
         return subprocess.check_output(["git", "-c", "core.hooksPath=" + os.devnull, "-C", str(repository), *arguments]).decode().strip()
 
     git("init", "-b", "main")
-    git("add", "config.yml", "himate-knowledge-wifi-mp/docs-raw/protocols/input.txt")
+    git("add", "config.yml", raw_relative)
     git("-c", "user.name=Isolated fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "Isolated original fixture")
     head = git("rev-parse", "HEAD")
     forced = dict(os.environ, GIT_TEST_ASSUME_DIFFERENT_OWNER="1", GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull)
@@ -48,13 +50,13 @@ def test_exact_configured_git_original_survives_different_repository_owner(tmp_p
     # variables remain sanitized. Every command executes real Git objects.
     monkeypatch.setenv("GIT_TEST_ASSUME_DIFFERENT_OWNER", "1")
     snapshot = {"snapshot_id": "raw:fixture", "sha256": hashlib.sha256(raw).hexdigest(), "bytes": len(raw),
-                "recovery": {"kind": "git", "commit": head, "path": "himate-knowledge-wifi-mp/docs-raw/protocols/input.txt"}}
+                "recovery": {"kind": "git", "commit": head, "path": raw_relative}}
     assert source_resources.recover_snapshot(knowledge, snapshot, allow_local_fallback=False) == raw
     assert raw_path.read_bytes() == raw
     # Exact Git root checks still reject a configured directory inside a repo.
     nested = repository / "nested"
     nested.mkdir()
-    (repository / "config.yml").write_text(yaml.safe_dump({"knowledge_roots": {"wifi": knowledge.name}, "repos": [{"repo_id": "nested", "root": str(nested)}]}), encoding="utf-8")
+    (repository / "config.yml").write_text(yaml.safe_dump({"knowledge_roots": {"wifi": knowledge_relative}, "repos": [{"repo_id": "nested", "root": str(nested)}]}), encoding="utf-8")
     snapshot["recovery"].update(repo_id="nested", path="input.txt")
     with pytest.raises(v.ContractError):
         source_resources.recover_snapshot(knowledge, snapshot, allow_local_fallback=False)

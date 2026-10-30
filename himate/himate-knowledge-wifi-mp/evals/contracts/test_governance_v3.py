@@ -6,6 +6,8 @@ import hashlib
 import shutil
 import yaml
 import pytest
+from support.stages.source import Harness
+from support.stages.source_code import setup_code
 
 DOMAIN = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location("wifi_v3", DOMAIN / "governance/contracts/__init__.py", submodule_search_locations=[str(DOMAIN / "governance/contracts")])
@@ -206,7 +208,10 @@ def test_current_code_check_projects_claim_sources_and_keeps_current_version_str
     git("add", "source.c")
     git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "current")
     commit = git("rev-parse", "HEAD")
-    normalized = v.normalize_workspace(yaml.safe_load((DOMAIN.parent / "config.yml").read_bytes()), DOMAIN.parent)
+    fixture = Harness(tmp_path)
+    setup_code(fixture)
+    fixture_configuration = v.workspace_config_path(fixture.root)
+    normalized = v.normalize_workspace(yaml.safe_load(fixture_configuration.read_bytes()), fixture_configuration.parent)
     legacy_fields = ("schema_version", "workspace_id", "knowledge_roots", "repos", "architecture",
                      "wiki_entities", "symbol_aliases", "targets", "pairs", "query")
     config = {field: normalized[field] for field in legacy_fields}

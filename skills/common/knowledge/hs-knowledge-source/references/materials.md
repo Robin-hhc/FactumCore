@@ -15,7 +15,7 @@
 
 输出 `prepared` 包含 `material_ref/material_digest`、`bundle_ref`、适用的 `scan_ref` 和 `gaps`。材料保存新旧原文、完整候选旧卡、定位、采用版本和缺口；候选关联只是阅读线索，由 P2 决定是否修改。独立目标不伪造全库扫描、变化分类或完整性。
 
-`context_ref` 只绑定已明确提供的项目上下文；捕获代码不会自动补全 `repos[].files` 文件清单。代码门禁稿在 P3 前还需固定该输入，不能把 E0 的 discovery 记录直接当作完整代码上下文。
+备料采用代码时，脚本按实际配置、入口及本批文件生成完整 `project_context`，随材料返回 `context_ref/context_digest`；只收集采用文件，不扫描全仓。E0 的 discovery 可作为发现输入，完整代码上下文由 P1 另存，旧记录保留。显式完整上下文沿用并核对，不自动替换；纯文档不需要代码上下文。
 
 ## 补料与返工
 

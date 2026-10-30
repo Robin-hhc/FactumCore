@@ -22,8 +22,10 @@ def test_missing_repository_runtime_returns_an_external_diagnostic_without_creat
     response = tmp_path / "response.json"
     cli = FIXTURE.REPO / "himate/himate-knowledge-wifi-mp/knowledge.py"
     action = ["--action", "review"] if skill == "hs-knowledge-lint" else []
+    stage = skill.removeprefix("hs-knowledge-")
+    entry = ["patrol", stage.removeprefix("patrol-")] if stage.startswith("patrol-") else [stage]
     process = subprocess.run([
-        sys.executable, str(cli), skill.removeprefix("hs-knowledge-"), "--json", "--knowledge-root", str(knowledge),
+        sys.executable, str(cli), *entry, "--json", "--knowledge-root", str(knowledge),
         "--input", str(tmp_path / "missing-request.json"), "--output", str(response),
         *action,
     ], capture_output=True, timeout=30)

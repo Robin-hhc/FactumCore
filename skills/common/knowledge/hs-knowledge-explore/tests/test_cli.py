@@ -1,9 +1,18 @@
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 import shutil
 import subprocess
 import sys
+
+
+_runtime_spec = importlib.util.spec_from_file_location(
+    "explore_repository_runtime_fixture",
+    Path(__file__).resolve().parents[5] / "himate-knowledge-wifi-mp/evals/contract_test_support.py",
+)
+_runtime_fixture = importlib.util.module_from_spec(_runtime_spec)
+_runtime_spec.loader.exec_module(_runtime_fixture)
 
 
 def fixture(tmp_path):
@@ -12,6 +21,7 @@ def fixture(tmp_path):
         root / "himate-knowledge-wifi-mp/governance",
         tmp_path / "himate-knowledge-wifi-mp/governance",
     )
+    _runtime_fixture.copy_runtime(tmp_path / "himate-knowledge-wifi-mp")
     shutil.copyfile(root / "config.yml", tmp_path / "config.yml")
     (tmp_path / "AGENTS.md").write_text("Read project rules", encoding="utf-8")
     (tmp_path / "himate-knowledge-wifi-mp/AGENTS.md").write_text(

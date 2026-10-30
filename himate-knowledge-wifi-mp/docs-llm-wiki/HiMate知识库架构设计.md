@@ -1,16 +1,16 @@
 # HiMate知识库架构设计
 
-Skill 可人工逐个调用，只校验本职业务数据和固定检查；OpenFlow 负责流程顺序、角色隔离及交棒合法性。节点不要求 Workflow 身份、catalog 登记或上游通过凭证。
+可按Skill指引逐个调用仓内阶段命令，CLI核对本职业务数据和固定检查；OpenFlow负责流程顺序、角色隔离及交棒合法性。节点不要求Workflow身份、catalog登记或上游通过凭证。
 
 ## 5.3 HiMate knowledge目录架构
 
 himate-knowledge知识库仓目录结构如下所示。
 
-本节以 `repo/` 表示项目根目录，实际目录名称和存放位置不限。下树以平铺布局示意；实际知识根 K 由项目 `config.yml` 的 `knowledge_roots.wifi` 相对配置目录解析，允许安全的前置子目录，与业务代码共同管理。开发仓保存 Skill／Workflow 分发源码；实际部署在 Agent 自己的能力目录，运行不依赖项目根保留源码副本。业务工作区可包含 Host、Device、特性和算法等多个代码模块；知识库按配置中的相对路径读取实际文件，以内容指纹核对引用。
+本节以 `repo/` 表示项目根目录，实际目录名称和存放位置不限。下树以平铺布局示意；实际知识根 K 由项目 `config.yml` 的 `knowledge_roots.wifi` 相对配置目录解析，允许安全的前置子目录，与业务代码共同管理。开发仓保存 Skill／Workflow 分发源码，Agent 安装指引和编排；真正执行实现随 K 的启动器与 `runtime/` 分发，执行端不依赖 Skill 脚本或项目根能力源码副本。业务工作区可包含 Host、Device、特性和算法等多个代码模块；知识库按配置中的相对路径读取实际文件，以内容指纹核对引用。
 
-当前入口按同一业务工作区读取根 `config.yml`，项目配置全部由用户在这份文件维护。已安装 `hs-knowledge-explore` 是全库能力入口，提供 ingest、query、lint 等任务的选择与指引；首次部署和本机依赖准备使用分发仓根的 `deploy.ps1`，后续缺上下文时才运行只读发现。目标代码仓在远端时，Agent 通过 OpenFlow／宿主已有 SSH MCP 在实际执行端运行脚本与仓库操作。正常流程不增加私有环境或登记步骤。
+当前入口按同一业务工作区读取根 `config.yml`，项目配置全部由用户在这份文件维护。`hs-knowledge-explore` 提供 ingest、query、lint 等任务选择与指引，K 的 `knowledge` CLI 执行八阶段固定动作；它不调用模型，内容判断和 P5 独立审阅仍由 Agent／Workflow 完成。首次部署使用分发仓根 `deploy.ps1`，每个实际执行端分别准备 Python 与锁定依赖并运行 doctor。目标代码仓在远端时，Agent 通过 OpenFlow／宿主已有 SSH MCP 在服务器原生 K 运行同一 CLI，不逐次上传 Skill 脚本。正常业务不要求登记；裸命令通过可选 install-command 在每个执行端注册一次。
 
-部署升级将框架与业务资产分开：受管能力包及治理四个纯框架子树精确同步，移除过时文件／退役包；原件、卡与导航、来源锁、日志和本机运行状态保留。安装根的部署清单只帮助安装器识别上次包名，不参与业务加载或机器绑定。升级边界见[知识库关键点 §1.2](知识库关键点.md#12-知识库与代码位于同一工作区)，操作与预览见[使用说明](使用说明.md#2-首次环境安装)。
+部署升级将框架与业务资产分开：受管指引／编排、仓内启动器与runtime及治理四个纯框架子树成套同步，移除过时文件／退役包；原件、卡与导航、来源锁、日志和本机运行状态保留。安装根的部署清单只帮助安装器识别上次包名，不参与业务加载或机器绑定。升级边界见[知识库关键点 §1.2](知识库关键点.md#12-知识库与代码位于同一工作区)，操作与预览见[使用说明](使用说明.md#2-首次环境安装)。
 
 - AGENTS.md：具体业务仓的代码架构、开发约定与位置说明；由该工作区维护
 - AGENTS.md.example：本项目分发的接入示例，供合并 main、config.yml、知识根及设计文档四项说明
@@ -47,6 +47,12 @@ repo/
 │   └── hs-knowledge-lint/     # 同步／差异筛选 → 复用入库 → 实际完成与基线
 └── himate-knowledge-wifi-mp/       # WiFi 领域根，无嵌套 .git
     ├── AGENTS.md / README.md / CONTRIBUTING.md
+    ├── knowledge.py / knowledge.cmd / knowledge.sh  # 仓内跨平台命令入口
+    ├── runtime/
+    │   ├── manifest.json / requirements.lock.txt   # 运行实现与依赖分别固定
+    │   └── himate_knowledge/
+    │       ├── cli.py / protocol.py / stage_dispatch.py
+    │       └── stages/            # 八阶段单份实现；apply保留历史事务适配
     ├── check.py / check.sh         # 固定 CI 入口，复用共用检查函数
     ├── docs-raw/                 # 原始证据，Agent 只读
     │   ├── conventions/          # 编码规范
@@ -85,15 +91,15 @@ repo/
 
 节点 Skill 和 Workflow 随 WiFi 知识库维护：
 
-上树展示开发分发源码。实际能力已经安装在 Agent 自己的 `S`、`F` 目录，由 harness 使用；不要求业务仓根保留能力源码。首次部署使用分发仓根的 `deploy.ps1`：选择本机 Python、安装能力，并由 Windows 直接在所选项目路径解压知识 ZIP；不使用 SSH，也不验证远端 Python。实际业务任务在目标代码仓所在端执行，远端使用宿主已有 SSH MCP，不建立机器绑定。业务产物仍在 K 已有 `.build/`、`logs/`、`artifacts/`。ingest 完成 P1—P7，lint 保持确定性检查；文档和代码均独立内容复核，代码及混合稿另做适用代码核验。
+上树展示开发分发源码。Agent 的 `S`、`F` 目录分别安装 Skill 指引与 Workflow 编排；八阶段执行实现位于 K 的 `runtime/himate_knowledge/stages/`，共用 `protocol.py`，不要求执行端安装 Skill 脚本。首次部署使用分发仓根的 `deploy.ps1`：选择本机 Python、安装指引和编排，并将含启动器／runtime 的知识 ZIP 在所选项目路径解压；不使用 SSH，也不验证远端 Python。实际业务任务在目标代码仓所在端执行，产物仍在 K 已有 `.build/`、`logs/`、`artifacts/`。ingest Workflow 完成 P1—P7，CLI 提供各阶段固定动作；文档和代码均独立内容复核，代码及混合稿另做适用代码核验。
 
-服务器项目先由用户或部署维护者在 OpenFlow 配置、启用 SSH MCP，并验证该能力实际可调用；连接凭据由宿主管理，操作集中见[远端执行准备](使用说明.md#12-远端执行先配置-openflow-ssh-mcp)。远端须已有全局 Python 和配套已安装 Skill，Agent 再通过 SSH MCP 在服务器原生项目路径执行。harness 须确认实际执行端能调用对应脚本；调用端的安装路径不能当作远端脚本路径。同机执行不要求 SSH。部署脚本不配置 SSH MCP、角色权限或远端运行环境，旧 setup 仅保留显式诊断和兼容用途；执行端能力缺失时报告缺口，特殊处理先与用户讨论，不另建目录或工具副本。连接、权限与命令结果由 harness 判断，不另外建立 runner 硬校验层。“本地入库”和“本机索引”指实际执行端；生成物留在 K 原有目录。行为与恢复见[详细设计 §6.3](知识库详细设计.md#63-命令分派与工作流续办)，首次操作见[使用说明](使用说明.md#首次准备运行依赖)。
+服务器项目先由用户或部署维护者在 OpenFlow 配置、启用 SSH MCP，并验证实际可调用；凭据由宿主管理，见[远端执行准备](使用说明.md#12-远端执行先配置-openflow-ssh-mcp)。Agent 在服务器原生 K 调用仓内入口，该端只需准备 Python 与 `runtime/requirements.lock.txt` 中的依赖，并用 doctor 核对环境。Windows 从 Samba 映射盘运行仍产生跨网络文件访问；服务器执行由宿主 SSH 提供，CLI 不推断映射地址或自动连接。部署脚本只检查调用机，不验证远端环境。“本地入库”和“本机索引”均指实际执行端，生成物留在 K 原有目录。行为与恢复见[详细设计 §6.3](知识库详细设计.md#63-命令分派与工作流续办)，命令注册和操作见[使用说明](使用说明.md#22-仓内命令入口与诊断)。
 
 
 
 # 11 HiMate知识库架构
 
-知识库随代码仓一并拉取；能力与本机依赖通过 `deploy.ps1` 部署，explore 提供任务路由和只读发现，不需要常驻服务。首次来源准备在真正执行端使用 source.configure 填写并验证一个 dbox 目录，文件已部署与来源就绪分别报告。`ingest` 默认处理六类仓内 raw 与已配置 dbox，经扫描、独立备料、作者计划和完整成稿，在 P5 集中独立内容／代码审阅及完整质量检查，P6 转写处理记录，P7 将确切字节安全落位并完成检索收尾；有问题时返回相应阶段。`lint` 是可单独调用的只读确定性检查入口，供手动修改和 CI 复用，不自动修稿或入库；`query` 消费知识。内容批完成本地入库、真实索引全验、冻结目标查询和活动代激活后，由人提交、触发固定 CI 并评审合入；仅记录批保存处置和欠账，不建索引。`ingest --source` 可选限定来源；命令格式见[详细设计 §1.1](知识库详细设计.md#11-从命令进入流程)，OpenFlow 负责 Workflow 的调度和交棒校验；人工测试可逐个调用 Skill 并按实际结果继续。
+知识库随代码仓一并拉取；能力与本机依赖通过 `deploy.ps1` 部署，explore 提供任务路由和只读发现，不需要常驻服务。首次来源准备在真正执行端使用 source.configure 填写并验证一个 dbox 目录，文件已部署与来源就绪分别报告。`ingest` 默认处理六类仓内 raw 与已配置 dbox，经扫描、独立备料、作者计划和完整成稿，在 P5 集中独立内容／代码审阅及完整质量检查，P6 转写处理记录，P7 将确切字节安全落位并完成检索收尾；有问题时返回相应阶段。`lint` 是可单独调用的只读确定性检查入口，供手动修改和 CI 复用，不自动修稿或入库；`query` 消费知识。内容批完成本地入库、真实索引全验、冻结目标查询和活动代激活后，由人提交、触发固定 CI 并评审合入；仅记录批保存处置和欠账，不建索引。ingest Workflow的source请求可选限定来源；命令格式见[详细设计 §1.1](知识库详细设计.md#11-从命令进入流程)，OpenFlow 负责 Workflow 的调度和交棒校验；人工测试可逐个调用 Skill 并按实际结果继续。
 
 ingest 是原件到本地正式知识的完整流程；lint Skill 可被 ingest、独立命令和 CI 复用，query 负责消费。同名 lint Workflow 供手动或外部周期治理：同步后重新加载规则，脚本筛选 raw 与登记代码变更，按待办复用 source.prepare 和 P3—P7，核验真实完成后推进成功基线。无待办结束，失败和欠账保留；独立 lint Skill 保持原默认检查行为。实际宿主加载、内部同步适配和周期触发需按部署环境验证；这些能力不要求用户顺序执行。
 
@@ -161,7 +167,8 @@ flowchart TB
     subgraph S4["④ 治理与工具层"]
         direction LR
         D1["governance/<br />templates · schemas · contracts · specs · sources.lock.yaml"]
-        D2["Agent Skills · S<br />主线五包＋query · explore · maintain"]
+        D2["Agent Skills · S<br />八包操作指引与契约文本"]
+        D4["K/knowledge.py + runtime/<br />八阶段执行 · 公共协议 · 独立运行manifest"]
         D3["OpenFlow · Agent Workflows · F<br />ingest：完整 P1—P7<br />lint：治理巡检，按待办复用P3—P7"]
     end
 
@@ -181,7 +188,9 @@ flowchart TB
     S1 --> S2
     S2 -->|"ingest 生产 draft"| E1
     E1 -->|"P5 独立审阅与固定检查 → P6 记录 → P7 安全落位"| S3
-    S4 -.->|"Skill 核业务数据 · OpenFlow 管流程交接"| S3
+    D2 -->|"Agent按指引调用"| D4
+    D4 -->|"同进程复用规则"| D1
+    S4 -.->|"CLI核业务数据 · OpenFlow管流程交接"| S3
     S5 -.->|"质量保障"| S3
 ```
 
@@ -192,7 +201,7 @@ flowchart TB
 | ① 入口路由层 | explore 提供能力路由；已知上下文直接复用，缺失时才发现 | `hs-knowledge-explore` 指引；业务仓 `AGENTS.md` · `config.yml` · 领域仓根四件套；脚本发现为可选前置 E0 |
 | ② 源事实层 | 证据底座：代码事实 + 原始材料，喂知识层 | `main/` · `docs-raw/` |
 | ③ 知识资产层 | 唯一检索对象：治理后的知识卡 | `knowledge/` |
-| ④ 治理与工具层 | Skill 执行业务动作，OpenFlow 编排顺序、角色与交棒；harness 执行命令 | `governance/` 的受锁公共契约 · Agent 的 `S`／`F` |
+| ④ 治理与工具层 | CLI执行固定动作，Skill指引Agent判断，OpenFlow编排顺序、角色与交棒 | `knowledge.py` · `runtime/` · `governance/` 的受锁公共契约 · Agent 的 `S`／`F` |
 | ⑤ 配套支撑层 | 候选暂存 · 回归门禁 · 留痕 · 派生索引 | `.build/` · `evals/` · `logs/` · `artifacts/` · `docs-llm-wiki/` |
 
 递进一句话：证据层喂知识层，契约层束知识层，技能层跑知识层，配套层验知识层，入口层路由知识层。
@@ -238,7 +247,7 @@ flowchart LR
 
 #### `skills/common/knowledge/` —— 项目入口与节点级能力
 
-该路径是开发分发源码；实际能力位于 Agent 的 `S` 目录，由 harness 使用，不依赖项目根同名目录。Skill 保存操作指引与所需脚本；`hs-knowledge-explore` 承担全库能力路由，并提供部署入口指引和只读项目发现，领域事实仍只放知识库：
+该路径是开发分发源码；实际指引位于 Agent 的 `S` 目录，由 harness 使用，不依赖项目根同名目录。Skill 分发操作指引与契约文本，不携带执行脚本或 Python 依赖；阶段实现迁入 K 的 runtime，原开发 scripts 仅作兼容委派。`hs-knowledge-explore` 承担全库能力路由，并提供部署与只读发现指引，领域事实仍只放知识库：
 
 公开集合恰好8包；主线使用5包，query、explore、maintain独立保留。
 
@@ -257,7 +266,7 @@ flowchart LR
 
 #### `workflows/common/knowledge/` —— 增量更新与治理工作流
 
-该路径是开发分发源码；实际 Workflow 放在 Agent 的 `F` 目录，由 OpenFlow 按 Skill ID 编排并校验流程顺序、角色隔离和交棒合法性。Skill 自身只处理本次业务输入与输出，不要求 Workflow run／node／attempt 身份或生成流程 manifest。运行脚本从已安装能力定位，不以项目根目录拼接；Workflow 不装领域事实：
+该路径是开发分发源码；实际 Workflow 放在 Agent 的 `F` 目录，由 OpenFlow 按 Skill ID 编排并校验流程顺序、角色隔离和交棒合法性。Agent 按 Skill 指引调用实际 K 的对应阶段命令；CLI 不要求 Workflow run／node／attempt 身份或生成流程 manifest。Workflow 不装执行代码或领域事实，P5 仍由宿主安排独立 reviewer：
 
 | 工作流 | 职责 | 一句话 |
 |------|------|--------|
@@ -288,6 +297,12 @@ WiFi 原件、知识和治理集中在 `himate-knowledge-wifi-mp/`，项目配�
 四个文件提供领域阅读、贡献和固定检查入口，不承载知识内容；全库任务路由归 explore，领域知识与治理材料分别位于 `knowledge/`、`governance/`。
 
 参与链路：`README.md` / `CONTRIBUTING.md` 是贡献者入口；`check.py / check.sh` 用于提交后的固定 CI 检查；领域 `AGENTS.md` 提供知识边界，生产、治理和消费均加载这些约定。
+
+#### 仓内 CLI 与 runtime/ —— 执行实现
+
+`knowledge.py`配套Windows的`knowledge.cmd`和POSIX的`knowledge.sh`。CLI自动锚定自身K、当前规则、操作和默认请求／结果位置，支持简短参数与原有JSON协议；八阶段实现位于`runtime/himate_knowledge/stages/`，由`stage_dispatch.py`同进程分派，七包共用`protocol.py`，apply保留历史事务适配。它不调用模型，P3内容决定、P4作者成稿及P5独立审阅仍由Agent／Workflow完成。
+
+`runtime/manifest.json`固定实际运行源码与启动器，`runtime/requirements.lock.txt`固定依赖，治理规则另由`governance/framework.lock.yaml`固定。新结果保留逻辑Skill名称并声明CLI执行器和真实运行包摘要；旧journal、receipt和已发布记录不搬迁或重签。同步可能更新三者，后续阶段必须新起命令进程。裸`knowledge`需每执行端显式注册一次；`doctor`、注册和query/read/source/patrol/status操作见[使用说明](使用说明.md#22-仓内命令入口与诊断)。
 
 #### knowledge/ —— 知识正文根（唯一检索对象）
 
@@ -376,7 +391,7 @@ flowchart LR
 
 #### governance/ —— 治理规则层（契约 SSOT）
 
-`templates/`（七类卡、导航与处理记录模板）、`schemas/`（frontmatter / sources schema、profiles、registries）、`contracts/`（来源、成稿、审阅、索引、查询与维护等公共函数）、`specs/`（编写、复核、生命周期规范）、`sources.lock.yaml`（来源锁：声明版本/落点/hash/bytes/恢复说明）。生产、治理、消费**共用同一套受锁契约**；Skill 在同进程复用公共函数，不启动兄弟 Skill CLI、不导入兄弟私有脚本，也不维护私有规则例外。
+`templates/`（七类卡、导航与处理记录模板）、`schemas/`（frontmatter / sources schema、profiles、registries）、`contracts/`（来源、成稿、审阅、索引、查询与维护等公共函数）、`specs/`（编写、复核、生命周期规范）、`sources.lock.yaml`（来源锁：声明版本/落点/hash/bytes/恢复说明）。生产、治理、消费**共用同一套受锁契约**；仓内阶段在同进程复用公共函数，不启动兄弟Skill CLI、不导入已安装Skill的私有脚本，也不维护私有规则例外。
 
 参与链路：生产链路（建卡时套它的模板）+ 治理链路（契约为治理全程供给规则）+ 消费链路（过滤时按它的规范）。
 
@@ -431,7 +446,7 @@ P6机械转写P3/P4已冻结的处置、理由、卡／Claim引用和欠账，�
 
 ### 流程二：lint —— 只读检查与引用巡检报告
 
-`hs-knowledge-lint` 是 Agent 已安装的 Skill 包，内部调用固定脚本。P5使用lint的review动作，由独立Agent审阅并调用完整固定检查；默认独立lint与C1继续只做确定性检查和报告。lint不修稿或apply，固定脚本不代替语义判断。C1 直接使用知识库的 `check.py`／`check.sh` 与受锁领域规则，不依赖 Agent 的能力目录。
+`hs-knowledge-lint` 是 Agent 的检查指引，固定实现通过仓内 `knowledge lint` 调用。P5使用lint的review动作，由独立Agent审阅并调用完整固定检查；默认独立lint与C1继续只做确定性检查和报告。lint不修稿或apply，CLI不代替语义判断。C1 直接使用知识库的 `check.py`／`check.sh` 与受锁领域规则，不依赖 Agent 的能力目录。
 
 ```mermaid
 flowchart LR
@@ -502,7 +517,8 @@ shared 索引可在构建时按 `knowledge_commit` 核对实际 Git 快照，que
 |---|---|---|---|
 | `AGENTS.md` / `config.yml` | 项目约定、代码根与模块归属 | 适用规则、实际代码上下文和条件缺口 | 路由与范围依据 |
 | 实际业务代码目录 | 代码取证与P5独立内容复核 | 固定引用与文件身份检查 | 源码交叉印证 |
-| Agent Skills（`S`） | 可独立调用的 P1—P7 材料、计划、内容复核、lint、核验及入库能力 | 独立 lint Skill；固定 CI 直接复用 K 内规则 | 查询、精读、来源恢复 |
+| Agent Skills（`S`） | P1—P7的阅读、判断、成稿、独立复核及命令调用指引 | 独立lint指引；固定CI直接复用K内规则 | 检索、精读、来源恢复与回答指引 |
+| K内启动器与`runtime/` | 八阶段固定执行、实际输入输出和安全入库，CLI不调用模型 | lint固定检查与patrol阶段；固定CI仍用check.py | query/read及真实来源资格核验 |
 | Agent Workflows（`F`） | OpenFlow 编排 P1—P7，校验顺序、角色与交棒 | lint Workflow 脚本筛选变更并复用入库，核实际结果后推进成功基线；固定 CI 不调用 Workflow | — |
 | `knowledge/` | 查重、关联卡和 P7 精确入库 | 正式卡格式与引用检查 | 唯一正文检索对象 |
 | `docs-raw/` | 只读原件 | 来源一致性复核 | 原件与证据溯源 |

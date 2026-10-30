@@ -3,14 +3,16 @@ name: hs-knowledge-view-materialize
 description: Produce one exact authored candidate with navigation, source lock, dispositions and input bindings; revise in a new operation or describe the saved candidate without sibling calls.
 ---
 
+执行入口为实际知识根的 `python K/knowledge.py view-materialize`；K内Windows可用 `.\knowledge.cmd view-materialize`，POSIX可用 `sh ./knowledge.sh view-materialize`。一次注册后可用裸knowledge。Skill只提供指令与文本契约，实现与依赖锁随K/runtime分发；复杂请求保留--input/--output，CLI自动固定省略的根、操作和结果路径并返回真实引用。
+
 P4 负责一次保存完整候选稿。Agent 按 P3 的内容决定写好实际卡片，再调用本入口组织卡、导航、来源登记、写删目标、旧基线及处置预览。已有项目上下文直接复用；缺入口时按 `hs-knowledge-explore` 指引定位。默认使用执行端全局 Python，产物沿用知识根 `.build/`、`logs/`、`artifacts/`。
 
-目标代码仓在远端时，通过 OpenFlow／宿主已有的 SSH MCP 在远端项目根执行脚本、读取文件和进行仓库操作，使用执行端的全局 Python 与已安装 Skill 路径，并核对实际结果；本地路径不能直接用于远端。
+本机数据使用本机知识根 K 的仓内 CLI。代码仓在服务器或 Windows 仅经 Samba 映射访问时，通过 OpenFlow／宿主已有 SSH MCP 在服务器原生 K 路径运行 CLI 并核对实际结果；不自动连接 SSH，不推断映射关系。本机与服务器分别准备 Python 和配套依赖，远端不需要安装或上传 Skill 脚本。
 
 ```text
-python scripts/cli.py --action run --input REQUEST.json --output RESPONSE.json --knowledge-root K
-python scripts/cli.py --action revise --input REQUEST.json --output RESPONSE.json --knowledge-root K
-python scripts/cli.py --action describe --input REQUEST.json --output RESPONSE.json --knowledge-root K
+python K/knowledge.py view-materialize --action run --input REQUEST.json --output RESPONSE.json --knowledge-root K
+python K/knowledge.py view-materialize --action revise --input REQUEST.json --output RESPONSE.json --knowledge-root K
+python K/knowledge.py view-materialize --action describe --input REQUEST.json --output RESPONSE.json --knowledge-root K
 ```
 
 run 消费 `semantic_plan_ref/material_ref` 和作者的 `decisions/card_inputs`；材料已记录时从实际引用解析 `bundle_ref`，代码上下文显式使用本次材料。也可将旧字节请求的 `bundle_ref/decisions` 机械改投本入口。简单新建／更新／暂缓可用按卡 ID 的 `cards`；合并、拆分和退役必须有显式决定、旧卡和 Claim 去向，不由脚本猜测。

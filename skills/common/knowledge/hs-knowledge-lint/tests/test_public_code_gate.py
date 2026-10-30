@@ -17,6 +17,15 @@ from unittest.mock import patch
 
 import yaml
 
+import importlib.util as _repository_importlib
+from pathlib import Path as _RepositoryPath
+_repository_spec = _repository_importlib.spec_from_file_location(
+    "test_public_code_gate_repository_runtime_fixture",
+    _RepositoryPath(__file__).resolve().parents[5] / "himate-knowledge-wifi-mp/evals/contract_test_support.py",
+)
+_repository_fixture = _repository_importlib.module_from_spec(_repository_spec)
+_repository_spec.loader.exec_module(_repository_fixture)
+
 SKILLS = pathlib.Path(__file__).resolve().parents[2]
 _fixture_root = _FixturePath(__file__).resolve().parents[5]
 _fixture_spec = _fixture_importlib.spec_from_file_location("lint_contract_fixture", _fixture_root / "himate-knowledge-wifi-mp/evals/contract_test_support.py")
@@ -270,6 +279,7 @@ class PublicCodeGateTests(unittest.TestCase):
             self.root / "governance",
             ignore=shutil.ignore_patterns("__pycache__"),
         )
+        _repository_fixture.copy_runtime(self.root)
         empty_dbox = self.workspace / "empty-dbox"
         empty_dbox.mkdir()
         local = self.root / "docs-raw/sources/dbox.local.yml"

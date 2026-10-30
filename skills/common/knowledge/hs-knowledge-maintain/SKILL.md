@@ -3,13 +3,15 @@ name: hs-knowledge-maintain
 description: Plan incremental knowledge patrols, hand exact changes to ingest, verify actual completion and maintain source-change restrictions.
 ---
 
-已有项目上下文时直接复用；缺少入口信息才使用已安装的 `hs-knowledge-explore` 做只读发现。首次部署或本机依赖缺项时，按知识根使用说明运行分发仓根 `deploy.ps1`，不自动执行 pip 或远端 setup；远端任务另核实际执行端的 Python、依赖和能力路径。
+执行入口为实际知识根的 `python K/knowledge.py maintain`；K内Windows可用 `.\knowledge.cmd maintain`，POSIX可用 `sh ./knowledge.sh maintain`。一次注册后可用裸knowledge。Skill只提供指令与文本契约，实现与依赖锁随K/runtime分发；复杂请求保留--input/--output，CLI自动固定省略的根、操作和结果路径并返回真实引用。
 
-目标代码仓在远端时，通过 OpenFlow／宿主已有的 SSH MCP 在远端项目根执行脚本、读取文件和进行仓库操作，使用执行端的全局 Python 与已安装 Skill 路径，并核对实际结果；本地路径不能直接用于远端。请求、稿件和结果继续放实际知识根已有的 `.build/`、`logs/`、`artifacts/`。
+已有项目上下文时直接复用；缺少入口信息才使用已安装的 `hs-knowledge-explore` 做只读发现。首次部署或本机依赖缺项时，按知识根使用说明运行分发仓根 `deploy.ps1`，不自动执行 pip 或远端 setup；远端任务另核实际执行端的 Python、依赖和仓内 CLI。
+
+本机数据使用本机知识根 K 的仓内 CLI。代码仓在服务器或 Windows 仅经 Samba 映射访问时，通过 OpenFlow／宿主已有 SSH MCP 在服务器原生 K 路径运行 CLI 并核对实际结果；不自动连接 SSH，不推断映射关系。本机与服务器分别准备 Python 和配套依赖，远端不需要安装或上传 Skill 脚本。请求、稿件和结果继续放实际知识根已有的 `.build/`、`logs/`、`artifacts/`。
 
 本 Skill 可由人工单独调用。只校验本次业务输入、实际文件及输出，不检查 Workflow 顺序或上游通过凭证。流程顺序、角色分工与交棒合法性由 OpenFlow 的 Workflow 管理；人工测试时由人选择顺序。
 
-Use `scripts/cli.py --input REQUEST.json --output RESPONSE.json --knowledge-root K  --action inspect-context|patrol-sync|patrol-plan|patrol-reindex|patrol-complete|audit-references|register-source-change|register-code-change|recover-events|status|advance`. All event changes use the domain cooperative writer lock. [Request details](references/request.md) explain each action's actual inputs and checks.
+Use `python K/knowledge.py maintain --input REQUEST.json --output RESPONSE.json --knowledge-root K  --action inspect-context|patrol-sync|patrol-plan|patrol-reindex|patrol-complete|audit-references|register-source-change|register-code-change|recover-events|status|advance`. All event changes use the domain cooperative writer lock. [Request details](references/request.md) explain each action's actual inputs and checks.
 
 `inspect-context` 在 ingest 开始时只读比较实际来源、代码/配置和规则身份，输出受影响 Claim、依赖和缺口，不要求先登记本机变化事件。未知上下文保留限制；OpenFlow 安排必要的 P2—P7 内容修订、复核和收尾。query 另按相同当前引用和确切资格判断过滤，不因 raw 未变而信任旧代码。
 

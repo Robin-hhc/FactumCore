@@ -4,7 +4,9 @@ Independent review declarations are synthetic fixture data, not production seman
 """
 
 import hashlib
+import importlib.util
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -14,6 +16,12 @@ import yaml
 
 
 REPO = Path(__file__).resolve().parents[2]
+_runtime_spec = importlib.util.spec_from_file_location(
+    "pipeline_repository_runtime_fixture", Path(__file__).with_name("contract_test_support.py")
+)
+_runtime_fixture = importlib.util.module_from_spec(_runtime_spec)
+_runtime_spec.loader.exec_module(_runtime_fixture)
+copy_runtime = _runtime_fixture.copy_runtime
 PUBLIC_SKILLS = tuple("hs-knowledge-" + name for name in (
     "apply", "change-plan", "explore", "lint", "maintain", "query",
     "source", "view-materialize"))
@@ -87,7 +95,8 @@ def package_digest(package):
 
 
 class Pipeline:
-    def __init__(self, base):
+    def __init__(self, base, *, repository_cli=False):
+        self.repository_cli = repository_cli
         self.base, self.root = base, base / "w/himate-knowledge-wifi-mp"
         self.root.mkdir(parents=True)
         # Legacy journeys observe an explicitly configured, empty external root.
@@ -98,13 +107,16 @@ class Pipeline:
         local.parent.mkdir(parents=True)
         local.write_text(yaml.safe_dump({"schema_version": "1.0", "path": str(empty_dbox.absolute())}), encoding="utf-8")
         shutil.copytree(
-            REPO / "himate-knowledge-wifi-mp/governance",
+            Path(os.environ.get("AIOT_DOMAIN_FIXTURE", str(REPO / "himate-knowledge-wifi-mp/governance"))),
             self.root / "governance",
             ignore=shutil.ignore_patterns("__pycache__"),
         )
+        _runtime_fixture.copy_runtime(self.root)
         self.rules = sha((self.root / "governance/framework.lock.yaml").read_bytes())
         self.root.joinpath(".isolated-knowledge-fixture").write_text("HIMATE_SYNTHETIC_FIXTURE_V2", encoding="utf-8")
-        self.skills = install_packages(base / "installed-skills")
+        self.skills = base / "installed-skills"
+        if not repository_cli:
+            install_packages(self.skills)
         self.catalog = {
             "schema_version": "2.0", "skills": {}, "test_fixture_root": str(self.root),
         }
@@ -119,6 +131,12 @@ class Pipeline:
         self.catalog_path = base / "catalog.json"
         self.catalog_path.write_bytes(canonical(self.catalog))
         self.sequence = 0
+
+    def command(self, slug):
+        if getattr(self, "repository_cli", False):
+            stage = slug.removeprefix("hs-").removeprefix("knowledge-")
+            return [sys.executable, str(self.root / "knowledge.py"), stage, "--json"]
+        return [sys.executable, str(self.skills / ("hs-" + slug) / "scripts/cli.py")]
 
     def write(self, ref, data):
         path = self.root / ref
@@ -139,8 +157,7 @@ class Pipeline:
         incoming, outgoing = self.base / f"input-{self.sequence}.json", self.base / f"output-{self.sequence}.json"
         incoming.write_bytes(canonical(request))
         argv = [
-            sys.executable,
-            str(self.skills / ("hs-" + slug) / "scripts/cli.py"),
+            *self.command(slug),
             "--input",
             str(incoming),
             "--output",
@@ -157,6 +174,14 @@ class Pipeline:
         completed = subprocess.run(argv, capture_output=True, timeout=180)
         result = json.loads(outgoing.read_bytes()) if outgoing.exists() else {}
         assert completed.returncode == expected, (slug, result, completed.stderr.decode(errors="replace"))
+        if getattr(self, "repository_cli", False):
+            presentation = json.loads(completed.stdout.decode("utf-8"))
+            assert presentation["digest"] == sha(canonical({key: value for key, value in presentation.items() if key != "digest"}))
+            transport = presentation.pop("cli_transport")
+            assert transport["stage_result_digest"] == result["digest"]
+            assert Path(transport["result_ref"]) == outgoing
+            presentation.pop("digest")
+            assert presentation == {key: value for key, value in result.items() if key != "digest"}
         assert result.get("digest") == sha(
             canonical({key: value for key, value in result.items() if key != "digest"})
         ), result

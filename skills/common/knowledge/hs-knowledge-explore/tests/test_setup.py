@@ -10,14 +10,14 @@ import sys
 import pytest
 
 
-SOURCE = Path(__file__).resolve().parents[1]
+SOURCE = Path(__file__).resolve().parents[5] / "himate-knowledge-wifi-mp/runtime/himate_knowledge/stages/explore"
 
 
 @pytest.fixture
 def deployment(tmp_path):
-    skill = tmp_path / "agent/.codex/skills/hs-knowledge-explore"
-    (skill / "scripts").mkdir(parents=True)
-    shutil.copyfile(SOURCE / "scripts/setup.py", skill / "scripts/setup.py")
+    skill = tmp_path / "runtime/himate_knowledge/stages/explore"
+    skill.mkdir(parents=True)
+    shutil.copyfile(SOURCE / "setup.py", skill / "setup.py")
     shutil.copyfile(SOURCE / "requirements.lock.txt", skill / "requirements.lock.txt")
     project = tmp_path / "business"
     knowledge = project / "nested/himate-knowledge-wifi-mp"
@@ -38,7 +38,7 @@ def invoke(deployment, *args, no_site=False):
     command = [sys.executable, "-B", "-I"]
     if no_site:
         command.append("-S")
-    command += [str(skill / "scripts/setup.py"), *args]
+    command += [str(skill / "setup.py"), *args]
     return subprocess.run(command, cwd=project, capture_output=True, timeout=60)
 
 
@@ -88,7 +88,7 @@ def test_legacy_connection_file_does_not_redirect_or_block_setup(deployment):
 
 def test_missing_packages_are_installed_into_the_same_python(deployment, monkeypatch, capsys):
     skill, project, _ = deployment
-    spec = importlib.util.spec_from_file_location("global_setup_test", skill / "scripts/setup.py")
+    spec = importlib.util.spec_from_file_location("global_setup_test", skill / "setup.py")
     setup = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(setup)
     outcomes = iter([[{"name": "example", "required": "1", "installed": None}], []])
@@ -108,7 +108,7 @@ def test_missing_packages_are_installed_into_the_same_python(deployment, monkeyp
 
 def test_failed_global_install_does_not_publish_any_state(deployment, monkeypatch, capsys):
     skill, project, _ = deployment
-    spec = importlib.util.spec_from_file_location("failed_setup_test", skill / "scripts/setup.py")
+    spec = importlib.util.spec_from_file_location("failed_setup_test", skill / "setup.py")
     setup = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(setup)
     monkeypatch.setattr(setup, "missing_packages", lambda pins: [{"name": "missing"}])
@@ -136,7 +136,7 @@ def test_config_error_is_reported_without_creating_a_binding(deployment):
 
 def test_missing_project_config_is_reported_before_installing_packages(deployment, monkeypatch, capsys):
     skill, project, _ = deployment
-    spec = importlib.util.spec_from_file_location("missing_config_setup_test", skill / "scripts/setup.py")
+    spec = importlib.util.spec_from_file_location("missing_config_setup_test", skill / "setup.py")
     setup = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(setup)
     monkeypatch.setattr(setup, "missing_packages", lambda pins: pytest.fail("project path must be checked first"))

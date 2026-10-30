@@ -1,6 +1,7 @@
 """Synthetic domain copied from current pinned contracts; no production originals."""
 
 import hashlib
+import importlib.util
 import json
 import os
 import shutil
@@ -10,6 +11,14 @@ from pathlib import Path
 
 import pytest
 import yaml
+
+
+_runtime_spec = importlib.util.spec_from_file_location(
+    "lint_repository_fixture",
+    Path(__file__).resolve().parents[5] / "himate-knowledge-wifi-mp/evals/contract_test_support.py",
+)
+_runtime_fixture = importlib.util.module_from_spec(_runtime_spec)
+_runtime_spec.loader.exec_module(_runtime_fixture)
 
 
 def hashed(data):
@@ -65,6 +74,7 @@ class Harness:
             self.root / "governance",
             ignore=shutil.ignore_patterns("__pycache__"),
         )
+        _runtime_fixture.copy_runtime(self.root)
         (self.root / ".synthetic-test-root").write_text(
             "isolated mechanism fixture", encoding="utf-8"
         )
@@ -118,7 +128,7 @@ class Harness:
         ]
         if action:
             argv += ["--action", action]
-        process = subprocess.run(argv, capture_output=True, text=True, check=False)
+        process = subprocess.run(argv, capture_output=True, text=True, encoding="utf-8", check=False)
         assert "Traceback" not in process.stderr, process.stderr
         response = json.loads(outgoing.read_text(encoding="utf-8"))
         assert process.returncode == expected, response

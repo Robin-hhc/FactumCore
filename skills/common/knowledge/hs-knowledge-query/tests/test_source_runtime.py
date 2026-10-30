@@ -42,8 +42,9 @@ from pathlib import Path
 import runpy
 import sys
 cli, attempt = sys.argv[1], int(sys.argv[2])
-sys.path.insert(0, str(Path(cli).parent))
-import support
+sys.path.insert(0, str(Path(sys.argv[sys.argv.index("--knowledge-root") + 1]) / "runtime"))
+from himate_knowledge import protocol as support
+from himate_knowledge.stage_dispatch import run_stage
 load_domain = support.domain
 resolutions = 0
 
@@ -61,7 +62,7 @@ def instrumented_domain(root, expected):
     return modules, rules
 support.domain = instrumented_domain
 sys.argv = [cli, *sys.argv[3:]]
-runpy.run_path(cli, run_name='__main__')
+raise SystemExit(run_stage('query', sys.argv[1:]))
 """
     process = subprocess.run(
         [

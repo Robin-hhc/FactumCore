@@ -11,6 +11,15 @@ import sys
 import pytest
 import yaml
 
+import importlib.util as _repository_importlib
+from pathlib import Path as _RepositoryPath
+_repository_spec = _repository_importlib.spec_from_file_location(
+    "test_index_journal_liveness_repository_runtime_fixture",
+    _RepositoryPath(__file__).resolve().parents[5] / "himate-knowledge-wifi-mp/evals/contract_test_support.py",
+)
+_repository_fixture = _repository_importlib.module_from_spec(_repository_spec)
+_repository_spec.loader.exec_module(_repository_fixture)
+
 HELPER_SPEC = importlib.util.spec_from_file_location("p7_liveness_test_helpers", Path(__file__).with_name("p7_test_helpers.py"))
 HELPER = importlib.util.module_from_spec(HELPER_SPEC)
 HELPER_SPEC.loader.exec_module(HELPER)
@@ -31,6 +40,7 @@ class EmptyIndex:
         self.root.mkdir()
         source = Path(__file__).resolve().parents[5] / "himate-knowledge-wifi-mp/governance"
         shutil.copytree(source, self.root / "governance", ignore=shutil.ignore_patterns("__pycache__"))
+        _repository_fixture.copy_runtime(self.root)
         (self.root / "knowledge").mkdir()
         (self.root / "knowledge/index.md").write_bytes(b"# Empty knowledge\n")
         self.rules = hashlib.sha256((self.root / "governance/framework.lock.yaml").read_bytes()).hexdigest()

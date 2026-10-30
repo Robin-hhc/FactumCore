@@ -280,10 +280,7 @@ def test_mixed_query_report_retains_each_incomplete_case(fixture, monkeypatch, r
     assert unavailable["purpose"] == "current" and unavailable["gaps"] == expected_gap
     assert "return_to" not in unavailable
     checks.validate_report(report)
-    spec = importlib.util.spec_from_file_location("candidate_review_report",
-        DOMAIN.parent / "skills/common/knowledge/hs-knowledge-lint/scripts/review.py")
-    review = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(review)
+    review = SUPPORT.runtime_module("stages.lint.review")
     review.finish(report, {"validation": ctx.modules["validation"], "checks": checks})
     assert report["complete"] is False
     checks.validate_report(report)

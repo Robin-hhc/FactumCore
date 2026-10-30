@@ -10,13 +10,15 @@ import pytest
 
 
 def context_for(harness, operation, **request):
-    path = harness.packages / "hs-knowledge-source/scripts/support.py"
-    spec = importlib.util.spec_from_file_location("patrol_material_public_support", path)
-    support = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(support)
+    path = Path(__file__).resolve().parents[5] / "himate-knowledge-wifi-mp/evals/contract_test_support.py"
+    spec = importlib.util.spec_from_file_location("patrol_material_runtime_fixture", path)
+    fixture = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fixture)
+    support = fixture.runtime_module("protocol")
     args = SimpleNamespace(knowledge_root=str(harness.root), rules_digest=harness.rules,
                            action="scan", catalog=str(harness.catalog))
-    return support.Context(args, {"operation_id": operation, **request}, path.parents[1])
+    package = harness.root / "runtime/himate_knowledge/stages/source"
+    return support.Context(args, {"operation_id": operation, **request}, package)
 
 
 def inventory(harness, operation):

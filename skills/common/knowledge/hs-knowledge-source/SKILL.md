@@ -3,13 +3,15 @@ name: hs-knowledge-source
 description: Configure a local dbox source directory, observe source changes, prepare exact current and historical material, stage portable dispositions, and inspect explicitly selected execution facts.
 ---
 
-已有项目上下文时直接复用；缺少入口信息才使用已安装的 `hs-knowledge-explore` 做只读发现。首次部署或本机依赖缺项时，按知识根使用说明运行分发仓根 `deploy.ps1`，不自动执行 pip 或远端 setup；远端任务另核实际执行端的 Python、依赖和能力路径。
+执行入口为实际知识根的 `python K/knowledge.py source`；K内Windows可用 `.\knowledge.cmd source`，POSIX可用 `sh ./knowledge.sh source`。一次注册后可用裸knowledge。Skill只提供指令与文本契约，实现与依赖锁随K/runtime分发；复杂请求保留--input/--output，CLI自动固定省略的根、操作和结果路径并返回真实引用。
 
-目标代码仓在远端时，通过 OpenFlow／宿主已有的 SSH MCP 在远端项目根执行脚本、读取文件和进行仓库操作，使用执行端的全局 Python 与已安装 Skill 路径，并核对实际结果；本地路径不能直接用于远端。请求、稿件和结果继续放实际知识根已有的 `.build/`、`logs/`、`artifacts/`。
+已有项目上下文时直接复用；缺少入口信息才使用已安装的 `hs-knowledge-explore` 做只读发现。首次部署或本机依赖缺项时，按知识根使用说明运行分发仓根 `deploy.ps1`，不自动执行 pip 或远端 setup；远端任务另核实际执行端的 Python、依赖和仓内 CLI。
+
+本机数据使用本机知识根 K 的仓内 CLI。代码仓在服务器或 Windows 仅经 Samba 映射访问时，通过 OpenFlow／宿主已有 SSH MCP 在服务器原生 K 路径运行 CLI 并核对实际结果；不自动连接 SSH，不推断映射关系。本机与服务器分别准备 Python 和配套依赖，远端不需要安装或上传 Skill 脚本。请求、稿件和结果继续放实际知识根已有的 `.build/`、`logs/`、`artifacts/`。
 
 本 Skill 可由人工单独调用。只校验本次业务输入、实际文件及输出，不检查 Workflow 顺序或上游通过凭证。流程顺序、角色分工与交棒合法性由 OpenFlow 的 Workflow 管理；人工测试时由人选择顺序。
 
-Use `scripts/cli.py --input REQUEST.json --output RESPONSE.json --knowledge-root K` after the Agent has read the project entry. Default / `run` observes current inputs and then prepares actual material in the same process. Independent actions are `configure|scan|prepare|capture|resolve|resolve-source|record|status`. Project discovery and environment installation stay outside this Skill; explicit configure only manages the fixed local source address.
+Use `python K/knowledge.py source --input REQUEST.json --output RESPONSE.json --knowledge-root K` after the Agent has read the project entry. Default / `run` observes current inputs and then prepares actual material in the same process. Independent actions are `configure|scan|prepare|capture|resolve|resolve-source|record|status`. Project discovery and environment installation stay outside this Skill; explicit configure only manages the fixed local source address.
 
 首次在真正执行端调用 `configure`，填写一个可读的dbox绝对目录；固定 `K/docs-raw/sources/dbox.local.yml` 仅含字符串schema_version 1.0与path。无path只核已有配置，同地址保留原字节，显式新地址才创建或修改；目录、忽略保护或原配置基线有误时保留旧文件。模板和精确ignore分发，local不入Git、正式来源、owned或cleanup。Windows部署不证明服务器来源就绪。configure只核根，日常run不隐式配置或重跑setup；请求细节见[request](references/request.md)。
 

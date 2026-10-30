@@ -18,8 +18,15 @@ import tempfile
 import unittest
 
 SKILLS = pathlib.Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(SKILLS / "hs-knowledge-apply/scripts"))
-from support import canonical, digest, package_digest, seal  # noqa: E402 - isolated package test seam
+sys.path.insert(0, str(SKILLS.parents[2] / "himate-knowledge-wifi-mp/runtime"))
+from himate_knowledge.stages.apply.support import canonical, digest, package_digest, seal  # noqa: E402 - isolated package test seam
+
+_repository_spec = importlib.util.spec_from_file_location(
+    "test_public_governance_repository_runtime_fixture",
+    pathlib.Path(__file__).resolve().parents[5] / "himate-knowledge-wifi-mp/evals/contract_test_support.py",
+)
+_repository_fixture = importlib.util.module_from_spec(_repository_spec)
+_repository_spec.loader.exec_module(_repository_fixture)
 _p7_spec = importlib.util.spec_from_file_location("public_governance_p7_helpers", pathlib.Path(__file__).with_name("p7_test_helpers.py"))
 _p7_helpers = importlib.util.module_from_spec(_p7_spec)
 _p7_spec.loader.exec_module(_p7_helpers)
@@ -224,6 +231,7 @@ class PublicGovernanceTests(unittest.TestCase):
             self.root / "governance",
             ignore=shutil.ignore_patterns("__pycache__"),
         )
+        _repository_fixture.copy_runtime(self.root)
         self.rules_digest = digest(
             (self.root / "governance/framework.lock.yaml").read_bytes()
         )

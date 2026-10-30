@@ -89,6 +89,7 @@ class Harness:
             self.root / "governance",
             ignore=shutil.ignore_patterns("__pycache__"),
         )
+        _helper.copy_runtime(self.root)
         (self.root / ".synthetic-test-root").write_text(
             "isolated mechanism fixture", encoding="utf-8"
         )
@@ -126,9 +127,10 @@ class Harness:
         )
         incoming.write_bytes(canonical(request))
         cli = self.packages / ("hs-knowledge-" + slug) / "scripts/cli.py"
+        command = ([sys.executable, str(self.root / "knowledge.py"), slug, "--json"]
+                   if getattr(self, "repository_cli", False) else [sys.executable, str(cli)])
         argv = [
-            sys.executable,
-            str(cli),
+            *command,
             "--input",
             str(incoming),
             "--output",
@@ -142,7 +144,7 @@ class Harness:
         ]
         if action:
             argv += ["--action", action]
-        process = subprocess.run(argv, capture_output=True, text=True, check=False)
+        process = subprocess.run(argv, capture_output=True, text=True, encoding="utf-8", check=False)
         assert "Traceback" not in process.stderr, process.stderr
         response = json.loads(outgoing.read_text(encoding="utf-8"))
         assert process.returncode == expected, response

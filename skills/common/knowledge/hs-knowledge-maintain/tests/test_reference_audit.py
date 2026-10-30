@@ -65,7 +65,7 @@ def lint_report(harness, checkout=None, name="fixed"):
     incoming.write_bytes(canonical({"inputs": {"code_checkout": checkout}} if checkout else {}))
     ref = ".build/reports/" + name + ".json"
     completed = subprocess.run([sys.executable, str(harness.packages / "hs-knowledge-lint/scripts/cli.py"),
-        "--knowledge-root", str(harness.root), "--input", str(incoming), "--output", str(harness.root / ref)], capture_output=True, text=True)
+        "--knowledge-root", str(harness.root), "--input", str(incoming), "--output", str(harness.root / ref)], capture_output=True, text=True, encoding="utf-8")
     assert completed.returncode in (0, 1, 2), completed.stderr
     report = harness.record(ref)
     assert report.get("digest") and report.get("checks"), report

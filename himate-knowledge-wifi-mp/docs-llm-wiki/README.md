@@ -1,6 +1,6 @@
 # HiMate 设计与使用入口
 
-第一次使用从[使用说明](使用说明.md)开始：保留业务仓已有的根 `AGENTS.md`，按 `AGENTS.md.example` 合并位置说明和 `hs-knowledge-explore` 入口指针，核对项目 `config.yml`、知识根和 Agent 已安装的配套能力。首次部署或本机依赖缺项使用[部署脚本](使用说明.md#2-首次环境安装)；已有部署与项目上下文时直接选择业务任务，缺少入口时才做只读发现。
+第一次使用从[使用说明](使用说明.md)开始：保留业务仓已有的根 `AGENTS.md`，按 `AGENTS.md.example` 合并位置说明和 `hs-knowledge-explore` 入口指针，核对项目 `config.yml`、知识根和 Agent 的配套指引。知识根自带 `knowledge.py`、Windows/POSIX 启动器与 `runtime/`，执行端不依赖 Skill 脚本。首次部署使用[部署脚本](使用说明.md#2-首次环境安装)，各执行端分别准备环境并运行 `doctor`；已有部署与项目上下文时直接选择业务任务，缺少入口时才做只读发现。查询、扫描、巡检阶段与命令注册见[仓内命令](使用说明.md#22-仓内命令入口与诊断)。
 
 首次来源准备还须在实际执行 ingest 的机器调用 source.configure，填写一个可读的 dbox 资料目录；固定模板与精确忽略规则上库，`docs-raw/sources/dbox.local.yml` 只留本机。Windows 已部署不等于服务器来源就绪，详见[dbox 首次配置](使用说明.md#21-首次配置-dbox-资料目录)。日常脚本固定读取配置递归扫描，P3—P7沿用现有分工；已发布原文证据不依赖生产者的私人地址。
 
@@ -25,7 +25,7 @@ flowchart LR
 
 ## 能力与任务入口
 
-当前有8个公开 Skill，名称均以 `hs-knowledge-` 开头：explore、source、change-plan、view-materialize、lint、apply、query、maintain。开发分发源码在项目根的 `skills/common/knowledge/`；实际运行使用 Agent 已安装的能力。两个 Workflow 的源码在 `workflows/common/knowledge/`，由 OpenFlow 加载和编排。
+当前有8个公开 Skill，名称均以 `hs-knowledge-` 开头：explore、source、change-plan、view-materialize、lint、apply、query、maintain。开发分发源码在项目根的 `skills/common/knowledge/`；Agent 安装指引和契约文本，再调用知识根 CLI 中对应的八阶段实现。两个 Workflow 的源码在 `workflows/common/knowledge/`，由 OpenFlow 加载和编排。CLI 执行固定步骤，Agent 负责内容判断和成稿，P5 仍由独立 reviewer 执行；没有自动模型驱动的 `knowledge ingest` 命令。
 
 | 任务 | 使用哪个入口 | 做到哪里结束 |
 |---|---|---|
@@ -41,7 +41,7 @@ flowchart LR
 
 ingest保留P1—P7七个业务步骤，由六个OpenFlow节点调度。首个coder节点`prepare_sources`使用source默认`run`，先由脚本生成真实扫描清单，再按待办准备材料；完整且没有待办、维护限制、缺口或明确修订目标才返回`unchanged`结束，否则交实际`scan_ref/material_ref`给P3。新流程不搜索旧私有操作，Agent不重写扫描事实。P3／P4／P5缺材料返回首节点，但明确调用`prepare`定向补齐，不先重跑默认`run`；判断有误回P3，稿件问题回P4。输入漂移按变化对象刷新有效材料，运行故障保留原停点。只有明确继续某次执行时，才按其确切引用核对停点；指定操作的`status`只观察历史事实，不证明当前索引健康。用法见[使用说明](使用说明.md#进度续办和完成判断)。
 
-Workflow负责顺序、角色与交棒：P5由独立reviewer执行，其余节点由coder执行。Skill只核对本职业务数据，不认证角色、Workflow身份或上游通过票据；内部通过知识根的受锁公共函数复用规则，不调用兄弟Skill CLI。人工验证可逐个调用同一组Skill，真实宿主的角色隔离、出口选择和等待恢复仍需按部署环境核实。
+Workflow负责顺序、角色与交棒：P5由独立reviewer执行，其余节点由coder执行。仓内阶段命令只核对本职业务数据，不认证角色、Workflow身份或上游通过票据；内部通过受锁公共函数复用规则，不调用兄弟Skill CLI。人工验证可按同一组Skill指引逐阶段执行，真实宿主的角色隔离、出口选择和等待恢复仍需按部署环境核实。
 
 ## 项目与执行位置
 
@@ -49,6 +49,6 @@ Workflow负责顺序、角色与交棒：P5由独立reviewer执行，其余节�
 
 `hs-knowledge-explore` 负责全库路由与只读项目发现；首次部署统一使用分发仓根的 `deploy.ps1`，旧 `setup.py` 只保留显式诊断或兼容用途。已有部署及有效上下文后直接使用业务能力，不自动安装依赖，不新增catalog、registry或机器绑定。首次CodeGraph准备由Agent按真实配置逐仓执行，空模块列表不建图，MCP由harness提供；见[首次环境安装](使用说明.md#2-首次环境安装)及[详细设计 §5.11](知识库详细设计.md#511-explorecodegraph-首次初始化)。
 
-目标代码仓在远端时，用户或部署维护者先在 OpenFlow 配置、启用 SSH MCP，并验证实际可调用，连接凭据由宿主管理；操作见[远端执行准备](使用说明.md#12-远端执行先配置-openflow-ssh-mcp)。远端须已有全局 Python 和配套已安装 Skill，Agent 再通过 SSH MCP 执行脚本与仓库操作，核对执行端能力和原生路径；调用端路径不能直接用作远端路径。同机执行不要求 SSH。请求、稿件、记录和索引沿用实际知识根的 `.build/`、`logs/`、`artifacts/`。共享正式资产与本机执行材料的区别见[保存与提交边界](知识库详细设计.md#64-哪些内容上库哪些用于本机执行)。
+目标代码仓在远端时，用户或部署维护者先在 OpenFlow 配置、启用 SSH MCP，并验证实际可调用，连接凭据由宿主管理；操作见[远端执行准备](使用说明.md#12-远端执行先配置-openflow-ssh-mcp)。Agent 在服务器原生 K 调用随仓库分发的 CLI，服务器只需准备配套 Python 与依赖，不逐次上传 Skill 脚本。调用端路径不能直接用作远端路径，CLI 不自动配置 SSH 或推断 Samba 映射。同机执行不要求 SSH。请求、稿件、记录和索引沿用实际知识根的 `.build/`、`logs/`、`artifacts/`。共享正式资产与本机执行材料的区别见[保存与提交边界](知识库详细设计.md#64-哪些内容上库哪些用于本机执行)。
 
 本地入库、索引启用、Git提交、固定CI和合入分别记录实际事实。ingest完成后，按本批清单由人提交并触发固定CI，复用确定性检查函数，再评审合入；见[上库流程](知识库详细设计.md#32-上库固定-ci-检查后合入)。设计图、目录、角色标签及机制测试各有说明范围，不能代替真实业务内容、宿主接入或权限验收。

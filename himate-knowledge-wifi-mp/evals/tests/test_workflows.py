@@ -56,7 +56,41 @@ def fixture_packages(root):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(data, encoding="utf-8")
     shutil.copytree(ROOT / "workflows", root / "workflows")
+    for relative in ("knowledge.py", "knowledge.sh", "knowledge.cmd", "runtime/manifest.json",
+                     "runtime/requirements.lock.txt", "runtime/himate_knowledge/__init__.py",
+                     "runtime/himate_knowledge/cli.py"):
+        path = root / "himate-knowledge-wifi-mp" / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# synthetic repository runtime\n", encoding="utf-8")
     return root
+
+
+@pytest.mark.parametrize("workflow", ["hs-knowledge-ingest", "hs-knowledge-lint"])
+@pytest.mark.parametrize("markers", [(), ("__start__",), ("__end__",), ("__start__", "__end__")])
+def test_layout_accepts_optional_canvas_endpoints(tmp_path, workflow, markers):
+    module = validator_module()
+    source = fixture_packages(tmp_path / "fixture")
+    path = source / "workflows/common/knowledge" / workflow / "layouts.yaml"
+    layout = yaml.safe_load(path.read_bytes())
+    coordinates = layout["canvas"]["nodes"]
+    for marker in ("__start__", "__end__"):
+        coordinates.pop(marker, None)
+    for marker in markers:
+        coordinates[marker] = {"x": 0, "y": 0}
+    path.write_text(yaml.safe_dump(layout), encoding="utf-8")
+    assert module.validate(source) == []
+
+
+@pytest.mark.parametrize("workflow", ["hs-knowledge-ingest", "hs-knowledge-lint"])
+def test_layout_rejects_unknown_canvas_nodes(tmp_path, workflow):
+    module = validator_module()
+    source = fixture_packages(tmp_path / "fixture")
+    path = source / "workflows/common/knowledge" / workflow / "layouts.yaml"
+    layout = yaml.safe_load(path.read_bytes())
+    layout["canvas"]["nodes"]["unexpected_canvas_node"] = {"x": 0, "y": 0}
+    path.write_text(yaml.safe_dump(layout), encoding="utf-8")
+    assert any(workflow + ": layout identity/node set mismatch" == error
+               for error in module.validate(source))
 
 
 def test_final_public_capability_set_is_exactly_eight_skills():
@@ -245,11 +279,23 @@ def test_node_skill_requires_entry_document(tmp_path):
                for error in module.validate(source))
 
 
-def test_node_skill_requires_cli(tmp_path):
+def test_instruction_skill_does_not_require_a_private_cli(tmp_path):
     module = validator_module()
     source = fixture_packages(tmp_path / "fixture")
-    (source / "skills/common/knowledge/hs-knowledge-query/scripts/cli.py").unlink()
-    assert any("hs-knowledge-query: missing scripts/cli.py" in error for error in module.validate(source))
+    package = source / "skills/common/knowledge/hs-knowledge-query"
+    shutil.rmtree(package / "scripts")
+    for path in package.glob("requirements*.txt"):
+        path.unlink()
+    assert not any("hs-knowledge-query: missing scripts/" in error
+                   or "hs-knowledge-query: missing requirements" in error
+                   for error in module.validate(source))
+
+
+def test_repository_execution_entry_is_required(tmp_path):
+    module = validator_module()
+    source = fixture_packages(tmp_path / "fixture")
+    (source / "himate-knowledge-wifi-mp/knowledge.py").unlink()
+    assert any("repository runtime: missing knowledge.py" in error for error in module.validate(source))
 
 
 def test_missing_reference_or_wrong_artifact_exit_is_rejected(tmp_path):

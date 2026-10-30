@@ -232,8 +232,9 @@ from pathlib import Path
 import runpy
 import sys
 cli, config, replacement, attempt = sys.argv[1:5]
-sys.path.insert(0, str(Path(cli).parent))
-import support
+sys.path.insert(0, str(Path(sys.argv[sys.argv.index("--knowledge-root") + 1]) / "runtime"))
+from himate_knowledge import protocol as support
+from himate_knowledge.stage_dispatch import run_stage
 load_domain = support.domain
 def changing_domain(root, expected):
     modules, rules = load_domain(root, expected)
@@ -250,7 +251,7 @@ def changing_domain(root, expected):
     return modules, rules
 support.domain = changing_domain
 sys.argv = [cli, *sys.argv[5:]]
-runpy.run_path(cli, run_name='__main__')
+raise SystemExit(run_stage('query', sys.argv[1:]))
 """
     process = subprocess.run([sys.executable, "-X", "utf8", "-c", program,
         str(harness.packages / "hs-knowledge-query/scripts/cli.py"), str(local), replacement.hex(), str(attempt),

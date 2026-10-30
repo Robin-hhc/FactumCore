@@ -3,9 +3,11 @@ name: hs-knowledge-change-plan
 description: Freeze Agent-authored Claim decisions, explicit source and maintenance dispositions, card actions and representative query expectations before drafting.
 ---
 
+执行入口为实际知识根的 `python K/knowledge.py change-plan`；K内Windows可用 `.\knowledge.cmd change-plan`，POSIX可用 `sh ./knowledge.sh change-plan`。一次注册后可用裸knowledge。Skill只提供指令与文本契约，实现与依赖锁随K/runtime分发；复杂请求保留--input/--output，CLI自动固定省略的根、操作和结果路径并返回真实引用。
+
 P3 是作者的内容决策入口。已有项目与规则上下文直接复用；缺入口时按已安装的 `hs-knowledge-explore` 指引定位实际知识根和配置。使用执行端已有的全局 Python，材料与结果放知识根现有 `.build/`、`logs/`、`artifacts/`。
 
-目标代码仓在远端时，通过 OpenFlow／宿主已有的 SSH MCP 在远端项目根执行脚本、读取文件和进行仓库操作，使用执行端的全局 Python 与已安装 Skill 路径，并核对实际结果；本地路径不能直接用于远端。
+本机数据使用本机知识根 K 的仓内 CLI。代码仓在服务器或 Windows 仅经 Samba 映射访问时，通过 OpenFlow／宿主已有 SSH MCP 在服务器原生 K 路径运行 CLI 并核对实际结果；不自动连接 SSH，不推断映射关系。本机与服务器分别准备 Python 和配套依赖，远端不需要安装或上传 Skill 脚本。
 
 Agent 先阅读实际原文、各卡采用旧版、完整旧卡及需要的源码／配置，再判断新增、更新、保留、退役或欠账，保存逐单元处置、逐 Claim 理由、卡动作及目标查询预期。脚本检查这些业务数据并固定内容，不生成知识断言或替代独立审阅。
 
@@ -14,7 +16,7 @@ Agent 先阅读实际原文、各卡采用旧版、完整旧卡及需要的源�
 默认动作 `plan`：
 
 ```text
-python scripts/cli.py --action plan --input REQUEST.json --output RESPONSE.json --knowledge-root K
+python K/knowledge.py change-plan --action plan --input REQUEST.json --output RESPONSE.json --knowledge-root K
 ```
 
 正常主线输入真实 `scan_ref` 与 `material_ref`。独立备料可只提供明确目标的 `material_ref`，按材料中的实际 `units` 覆盖，不要求 P1 通过票据、不伪造全库扫描。必须给出完整 `units`、`claim_changes`、`card_actions` 及适用的 `target_queries`；维护单元与 raw 单元分开。输出 `semantic_plan_ref`、内容绑定和冻结查询，阶段为 `content_planned`。

@@ -123,6 +123,12 @@ def validate(root):
     root = Path(root).resolve(strict=True)
     errors = []
     artifacts = set()
+    knowledge_root = root / "himate-knowledge-wifi-mp"
+    for ref in ("knowledge.py", "knowledge.sh", "knowledge.cmd", "runtime/manifest.json",
+                "runtime/requirements.lock.txt", "runtime/himate_knowledge/__init__.py",
+                "runtime/himate_knowledge/cli.py"):
+        if not (knowledge_root / ref).is_file():
+            errors.append(f"repository runtime: missing {ref}")
     package_root = root / "skills/common/knowledge"
     # A leftover historical directory is not an installed Skill. A package with
     # SKILL.md is active and must belong to the exact final public capability set.
@@ -149,14 +155,8 @@ def validate(root):
             )
             if metadata.get("name") != skill or not metadata.get("description"):
                 errors.append(f"{skill}: missing or inconsistent Skill identity")
-            for ref in (
-                "scripts/cli.py",
-                "scripts/support.py",
-                "requirements.lock.txt",
-                "requirements-dev.lock.txt",
-            ):
-                if not (package / ref).is_file():
-                    errors.append(f"{skill}: missing {ref}")
+            # Deployed Skills are instructions/contracts. Repository runtime and
+            # its independent lock own execution; development wrappers are optional.
             if not any((package / "tests").rglob("test*.py")):
                 errors.append(f"{skill}: missing executable tests/test*.py")
             contract = load(package / "artifacts/result.yaml")
@@ -291,7 +291,11 @@ def validate(root):
                 errors.append(f"{identity}: unreachable node")
             layout = load(package / "layouts.yaml")
             coordinates = layout.get("canvas", {}).get("nodes", {})
-            if layout.get("template_id") != identity or set(coordinates) != set(by_id):
+            # The canvas may position its start/end glyphs independently of
+            # executable nodes. Every real node is still required; other IDs
+            # remain invalid, and endpoint coordinates use the same checks.
+            executable_coordinates = set(coordinates) - {"__start__", "__end__"}
+            if layout.get("template_id") != identity or executable_coordinates != set(by_id):
                 errors.append(f"{identity}: layout identity/node set mismatch")
             for node_id, xy in coordinates.items():
                 if set(xy) != {"x", "y"} or not all(

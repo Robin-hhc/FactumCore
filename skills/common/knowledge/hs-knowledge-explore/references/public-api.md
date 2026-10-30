@@ -2,7 +2,7 @@
 
 This CLI supplies optional project discovery for the Agent-facing [knowledge task entry](../SKILL.md). It does not implement ingest/query/lint/status routing, and an already valid project context does not require another discovery call. The Agent reads the actual knowledge root's `AGENTS.md` and documentation entry, then uses the relevant installed capability.
 
-Invoke `scripts/cli.py --input request.json --output response.json`. Request:
+Invoke `python K/knowledge.py explore --input request.json --output response.json`. Request:
 
 ```json
 {"operation_id":"bind-session","target_path":"<explicit existing code/workspace path>","target_id":"chip12-host"}
@@ -16,7 +16,7 @@ The public module shape is `code_root: main` plus `modules: [{path: relative/dir
 
 Workflow identities and transition checks belong to OpenFlow. This CLI returns its actual context and result directly; it does not validate Workflow IDs or create a per-attempt workflow manifest. Exit 2 is invalid input and 3 is a missing business prerequisite.
 
-First-time deployment and local dependency repair use the distribution checkout's Windows `deploy.ps1`, described in [deployment and execution](setup.md). Ordinary discovery remains read-only and does not install dependencies. The old `scripts/setup.py` is retained only for explicitly requested diagnostics or compatibility; it is not a routine installation step.
+First-time deployment and local dependency repair use the distribution checkout's Windows `deploy.ps1`, described in [deployment and execution](setup.md). Ordinary discovery remains read-only and does not install dependencies. Use repository `python K/knowledge.py doctor` for read-only execution-host diagnostics. Skill packages contain instructions and text contracts; repository runtime and its dependency lock are distributed with K. No installed Skill scripts are required on the SSH host.
 
 When the target code repository is remote, use OpenFlow's or the host's configured SSH MCP to run discovery and business scripts from the remote project root. Check that execution host's Python, dependencies and installed Skill paths separately; Windows deployment does not validate the remote runtime. Caller-side paths are not remote paths. The host manages the SSH connection; the Skill has no separate SSH configuration or dispatch mode. Shared project/module configuration remains in config.yml. The fixed K/docs-raw/sources/dbox.local.yml separately maps one private execution-host directory; source.configure prepares it explicitly, and discovery does not merge its private path into project identity/config_digest. Generated artifacts stay in the knowledge root's existing .build/logs/artifacts locations.
 

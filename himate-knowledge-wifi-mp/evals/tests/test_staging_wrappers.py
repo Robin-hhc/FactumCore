@@ -9,16 +9,17 @@ from types import SimpleNamespace
 import pytest
 
 
-SKILLS = Path(__file__).parents[3] / "skills/common/knowledge"
+DOMAIN = Path(__file__).parents[2]
+_spec = importlib.util.spec_from_file_location("staging_runtime_fixture", DOMAIN / "evals/contract_test_support.py")
+_fixture = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_fixture)
 
 
 @pytest.mark.parametrize("skill", ["source", "change-plan", "view-materialize"])
 @pytest.mark.parametrize("request_owner", ["current", "borrowed", "external"])
 def test_only_current_operation_request_and_output_are_owned(tmp_path, monkeypatch, skill, request_owner):
-    package = SKILLS / ("hs-knowledge-" + skill)
-    spec = importlib.util.spec_from_file_location("wrapper_" + skill.replace("-", "_"), package / "scripts/support.py")
-    support = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(support)
+    package = DOMAIN / "runtime/himate_knowledge/stages" / skill.replace("-", "_")
+    support = _fixture.runtime_module("protocol")
     root = tmp_path / "knowledge"
     root.mkdir()
     incoming = (root / ".build/operations" / ("op" if request_owner == "current" else "other") / "request.json"
@@ -33,7 +34,7 @@ def test_only_current_operation_request_and_output_are_owned(tmp_path, monkeypat
     monkeypatch.setattr(support, "tool_identity", lambda *a: {})
     monkeypatch.setattr(sys, "argv", ["cli", "--input", str(incoming), "--output", str(outgoing),
                                      "--knowledge-root", str(root)])
-    assert support.run(lambda ctx: ({"real_action": "observed"}, "prepared"), package) == 0
+    assert support.run(lambda ctx: ({"real_action": "observed"}, "prepared"), package, owned_io=True) == 0
     assert owned == ([".build/operations/op/request.json"] if request_owner == "current" else []) + [".build/operations/op/response.json"]
     assert json.loads(outgoing.read_bytes())["data"]["real_action"] == "observed"
 
@@ -41,10 +42,8 @@ def test_only_current_operation_request_and_output_are_owned(tmp_path, monkeypat
 @pytest.mark.parametrize("skill", ["source", "change-plan", "view-materialize"])
 @pytest.mark.parametrize("output", ["logs/error.json", "artifacts/error.json", ".build/operations/other/result.json"])
 def test_invalid_internal_output_never_runs_business_or_writes_error(tmp_path, monkeypatch, skill, output):
-    package = SKILLS / ("hs-knowledge-" + skill)
-    spec = importlib.util.spec_from_file_location("bad_wrapper_" + skill.replace("-", "_"), package / "scripts/support.py")
-    support = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(support)
+    package = DOMAIN / "runtime/himate_knowledge/stages" / skill.replace("-", "_")
+    support = _fixture.runtime_module("protocol")
     root = tmp_path / "knowledge"
     root.mkdir()
     incoming = tmp_path / "request.json"
@@ -53,5 +52,5 @@ def test_invalid_internal_output_never_runs_business_or_writes_error(tmp_path, m
     monkeypatch.setattr(support, "tool_identity", lambda *a: {})
     monkeypatch.setattr(sys, "argv", ["cli", "--input", str(incoming), "--output", str(outgoing),
                                      "--knowledge-root", str(root)])
-    assert support.run(lambda ctx: pytest.fail("Unsafe output must stop before the handler"), package) == 2
+    assert support.run(lambda ctx: pytest.fail("Unsafe output must stop before the handler"), package, owned_io=True) == 2
     assert not outgoing.exists()

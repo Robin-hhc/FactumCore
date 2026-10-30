@@ -1,6 +1,6 @@
 # Fixed code-evidence checks in lint
 
-Use this package's `scripts/cli.py --action code-check` for the standalone purpose, `code-recheck` for current evidence rechecking, or `verify-evidence` for a saved result. In P5 `--action review`, supply the same request fields inside `code_review`; the current operation and exact view are supplied by P5. The host performs the independent technical review. These deterministic actions never call another Skill, compile code, or perform a Git merge.
+Use this package's `python K/knowledge.py lint --action code-check` for the standalone purpose, `code-recheck` for current evidence rechecking, or `verify-evidence` for a saved result. In P5 `--action review`, supply the same request fields inside `code_review`; the current operation and exact view are supplied by P5. The host performs the independent technical review. These deterministic actions never call another Skill, compile code, or perform a Git merge.
 
 The fixed code-evidence invocation requires `operation_id`, `view_ref`, fixed `context_ref` and `semantic_report_ref`. Code-gate and mixed views are accepted; in a mixed view it checks only code-gate cards while binding the entire exact view. Pure-document cards remain exempt. The Agent reads the source and supplies a positive reason and exact references for every code Claim; an empty findings array alone is insufficient.
 

@@ -43,17 +43,17 @@ def test_file_directory_layout_changes_and_failure_restore_original_shapes(
     backend, monkeypatch, capsys, source, targets, fail
 ):
     package = source / "skills/common/knowledge/hs-knowledge-query"
-    put(package, "scripts/becomes-dir", b"old file")
-    put(package, "scripts/becomes-file/old.txt", b"old nested file")
+    put(package, "references/becomes-dir.md", b"old file")
+    put(package, "references/becomes-file.md/old.txt", b"old nested file")
     assert cli(source, targets)[0] == 0
     target = targets["skills_root"] / package.name
-    (target / "scripts/becomes-file/empty/child").mkdir(parents=True)
+    (target / "references/becomes-file.md/empty/child").mkdir(parents=True)
     before = snapshots(targets)
-    (package / "scripts/becomes-dir").unlink()
-    put(package, "scripts/becomes-dir/new.txt", b"new nested file")
-    (package / "scripts/becomes-file/old.txt").unlink()
-    (package / "scripts/becomes-file").rmdir()
-    put(package, "scripts/becomes-file", b"new file")
+    (package / "references/becomes-dir.md").unlink()
+    put(package, "references/becomes-dir.md/new.txt", b"new nested file")
+    (package / "references/becomes-file.md/old.txt").unlink()
+    (package / "references/becomes-file.md").rmdir()
+    put(package, "references/becomes-file.md", b"new file")
     if fail:
         real_write = backend._write_atomic
         injected = False
@@ -61,7 +61,7 @@ def test_file_directory_layout_changes_and_failure_restore_original_shapes(
         def interrupted(path, data, *args):
             nonlocal injected
             real_write(path, data, *args)
-            if path == target / "scripts/becomes-file" and not injected:
+            if path == target / "references/becomes-file.md" and not injected:
                 injected = True
                 raise OSError("Synthetic failure after both layout conversions")
 
@@ -73,8 +73,8 @@ def test_file_directory_layout_changes_and_failure_restore_original_shapes(
         assert snapshots(targets) == before
     else:
         assert (code, report["status"]) == (0, "deployed")
-        assert (target / "scripts/becomes-dir/new.txt").read_bytes() == b"new nested file"
-        assert (target / "scripts/becomes-file").read_bytes() == b"new file"
+        assert (target / "references/becomes-dir.md/new.txt").read_bytes() == b"new nested file"
+        assert (target / "references/becomes-file.md").read_bytes() == b"new file"
         assert cli(source, targets)[1]["write_count"] == 0
 
 
@@ -203,18 +203,18 @@ def test_removed_source_package_is_removed_from_its_previous_receipt(source, tar
 
 def test_removed_skill_source_file_and_subtree_do_not_survive_upgrade(source, targets):
     package = source / "skills/common/knowledge/hs-knowledge-query"
-    put(package, "scripts/legacy/deep/tool.py", b"old distributed tool")
+    put(package, "references/legacy/deep/tool.md", b"old distributed tool")
     assert cli(source, targets)[0] == 0
     (package / "references/request.md").unlink()
-    remove_fixture_tree(package / "scripts/legacy", source)
+    remove_fixture_tree(package / "references/legacy", source)
     destination = targets["skills_root"] / package.name
 
     code, report = cli(source, targets)
 
     assert (code, report["status"]) == (0, "deployed")
     assert not (destination / "references/request.md").exists()
-    assert not (destination / "scripts/legacy").exists()
-    assert (destination / "scripts/cli.py").read_bytes() == b"print('synthetic')\n"
+    assert not (destination / "references/legacy").exists()
+    assert (destination / "references/execution.md").read_bytes() == b"Synthetic execution guide.\n"
     assert report["delete_count"] == 2
 
 
@@ -453,8 +453,8 @@ def test_later_write_failure_restores_deleted_files_empty_directories_and_receip
     removed[1].mkdir(parents=True)
     # The failed upgrade would also change package ownership; its receipt must stay old.
     (source / "skills/common/knowledge/hs-knowledge-new-0/SKILL.md").unlink()
-    selected = targets["skills_root"] / "hs-knowledge-query/scripts/cli.py"
-    put(source, "skills/common/knowledge/hs-knowledge-query/scripts/cli.py", b"print('new version')\n")
+    selected = targets["skills_root"] / "hs-knowledge-query/references/execution.md"
+    put(source, "skills/common/knowledge/hs-knowledge-query/references/execution.md", b"print('new version')\n")
     before = snapshots(targets)
     real_replace, failed, deletion_observed = backend.os.replace, False, False
 

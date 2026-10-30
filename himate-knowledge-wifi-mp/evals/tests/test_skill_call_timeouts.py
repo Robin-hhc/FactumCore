@@ -28,11 +28,7 @@ MOCK_SECRET = "synthetic-timeout-command-credential-must-not-be-disclosed"
 
 
 def load_support(name):
-    path = REPO / "skills/common/knowledge" / name / "scripts/support.py"
-    spec = importlib.util.spec_from_file_location("public_support_" + name.replace("-", "_"), path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    return contracts.runtime_module("stages.apply.support" if name == "hs-knowledge-apply" else "protocol")
 
 
 @pytest.mark.parametrize("name", fixture.PUBLIC_SKILLS)
@@ -40,7 +36,7 @@ def test_retained_public_context_has_no_sibling_cli_transport(name):
     support = load_support(name)
     assert not hasattr(support.Context, "call")
     assert not hasattr(contracts.module("runtime").OperationContext, "call")
-    scripts = REPO / "skills/common/knowledge" / name / "scripts"
+    scripts = REPO / "himate-knowledge-wifi-mp/runtime/himate_knowledge/stages" / name.removeprefix("hs-knowledge-").replace("-", "_")
     for path in scripts.glob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8-sig"))
         delegated = [node for node in ast.walk(tree) if isinstance(node, ast.Call)

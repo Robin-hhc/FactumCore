@@ -13,7 +13,7 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-source
-  prompt: 目标代码仓在远端时，通过宿主已有 SSH MCP 在实际执行端运行本节点脚本并读取结果，复用已知执行端项目根、全局 Python 和已安装 Skill 路径。本批P1-P6业务新文件及请求输出仅写本批.build暂存，正式状态不变。正常新Workflow使用新operation_id调用默认run，由脚本同进程完成真实扫描及按需备料；完整且无待办、维护限制、缺口或明确修订目标才返回unchanged，不生成材料或记录。prepared时读取实际scan_ref、material_ref、输入指纹及gaps，交P3判断；不重写扫描事实，不新增交棒检查。P3/P4/P5明确退回补料时直接调用prepare，携原scan_ref、existing_material_ref及明确补充目标；尚未冻结计划时可同操作补料且不要求view，已有冻结候选的返工才使用新operation_id并携确切previous_view_ref和revision_reason；已冻结计划却无view而遇不可变绑定阻断时，保留真实停点，不伪造view或scan；不先调用run或scan，不覆盖旧工件、不搜索其他旧操作。输入漂移读取真实诊断、needs_scan及affected_scope，按实际对象取得新的有效输入，不能把所有诊断路径直接当作只接受raw的source参数，也不自动无限重扫。纯环境失败读取stopped_stage和已存scan_ref，只续办同操作的确切失败子步骤并保留宿主等待，不伪造准备成功。缺口原样保存，不代作者判断结论，未变化的明确修订仍须备料。
+  prompt: 调用仓内 python K/knowledge.py source --action run，传本节点实际请求并读取真实结果。本机使用本机K内CLI；Samba远端通过宿主已有SSH MCP在服务器原生K路径执行，不自动SSH、不猜映射、无需远端安装Skill。本批P1-P6业务新文件及请求输出仅写本批.build暂存，正式状态不变。正常新Workflow使用新operation_id调用默认run，由脚本同进程完成真实扫描及按需备料；完整且无待办、维护限制、缺口或明确修订目标才返回unchanged，不生成材料或记录。prepared时读取实际scan_ref、material_ref、输入指纹及gaps，交P3判断；不重写扫描事实，不新增交棒检查。P3/P4/P5明确退回补料时直接调用prepare，携原scan_ref、existing_material_ref及明确补充目标；尚未冻结计划时可同操作补料且不要求view，已有冻结候选的返工才使用新operation_id并携确切previous_view_ref和revision_reason；已冻结计划却无view而遇不可变绑定阻断时，保留真实停点，不伪造view或scan；不先调用run或scan，不覆盖旧工件、不搜索其他旧操作。输入漂移读取真实诊断、needs_scan及affected_scope，按实际对象取得新的有效输入，不能把所有诊断路径直接当作只接受raw的source参数，也不自动无限重扫。纯环境失败读取stopped_stage和已存scan_ref，只续办同操作的确切失败子步骤并保留宿主等待，不伪造准备成功。缺口原样保存，不代作者判断结论，未变化的明确修订仍须备料。
   exits:
   - id: prepared
     label: 来源材料已保存
@@ -28,7 +28,7 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-change-plan
-  prompt: 目标代码仓在远端时，通过宿主已有 SSH MCP 在实际执行端运行本节点脚本并读取结果，使用该端项目根、全局 Python 和已安装 Skill 路径；本地路径不能直接用于远端。plan成功即保存并冻结本批语义计划，同一operation_id下不可追加或覆盖。先汇总核对本批全部卡、Claim、处置和查询，再调用plan提交完整计划；不得用部分卡试跑校验后再扩充。逐单元确定content、skip、defer、failed或uncovered及理由，覆盖明确维护事项。判断卡和旧Claim的新建、更新、合并、拆分、退役或暂缓，保留身份和全部去向；同单元多种卡动作时显式record_action并保全明细。冻结本批查询及明确预期，按实际Claim的usage、evidence_kind和scope选择purpose，存在代码链接不等于implementation依据；正向用例推荐expected_claim_ids，负向保留排除或明确空结果断言。P5退回或P2补料后，用新operation_id、previous_view_ref及revision_reason保存新计划；原scan及单元身份不变，采用旧材料须与前序稿精确绑定，补料须引用新材料版本，旧工件不覆盖。这里不做提前独立复核，不生产字节写入清单；缺材料回prepare_sources直接prepare；采用源变化保留诊断，在该节点按实际对象刷新有效输入，不自动无限重扫。
+  prompt: 调用仓内 python K/knowledge.py change-plan --action plan，传本节点实际请求并读取真实结果。本机使用本机 K 的 CLI；Samba远端通过宿主已有SSH MCP在服务器原生K路径执行，不自动SSH、不猜映射、无需远端安装Skill。plan成功即保存并冻结本批语义计划，同一operation_id下不可追加或覆盖。先汇总核对本批全部卡、Claim、处置和查询，再调用plan提交完整计划；不得用部分卡试跑校验后再扩充。逐单元确定content、skip、defer、failed或uncovered及理由，覆盖明确维护事项。判断卡和旧Claim的新建、更新、合并、拆分、退役或暂缓，保留身份和全部去向；同单元多种卡动作时显式record_action并保全明细。冻结本批查询及明确预期，按实际Claim的usage、evidence_kind和scope选择purpose，存在代码链接不等于implementation依据；正向用例推荐expected_claim_ids，负向保留排除或明确空结果断言。P5退回或P2补料后，用新operation_id、previous_view_ref及revision_reason保存新计划；原scan及单元身份不变，采用旧材料须与前序稿精确绑定，补料须引用新材料版本，旧工件不覆盖。这里不做提前独立复核，不生产字节写入清单；缺材料回prepare_sources直接prepare；采用源变化保留诊断，在该节点按实际对象刷新有效输入，不自动无限重扫。
   exits:
   - id: content_planned
     label: 作者判断已固定
@@ -43,7 +43,7 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-view-materialize
-  prompt: 目标代码仓在远端时，通过宿主已有 SSH MCP 在实际执行端运行本节点脚本并读取结果，使用该端项目根、全局 Python 和已安装 Skill 路径；本地路径不能直接用于远端。调用run一次组织作者卡、导航、来源锁、写删集合、处置预览、展示字节及完整输入快照，读取实际输出，提前固定stage→final路径及完整字节，P5所审内容与P7发布字节身份保持一致，正式区不变。修订用新operation_id、previous_view_ref和revision_reason，通过同一入口保存新稿。仅退回P4时可明确采用前序稿精确绑定的未变semantic_plan和material；退回P2/P3时用它们的新版本。保留原scan及处理单元身份，核material_digest和previous_view_digest，新稿重新交P5；旧材料、计划、稿件和报告均不覆盖。相同操作重入读取已保存稿，不重新生成计划或导航，不跑整库质量lint。缺材料回prepare_sources直接prepare，作者判断不清楚回P3；采用源变化保留诊断，按实际对象刷新有效输入，不自动无限重扫。
+  prompt: 调用仓内 python K/knowledge.py view-materialize --action run，传本节点实际请求并读取真实结果。本机使用本机 K 的 CLI；Samba远端通过宿主已有SSH MCP在服务器原生K路径执行，不自动SSH、不猜映射、无需远端安装Skill。调用run一次组织作者卡、导航、来源锁、写删集合、处置预览、展示字节及完整输入快照，读取实际输出，提前固定stage→final路径及完整字节，P5所审内容与P7发布字节身份保持一致，正式区不变。修订用新operation_id、previous_view_ref和revision_reason，通过同一入口保存新稿。仅退回P4时可明确采用前序稿精确绑定的未变semantic_plan和material；退回P2/P3时用它们的新版本。保留原scan及处理单元身份，核material_digest和previous_view_digest，新稿重新交P5；旧材料、计划、稿件和报告均不覆盖。相同操作重入读取已保存稿，不重新生成计划或导航，不跑整库质量lint。缺材料回prepare_sources直接prepare，作者判断不清楚回P3；采用源变化保留诊断，按实际对象刷新有效输入，不自动无限重扫。
   exits:
   - id: ready
     label: 完整稿件已保存
@@ -62,7 +62,7 @@ nodes:
   type: skill
   owner: reviewer
   skill: hs-knowledge-lint
-  prompt: 目标代码仓在远端时，通过宿主已有 SSH MCP 在实际执行端运行本节点脚本并读取结果，使用该端项目根、全局 Python 和已安装 Skill 路径；本地路径不能直接用于远端。由宿主安排独立reviewer任务，实际读原文、旧卡、作者计划、全部处置和稿件，审结论、归卡、实质skip及必要代码依据。调用action review，传view_ref、实际semantic_plan_ref、sampled_unit_ids、unreviewed_unit_ids、reason及明确findings；代码稿另传code_review的真实context和逐Claim材料。角色标签不认证独立性。正常候选一次完整固定lint，并在同次已全验临时索引上执行最终候选的原冻结查询及同代精读；读取index.build的candidate_queries逐例预期与实际结果，TARGET_QUERY_EXPECTATION_FAILED阻断并回P3，必需输入不可用保持incomplete按实际缺口处理。语义已阻断时记录未执行项。记录批只查处置和适用项，不建临时索引。读实际报告，披露抽样和未审范围；缺材料回P2、判断错回P3、稿件错回P4，并携确切previous_view_ref和理由交新操作返工，保留有效原scan、不覆盖旧工件，新稿必须重审。纯运行故障留本节点等待。
+  prompt: 调用仓内 python K/knowledge.py lint --action review，传本节点实际请求并读取真实结果。本机使用本机 K 的 CLI；Samba远端通过宿主已有SSH MCP在服务器原生K路径执行，不自动SSH、不猜映射、无需远端安装Skill。由宿主安排独立reviewer任务，实际读原文、旧卡、作者计划、全部处置和稿件，审结论、归卡、实质skip及必要代码依据。调用action review，传view_ref、实际semantic_plan_ref、sampled_unit_ids、unreviewed_unit_ids、reason及明确findings；代码稿另传code_review的真实context和逐Claim材料。角色标签不认证独立性。正常候选一次完整固定lint，并在同次已全验临时索引上执行最终候选的原冻结查询及同代精读；读取index.build的candidate_queries逐例预期与实际结果，TARGET_QUERY_EXPECTATION_FAILED阻断并回P3，必需输入不可用保持incomplete按实际缺口处理。语义已阻断时记录未执行项。记录批只查处置和适用项，不建临时索引。读实际报告，披露抽样和未审范围；缺材料回P2、判断错回P3、稿件错回P4，并携确切previous_view_ref和理由交新操作返工，保留有效原scan、不覆盖旧工件，新稿必须重审。纯运行故障留本节点等待。
   exits:
   - id: passed
     label: 审阅和适用检查完成
@@ -85,7 +85,7 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-source
-  prompt: 目标代码仓在远端时，通过宿主已有 SSH MCP 在实际执行端运行本节点脚本并读取结果，使用该端项目根、全局 Python 和已安装 Skill 路径；本地路径不能直接用于远端。调用record，消费实际view、disposition_preview与semantic_plan，机械转写已定单元决定、record_action、卡及Claim引用、理由、范围和欠账。返工记录使用新稿的operation_id，精确绑定原scan_ref、origin_scan_operation_id、材料和前序稿摘要，不伪造新扫描。不用dispositions覆盖既定判断，不重新决定新建或跳过。核新记录结构和确切绑定，保存待入库记录；正式记录及实际写入事实由P7落位。缺口原样保留，不提前声称Git提交、CI或合入。
+  prompt: 调用仓内 python K/knowledge.py source --action record，传本节点实际请求并读取真实结果。本机使用本机 K 的 CLI；Samba远端通过宿主已有SSH MCP在服务器原生K路径执行，不自动SSH、不猜映射、无需远端安装Skill。调用record，消费实际view、disposition_preview与semantic_plan，机械转写已定单元决定、record_action、卡及Claim引用、理由、范围和欠账。返工记录使用新稿的operation_id，精确绑定原scan_ref、origin_scan_operation_id、材料和前序稿摘要，不伪造新扫描。不用dispositions覆盖既定判断，不重新决定新建或跳过。核新记录结构和确切绑定，保存待入库记录；正式记录及实际写入事实由P7落位。缺口原样保留，不提前声称Git提交、CI或合入。
   exits:
   - id: recorded
     label: 待入库记录已保存
@@ -96,7 +96,7 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-apply
-  prompt: 目标代码仓在远端时，通过宿主已有 SSH MCP 在实际执行端运行本节点脚本并读取结果，使用该端项目根、全局 Python 和已安装 Skill 路径；本地路径不能直接用于远端。调用action batch，传确切view、待发布记录和原冻结查询。保留输入快照、原版本、写锁、未完事务、CAS、备份和实际回读；发布已审完整字节与必要正式证据，内容核验成功后才发布正式成功处理记录及对应事件，不重跑P5语义工作或完整质量lint。继续适用索引、完整验证、原查询、同代read和原expected_active激活，建立logs/publications下的正式结果闭包。全部适用检索收尾成功后只清本批明确拥有且可删的暂存；借用、保留或用途不明项保留并说明。清理失败保持published/content_applied成功事实，batch_complete=false且cleanup_pending，仅重试缺失收尾或清理，不重apply；最终小响应可仍在.build。已完成操作从正式manifest/completion读取结果，不要求旧view存在。记录批不建索引。实际batch_complete与适用启用事实齐全才结束，Git、CI和合入另行处理。罕见P7半写保留真实状态和现有保护，不宣称自动修复。
+  prompt: 调用仓内 python K/knowledge.py apply --action batch，传本节点实际请求并读取真实结果。本机使用本机 K 的 CLI；Samba远端通过宿主已有SSH MCP在服务器原生K路径执行，不自动SSH、不猜映射、无需远端安装Skill。调用action batch，传确切view、待发布记录和原冻结查询。保留输入快照、原版本、写锁、未完事务、CAS、备份和实际回读；发布已审完整字节与必要正式证据，内容核验成功后才发布正式成功处理记录及对应事件，不重跑P5语义工作或完整质量lint。继续适用索引、完整验证、原查询、同代read和原expected_active激活，建立logs/publications下的正式结果闭包。全部适用检索收尾成功后只清本批明确拥有且可删的暂存；借用、保留或用途不明项保留并说明。清理失败保持published/content_applied成功事实，batch_complete=false且cleanup_pending，仅重试缺失收尾或清理，不重apply；最终小响应可仍在.build。已完成操作从正式manifest/completion读取结果，不要求旧view存在。记录批不建索引。实际batch_complete与适用启用事实齐全才结束，Git、CI和合入另行处理。罕见P7半写保留真实状态和现有保护，不宣称自动修复。
   exits:
   - id: completed
     label: 内容和检索收尾完成

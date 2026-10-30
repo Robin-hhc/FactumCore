@@ -12,6 +12,15 @@ import sys
 import pytest
 import yaml
 
+import importlib.util as _repository_importlib
+from pathlib import Path as _RepositoryPath
+_repository_spec = _repository_importlib.spec_from_file_location(
+    "test_p7_actions_repository_runtime_fixture",
+    _RepositoryPath(__file__).resolve().parents[5] / "himate-knowledge-wifi-mp/evals/contract_test_support.py",
+)
+_repository_fixture = _repository_importlib.module_from_spec(_repository_spec)
+_repository_spec.loader.exec_module(_repository_fixture)
+
 
 ROOT = Path(__file__).resolve().parents[5]
 HELPER_SPEC = importlib.util.spec_from_file_location("p7_action_helpers", Path(__file__).with_name("p7_test_helpers.py"))
@@ -25,6 +34,7 @@ class PublicP7:
         self.root.mkdir()
         shutil.copytree(ROOT / "himate-knowledge-wifi-mp/governance", self.root / "governance",
                         ignore=shutil.ignore_patterns("__pycache__"))
+        _repository_fixture.copy_runtime(self.root)
         self.write("knowledge/index.md", b"# Knowledge\n")
         self.write(".isolated-knowledge-fixture", b"HIMATE_SYNTHETIC_FIXTURE_V2")
         self.rules_digest = HELPER.sha((self.root / "governance/framework.lock.yaml").read_bytes())
@@ -54,7 +64,10 @@ class PublicP7:
         self.calls += 1
         incoming, outgoing = self.base / (str(self.calls) + ".in.json"), self.base / (str(self.calls) + ".out.json")
         incoming.write_bytes(HELPER.canonical(request))
-        command = [sys.executable, str(ROOT / "skills/common/knowledge" / skill / "scripts/cli.py"),
+        entry = ([sys.executable, str(self.root / "knowledge.py"), skill.removeprefix("hs-knowledge-"), "--json"]
+                 if getattr(self, "repository_cli", False) else
+                 [sys.executable, str(ROOT / "skills/common/knowledge" / skill / "scripts/cli.py")])
+        command = [*entry,
                    "--input", str(incoming), "--output", str(outgoing), "--knowledge-root", str(self.root)]
         if action:
             command += ["--action", action]

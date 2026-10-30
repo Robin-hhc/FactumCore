@@ -1,4 +1,4 @@
-"""A consumer receives only committed assets, never a producer's runtime tree."""
+"""A consumer receives shared executable/assets, never producer execution state."""
 
 import importlib.util
 import io
@@ -103,14 +103,20 @@ def test_document_ingest_survives_git_clone_without_private_runtime(tmp_path, co
     # Commit the actual formal closure. No producer stage or private cache is
     # copied into the consumer to compensate for a missing publication object.
     git(workspace, "add", ".gitignore", "config.yml", p.root.name + "/governance",
-        p.root.name + "/docs-raw", *[p.root.name + "/" + ref for ref in ready["commit_files"]])
+        p.root.name + "/docs-raw", p.root.name + "/runtime",
+        *[p.root.name + "/" + name for name in ("knowledge.py", "knowledge.sh", "knowledge.cmd")],
+        *[p.root.name + "/" + ref for ref in ready["commit_files"]])
     git(workspace, "commit", "-m", "Isolated formal knowledge")
     cloned = tmp_path / "consumer-workspace"
     git(tmp_path, "clone", "--no-hardlinks", str(workspace), str(cloned))
     consumer = MANUAL.ManualPipeline.__new__(MANUAL.ManualPipeline)
     consumer.base = tmp_path / "consumer-io"
     consumer.base.mkdir()
-    consumer.root, consumer.skills, consumer.sequence = cloned / p.root.name, p.skills, 0
+    consumer.root, consumer.skills, consumer.sequence = cloned / p.root.name, tmp_path / "no-consumer-skills", 0
+    consumer.repository_cli = True
+    assert not consumer.skills.exists()
+    assert (consumer.root / "knowledge.py").is_file()
+    assert (consumer.root / "runtime/manifest.json").is_file()
     assert not any((consumer.skills / name).exists() for name in MANUAL.FIXTURE.RETIRED_SKILLS)
     assert not (consumer.root / ".build").exists()
     assert not (consumer.root / "artifacts").exists()
@@ -172,7 +178,8 @@ def test_document_ingest_survives_git_clone_without_private_runtime(tmp_path, co
         restricted = MANUAL.ManualPipeline.__new__(MANUAL.ManualPipeline)
         restricted.base = tmp_path / "restricted-consumer-io"
         restricted.base.mkdir()
-        restricted.root, restricted.skills, restricted.sequence = restricted_root / consumer.root.name, p.skills, 0
+        restricted.root, restricted.skills, restricted.sequence = restricted_root / consumer.root.name, tmp_path / "no-restricted-skills", 0
+        restricted.repository_cli = True
         generation = restricted.call("knowledge-index-build", {"operation_id": "restricted-build"})["data"]
         assert restricted.call("knowledge-query-regression", {
             "operation_id": "restricted-regression", "generation_ref": generation["generation_ref"],
@@ -266,7 +273,9 @@ def test_static_code_card_survives_clean_clone_with_configured_module_bytes(tmp_
     assert p.call("knowledge-apply", {"operation_id": "code-clone", "view_ref": view_ref})["phase"] == "committed"
     (workspace / ".gitignore").write_bytes((MANUAL.FIXTURE.REPO / ".gitignore").read_bytes())
     git(workspace, "init", "-b", "main")
-    git(workspace, "add", ".gitignore", "config.yml", p.root.name + "/governance", p.root.name + "/knowledge")
+    git(workspace, "add", ".gitignore", "config.yml", p.root.name + "/governance", p.root.name + "/knowledge",
+        p.root.name + "/runtime",
+        *[p.root.name + "/" + name for name in ("knowledge.py", "knowledge.sh", "knowledge.cmd")])
     git(workspace, "commit", "-m", "Isolated static code knowledge")
     cloned = tmp_path / "code-consumer-workspace"
     git(tmp_path, "clone", "--no-hardlinks", str(workspace), str(cloned))
@@ -277,7 +286,11 @@ def test_static_code_card_survives_clean_clone_with_configured_module_bytes(tmp_
     consumer = MANUAL.ManualPipeline.__new__(MANUAL.ManualPipeline)
     consumer.base = tmp_path / "code-consumer-io"
     consumer.base.mkdir()
-    consumer.root, consumer.skills, consumer.sequence = cloned / p.root.name, p.skills, 0
+    consumer.root, consumer.skills, consumer.sequence = cloned / p.root.name, tmp_path / "no-code-consumer-skills", 0
+    consumer.repository_cli = True
+    assert not consumer.skills.exists()
+    assert (consumer.root / "knowledge.py").is_file()
+    assert (consumer.root / "runtime/manifest.json").is_file()
     for path in (".build", "artifacts", "logs/evidence", "logs/operations"):
         assert not (consumer.root / path).exists()
     built = consumer.call("knowledge-index-build", {"operation_id": "consumer-code-build"})["data"]

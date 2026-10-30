@@ -127,7 +127,9 @@ def pending(base, kind="md"):
             (RELEASE / "himate-knowledge-wifi-mp/docs-raw/sources" / name).read_bytes())
     git(workspace, "init", "-b", "main")
     git(workspace, "add", ".gitignore", ".gitattributes", "config.yml",
-        pipeline.root.name + "/governance", pipeline.root.name + "/docs-raw/sources/.gitignore",
+        pipeline.root.name + "/governance", pipeline.root.name + "/runtime",
+        pipeline.root.name + "/knowledge.py", pipeline.root.name + "/knowledge.cmd",
+        pipeline.root.name + "/knowledge.sh", pipeline.root.name + "/docs-raw/sources/.gitignore",
         pipeline.root.name + "/docs-raw/sources/dbox.example.yml")
     git(workspace, "commit", "-m", "Synthetic shared baseline")
     source = base / "生产者 外部目录" / "nested"

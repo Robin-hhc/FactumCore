@@ -10,6 +10,15 @@ import sys
 
 import pytest
 
+import importlib.util as _repository_importlib
+from pathlib import Path as _RepositoryPath
+_repository_spec = _repository_importlib.spec_from_file_location(
+    "test_unicode_output_repository_runtime_fixture",
+    _RepositoryPath(__file__).resolve().parents[3] / "himate-knowledge-wifi-mp/evals/contract_test_support.py",
+)
+_repository_fixture = _repository_importlib.module_from_spec(_repository_spec)
+_repository_spec.loader.exec_module(_repository_fixture)
+
 
 DOMAIN = Path(__file__).resolve().parents[2]
 SKILLS = DOMAIN.parent / "skills/common/knowledge"
@@ -43,6 +52,7 @@ def assert_same_report(completed, output, expected_status, expected_exit):
 def test_formal_lint_json_stdout_matches_utf8_file_under_cp1252(tmp_path, invalid_card, status, code):
     root = tmp_path / "root"
     shutil.copytree(DOMAIN / "governance", root / "governance")
+    _repository_fixture.copy_runtime(root)
     if invalid_card:
         (root / "knowledge").mkdir()
         (root / "knowledge/bad.md").write_text("---\nbad: true\n---\n# Invalid\n", encoding="utf-8")
@@ -78,6 +88,7 @@ def test_protected_ci_json_stdout_matches_utf8_file_under_cp1252(tmp_path, inval
     trusted = tmp_path / "trusted"
     candidate = tmp_path / "中文报告候选库"
     shutil.copytree(DOMAIN / "governance", trusted / "governance")
+    _repository_fixture.copy_runtime(trusted)
     (candidate / "governance").mkdir(parents=True)
     shutil.copyfile(trusted / "governance/sources.lock.yaml", candidate / "governance/sources.lock.yaml")
     if invalid_card:

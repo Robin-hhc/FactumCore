@@ -1,6 +1,12 @@
-"""Public query adapter; algorithms are shared with P7 regression."""
+"""Development compatibility import; no duplicate stage implementation."""
+import secrets
+import sys
+import tempfile
+from pathlib import Path
 
+sys.dont_write_bytecode = True
+sys.pycache_prefix = str(Path(tempfile.gettempdir()) / ("hs-no-cache-" + secrets.token_hex(16)))
 
-def execute(context):
-    ctx = context.modules["runtime"].fork_context(context)
-    return ctx.modules["query_runtime"].execute(ctx)
+from _runtime import expose  # noqa: E402
+
+_actual = expose(__file__, globals(), 'query', 'node')

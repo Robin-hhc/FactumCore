@@ -1,6 +1,6 @@
 # WiFi 领域知识入口
 
-本目录为项目根 `repo/` 下的 `himate-knowledge-wifi-mp/`，不包含嵌套 `.git`。原件在 `docs-raw/`，治理契约在 `governance/`，正式卡在 `knowledge/`，系统设计在 `docs-llm-wiki/`。Skill／Workflow 开发分发源码在项目根对应目录，实际能力已装在 Agent 自己的目录，由 harness 调用。首次部署使用分发仓根 `deploy.ps1`，按需检查本机 Python 和依赖并安装能力与知识库；explore 提供任务路由与只读项目发现，旧 setup 仅供显式诊断或兼容；不要求额外登记或机器绑定。运行产物使用已有 `.build/`、`logs/`、`artifacts/`。现行布局见[总体设计 §5.3](docs-llm-wiki/HiMate知识库架构设计.md#53-himate-knowledge目录架构)。
+本目录为项目根 `repo/` 下的 `himate-knowledge-wifi-mp/`，不包含嵌套 `.git`。原件在 `docs-raw/`，治理契约在 `governance/`，正式卡在 `knowledge/`，系统设计在 `docs-llm-wiki/`。`knowledge.py`、`knowledge.cmd`、`knowledge.sh` 是仓内执行入口，配套实现与依赖锁在 `runtime/`，随知识仓分发。Agent 自己的目录安装 Skill 指引和 Workflow 编排；执行端不依赖 Skill 脚本。首次部署使用分发仓根 `deploy.ps1`，按需检查调用机 Python 和依赖并安装能力与知识库；每个实际执行端分别准备一次环境并运行 `knowledge doctor`。explore 提供任务路由与只读项目发现，旧 setup 仅供显式诊断或兼容；不要求业务登记或机器绑定。运行产物使用已有 `.build/`、`logs/`、`artifacts/`。现行布局见[总体设计 §5.3](docs-llm-wiki/HiMate知识库架构设计.md#53-himate-knowledge目录架构)。
 
 知识库能力介绍与任务路由见已安装 `hs-knowledge-explore/SKILL.md`；已有有效上下文直接选择业务能力，首次准备和只读发现脚本按需运行。根 `AGENTS.md` 介绍真实业务仓，部署时保留已有内容，仅按 `AGENTS.md.example` 合并四项位置说明和 explore 入口指针；本开发仓的根文件仅本地维护。设计阅读先看[文档入口](docs-llm-wiki/README.md)。详细设计分概要和节点详细设计两层。项目自身的需求、实现任务、测试和验收记录保存在本地 `docs-llm-wiki/sdd/`，任务入口为本地 `docs-llm-wiki/task.md`，均由 Git 忽略，不随仓库分发。开发时按需读取本地已有工件；未提供时依据共享设计、源码与实际验证工作，不把缺少工件视为部署缺项。保留本地历史工件原字节。
 
@@ -14,7 +14,9 @@
 
 Git 操作在项目根 `repo/` 执行。保留其他任务本地文件，不读受限 gold，不提交本机配置、凭据、跨组资料或无关修改。目录与忽略规则不提供 ACL；业务接入、宿主触发及权限隔离各自记录真实证据。
 
-Skill 可人工逐个调用，只校验本职业务数据和固定检查；OpenFlow 负责流程顺序、角色隔离及交棒合法性。节点不要求 Workflow 身份、catalog 登记或上游通过凭证。
+Skill 指引 Agent 调用仓内对应阶段命令，CLI 负责实际数据和固定检查；OpenFlow 负责流程顺序、角色隔离及交棒合法性。CLI 不调用模型，也不代替 P3 内容判断或 P5 独立审阅；节点不要求 Workflow 身份、catalog 登记或上游通过凭证。
+
+进入本目录可用 `sh ./knowledge.sh`（POSIX）或 `.\knowledge.cmd`（Windows）；准备好的解释器可由 `HIMATE_KNOWLEDGE_PYTHON` 指定。裸 `knowledge` 需在每个执行端显式运行一次 `install-command`，Windows 修改用户 PATH 另需 `--add-path`，新终端生效。远端通过宿主 SSH 在服务器原生知识根执行同一命令，不逐次传 Skill 脚本，不自动猜测映射盘地址。常用 query/read/source/patrol/status 与复杂 JSON 请求见[使用说明](docs-llm-wiki/使用说明.md#22-仓内命令入口与诊断)。
 
 P1只观察当前输入、正式处理记录和维护限制，不搜索旧私有操作；扫描清单、指纹、分类和完整性由脚本生成，Agent仅传目标和确切引用。source默认`run`先扫后按待办备料，完整且无待办、维护限制、缺口或明确修订目标才返回`unchanged`；有材料缺口可交P3决定，运行故障留节点。独立`scan/prepare/capture/resolve/resolve-source/record/status`保留；P3／P4／P5缺料回首节点时明确调用`prepare`定向补齐，不先默认扫描。输入漂移按实际变化对象刷新，不能把`affected_scope`全部直接作为raw的`source`参数。P3—P7职责保持：作者决定与冻结查询、完整稿和输入快照、独立P5、机械记录、P7安全发布及真实检索收尾。旧apply.run和恢复沿原完整检查／journal语义，不把旧事务改成新batch；独立索引、回归、恢复和只读提交核对仍由apply提供。
 

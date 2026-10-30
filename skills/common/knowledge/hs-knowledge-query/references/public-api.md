@@ -1,6 +1,6 @@
 # Search and same-generation read
 
-Use this package's public `scripts/cli.py` with input/output and the actual K.
+Use this package's public `python K/knowledge.py query` with input/output and the actual K.
 Rules default to the actual framework lock; no catalog is required. Actions are `search`, `read`, `receipt`.
 
 ## Search request

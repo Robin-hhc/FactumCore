@@ -14,10 +14,18 @@ sys.modules[spec.name] = contract
 spec.loader.exec_module(contract)
 from wifi_v3 import records, source_resources, validation as v  # noqa: E402
 
+_repository_spec = importlib.util.spec_from_file_location(
+    "test_governance_v3_repository_runtime_fixture",
+    Path(__file__).resolve().parents[3] / "himate-knowledge-wifi-mp/evals/contract_test_support.py",
+)
+_repository_fixture = importlib.util.module_from_spec(_repository_spec)
+_repository_spec.loader.exec_module(_repository_fixture)
+
 
 @pytest.fixture
 def rules(tmp_path):
     shutil.copytree(DOMAIN / "governance", tmp_path / "governance")
+    _repository_fixture.copy_runtime(tmp_path)
     lock_path = tmp_path / "governance/framework.lock.yaml"
     return v.load_rules(tmp_path, hashlib.sha256(lock_path.read_bytes()).hexdigest())
 
@@ -424,6 +432,7 @@ def test_lint_recovers_the_record_version_from_real_git_without_archive_input(ru
     workspace = tmp_path / "workspace"
     domain = workspace / "himate-knowledge-wifi-mp"
     shutil.copytree(tmp_path / "governance", domain / "governance")
+    _repository_fixture.copy_runtime(domain)
     test_lint_json_recovers_exact_old_record_card_after_current_card_update({**rules, "knowledge_root": domain}, domain, True, 0)
     path = domain / "knowledge/concepts/entities/a.md"
     current = path.read_bytes()

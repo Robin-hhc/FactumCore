@@ -26,7 +26,7 @@ class ManualPipeline(FIXTURE.Pipeline):
         # Harness metadata is irrelevant to the business CLI, even if malformed.
         incoming.write_bytes(FIXTURE.canonical({**request, "workflow": "host-owned"}))
         command = [
-            sys.executable, str(self.skills / ("hs-" + slug) / "scripts/cli.py"),
+            *self.command(slug),
             "--input", str(incoming), "--output", str(outgoing),
             "--knowledge-root", str(self.root),
         ]

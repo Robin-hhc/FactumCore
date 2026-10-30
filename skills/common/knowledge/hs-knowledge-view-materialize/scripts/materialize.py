@@ -1,15 +1,12 @@
-"""P4 directly assembles, revises and describes its owned candidate bytes."""
+"""Development compatibility import; no duplicate stage implementation."""
+import secrets
+import sys
+import tempfile
+from pathlib import Path
 
-from support import NodeError
+sys.dont_write_bytecode = True
+sys.pycache_prefix = str(Path(tempfile.gettempdir()) / ("hs-no-cache-" + secrets.token_hex(16)))
 
+from _runtime import expose  # noqa: E402
 
-def execute(context):
-    production = context.modules["production"]
-    action = context.args.action or "run"
-    if action == "run":
-        return production.assemble(context)
-    if action == "revise":
-        return production.revise(context)
-    if action in {"describe", "inspect"}:
-        return production.describe(context)
-    raise NodeError("INVALID_ACTION", "Choose run, revise or describe", action)
+_actual = expose(__file__, globals(), 'view_materialize', 'materialize')

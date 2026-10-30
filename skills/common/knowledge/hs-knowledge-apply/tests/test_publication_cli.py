@@ -380,7 +380,8 @@ def test_actual_source_defer_state_is_submitted_and_survives_git_clone(tmp_path)
     trial = P7.PublicP7(tmp_path)
     initial = publication_content(trial)
     trial.git("init", "-b", "main")
-    trial.git("add", "governance", "knowledge/index.md", "docs-raw")
+    trial.git("add", "governance", "knowledge/index.md", "docs-raw", "runtime",
+              "knowledge.py", "knowledge.sh", "knowledge.cmd")
     trial.git("commit", "-m", "Initial synthetic source")
     first = trial.call("batch", initial)["data"]
     ready = trial.call("prepare-submission", {"operation_id": "batch", "publication_ref": first["publication_ref"]})["data"]
@@ -440,7 +441,9 @@ def test_actual_source_defer_state_is_submitted_and_survives_git_clone(tmp_path)
     assert not (clone / ".build").exists()
     consumer = P7.PublicP7.__new__(P7.PublicP7)
     consumer.base, consumer.root, consumer.calls = tmp_path / "consumer-io", clone, 0
+    consumer.repository_cli = True
     consumer.base.mkdir()
+    assert (clone / "knowledge.py").is_file() and (clone / "runtime/manifest.json").is_file()
     built = consumer.call("index-build", {"operation_id": "consumer-build"})["data"]
     tested = consumer.call("regression", {"operation_id": "consumer-test", "generation_ref": built["generation_ref"],
         "expected_active": built["expected_active"], "cases": [{"id": "debt", "query": "capture marker", "forbidden": ["batch-card"]}]})

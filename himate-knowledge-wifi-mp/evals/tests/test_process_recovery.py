@@ -11,6 +11,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+import pytest
+
 
 SPEC = importlib.util.spec_from_file_location(
     "process_recovery_fixture", Path(__file__).parents[1] / "pipeline_harness.py"
@@ -19,8 +21,9 @@ FIXTURE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(FIXTURE)
 
 
-def test_hard_exit_after_card_replace_preserves_journal_and_recovers_exact_view(tmp_path):
-    p = FIXTURE.Pipeline(tmp_path)
+@pytest.mark.parametrize("repository_cli", [False, True], ids=["compatibility-entry", "repository-only"])
+def test_hard_exit_after_card_replace_preserves_journal_and_recovers_exact_view(tmp_path, repository_cli):
+    p = FIXTURE.Pipeline(tmp_path, repository_cli=repository_cli)
     operation = "crash-operation"
     target_ref = "knowledge/rules/crash-rule.md"
     bundle_ref, bundle = p.capture(operation, b"# Fixture\nCrash recovery is a synthetic rule.\n")
@@ -37,7 +40,7 @@ def test_hard_exit_after_card_replace_preserves_journal_and_recovers_exact_view(
     outgoing = tmp_path / "crash-output.json"
     incoming.write_bytes(FIXTURE.canonical({"operation_id": operation, "view_ref": view_ref,
         "content_review_ref": proof_ref, "ingest_record_ref": pending_ref}))
-    cli = p.skills / "hs-knowledge-apply/scripts/cli.py"
+    cli = p.root / "knowledge.py" if repository_cli else p.skills / "hs-knowledge-apply/scripts/cli.py"
     target = p.root / target_ref
     # The test intercepts only the exact final target, after the genuine OS
     # replacement. os._exit bypasses Python finally/atexit and the normal CLI
@@ -59,7 +62,8 @@ def hard_exit_after_exact_replace(source,destination,*args,**kwargs):
     return result
 os.replace=hard_exit_after_exact_replace
 sys.path.insert(0,str(pathlib.Path(cli).parent))
-sys.argv=[cli,'--input',incoming,'--output',outgoing,'--knowledge-root',knowledge,
+prefix=['apply','--json'] if pathlib.Path(cli).name=='knowledge.py' else []
+sys.argv=[cli,*prefix,'--input',incoming,'--output',outgoing,'--knowledge-root',knowledge,
           '--rules-digest',rules,'--catalog',catalog]
 runpy.run_path(cli,run_name='__main__')
 """

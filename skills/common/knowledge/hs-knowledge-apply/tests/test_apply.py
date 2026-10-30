@@ -6,12 +6,12 @@ import sys
 import tempfile
 import unittest
 
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "scripts"))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[5] / "himate-knowledge-wifi-mp/runtime"))
 
 
 class ApplyTests(unittest.TestCase):
     def fixture(self, root):
-        from support import Context, digest
+        from himate_knowledge.stages.apply.support import Context, digest
 
         ctx = Context.synthetic(root, "hs-knowledge-apply")
         ctx.catalog = {"test_fixture_root": str(root.resolve())}
@@ -64,7 +64,7 @@ class ApplyTests(unittest.TestCase):
         return ctx, request
 
     def test_multi_write_delete_commit_and_idempotent_reentry(self):
-        from transaction import execute
+        from himate_knowledge.stages.apply.transaction import execute
 
         with tempfile.TemporaryDirectory() as tmp:
             ctx, request = self.fixture(pathlib.Path(tmp))
@@ -79,8 +79,8 @@ class ApplyTests(unittest.TestCase):
             )
 
     def test_complete_cas_blocks_before_first_write(self):
-        from transaction import execute
-        from support import Blocked
+        from himate_knowledge.stages.apply.transaction import execute
+        from himate_knowledge.stages.apply.support import Blocked
 
         with tempfile.TemporaryDirectory() as tmp:
             ctx, request = self.fixture(pathlib.Path(tmp))
@@ -91,8 +91,8 @@ class ApplyTests(unittest.TestCase):
             self.assertEqual(ctx.path("knowledge/update.md").read_bytes(), b"old")
 
     def test_failure_then_resume(self):
-        from transaction import execute
-        from support import Blocked
+        from himate_knowledge.stages.apply.transaction import execute
+        from himate_knowledge.stages.apply.support import Blocked
 
         with tempfile.TemporaryDirectory() as tmp:
             ctx, request = self.fixture(pathlib.Path(tmp))
@@ -105,8 +105,8 @@ class ApplyTests(unittest.TestCase):
             self.assertFalse(ctx.path("knowledge/delete.md").exists())
 
     def test_silent_target_write_failure_never_reports_committed_and_can_recover(self):
-        from transaction import execute, atomic_bytes
-        from support import Blocked
+        from himate_knowledge.stages.apply.transaction import execute, atomic_bytes
+        from himate_knowledge.stages.apply.support import Blocked
         from unittest.mock import patch
 
         for relative in ("knowledge/create.md", "knowledge/update.md"):
@@ -119,7 +119,7 @@ class ApplyTests(unittest.TestCase):
                         if path != target:
                             return atomic_bytes(path, raw)
 
-                    with patch("transaction.atomic_bytes", side_effect=silently_skip):
+                    with patch("himate_knowledge.stages.apply.transaction.atomic_bytes", side_effect=silently_skip):
                         with self.assertRaisesRegex(Blocked, "verification failed"):
                             execute(ctx, request)
                     journal = ctx.read(".build/operations/op/transaction/journal.json")
@@ -134,8 +134,8 @@ class ApplyTests(unittest.TestCase):
                     self.assertEqual(ctx.path("knowledge/create.md").exists(), recovery == "resume")
 
     def test_silent_delete_failure_never_reports_committed(self):
-        from transaction import execute
-        from support import Blocked
+        from himate_knowledge.stages.apply.transaction import execute
+        from himate_knowledge.stages.apply.support import Blocked
         from unittest.mock import patch
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -158,8 +158,8 @@ class ApplyTests(unittest.TestCase):
             self.assertFalse(target.exists())
 
     def test_commit_rechecks_all_targets_after_individual_installation(self):
-        from transaction import execute, save_journal
-        from support import Blocked
+        from himate_knowledge.stages.apply.transaction import execute, save_journal
+        from himate_knowledge.stages.apply.support import Blocked
         from unittest.mock import patch
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -173,7 +173,7 @@ class ApplyTests(unittest.TestCase):
                     changed = True
                     ctx.path("knowledge/update.md").write_bytes(b"external")
 
-            with patch("transaction.save_journal", side_effect=drift_after_last_install):
+            with patch("himate_knowledge.stages.apply.transaction.save_journal", side_effect=drift_after_last_install):
                 with self.assertRaisesRegex(Blocked, "verification failed"):
                     execute(ctx, request)
             self.assertTrue(changed)
@@ -185,8 +185,8 @@ class ApplyTests(unittest.TestCase):
             self.assertEqual(ctx.path("knowledge/update.md").read_bytes(), b"external")
 
     def test_recovery_reconciles_install_marker_from_actual_bytes(self):
-        from transaction import execute, atomic_bytes
-        from support import Blocked
+        from himate_knowledge.stages.apply.transaction import execute, atomic_bytes
+        from himate_knowledge.stages.apply.support import Blocked
         from unittest.mock import patch
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -197,7 +197,7 @@ class ApplyTests(unittest.TestCase):
                 if path == ctx.path("knowledge/create.md"):
                     raise OSError("synthetic interruption after replacement")
 
-            with patch("transaction.atomic_bytes", side_effect=interrupt_after_write):
+            with patch("himate_knowledge.stages.apply.transaction.atomic_bytes", side_effect=interrupt_after_write):
                 with self.assertRaises(Blocked):
                     execute(ctx, request)
             self.assertFalse(ctx.read(".build/operations/op/transaction/journal.json")["entries"][0]["installed"])
@@ -205,8 +205,8 @@ class ApplyTests(unittest.TestCase):
             self.assertTrue(all(row["installed"] for row in ctx.read(".build/operations/op/transaction/journal.json")["entries"]))
 
     def test_failure_then_rollback_restores_old_bytes(self):
-        from transaction import execute
-        from support import Blocked
+        from himate_knowledge.stages.apply.transaction import execute
+        from himate_knowledge.stages.apply.support import Blocked
 
         with tempfile.TemporaryDirectory() as tmp:
             ctx, request = self.fixture(pathlib.Path(tmp))
@@ -218,8 +218,8 @@ class ApplyTests(unittest.TestCase):
             self.assertEqual(ctx.path("knowledge/delete.md").read_bytes(), b"delete")
 
     def test_silent_rollback_restore_failure_never_reports_rolled_back(self):
-        from transaction import execute, atomic_bytes
-        from support import Blocked
+        from himate_knowledge.stages.apply.transaction import execute, atomic_bytes
+        from himate_knowledge.stages.apply.support import Blocked
         from unittest.mock import patch
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -232,7 +232,7 @@ class ApplyTests(unittest.TestCase):
                 if path != target:
                     return atomic_bytes(path, raw)
 
-            with patch("transaction.atomic_bytes", side_effect=silently_skip):
+            with patch("himate_knowledge.stages.apply.transaction.atomic_bytes", side_effect=silently_skip):
                 with self.assertRaisesRegex(Blocked, "verification failed"):
                     execute(ctx, {"operation_id": "op"}, "rollback")
             self.assertEqual(ctx.read(".build/operations/op/transaction/journal.json")["status"], "recovery_required")
@@ -243,8 +243,8 @@ class ApplyTests(unittest.TestCase):
             self.assertFalse(ctx.path("knowledge/create.md").exists())
 
     def test_recovery_preserves_external_edit(self):
-        from transaction import execute
-        from support import Blocked
+        from himate_knowledge.stages.apply.transaction import execute
+        from himate_knowledge.stages.apply.support import Blocked
 
         with tempfile.TemporaryDirectory() as tmp:
             ctx, request = self.fixture(pathlib.Path(tmp))
@@ -257,7 +257,7 @@ class ApplyTests(unittest.TestCase):
             self.assertEqual(ctx.path("knowledge/create.md").read_bytes(), b"external")
 
     def test_document_admission_needs_no_human_adapter_or_event(self):
-        from transaction import execute
+        from himate_knowledge.stages.apply.transaction import execute
         with tempfile.TemporaryDirectory() as tmp:
             ctx, request = self.fixture(pathlib.Path(tmp))
             request.pop("proof_ref")
@@ -271,8 +271,8 @@ class ApplyTests(unittest.TestCase):
             self.assertNotIn("content_review_ref", journal)
 
     def test_optional_review_identity_is_not_an_apply_gate(self):
-        from transaction import execute
-        from support import canonical, seal
+        from himate_knowledge.stages.apply.transaction import execute
+        from himate_knowledge.stages.apply.support import canonical, seal
         with tempfile.TemporaryDirectory() as tmp:
             ctx, request = self.fixture(pathlib.Path(tmp))
             proof = ctx.read(request["proof_ref"])
@@ -283,8 +283,8 @@ class ApplyTests(unittest.TestCase):
             self.assertEqual(result["verification_tier"], "transaction_bytes_only")
 
     def test_optional_review_status_does_not_certify_apply(self):
-        from transaction import execute
-        from support import canonical, seal
+        from himate_knowledge.stages.apply.transaction import execute
+        from himate_knowledge.stages.apply.support import canonical, seal
         with tempfile.TemporaryDirectory() as tmp:
             ctx, request = self.fixture(pathlib.Path(tmp))
             proof = ctx.read(request["proof_ref"])
@@ -295,8 +295,8 @@ class ApplyTests(unittest.TestCase):
             self.assertEqual(result["verification_tier"], "transaction_bytes_only")
 
     def test_changed_document_view_invalidates_review(self):
-        from transaction import execute
-        from support import Invalid, canonical, seal
+        from himate_knowledge.stages.apply.transaction import execute
+        from himate_knowledge.stages.apply.support import Invalid, canonical, seal
         with tempfile.TemporaryDirectory() as tmp:
             ctx, request = self.fixture(pathlib.Path(tmp))
             proof = ctx.read(request["proof_ref"])
@@ -307,14 +307,14 @@ class ApplyTests(unittest.TestCase):
             self.assertFalse(ctx.path("knowledge/create.md").exists())
 
     def test_unused_workflow_proof_set_is_not_an_apply_gate(self):
-        from transaction import execute
+        from himate_knowledge.stages.apply.transaction import execute
         with tempfile.TemporaryDirectory() as tmp:
             ctx, request = self.fixture(pathlib.Path(tmp))
             self.assertEqual(execute(ctx, {**request, "proof_set": {}})["transaction_status"], "committed")
 
     def test_optional_review_does_not_require_plan_author_chain(self):
-        from transaction_v3 import validate_content_review
-        from support import seal
+        from himate_knowledge.stages.apply.transaction_v3 import validate_content_review
+        from himate_knowledge.stages.apply.support import seal
         with tempfile.TemporaryDirectory() as tmp:
             ctx, request = self.fixture(pathlib.Path(tmp))
             view = ctx.read(request["view_ref"])
@@ -330,7 +330,7 @@ class ApplyTests(unittest.TestCase):
             self.assertEqual(validate_content_review(ctx, view, review), review)
 
     def mixed_fixture(self, root):
-        from support import canonical, seal
+        from himate_knowledge.stages.apply.support import canonical, seal
         ctx, request = self.fixture(root)
         view = seal({**ctx.read(request["view_ref"]), "review_mode": "mixed"})
         ctx.path(request["view_ref"]).write_bytes(canonical(view))
@@ -342,15 +342,15 @@ class ApplyTests(unittest.TestCase):
         return ctx, {**request, "proof_ref": "logs/operations/op/code-proof.json"}
 
     def test_mixed_view_does_not_require_a_separate_full_view_review_gate(self):
-        from transaction import execute
+        from himate_knowledge.stages.apply.transaction import execute
         with tempfile.TemporaryDirectory() as tmp:
             ctx, request = self.mixed_fixture(pathlib.Path(tmp))
             request.pop("content_review_ref")
             self.assertEqual(execute(ctx, request)["transaction_status"], "committed")
 
     def test_safe_recovery_does_not_depend_on_optional_upstream_reports(self):
-        from transaction import execute
-        from support import Blocked
+        from himate_knowledge.stages.apply.transaction import execute
+        from himate_knowledge.stages.apply.support import Blocked
         for action in ("resume", "rollback"):
             with self.subTest(action=action), tempfile.TemporaryDirectory() as tmp:
                 ctx, request = self.mixed_fixture(pathlib.Path(tmp))
@@ -368,8 +368,8 @@ class ApplyTests(unittest.TestCase):
                 self.assertEqual(ctx.path("knowledge/update.md").read_bytes(), b"updated" if action == "resume" else b"old")
 
     def test_resealed_journal_cannot_authorize_raw_writes(self):
-        from transaction import execute
-        from support import Blocked, Invalid, canonical, seal
+        from himate_knowledge.stages.apply.transaction import execute
+        from himate_knowledge.stages.apply.support import Blocked, Invalid, canonical, seal
 
         with tempfile.TemporaryDirectory() as tmp:
             ctx, request = self.fixture(pathlib.Path(tmp))
@@ -385,7 +385,7 @@ class ApplyTests(unittest.TestCase):
             self.assertEqual(ctx.path("knowledge/create.md").read_bytes(), b"created")
 
     def test_cooperative_writer_lock_is_exclusive(self):
-        from support import WriterLock, Blocked
+        from himate_knowledge.stages.apply.support import WriterLock, Blocked
 
         with tempfile.TemporaryDirectory() as tmp:
             with WriterLock(pathlib.Path(tmp)):
@@ -394,8 +394,8 @@ class ApplyTests(unittest.TestCase):
                         self.fail("second writer acquired the domain lock")
 
     def test_other_interrupted_operation_blocks_new_apply(self):
-        from transaction import execute
-        from support import Blocked
+        from himate_knowledge.stages.apply.transaction import execute
+        from himate_knowledge.stages.apply.support import Blocked
 
         with tempfile.TemporaryDirectory() as tmp:
             ctx, request = self.fixture(pathlib.Path(tmp))
@@ -408,8 +408,8 @@ class ApplyTests(unittest.TestCase):
             self.assertFalse(ctx.path("knowledge/create.md").exists())
 
     def test_unrelated_old_rules_terminal_journal_does_not_authorize_or_block_new_review(self):
-        from transaction import execute
-        from support import seal
+        from himate_knowledge.stages.apply.transaction import execute
+        from himate_knowledge.stages.apply.support import seal
 
         with tempfile.TemporaryDirectory() as tmp:
             ctx, request = self.fixture(pathlib.Path(tmp))
@@ -424,7 +424,7 @@ class ApplyTests(unittest.TestCase):
             self.assertEqual(ctx.path("logs/operations/legacy/journal.json").read_bytes(), frozen)
 
     def test_committed_reentry_is_read_only_during_another_recovery(self):
-        from transaction import execute
+        from himate_knowledge.stages.apply.transaction import execute
 
         with tempfile.TemporaryDirectory() as tmp:
             ctx, request = self.fixture(pathlib.Path(tmp))
@@ -441,8 +441,8 @@ class ApplyTests(unittest.TestCase):
             self.assertEqual(execute(ctx, request, "run"), original)
 
     def test_rollback_preserves_external_final_bytes_on_unattempted_target(self):
-        from transaction import execute
-        from support import Blocked
+        from himate_knowledge.stages.apply.transaction import execute
+        from himate_knowledge.stages.apply.support import Blocked
 
         with tempfile.TemporaryDirectory() as tmp:
             ctx, request = self.fixture(pathlib.Path(tmp))
@@ -455,7 +455,7 @@ class ApplyTests(unittest.TestCase):
             self.assertEqual(ctx.path("knowledge/create.md").read_bytes(), b"created")
 
     def test_interrupted_immutable_publish_never_leaves_partial_record(self):
-        from support import Context
+        from himate_knowledge.stages.apply.support import Context
         from unittest.mock import patch
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -463,7 +463,7 @@ class ApplyTests(unittest.TestCase):
             record = ctx.record("apply_result", "op", status="committed")
             ref = "logs/operations/op/atomic-test.json"
             with patch(
-                "support.os.link",
+                "himate_knowledge.stages.apply.support.os.link",
                 side_effect=RuntimeError("synthetic hard interruption before publish"),
             ):
                 with self.assertRaises(RuntimeError):

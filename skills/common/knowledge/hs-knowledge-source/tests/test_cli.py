@@ -21,8 +21,7 @@ def hashed(data):
 @pytest.mark.parametrize("dangling", [False, True], ids=["existing", "dangling"])
 @pytest.mark.parametrize(
     "package",
-    sorted(Path(__file__).resolve().parents[2].glob("*/scripts/support.py")),
-    ids=lambda path: path.parents[1].name,
+    ["protocol", "stages.apply.support"],
 )
 def test_node_paths_reject_same_root_junction_without_python312_api(tmp_path, package, dangling):
     import _winapi
@@ -37,14 +36,15 @@ def test_node_paths_reject_same_root_junction_without_python312_api(tmp_path, pa
         (target / "source.md").unlink()
         target.rmdir()
     # Exercise the 3.11 boundary even when this regression runs under 3.12.
-    code = """import runpy,sys
+    code = """import importlib,sys
 from pathlib import Path
 if hasattr(Path, 'is_junction'):
     delattr(Path, 'is_junction')
-namespace = runpy.run_path(sys.argv[1])
-safe = namespace.get('safe') or namespace['safe_path']
+sys.path.insert(0, sys.argv[1])
+module = importlib.import_module('himate_knowledge.' + sys.argv[2])
+safe = getattr(module, 'safe', None) or module.safe_path
 try:
-    safe(Path(sys.argv[2]), 'alias/source.md')
+    safe(Path(sys.argv[3]), 'alias/source.md')
 except ValueError:
     pass
 else:
@@ -52,7 +52,8 @@ else:
 """
     try:
         process = subprocess.run(
-            [sys.executable, "-I", "-B", "-c", code, str(package), str(root)],
+            [sys.executable, "-I", "-B", "-c", code,
+             str(Path(__file__).resolve().parents[5] / "himate-knowledge-wifi-mp/runtime"), package, str(root)],
             capture_output=True,
             text=True,
             check=False,

@@ -197,8 +197,10 @@ def runtime_report(source_root, install_dependencies=False):
     if not report["supported"]:
         report["status"] = "failed"
         return report
-    lock = _check_chain(Path(source_root) / "skills/common/knowledge/hs-knowledge-explore/requirements.lock.txt", True)
-    lock_bytes = lock.read_bytes()
+    # Verify the executable set before even an explicitly requested pip call.
+    # The dependency lock must be the exact bytes adopted by this manifest.
+    runtime = _runtime_payload(Path(source_root) / KNOWLEDGE)
+    lock_bytes = runtime["runtime/requirements.lock.txt"]
     pins = _parse_pins(lock_bytes)
     report["lock_sha256"] = digest(lock_bytes)
 
@@ -287,7 +289,14 @@ def _package_payload(source, marker, allowed):
         names.append(package.name)
         for rel, path in _tree_files(package):
             if allowed(PurePosixPath(rel)):
-                _put(payload, package.name + "/" + rel, path.read_bytes())
+                data = path.read_bytes()
+                try:
+                    data.decode("utf-8-sig")
+                except UnicodeError as exc:
+                    raise DeploymentError("Capability asset must be UTF-8 text: " + rel) from exc
+                if b"\0" in data:
+                    raise DeploymentError("Capability asset contains binary data: " + rel)
+                _put(payload, package.name + "/" + rel, data)
     if not names:
         raise DeploymentError("No effective packages found under " + str(source))
     return payload, names
@@ -357,6 +366,54 @@ def validate_metadata(skills, workflows, skill_names, workflow_names):
             raise DeploymentError("Workflow references a Skill absent from this distribution: " + name)
 
 
+def _runtime_payload(source):
+    """Freeze only the explicitly locked repository runtime, independently of rules."""
+    path = _check_chain(source / "runtime/manifest.json", True)
+    data = path.read_bytes()
+
+    def unique(pairs):
+        value = {}
+        for key, item in pairs:
+            if key in value:
+                raise DeploymentError("Duplicate runtime manifest key: " + str(key))
+            value[key] = item
+        return value
+
+    try:
+        manifest = json.loads(data.decode("utf-8"), object_pairs_hook=unique)
+        if (not isinstance(manifest, dict)
+                or set(manifest) != {"schema_version", "version", "files", "entrypoints"}
+                or manifest["schema_version"] != "1.0"
+                or not isinstance(manifest["version"], str)
+                or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?", manifest["version"])):
+            raise DeploymentError("Invalid repository runtime manifest identity")
+        files, entrypoints = manifest["files"], manifest["entrypoints"]
+        if (not isinstance(files, dict) or not isinstance(entrypoints, dict)
+                or set(entrypoints) != {"knowledge.py", "knowledge.sh", "knowledge.cmd"}
+                or not {"requirements.lock.txt", "himate_knowledge/__init__.py", "himate_knowledge/cli.py"} <= set(files)):
+            raise DeploymentError("Incomplete repository runtime manifest")
+        payload = {"runtime/manifest.json": data}
+        for entries, prefix in ((files, "runtime/"), (entrypoints, "")):
+            for relative, row in entries.items():
+                relative = _relative(relative).as_posix()
+                if prefix and relative != "requirements.lock.txt" and not relative.startswith("himate_knowledge/"):
+                    raise DeploymentError("Runtime file is outside its executable package: " + relative)
+                if (_excluded(PurePosixPath(relative).parts) or not isinstance(row, dict)
+                        or set(row) != {"sha256"} or not isinstance(row["sha256"], str)
+                        or not re.fullmatch("[0-9a-f]{64}", row["sha256"])):
+                    raise DeploymentError("Invalid repository runtime file: " + relative)
+                value = _check_chain(source / (prefix + relative), True).read_bytes()
+                if digest(value) != row["sha256"]:
+                    raise DeploymentError("Runtime manifest digest mismatch: " + relative)
+                _put(payload, prefix + relative, value)
+        actual = {relative for relative, _ in _tree_files(source / "runtime")}
+        if actual != set(files) | {"manifest.json"}:
+            raise DeploymentError("Repository runtime files differ from the manifest")
+        return payload
+    except (ValueError, KeyError, TypeError, UnicodeError) as exc:
+        raise DeploymentError("Invalid repository runtime manifest: " + str(exc)) from exc
+
+
 def _knowledge_payload(source_root, project_root):
     import yaml
 
@@ -410,6 +467,8 @@ def _knowledge_payload(source_root, project_root):
 
     for name in ("AGENTS.md", "README.md", "CONTRIBUTING.md", "check.py", "check.sh"):
         add(name, _check_chain(source / name, True).read_bytes())
+    for name, data in _runtime_payload(source).items():
+        add(name, data)
     for name in SHARED_DOCS:
         add("docs-llm-wiki/" + name, _check_chain(source / "docs-llm-wiki" / name, True).read_bytes())
     governance = {}
@@ -586,8 +645,8 @@ def _mirror_scopes(skills_root, workflows_root, project_root, knowledge_root, pa
             if files or _exists(path):
                 scopes.append({"root": path, "anchor": root, "kind": kind,
                                "before": _tree_state(path), "after": _expected_tree(files)})
-    for name in FRAMEWORK_TREES:
-        path = knowledge_root / "governance" / name
+    for name in (*("governance/" + item for item in FRAMEWORK_TREES), "runtime"):
+        path = knowledge_root / name
         prefix = path.relative_to(project_root).as_posix() + "/"
         files = {rel[len(prefix):]: data for rel, data in payloads["knowledge"].items() if rel.startswith(prefix)}
         if files or _exists(path):
@@ -901,15 +960,15 @@ def deploy(source_root, skills_root, workflows_root, project_root, plan=False, i
         report["status"] = "missing_dependencies"
         return report
     skills, skill_names = _package_payload(source_root / "skills/common/knowledge", "SKILL.md", lambda rel:
-        rel.as_posix() == "SKILL.md" or rel.parts[0] in {"scripts", "references", "artifacts"}
-        or len(rel.parts) == 1 and rel.name.startswith("requirements") and rel.suffix == ".txt")
+        rel.as_posix() == "SKILL.md" or rel.parts[0] in {"references", "artifacts"}
+        and rel.suffix.casefold() in {".md", ".yaml", ".yml", ".json", ".txt"})
     workflows, workflow_names = _package_payload(source_root / "workflows/common/knowledge", "workflow.yaml",
                                                lambda rel: rel.as_posix() in {"workflow.yaml", "layouts.yaml", "README.md"})
     validate_metadata(skills, workflows, skill_names, workflow_names)
-    runtime_lock = skills.get("hs-knowledge-explore/requirements.lock.txt")
-    if environment.get("lock_sha256") and digest(runtime_lock or b"") != environment["lock_sha256"]:
-        raise DeploymentError("Runtime lock changed while preparing deployment")
     knowledge, initial, knowledge_root, governed_count, guards = _knowledge_payload(source_root, project_root)
+    runtime_lock = knowledge[knowledge_root.relative_to(project_root).as_posix() + "/runtime/requirements.lock.txt"]
+    if environment.get("lock_sha256") and digest(runtime_lock) != environment["lock_sha256"]:
+        raise DeploymentError("Runtime lock changed while preparing deployment")
     report["targets"]["knowledge_root"] = str(knowledge_root)
     report["packages"] = {"skills": skill_names, "workflows": workflow_names}
     report["framework_files_verified"] = governed_count

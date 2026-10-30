@@ -66,6 +66,34 @@ def write_lock(source: Path, entries: dict | None = None) -> None:
     )
 
 
+def write_runtime(source):
+    """A separately pinned synthetic repository runtime; never an installed Skill."""
+    root = source / DOMAIN
+    pins = "PyYAML==" + importlib.metadata.version("PyYAML") + "\n"
+    files = {
+        "knowledge.py": b"print('repository cli')\n",
+        "knowledge.sh": b"#!/bin/sh\nexec python3 knowledge.py \"$@\"\n",
+        "knowledge.cmd": b'@echo off\npython "%~dp0knowledge.py" %*\n',
+        "runtime/requirements.lock.txt": pins.encode(),
+        "runtime/himate_knowledge/__init__.py": b'"""Synthetic runtime."""\n',
+        "runtime/himate_knowledge/cli.py": b"VALUE = 'repository cli'\n",
+    }
+    for name, data in files.items():
+        put(root, name, data)
+    write_runtime_manifest(source)
+    return files
+
+
+def write_runtime_manifest(source):
+    root = source / DOMAIN
+    files = {name: {"sha256": hashlib.sha256(data).hexdigest()}
+             for name, data in tree(root / "runtime").items() if name != "manifest.json"}
+    entries = {name: {"sha256": hashlib.sha256((root / name).read_bytes()).hexdigest()}
+               for name in ("knowledge.py", "knowledge.sh", "knowledge.cmd")}
+    put(root, "runtime/manifest.json", json.dumps({"schema_version": "1.0", "version": "0.0.1",
+        "files": files, "entrypoints": entries}, sort_keys=True) + "\n")
+
+
 def make_source(root: Path, skill_count: int = 8) -> Path:
     """Use deliberately unfamiliar names to exercise active-package discovery."""
     root.mkdir()
@@ -93,10 +121,11 @@ def make_source(root: Path, skill_count: int = 8) -> Path:
         put(package, "SKILL.md", f"---\nname: {name}\n---\nSynthetic skill.\n")
         put(package, "scripts/cli.py", "print('synthetic')\n")
         put(package, "references/request.md", "Synthetic request.\n")
+        put(package, "references/execution.md", "Synthetic execution guide.\n")
         put(package, "artifacts/result.yaml", "version: 1\n")
         put(package, "artifacts/templates/result.md", "# Synthetic result\n")
         put(package, "requirements.lock.txt", pins)
-        put(package, "requirements-dev.lock.txt", "# Kept as a distributed file\n")
+        put(package, "requirements-dev.lock.txt", "# Legacy developer lock; not distributed\n")
         put(package, "tests/private.txt", b"do not distribute tests")
         put(package, "config.env", b"DO_NOT_SHIP=synthetic")
         put(package, ".env", b"DO_NOT_SHIP=synthetic-dotenv")
@@ -150,6 +179,7 @@ def make_source(root: Path, skill_count: int = 8) -> Path:
     ):
         put(knowledge, name, b"synthetic business data: must never be shipped")
     write_lock(root)
+    write_runtime(root)
     return root
 
 
@@ -333,12 +363,10 @@ def test_actual_cli_discovers_active_packages_and_preserves_distribution_files(
         actual = tree(skills / name)
         for relative in (
             "SKILL.md",
-            "scripts/cli.py",
+            "references/execution.md",
             "references/request.md",
             "artifacts/result.yaml",
             "artifacts/templates/result.md",
-            "requirements.lock.txt",
-            "requirements-dev.lock.txt",
         ):
             assert actual[relative] == (
                 source / "skills/common/knowledge" / name / relative
@@ -384,10 +412,10 @@ def test_cli_repeat_update_preserves_project_and_business_bytes(source, targets)
     before["skills_root"].pop("hs-knowledge-query/local-helper.txt")
     assert all_target_bytes(targets) == before
     replacement = b"print('updated framework bytes')\n"
-    put(source, "skills/common/knowledge/hs-knowledge-query/scripts/cli.py", replacement)
+    put(source, "skills/common/knowledge/hs-knowledge-query/references/execution.md", replacement)
     code, report = cli(source, targets)
     assert (code, report["status"]) == (0, "deployed")
-    assert (targets["skills_root"] / "hs-knowledge-query/scripts/cli.py").read_bytes() == replacement
+    assert (targets["skills_root"] / "hs-knowledge-query/references/execution.md").read_bytes() == replacement
     assert all((project / name).read_bytes() == data for name, data in keep.items())
     assert (targets["skills_root"] / "unrelated-package/custom.txt").read_bytes() == b"other package"
     assert not (targets["skills_root"] / "hs-knowledge-query/local-helper.txt").exists()
@@ -538,7 +566,7 @@ def test_real_dependency_installer_failure_uses_selected_python_and_cannot_publi
     assert len(commands) == 1
     assert commands[0][:3] == [sys.executable, "-m", "pip"]
     assert supplied_locks == [
-        (source / "skills/common/knowledge/hs-knowledge-explore/requirements.lock.txt").read_bytes()
+        (source / DOMAIN / "runtime/requirements.lock.txt").read_bytes()
     ]
     assert_no_targets(targets)
 
@@ -644,8 +672,8 @@ def test_readback_mismatch_cannot_be_reported_as_deployed(
     backend, monkeypatch, capsys, source, targets
 ):
     assert cli(source, targets)[0] == 0
-    selected = targets["skills_root"] / "hs-knowledge-query/scripts/cli.py"
-    put(source, "skills/common/knowledge/hs-knowledge-query/scripts/cli.py", b"new expected bytes\n")
+    selected = targets["skills_root"] / "hs-knowledge-query/references/execution.md"
+    put(source, "skills/common/knowledge/hs-knowledge-query/references/execution.md", b"new expected bytes\n")
     real_write = backend._write_atomic
 
     def replaced_after_write(path, data, *args, **kwargs):
@@ -665,8 +693,8 @@ def test_detected_readback_failure_restores_verified_batch_bytes(
 ):
     assert cli(source, targets)[0] == 0
     before = all_target_bytes(targets)
-    selected = targets["skills_root"] / "hs-knowledge-query/scripts/cli.py"
-    put(source, "skills/common/knowledge/hs-knowledge-query/scripts/cli.py", b"updated script\n")
+    selected = targets["skills_root"] / "hs-knowledge-query/references/execution.md"
+    put(source, "skills/common/knowledge/hs-knowledge-query/references/execution.md", b"updated script\n")
     real_write = backend._write_atomic
     real_current = backend._current
     armed = False
@@ -793,7 +821,8 @@ def test_unavailable_drive_anchor_fails_promptly_without_directory_creation(sour
 
 def test_first_user_site_install_is_verified_by_fresh_python_and_becomes_visible(source, tmp_path):
     """The user site is absent at process startup; fake pip only writes metadata."""
-    put(source, "skills/common/knowledge/hs-knowledge-explore/requirements.lock.txt", "factum-fresh-probe-only==1.2.3\n")
+    put(source / DOMAIN, "runtime/requirements.lock.txt", "factum-fresh-probe-only==1.2.3\n")
+    write_runtime_manifest(source)
     userbase = tmp_path / "isolated-userbase"
     environment = {**os.environ, "PYTHONUSERBASE": str(userbase), "TMP": str(tmp_path), "TEMP": str(tmp_path)}
     environment.pop("PYTHONNOUSERSITE", None)
@@ -917,9 +946,9 @@ def test_concurrent_bytes_inserted_immediately_before_writer_are_preserved(
     backend, monkeypatch, capsys, source, targets
 ):
     assert cli(source, targets)[0] == 0
-    selected = targets["skills_root"] / "hs-knowledge-query/scripts/cli.py"
+    selected = targets["skills_root"] / "hs-knowledge-query/references/execution.md"
     original = selected.read_bytes()
-    put(source, "skills/common/knowledge/hs-knowledge-query/scripts/cli.py", b"new deployment bytes\n")
+    put(source, "skills/common/knowledge/hs-knowledge-query/references/execution.md", b"new deployment bytes\n")
     before = all_target_bytes(targets)
     real_write = backend._write_atomic
     injected = False
@@ -936,7 +965,7 @@ def test_concurrent_bytes_inserted_immediately_before_writer_are_preserved(
     assert (code, report["status"]) == (3, "failed")
     assert injected
     assert selected.read_bytes() == b"concurrent owner bytes"
-    before["skills_root"]["hs-knowledge-query/scripts/cli.py"] = b"concurrent owner bytes"
+    before["skills_root"]["hs-knowledge-query/references/execution.md"] = b"concurrent owner bytes"
     assert all_target_bytes(targets) == before
     assert str(selected) in report["rollback_conflicts"]
     assert original in tree(Path(report["backup_directory"])).values()
@@ -946,9 +975,9 @@ def test_rollback_writer_cannot_replace_bytes_changed_after_rollback_check(
     backend, monkeypatch, capsys, source, targets
 ):
     assert cli(source, targets)[0] == 0
-    selected = targets["skills_root"] / "hs-knowledge-query/scripts/cli.py"
+    selected = targets["skills_root"] / "hs-knowledge-query/references/execution.md"
     original = selected.read_bytes()
-    put(source, "skills/common/knowledge/hs-knowledge-query/scripts/cli.py", b"new deployment bytes\n")
+    put(source, "skills/common/knowledge/hs-knowledge-query/references/execution.md", b"new deployment bytes\n")
     real_write = backend._write_atomic
     calls = 0
 
@@ -978,7 +1007,7 @@ def test_keyboard_interrupt_after_first_write_is_failed_and_restores_original_by
 ):
     if already_deployed:
         assert cli(source, targets)[0] == 0
-        put(source, "skills/common/knowledge/hs-knowledge-query/scripts/cli.py", b"new deployment bytes\n")
+        put(source, "skills/common/knowledge/hs-knowledge-query/references/execution.md", b"new deployment bytes\n")
     before = all_target_bytes(targets)
     real_write = backend._write_atomic
     interrupted = False

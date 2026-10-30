@@ -1,4 +1,4 @@
-"""Reconcile a portable record; P7 owns its eventual formal application."""
+"""Reconcile a portable record; P6 owns its eventual formal application."""
 
 import json
 import copy
@@ -16,7 +16,7 @@ def _preview_dispositions(context, request, scan, semantic, view, preview):
             or preview.get("maintenance_units") != semantic.get("maintenance_units", [])
             or preview.get("card_decisions") != view.get("dispositions")
             or preview.get("input_snapshot_digest") != view.get("input_snapshot", {}).get("snapshot_digest")):
-        raise NodeError("DISPOSITION_PREVIEW_MISMATCH", "P6 requires the exact P3/P4 disposition preview")
+        raise NodeError("DISPOSITION_PREVIEW_MISMATCH", "P5 requires the exact P2/P3 disposition preview")
     observations = {unit["unit_id"]: unit for unit in scan["units"]}
     authored = preview["units"]
     if len(authored) != len(observations) or {unit["unit_id"] for unit in authored} != set(observations):
@@ -40,9 +40,9 @@ def _preview_dispositions(context, request, scan, semantic, view, preview):
                 raise NodeError("CONTENT_ACTION_REQUIRED", "Content outcome needs an actual authored card action", identity)
             action = planned.get("record_action")
             if action not in actual_actions:
-                raise NodeError("PLAN_RECORD_ACTION_REQUIRED", "P3 must freeze record_action from this unit's actual content decisions", identity)
+                raise NodeError("PLAN_RECORD_ACTION_REQUIRED", "P2 must freeze record_action from this unit's actual content decisions", identity)
             if not isinstance(planned.get("card_refs"), list) or not isinstance(planned.get("claim_refs"), list):
-                raise NodeError("PLAN_RECORD_REFS_REQUIRED", "P3 must freeze the actual card and Claim references", identity)
+                raise NodeError("PLAN_RECORD_REFS_REQUIRED", "P2 must freeze the actual card and Claim references", identity)
             adopted = observation.get("observed_fingerprint")
             withdrawn = (action == "deprecate" and scan.get("complete") is True
                          and observation.get("change") == "missing" and not observation.get("read_error")
@@ -132,7 +132,7 @@ def record(context):
     preview_ref = request.get("disposition_preview_ref") or (view or {}).get("disposition_preview_ref")
     preview = context.record(preview_ref, "artifact_manifest") if preview_ref else None
     if preview and not semantic and not request.get("disposition_preview_ref") and isinstance(dispositions, list):
-        # Standalone P4 byte production has no authored P3 decisions. Preserve
+        # Standalone P3 byte production has no authored P2 decisions. Preserve
         # the independent explicit-record utility without asserting review.
         preview = None
     if preview:
@@ -141,15 +141,15 @@ def record(context):
             raise NodeError("DISPOSITION_PREVIEW_MISMATCH", "Preview needs its exact view and authored plan")
         derived = _preview_dispositions(context, {**request, "semantic_plan_ref": semantic_ref}, scan, semantic, view, preview)
         if dispositions is not None and dispositions != derived:
-            raise NodeError("DISPOSITION_PREVIEW_MISMATCH", "P6 cannot replace authored dispositions")
+            raise NodeError("DISPOSITION_PREVIEW_MISMATCH", "P5 cannot replace authored dispositions")
         dispositions = derived
     elif not isinstance(dispositions, list):
-        raise NodeError("DISPOSITIONS_REQUIRED", "Supply a bound P4 preview or explicit independent dispositions")
+        raise NodeError("DISPOSITIONS_REQUIRED", "Supply a bound P3 preview or explicit independent dispositions")
     maintenance = request.get("maintenance_dispositions", [])
     if semantic:
         planned = semantic.get("maintenance_units", [])
         if "maintenance_dispositions" in request and maintenance != planned:
-            raise NodeError("MAINTENANCE_PLAN_MISMATCH", "P6 cannot rewrite authored maintenance decisions")
+            raise NodeError("MAINTENANCE_PLAN_MISMATCH", "P5 cannot rewrite authored maintenance decisions")
         maintenance = planned
     if view and view["operation_id"] != context.operation:
         raise NodeError("OPERATION_MISMATCH", "Content view belongs to another operation")

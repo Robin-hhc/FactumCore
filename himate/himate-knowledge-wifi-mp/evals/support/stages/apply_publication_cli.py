@@ -13,16 +13,16 @@ import yaml as yaml
 
 
 SPEC = importlib.util.spec_from_file_location("publication_public_p7", Path(__file__).with_name("apply_p7.py"))
-P7 = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(P7)
+P6 = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(P6)
 MANUAL_SPEC = importlib.util.spec_from_file_location("publication_manual_skills",
-    P7.HELPER.ROOT / "himate/himate-knowledge-wifi-mp/evals/support/manual.py")
+    P6.HELPER.ROOT / "himate/himate-knowledge-wifi-mp/evals/support/manual.py")
 MANUAL = importlib.util.module_from_spec(MANUAL_SPEC)
 MANUAL_SPEC.loader.exec_module(MANUAL)
 
 
 def manual_pending(tmp_path):
-    """Use real P1--P6 public entries, including authored plan and P5 review."""
+    """Use real P1--P5 public entries, including authored plan and P4 review."""
     pipeline = MANUAL.ManualPipeline(tmp_path)
     operation = "manual-publication"
     pipeline.write("docs-raw/specs/manual.md", b"# Source\nCapture marker is a documented rule.\n")
@@ -45,11 +45,11 @@ def publication_content(trial, operation="batch"):
     bundle = trial.record(".build/operations/" + operation + "-raw/capture.json")
     view.update(staged_objects=bundle.get("staged_objects", []), event_proposals=bundle.get("event_proposals", []),
                 owned_files=ctx.owned_files())
-    publication = P7.HELPER.load_contract("publication")
+    publication = P6.HELPER.load_contract("publication")
     view["publication_plan"] = publication.prepare_plan(ctx, view)
     view["content_digest"] = view["publication_plan"]["content_digest"]
     view = ctx.modules["records"].seal(view)
-    raw = P7.HELPER.canonical(view)
+    raw = P6.HELPER.canonical(view)
     trial.write(request["view_ref"], raw)
     ctx.register_owned(request["view_ref"], raw)
     return request
@@ -58,7 +58,7 @@ def publication_content(trial, operation="batch"):
 def run_transport(trial, request, output, *, incoming=None):
     incoming = incoming or (trial.base / "transport-input.json")
     incoming.parent.mkdir(parents=True, exist_ok=True)
-    incoming.write_bytes(P7.HELPER.canonical(request))
+    incoming.write_bytes(P6.HELPER.canonical(request))
     # This helper deliberately tests the retained stage transport, not the
     # normal CLI presentation envelope used by all business journeys.
     return subprocess.run([sys.executable, str(trial.root / "knowledge.py"), "apply", "--legacy-transport",

@@ -1,5 +1,5 @@
-# Review guide
+# 结果核对
 
-Review the selected action's actual result and its exact scan/material/source/record references. For record, inspect only the view bindings and bytes required by its business contract. Status observes saved facts; do not add whole-library lint or index-health checks. State unresolved gaps. Workflow order, role assignment and handoff validation belong to OpenFlow. A successful business check does not prove semantic correctness, deployment or Git merge.
+只核本次来源任务：`prepared` 的实际材料引用可读、范围和缺口明确；`unchanged` 符合完整无事项条件且没有虚构材料；失败如实保留停点。
 
-For run, verify actual saved scan/material references, explicit revision targets and context completeness before an unchanged result. Failures retain stopped_stage and saved scan without claiming preparation succeeded. Independent scan shows execution_history=not_inspected and compatible empty finalization arrays. For status, state targeted exact-ref inspection versus explicit global overview. A P6 record is pending publication, not formal success.
+不在此重判作者内容、执行独立审阅或检查全库索引。流程出口由 Workflow 依据真实结果选择。

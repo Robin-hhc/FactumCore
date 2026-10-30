@@ -20,7 +20,7 @@ import uuid
 
 
 STAGES = ("explore", "source", "change-plan", "view-materialize", "lint", "apply", "query", "maintain")
-COMMANDS = (*STAGES, "search", "read", "patrol", "status", "doctor", "install-command")
+COMMANDS = (*STAGES, "record", "review", "search", "read", "patrol", "status", "doctor", "install-command")
 
 
 class CommandError(ValueError):
@@ -344,7 +344,18 @@ def request_for(args, root):
         request = {}
     command, action, words = args.command, args.action, args.arguments
     stage = "query" if command in {"query", "search", "read"} else command
-    if command == "patrol":
+    if command == "record":
+        if words or action not in (None, "record"):
+            raise CommandError("INVALID_ACTION", "record accepts its request and options only")
+        # The public task has its own name while the original P5 engine and
+        # persisted identity remain shared with source --action record.
+        stage, action = "source", "record"
+    elif command == "review":
+        if words or action not in (None, "review"):
+            raise CommandError("INVALID_ACTION", "review accepts its request and options only")
+        # P4 has a clear task entry while the lint engine and saved identity stay shared.
+        stage, action = "lint", "review"
+    elif command == "patrol":
         if len(words) != 1 or words[0] not in {"sync", "plan", "reindex", "complete"}:
             raise CommandError("INVALID_ACTION", "Use patrol sync, plan, reindex or complete")
         stage, selected = "maintain", "patrol-" + words[0]

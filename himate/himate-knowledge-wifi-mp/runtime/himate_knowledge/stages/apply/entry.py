@@ -1,4 +1,4 @@
-"""Keep legacy apply semantics and route new P7 actions to shared functions."""
+"""Keep legacy apply semantics and route new P6 actions to shared functions."""
 
 from pathlib import Path
 import base64
@@ -97,7 +97,7 @@ def execute(ctx, request, action="run"):
             return transaction_execute(_BatchTransactionContext(ctx, ctx.modules["runtime"]), request, action)
         return transaction_execute(ctx, request, action)
     if ctx.domain is None:
-        raise Blocked("P7 actions require the versioned domain implementation")
+        raise Blocked("P6 actions require the versioned domain implementation")
     modules = ctx.modules
     runtime = modules["runtime"]
     published = ctx.path("logs/publications/" + runtime.identifier(request.get("operation_id")) + "/manifest.json").is_file()

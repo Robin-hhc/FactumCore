@@ -105,7 +105,7 @@ def catalog_gap(ctx, ref, error):
 
 
 def generation_observation(ctx, ref, manifest):
-    """Inspect saved build facts; exact database verification belongs to P7."""
+    """Inspect saved build facts; exact database verification belongs to P6."""
     if not hasattr(ctx, "_observed_generations"):
         ctx._observed_generations = {}
     cache = ctx._observed_generations
@@ -284,7 +284,7 @@ def finalization(ctx, journal, view, *, inspect_catalog=True):
 
 
 def batch_finalization(ctx, values):
-    """Locate a new P7 stop from durable local facts, without re-executing it."""
+    """Locate a new P6 stop from durable local facts, without re-executing it."""
     intent = values.get("batch_intent")
     built = values.get("batch_build")
     completed = values.get("batch_complete")

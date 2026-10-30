@@ -189,7 +189,7 @@ def scan(context, *, current_context=None):
         old = next(iter(prior_fingerprints)) if len(prior_fingerprints) == 1 else None
         source_id = identities.get(path) or (next(iter(prior_ids)) if len(prior_ids) == 1 else "raw:" + sha(path.encode())[:32])
         # Legacy formal records may pair terminal progress with unresolved
-        # actions. Real P7 publication confirms those recorded facts; it does
+        # actions. Real P6 publication confirms those recorded facts; it does
         # not turn defer/failed/uncovered into completed source work.
         finished = bool(prior) and all(
             progress_status(d) in FINISHED

@@ -1,4 +1,4 @@
-"""P6 transcribes fixed business decisions without a passed-step credential."""
+"""P5 transcribes fixed business decisions without a passed-step credential."""
 
 import importlib.util
 from pathlib import Path

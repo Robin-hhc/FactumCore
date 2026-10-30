@@ -1,7 +1,3 @@
-# Writing guide
+# 发现结果说明
 
-Report the actual CLI status, phase, diagnostics and returned business file references. Use the output of this invocation; do not invent a passing result. OpenFlow owns run/node/attempt tracking and transition checks.
-
-Distinguish runtime-dependency readiness, actual symbol-navigation results and optional CodeGraph preparation. Routing to a code_ref does not prove it resolves or justify building a graph; report only the preparation or business action actually performed.
-
-Report current context discovery only; do not turn an old private operation into a resumed Workflow.
+只报告本次已完成的项目发现或任务路由：实际项目与知识根、所选能力、返回的上下文引用及缺口。部署、图谱准备和业务执行分别记录，不把路由完成写成业务完成。

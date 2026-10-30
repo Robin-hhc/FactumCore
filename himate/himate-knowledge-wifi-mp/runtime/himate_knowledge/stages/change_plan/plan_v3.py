@@ -1,4 +1,4 @@
-"""Freeze authored P3 decisions; byte production and independent review live elsewhere."""
+"""Freeze authored P2 decisions; byte production and independent review live elsewhere."""
 from .support import NodeError, digest
 
 def require(value, code, message):
@@ -25,7 +25,7 @@ def validate_queries(cases):
 
 
 def freeze_dispositions(units, actions, claims):
-    """Freeze authored record data so P6 never chooses among mixed actions."""
+    """Freeze authored record data so P5 never chooses among mixed actions."""
     frozen = []
     for row in units:
         identity = row["unit_id"]

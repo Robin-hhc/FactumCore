@@ -1,10 +1,9 @@
-# Authored semantic plan
+# 作者内容计划
 
-- Operation and requested action:
-- Actual status / phase:
-- Business output file references:
-- Fixed source/maintenance outcomes and record actions:
-- Card/Claim judgments and representative queries:
-- Diagnostics and remaining gaps:
-
-Use semantic_plan_ref and the actual content_planned response. This plan records authored judgments; it does not report review or fixed-check success. OpenFlow records its own execution identities.
+- 操作与实际状态／阶段：
+- 材料及扫描引用：
+- `semantic_plan_ref`：
+- 主要来源／维护处置与卡／Claim决定：
+- 查询用途和预期：
+- 欠账、诊断或返工绑定：
+- 下一步：交 P3 成稿／补齐当前输入。

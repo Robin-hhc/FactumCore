@@ -1,4 +1,4 @@
-"""P5 executes the author's cases before any reviewed content is published."""
+"""P4 executes the author's cases before any reviewed content is published."""
 
 import copy
 import importlib.util
@@ -38,7 +38,7 @@ def query_check(result):
     return next(row for row in result["checks"] if row["check_id"] == "index.build")["candidate_queries"]
 
 
-def test_wrong_purpose_is_blocked_before_publish_and_a_new_p3_round_can_correct_it(tmp_path):
+def test_wrong_purpose_is_blocked_before_publish_and_a_new_p2_round_can_correct_it(tmp_path):
     pipeline = fixture.Pipeline(tmp_path)
     pipeline.catalog_path.unlink()
     (pipeline.root / ".isolated-knowledge-fixture").unlink()
@@ -52,7 +52,7 @@ def test_wrong_purpose_is_blocked_before_publish_and_a_new_p3_round_can_correct_
     before = formal_bytes(pipeline.root)
     rejected = review(pipeline, "wrong", first_ref, expected=1)
     assert rejected["status"] == "failed"
-    assert "P3" in rejected["data"]["return_to"]
+    assert rejected["data"]["return_to"] == ["P2"]
     assert any(row["code"] == "TARGET_QUERY_EXPECTATION_FAILED" for row in rejected["findings"])
     failed_case = query_check(rejected)["outcomes"][0]
     assert failed_case["case_id"] == "find-design" and failed_case["purpose"] == "implementation"
@@ -61,7 +61,7 @@ def test_wrong_purpose_is_blocked_before_publish_and_a_new_p3_round_can_correct_
     assert not (pipeline.root / "knowledge/rules/design-rule.md").exists()
     assert not (pipeline.root / "artifacts/indexes/local/active.json").exists()
 
-    previous = {"previous_view_ref": first_ref, "revision_reason": "Correct the frozen query purpose after P5"}
+    previous = {"previous_view_ref": first_ref, "revision_reason": "Correct the frozen query purpose after P4"}
     request = {key: copy.deepcopy(old_plan[key]) for key in (
         "author_id", "units", "maintenance_units", "claim_changes", "card_actions", "target_queries")}
     request.update(operation_id="corrected", scan_ref=first["scan_ref"], material_ref=first["material_ref"], **previous)
@@ -84,7 +84,7 @@ def test_wrong_purpose_is_blocked_before_publish_and_a_new_p3_round_can_correct_
     assert all((pipeline.root / ref).read_bytes() == raw for ref, raw in frozen.items())
 
 
-def test_p5_uses_the_candidate_instead_of_the_existing_active_generation(tmp_path):
+def test_p4_uses_the_candidate_instead_of_the_existing_active_generation(tmp_path):
     pipeline = fixture.Pipeline(tmp_path)
     old_bundle_ref, old_bundle = pipeline.capture("seed", b"# Source\nCapture marker is the original design.\n")
     old_ref = pipeline.view("seed", old_bundle_ref, "design-rule", pipeline.card("design-rule", old_bundle))

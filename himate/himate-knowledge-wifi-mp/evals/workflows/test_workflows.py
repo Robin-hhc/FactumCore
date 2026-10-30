@@ -31,7 +31,7 @@ def fixture_packages(root):
             "references/results/review-guide.md": "# Review\n",
         }
         contract = {
-            "id": skill + "-result",
+            "id": module.PRIMARY_ARTIFACT_IDS.get(skill, skill + "-result"),
             "title": skill,
             "required": True,
             "template": "templates/result.md",
@@ -103,12 +103,86 @@ def test_layout_rejects_unknown_canvas_nodes(tmp_path, workflow):
                for error in module.validate(source))
 
 
-def test_final_public_capability_set_is_exactly_eight_skills():
+def test_public_capabilities_separate_review_and_each_patrol_task():
     assert set(validator_module().SKILLS) == {
         "hs-knowledge-explore", "hs-knowledge-source",
-        "hs-knowledge-change-plan", "hs-knowledge-view-materialize", "hs-knowledge-lint",
-        "hs-knowledge-apply", "hs-knowledge-query", "hs-knowledge-maintain",
+        "hs-knowledge-change-plan", "hs-knowledge-view-materialize", "hs-knowledge-review",
+        "hs-knowledge-record", "hs-knowledge-apply", "hs-knowledge-query", "hs-knowledge-maintain",
+        "hs-knowledge-patrol-sync", "hs-knowledge-patrol-plan",
+        "hs-knowledge-patrol-reindex", "hs-knowledge-patrol-complete",
     }
+
+
+@pytest.mark.parametrize("node_id", ["sync_workspace", "plan_patrol", "refresh_index", "complete_patrol"])
+def test_patrol_node_cannot_reload_general_maintenance_context(tmp_path, node_id):
+    module = validator_module()
+    source = fixture_packages(tmp_path / "fixture")
+    path = source / "workflows/common/knowledge/hs-knowledge-lint/workflow.yaml"
+    value = yaml.safe_load(path.read_bytes())
+    next(row for row in value["nodes"] if row["id"] == node_id)["skill"] = "hs-knowledge-maintain"
+    path.write_text(yaml.safe_dump(value), encoding="utf-8")
+    assert f"hs-knowledge-lint.{node_id}: wrong Skill/owner/type" in module.validate(source)
+
+
+@pytest.mark.parametrize("skill", ["patrol-sync", "patrol-plan", "patrol-reindex", "patrol-complete"])
+def test_each_patrol_result_is_scoped_only_to_its_own_node_and_exits(tmp_path, skill):
+    module = validator_module()
+    source = fixture_packages(tmp_path / "fixture")
+    path = source / f"skills/common/knowledge/hs-knowledge-{skill}/artifacts/result.yaml"
+    value = yaml.safe_load(path.read_bytes())
+    value["applies_to"]["node_ids"].append("prepare_sources")
+    value["required_on"]["exit_ids"].append("prepared")
+    path.write_text(yaml.safe_dump(value), encoding="utf-8")
+    errors = module.validate(source)
+    assert f"hs-knowledge-{skill}: artifact node scope mismatch" in errors
+    assert f"hs-knowledge-{skill}: artifact exit obligations mismatch" in errors
+
+
+def test_review_keeps_the_existing_host_identity_and_rejects_old_skill_package(tmp_path):
+    module = validator_module()
+    source = fixture_packages(tmp_path / "fixture")
+    package = source / "skills/common/knowledge/hs-knowledge-review"
+    contract = yaml.safe_load((package / "artifacts/result.yaml").read_bytes())
+    assert contract["id"] == "hs-knowledge-lint-result"
+    shutil.copytree(package, package.with_name("hs-knowledge-lint"))
+    assert any("active Skill set mismatch" in error and "hs-knowledge-lint" in error
+               for error in module.validate(source))
+
+
+@pytest.mark.parametrize("workflow", ["hs-knowledge-ingest", "hs-knowledge-lint"])
+def test_record_node_cannot_load_the_source_preparation_skill(tmp_path, workflow):
+    module = validator_module()
+    source = fixture_packages(tmp_path / "fixture")
+    path = source / "workflows/common/knowledge" / workflow / "workflow.yaml"
+    value = yaml.safe_load(path.read_bytes())
+    node = next(row for row in value["nodes"] if row["id"] == "record_ingest")
+    node["skill"] = "hs-knowledge-source"
+    path.write_text(yaml.safe_dump(value), encoding="utf-8")
+    assert f"{workflow}.record_ingest: wrong Skill/owner/type" in module.validate(source)
+
+
+@pytest.mark.parametrize("field,value,diagnostic", [
+    ("id", "hs-knowledge-record-result", "artifact ID must be globally unique and exact"),
+    ("applies_to", {"node_ids": ["prepare_sources"]}, "artifact node scope mismatch"),
+    ("required_on", {"exit_ids": ["prepared"]}, "artifact exit obligations mismatch"),
+])
+def test_record_report_keeps_its_exact_host_identity_and_p6_scope(tmp_path, field, value, diagnostic):
+    module = validator_module()
+    source = fixture_packages(tmp_path / "fixture")
+    path = source / "skills/common/knowledge/hs-knowledge-record/artifacts/result.yaml"
+    contract = yaml.safe_load(path.read_bytes())
+    contract[field] = value
+    path.write_text(yaml.safe_dump(contract), encoding="utf-8")
+    assert "hs-knowledge-record: " + diagnostic in module.validate(source)
+
+
+def test_source_package_cannot_keep_a_second_p6_report_declaration(tmp_path):
+    module = validator_module()
+    source = fixture_packages(tmp_path / "fixture")
+    package_root = source / "skills/common/knowledge"
+    old = package_root / "hs-knowledge-source/artifacts/record-result.yaml"
+    shutil.copyfile(package_root / "hs-knowledge-record/artifacts/result.yaml", old)
+    assert "hs-knowledge-source: exact artifact contract set mismatch" in module.validate(source)
 
 
 @pytest.mark.parametrize("name", ["hs-knowledge-candidate-revise", "hs-knowledge-source-scan", "hs-knowledge-source-prepare"])
@@ -143,16 +217,15 @@ def test_ingest_stays_complete_beside_the_governance_lint_template():
         ("lint_view", "reviewer"), ("record_ingest", "coder"), ("apply_view", "coder"),
     ]
     assert "verify_merge" not in nodes and "maintain_knowledge" not in nodes
-    assert nodes["lint_view"]["skill"] == "hs-knowledge-lint"
+    assert nodes["lint_view"]["skill"] == "hs-knowledge-review"
     assert nodes["prepare_sources"]["skill"] == "hs-knowledge-source"
-    assert nodes["record_ingest"]["skill"] == "hs-knowledge-source"
+    assert nodes["record_ingest"]["skill"] == "hs-knowledge-record"
     assert {e["id"]: e["target"] for e in nodes["record_ingest"]["exits"]}["recorded"] == "apply_view"
     routes = {edge["id"]: edge["target"] for edge in nodes["prepare_sources"]["exits"]}
     assert routes == {"prepared": "plan_change", "unchanged": "__end__"}
-    assert "默认run" in nodes["prepare_sources"]["prompt"]
-    assert "直接调用prepare" in nodes["prepare_sources"]["prompt"]
-    assert "不先调用run或scan" in nodes["prepare_sources"]["prompt"]
-    assert "不自动无限重扫" in nodes["prepare_sources"]["prompt"]
+    assert "knowledge.py source" in nodes["prepare_sources"]["prompt"]
+    assert "prepare" in nodes["prepare_sources"]["prompt"]
+    assert "record" in nodes["record_ingest"]["prompt"]
     for identity in ("plan_change", "materialize_view", "lint_view"):
         assert {edge["id"]: edge["target"] for edge in nodes[identity]["exits"]}["needs_material"] == "prepare_sources"
     assert "proof_set" not in nodes["apply_view"]["prompt"]
@@ -163,7 +236,7 @@ def test_lint_workflow_filters_changes_then_reuses_ingest_without_nested_workflo
         (ROOT / "workflows/common/knowledge/hs-knowledge-lint/workflow.yaml").read_bytes()
     )
     assert workflow["entry_node"] == "sync_workspace"
-    assert workflow["entry"] == {"skill": "hs-knowledge-maintain"}
+    assert workflow["entry"] == {"skill": "hs-knowledge-patrol-sync"}
     nodes = {node["id"]: node for node in workflow["nodes"]}
     assert list(nodes) == ["sync_workspace", "plan_patrol", "prepare_sources", "plan_change",
                            "materialize_view", "lint_view", "record_ingest", "apply_view",
@@ -174,11 +247,20 @@ def test_lint_workflow_filters_changes_then_reuses_ingest_without_nested_workflo
     }
     assert {e["id"]: e["target"] for e in nodes["apply_view"]["exits"]} == {
         "completed": "complete_patrol", "recorded": "complete_patrol"}
-    assert "patrol-sync" in nodes["sync_workspace"]["prompt"]
-    assert "重新" in nodes["plan_patrol"]["prompt"]
+    assert "patrol sync" in nodes["sync_workspace"]["prompt"]
+    assert "patrol plan" in nodes["plan_patrol"]["prompt"]
     assert "source_request" in nodes["prepare_sources"]["prompt"]
     assert "prepare" in nodes["prepare_sources"]["prompt"]
-    assert "patrol-complete" in nodes["complete_patrol"]["prompt"]
+    assert "patrol complete" in nodes["complete_patrol"]["prompt"]
+    assert {node: nodes[node]["skill"] for node in (
+        "sync_workspace", "plan_patrol", "refresh_index", "complete_patrol"
+    )} == {
+        "sync_workspace": "hs-knowledge-patrol-sync",
+        "plan_patrol": "hs-knowledge-patrol-plan",
+        "refresh_index": "hs-knowledge-patrol-reindex",
+        "complete_patrol": "hs-knowledge-patrol-complete",
+    }
+    assert all(node["skill"] != "hs-knowledge-maintain" for node in nodes.values())
     ingest = yaml.safe_load((ROOT / "workflows/common/knowledge/hs-knowledge-ingest/workflow.yaml").read_bytes())
     original = {node["id"]: node for node in ingest["nodes"]}
     for identity in ("plan_change", "materialize_view", "lint_view", "record_ingest"):
@@ -242,7 +324,7 @@ def test_public_mixed_candidate_keeps_classification_and_routes_to_independent_p
     node = next(item for item in workflow["nodes"] if item["id"] == "materialize_view")
     assert {edge["id"]: edge["target"] for edge in node["exits"]}["ready"] == "lint_view"
     reviewer = next(item for item in workflow["nodes"] if item["id"] == "lint_view")
-    assert (reviewer["skill"], reviewer["owner"]) == ("hs-knowledge-lint", "reviewer")
+    assert (reviewer["skill"], reviewer["owner"]) == ("hs-knowledge-review", "reviewer")
 
 
 def test_design_validation_checks_package_contracts_and_owners(tmp_path):
@@ -325,10 +407,10 @@ def test_artifact_contracts_reject_retired_scope_and_missing_real_obligations(tm
     source = fixture_packages(tmp_path / "fixture")
     if mutation == "stale_prepare":
         package = source / "skills/common/knowledge/hs-knowledge-source/artifacts"
-        shutil.copyfile(package / "record-result.yaml", package / "prepare-result.yaml")
+        shutil.copyfile(package / "result.yaml", package / "prepare-result.yaml")
         assert any("exact artifact contract set mismatch" in error for error in module.validate(source))
         return
-    skill = "hs-knowledge-query" if mutation == "unscoped_old_node" else "hs-knowledge-lint"
+    skill = "hs-knowledge-query" if mutation == "unscoped_old_node" else "hs-knowledge-review"
     path = source / "skills/common/knowledge" / skill / "artifacts/result.yaml"
     contract = yaml.safe_load(path.read_bytes())
     if mutation == "unscoped_old_node":

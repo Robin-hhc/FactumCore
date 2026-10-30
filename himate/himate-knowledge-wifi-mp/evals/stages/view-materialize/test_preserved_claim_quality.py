@@ -1,4 +1,4 @@
-"""Independent public counterexample: authored preservation must survive P4."""
+"""Independent public counterexample: authored preservation must survive P3."""
 import copy
 import hashlib
 import json

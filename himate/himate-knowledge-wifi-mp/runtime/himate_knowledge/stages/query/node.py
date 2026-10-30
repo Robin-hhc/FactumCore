@@ -1,4 +1,4 @@
-"""Public query adapter; algorithms are shared with P7 regression."""
+"""Public query adapter; algorithms are shared with P6 regression."""
 
 
 def execute(context):

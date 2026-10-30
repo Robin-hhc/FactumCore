@@ -1,4 +1,4 @@
-"""Independent public P2 contracts; synthetic inputs, no model or remote service."""
+"""Independent public P1 contracts; synthetic inputs, no model or remote service."""
 
 import hashlib
 import importlib.util
@@ -122,7 +122,7 @@ def test_supplement_is_a_new_version_and_preserves_original_targets(harness):
     original_ref = first["data"]["material_ref"]
     original_bytes = (harness.root / original_ref).read_bytes()
     harness.write("docs-raw/specs/second.md", b"# Second\n")
-    # An unrelated unreadable original cannot turn a P5 supplement into P1.
+    # An unrelated unreadable original cannot turn a P4 supplement into P1.
     harness.write("docs-raw/specs/unrelated.md", b"\xff\x00")
     response = prepare(harness, {"operation_id": "supplement", "existing_material_ref": original_ref,
                                  "targets": [target("docs-raw/specs/second.md")]})

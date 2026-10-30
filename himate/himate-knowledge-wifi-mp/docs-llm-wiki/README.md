@@ -21,17 +21,17 @@ flowchart LR
 
 ## 能力与任务入口
 
-当前公开能力为八个 `hs-knowledge-` Skill 和 ingest、lint 两个 Workflow。Skill 指引 Agent 选择任务和调用仓内 CLI，Workflow 管理顺序与角色，CLI 执行固定步骤；内容判断和独立审阅由 Agent 与实际宿主完成。能力选择和公开动作以已安装 `hs-knowledge-explore` 为入口。
+当前公开能力为十三个 `hs-knowledge-` Skill 和 ingest、lint 两个 Workflow。Skill 指引 Agent 选择任务和调用仓内 CLI，Workflow 管理顺序与角色，CLI 执行固定步骤；内容判断和独立审阅由 Agent 与实际宿主完成。能力选择和公开动作以已安装 `hs-knowledge-explore` 为入口。
 
 | 任务 | 使用哪个入口 | 设计或操作 |
 |---|---|---|
 | 新原件入库、增量更新或修订已有卡 | `hs-knowledge-ingest` **Workflow** | [完整流程](知识库详细设计.md#21-完整流程与节点判断)、[入库操作](使用说明.md#ingest通过-openflow-执行入库-workflow) |
-| 单独检查正式库或候选稿 | `hs-knowledge-lint` **Skill** | [固定检查](知识库详细设计.md#原-lint-skilll1l5-固定检查)、[独立检查操作](使用说明.md#lint使用-skill-独立检查) |
+| 单独检查正式库或候选稿 | `hs-knowledge-review` **Skill** | [固定检查](知识库详细设计.md#原-lint-skilll1l5-固定检查)、[独立检查操作](使用说明.md#lint使用-skill-独立检查) |
 | 巡检 raw、来源或代码变更并处理 | `hs-knowledge-lint` **Workflow** | [增量治理](知识库详细设计.md#增量治理-workflow)；周期触发由外部系统提供 |
 | 检索知识并分析问题 | `hs-knowledge-query` **Skill** | [消费流程](知识库详细设计.md#4-消费流程从问题到证据回答)、[查询操作](使用说明.md#query提问并使用-skill-检索分析) |
 | 独立扫描、备料、进度观察、恢复或索引维护 | 对应 **Skill 的公开动作** | [独立动作](使用说明.md#独立备料恢复索引与提交核对)、[续办与完成判断](使用说明.md#进度续办和完成判断) |
 
-同名 lint Skill 与 Workflow 是不同入口；ingest 的 P5 使用 lint Skill 的 `review` 动作。完整分支、返工和结束条件见详细设计，README 不另维护一套流程。暂存、正式发布、清理与换机消费见[§5.7](知识库详细设计.md#57-p7安全事务真实索引与检索收尾)、[§6.3](知识库详细设计.md#63-命令分派与工作流续办)和[§6.4](知识库详细设计.md#64-哪些内容上库哪些用于本机执行)。
+review Skill负责审阅与检查，lint Workflow负责治理编排；ingest的P4使用knowledge review。巡检四步分别加载patrol-sync/plan/reindex/complete。完整分支、返工和结束条件见详细设计，README 不另维护一套流程。暂存、正式发布、清理与换机消费见[§5.7](知识库详细设计.md#57-p6安全事务真实索引与检索收尾)、[§6.3](知识库详细设计.md#63-命令分派与工作流续办)和[§6.4](知识库详细设计.md#64-哪些内容上库哪些用于本机执行)。
 
 ## 项目与执行位置
 

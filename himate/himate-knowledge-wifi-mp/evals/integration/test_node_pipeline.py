@@ -58,7 +58,7 @@ def test_raw_to_reviewed_stable_generation_and_post_ingest_correction(tmp_path):
     new_bundle_ref, new_bundle = p.capture(
         "update-source", b"# Original\nChanged marker requires another independent content review.\n"
     )
-    # Capture/P2 remains stage-only. This independent explicit action is the
+    # Capture/P1 remains stage-only. This independent explicit action is the
     # event-registration boundary used by the remainder of this legacy test.
     assert (event_state.read_bytes() if event_state.exists() else None) == previous_event_state
     registered = p.call("knowledge-maintain", {

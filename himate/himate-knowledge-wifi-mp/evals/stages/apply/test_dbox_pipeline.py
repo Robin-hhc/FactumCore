@@ -174,8 +174,8 @@ def test_empty_public_scope_cannot_bypass_retained_execution_bindings(tmp_path):
     ref = f"logs/publications/{request['operation_id']}/manifest.json"
     manifest = copy.deepcopy(pipeline.record(ref))
     manifest["dbox_execution_scope"] = []
-    manifest = existing.P7.HELPER.load_contract("records").seal(manifest)
-    pipeline.write(ref, existing.P7.HELPER.canonical(manifest))
+    manifest = existing.P6.HELPER.load_contract("records").seal(manifest)
+    pipeline.write(ref, existing.P6.HELPER.canonical(manifest))
     failed = batch(pipeline, {"operation_id": request["operation_id"]}, expected=2)
     assert any(row["code"] == "EXECUTION_INPUTS_UNAVAILABLE" for row in failed["diagnostics"])
     assert not (pipeline.root / "artifacts/indexes/local/active.json").exists()

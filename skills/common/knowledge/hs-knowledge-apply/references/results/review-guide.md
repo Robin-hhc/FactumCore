@@ -1,5 +1,9 @@
-# Review guide
+# P6 结果复核
 
-Check the actual result and relevant card/source/view/index bytes. State unresolved gaps. Workflow order, role assignment and handoff validation belong to OpenFlow. A successful business check does not prove semantic correctness, deployment or Git merge.
+- 完成结论是否依据真实 `batch_complete`，并与发布事实分开？
+- 内容批的真实索引、原冻结查询、同代精读和适用激活是否完成；记录批是否保持不建索引？
+- 发布／完成引用是否可追溯，剩余收尾或清理失败是否明确？
+- 重试是否沿用原操作、冻结查询和激活基线，而非重新发布或放宽预期？
+- 是否避免把本地事务状态当作 Git 提交、CI 或合入？
 
-Report formal publication/completion references, actual published/content_applied and batch_complete separately, plus cleanup status/deleted/retained/failed. Cleanup pending preserves published facts and requires only missing tail/cleanup retry; Git/CI remain separate.
+复核实际结果即可，不在展示阶段重跑整套业务检查。

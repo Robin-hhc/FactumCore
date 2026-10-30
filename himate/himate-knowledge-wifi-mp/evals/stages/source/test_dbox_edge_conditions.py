@@ -187,7 +187,7 @@ def test_missing_registered_snapshot_cannot_use_new_bytes_or_search_virtual_git_
     for path in (ordinary_path, virtual_path):
         assert git("cat-file", "blob", "HEAD:" + prefix + "/" + path) == original
 
-    # This creates formal-history fixture bytes; it is not an assertion of P7 execution.
+    # This creates formal-history fixture bytes; it is not an assertion of P6 execution.
     harness.publish_bundle(bundle)
     harness.publish_bundle(ordinary_bundle)
     harness.write("governance/sources.lock.yaml", yaml.safe_dump({

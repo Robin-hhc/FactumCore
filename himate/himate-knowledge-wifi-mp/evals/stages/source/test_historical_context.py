@@ -197,7 +197,7 @@ def test_completed_historical_code_drift_does_not_reopen_unchanged_raw(harness):
         "source_id": harness.record(before["scan_ref"])["units"][0]["source_id"]}, action="capture")["data"]
     assert captured["event_refs"] == []
     assert len(captured["event_proposals"]) == 1
-    assert state_path.read_bytes() == state_bytes  # P2 cannot publish a formal restriction.
+    assert state_path.read_bytes() == state_bytes  # P1 cannot publish a formal restriction.
     raw_changed = harness.run("source", {"operation_id": "raw-upgrade-scan"}, "scan")["data"]
     assert harness.record(raw_changed["scan_ref"])["units"][0]["change"] == "changed"
     assert raw_changed["actionable_unit_ids"]

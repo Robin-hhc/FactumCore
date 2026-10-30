@@ -41,7 +41,7 @@ LEGACY_SKILLS = {
         "source-scan", "source-prepare", "candidate-inspect", "candidate-revise",
         "governance-handoff", "index-build", "local-check", "merge-check",
         "publish-handoff", "query-regression", "recover", "source-capture",
-        "confirmation-prepare", "confirmation-record",
+        "confirmation-prepare", "confirmation-record", "lint",
     )
 }
 SHARED_DOCS = (

@@ -1,5 +1,5 @@
 id: hs-knowledge-change-plan-result
-title: authored semantic plan
+title: 作者内容计划
 required: true
 applies_to:
   node_ids:

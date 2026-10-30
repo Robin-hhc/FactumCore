@@ -1,9 +1,5 @@
-# Review guide
+# 结果核对
 
-Check the actual result and relevant card/source/view/index bytes. State unresolved gaps. Workflow order, role assignment and handoff validation belong to OpenFlow. A successful business check does not prove semantic correctness, deployment or Git merge.
+确认计划引用来自本次结果，全部实际单元有处置，卡／Claim判断和查询预期可供下游执行；未决材料与欠账如实保留。
 
-For this authored plan, check exact material-unit coverage, explicit Claim comparisons, card decisions, deterministic record dispositions and target query coverage. Independent semantic review and final draft fidelity belong to P5.
-
-Check query purpose against the intended Claim's usage, evidence kind and scope/context. Prefer explicit Claim expectations for positive new/changed conclusions; do not require them for negative cases. A design Claim may be valid guidance or current knowledge under its actual qualifications, but a code link alone cannot satisfy an implementation query. P5 executes the original cases on the final candidate; an unmet expectation needs an authored revision, not an automatic purpose change.
-
-Plan output is staged. Identify explicitly adopted inputs and final-reference mappings; never claim formal state or choose an old private draft implicitly.
+这是作者输出的核对，不在 P2 增加独立审阅或重跑检索。P4 才对最终候选验证计划忠实性和原冻结查询。

@@ -5,7 +5,7 @@ import json
 
 
 def publication(harness, *, complete=True):
-    """Synthetic sealed observations; never a claim of real P7 execution."""
+    """Synthetic sealed observations; never a claim of real P6 execution."""
     def save(ref, purpose, payload):
         value = {"schema_version": "2.0", "record_kind": "artifact_manifest",
                  "operation_id": "published", "rules_digest": harness.rules,

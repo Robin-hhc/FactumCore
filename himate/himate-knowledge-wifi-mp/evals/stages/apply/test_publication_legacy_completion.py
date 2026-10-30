@@ -10,7 +10,7 @@ _spec.loader.exec_module(existing)
 
 
 def test_legacy_content_completion_and_status_remain_readable(tmp_path):
-    trial = existing.P7.PublicP7(tmp_path)
+    trial = existing.P6.PublicP7(tmp_path)
     request = existing.publication_content(trial)
     probe = tmp_path / "legacy-writer"
     probe.mkdir()

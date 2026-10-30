@@ -1,4 +1,4 @@
-"""P5 checks the complete frozen mapping, including unreferenced payloads."""
+"""P4 checks the complete frozen mapping, including unreferenced payloads."""
 
 from support import library as fixture
 

@@ -1,7 +1,7 @@
-"""Persist P5's declared review coverage; never certify reviewer identity.
+"""Persist P4's declared review coverage; never certify reviewer identity.
 
-This is a business-record operation used in the same process as P5 lint.  A
-saved review alone does not mean fixed checks or the complete P5 stage passed.
+This is a business-record operation used in the same process as P4 lint.  A
+saved review alone does not mean fixed checks or the complete P4 stage passed.
 """
 
 from .runtime import NodeError
@@ -42,7 +42,7 @@ def content_review(ctx, request):
     applicable = {unit["unit_id"] for unit in plan["units"] + plan.get("maintenance_units", [])}
     planned_skips = {unit["unit_id"] for unit in plan["units"] if unit["outcome"] == "skip"}
     # Only a real saved P1 observation can establish an already-processed scan
-    # skip. Explicit P2 targets do not invent change/progress/full-scan facts.
+    # skip. Explicit material targets do not invent change/progress/full-scan facts.
     scan_skips = {unit["unit_id"] for unit in (scan or {}).get("units", [])
                   if unit["unit_id"] in planned_skips and unit.get("change") == "unchanged"
                   and unit.get("progress") in {"completed", "skipped", "withdrawn"}}
@@ -59,7 +59,7 @@ def content_review(ctx, request):
              "Report actual findings, including an explicitly empty list")
     for row in findings:
         _require(isinstance(row, dict) and row.get("unit_id") in sampled
-                 and row.get("return_to") in {"P2", "P3", "P4"}
+                 and row.get("return_to") in {"P1", "P2", "P3"}
                  and _text(row.get("reason")) and row.get("evidence"),
                  "INVALID_REVIEW_FINDING", "Findings need a location, evidence and return stage")
     view_digest = None

@@ -1,8 +1,8 @@
-# Node result
+# 发布与收尾结果
 
-- Operation and requested action:
-- Actual status / phase:
-- Business output file references:
-- Diagnostics and remaining gaps:
-
-Use the actual CLI response. OpenFlow records its own execution identities.
+- 操作与本批输入引用：
+- 实际状态和停点：
+- 发布事实、`batch_complete` 及正式结果引用：
+- 适用索引、原查询、同代精读和激活结果：
+- 已删／保留／失败的清理结果：
+- 剩余事项及诊断：

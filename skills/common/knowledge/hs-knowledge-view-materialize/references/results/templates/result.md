@@ -1,12 +1,9 @@
-# Assembled candidate
+# 完整候选稿
 
-- Operation and requested action:
-- Actual status / phase:
-- Business output file references:
-- Exact plan/view, disposition preview and summary references:
-- Input snapshot digest, batch kind and review mode:
-- Authored code_ref declarations and their unchanged evidence/snapshot/locator bindings, when present:
-- Previous view and revision reason, when revised:
-- Diagnostics and remaining gaps:
-
-Use the actual ready/described response. This artifact describes frozen authored bytes and dispositions; P5 reviews quality. OpenFlow records its own execution identities.
+- 操作与实际状态／阶段：
+- 计划与材料引用：
+- `view_ref`、处置预览及摘要引用：
+- `batch_kind`／`review_mode`：
+- 修订的前序视图与理由（适用时）：
+- 缺口或失败诊断：
+- 下一步：交 P4 审阅／返回对应阶段。

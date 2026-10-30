@@ -61,8 +61,8 @@ def test_current_ingest_review_lint_record_apply_query_without_human_confirmatio
     else:
         assert bundle["snapshots"][0]["recovery"]["kind"] == "git"
     if unrelated_nav_changes in {"historical_fallback", "local_only"}:
-        # P2 binds exact retained stage bytes to their preallocated final ref.
-        # This test still removes Git access without publishing before P7.
+        # P1 binds exact retained stage bytes to their preallocated final ref.
+        # This test still removes Git access without publishing before P6.
         snapshot = bundle["snapshots"][0]
         local = dict(snapshot["local_recovery"])
         assert staged_path(harness, bundle, local["path"]).is_file()
@@ -87,7 +87,7 @@ def test_current_ingest_review_lint_record_apply_query_without_human_confirmatio
         "target_queries": [{"id": "new-rule", "query": "Synthetic", "purpose": "guidance", "required": ["new"], "expected_claim_ids": ["new#new-claim"]}]}, "plan")["data"]["semantic_plan_ref"]
     if unrelated_nav_changes == "historical_fallback":
         # This candidate actually adopts retained local originals with no
-        # current Git configuration. Removing an input after P5 is a different
+        # current Git configuration. Removing an input after P4 is a different
         # stale-input case, covered separately by the batch drift tests.
         configuration = (harness.base / "config.yml").read_bytes()
         (harness.base / "config.yml").unlink()
@@ -149,7 +149,7 @@ def test_current_ingest_review_lint_record_apply_query_without_human_confirmatio
         material = harness.record(review)
         material.pop("digest")
         material["reviewer_id"] = "author"
-        material["findings"] = [{"unit_id": unit["unit_id"], "return_to": "P3",
+        material["findings"] = [{"unit_id": unit["unit_id"], "return_to": "P2",
                                  "reason": "Caller must resolve this review finding", "evidence": ["L2"]}]
         material["digest"] = hashlib.sha256(canonical(material)).hexdigest()
         apply_request["content_review_ref"] = harness.write(".build/operations/op/review-material.json", canonical(material))

@@ -87,7 +87,7 @@ def test_record_only_dispositions_have_real_review_scope_and_can_be_returned(har
     empty = harness.run("lint", {**review_request, "sampled_unit_ids": [], "unreviewed_unit_ids": sampled},
                         "record-review", expected=2)
     assert empty["diagnostics"][0]["code"] == "REVIEW_SCOPE_INVALID"
-    finding = {"unit_id": target, "return_to": "P3", "reason": "The recorded gap needs a precise next step",
+    finding = {"unit_id": target, "return_to": "P2", "reason": "The recorded gap needs a precise next step",
                "evidence": [{"reference": value["material_ref"], "locator": "gaps"}]}
     returned = harness.run("lint", {**review_request, "findings": [finding]}, "record-review", expected=1)
     record = harness.record(returned["data"]["content_review_ref"])
@@ -149,7 +149,7 @@ def test_explicit_material_skip_review_uses_actual_scope_without_scan_exemption(
     assert missing["diagnostics"][0]["code"] == "REVIEW_SCOPE_INVALID"
 
 
-@pytest.mark.parametrize("return_to", ["P2", "P3", "P4"])
+@pytest.mark.parametrize("return_to", ["P1", "P2", "P3"])
 def test_review_findings_keep_evidence_and_explicit_return_stage(harness, return_to):
     value = request(harness)
     plan = harness.run("change-plan", value, action="plan")["data"]["semantic_plan_ref"]
@@ -161,6 +161,18 @@ def test_review_findings_keep_evidence_and_explicit_return_stage(harness, return
     review = harness.record(result["data"]["content_review_ref"])
     assert result["phase"] == "needs_revision" and review["status"] == "failed"
     assert review["findings"] == [finding]
+
+
+def test_review_rejects_the_former_candidate_stage_number(harness):
+    value = request(harness)
+    plan = harness.run("change-plan", value, action="plan")["data"]["semantic_plan_ref"]
+    result = harness.run("lint", {"operation_id": "op", "semantic_plan_ref": plan,
+        "sampled_unit_ids": ["u1"], "unreviewed_unit_ids": [], "reason": "Read actual changed scope",
+        "findings": [{"unit_id": "u1", "return_to": "P4", "reason": "The old candidate stage is obsolete",
+                      "evidence": [{"source": "actual reviewed material", "locator": "L2"}]}]},
+        action="record-review", expected=2)
+    assert result["diagnostics"][0]["code"] == "INVALID_REVIEW_FINDING"
+    assert not list((harness.root / ".build/operations/op/content-review").glob("*.json"))
 
 
 @pytest.mark.parametrize("foreign_operation", [False, True])

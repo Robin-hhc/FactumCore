@@ -19,12 +19,13 @@ from support import contracts as _runtime_fixture
 REPO = _runtime_fixture.ROOT
 copy_runtime = _runtime_fixture.copy_runtime
 PUBLIC_SKILLS = tuple("hs-knowledge-" + name for name in (
-    "apply", "change-plan", "explore", "lint", "maintain", "query",
-    "source", "view-materialize"))
+    "apply", "change-plan", "explore", "review", "maintain", "query",
+    "source", "record", "view-materialize", "patrol-sync", "patrol-plan",
+    "patrol-reindex", "patrol-complete"))
 RETIRED_SKILLS = tuple("hs-knowledge-" + name for name in (
     "candidate-inspect", "candidate-revise", "governance-handoff", "index-build", "local-check",
     "merge-check", "publish-handoff", "query-regression", "recover", "source-capture",
-    "source-scan", "source-prepare"))
+    "source-scan", "source-prepare", "lint"))
 
 
 def target_call(slug, request, action=None):
@@ -241,12 +242,14 @@ class Pipeline:
         material = self.record(view["material_ref"])
         historical = {row["card_digest"]: str(self.root / row["card_ref"])
                       for row in material.get("candidates", []) if row.get("card_ref")}
-        result = self.call("knowledge-lint", {"operation_id": op, "view_ref": view_ref,
+        command = "knowledge-review" if self.repository_cli else "knowledge-lint"
+        action = None if self.repository_cli else "review"
+        result = self.call(command, {"operation_id": op, "view_ref": view_ref,
             "semantic_plan_ref": view["semantic_plan_ref"], "reviewer_id": "fixture-independent-reader",
             "independent_context": "fresh-fixture-context", "sampled_unit_ids": [row["unit_id"] for row in units],
             "unreviewed_unit_ids": [],
             "reason": "Fixture reader explicitly reviewed the entire selected scope", "findings": [],
-            "inputs": {"historical_card_objects": historical}}, "review")
+            "inputs": {"historical_card_objects": historical}}, action)
         ref = result["data"]["content_review_ref"]
         return ref, self.record(ref)
 
@@ -259,6 +262,10 @@ class Pipeline:
 
     def pending_record(self, op, view_ref):
         view = self.record(view_ref)
-        pending = self.call("knowledge-source", {"operation_id": op, "scan_ref": view["scan_ref"],
-            "view_ref": view_ref, "disposition_preview_ref": view["disposition_preview_ref"]}, "record")
+        if self.repository_cli:
+            pending = self.call("knowledge-record", {"operation_id": op, "view_ref": view_ref})
+        else:
+            # Explicit legacy transport retains its original source stage identity.
+            pending = self.call("knowledge-source", {"operation_id": op, "scan_ref": view["scan_ref"],
+                "view_ref": view_ref, "disposition_preview_ref": view["disposition_preview_ref"]}, "record")
         return pending["data"]["ingest_record_ref"]

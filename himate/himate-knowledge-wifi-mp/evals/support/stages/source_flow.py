@@ -1,7 +1,7 @@
 """Planned public document nodes in graph order, with synthetic review records.
 
 These are isolated CLI/transition checks, not an OpenFlow host or role-isolation
-acceptance. Mid-run card/index/log edits and no-P6 shortcut helpers are excluded.
+acceptance. Mid-run card/index/log edits and no-P5 shortcut helpers are excluded.
 """
 
 import json
@@ -40,7 +40,7 @@ class SupportedDocumentFlow:
         request = {
             "semantic_plan_ref": self.state["semantic_plan_ref"], "view_ref": self.state["view_ref"],
             "operation_id": self.operation,
-            "reviewer_id": "synthetic-reviewer", "independent_context": "P5-synthetic-fixture",
+            "reviewer_id": "synthetic-reviewer", "independent_context": "P4-synthetic-fixture",
             "sampled_unit_ids": [self.state["unit"]["unit_id"]], "unreviewed_unit_ids": [],
             "reason": "Synthetic declared review data; this does not establish real host isolation.",
             "findings": [],
@@ -90,7 +90,7 @@ class SupportedDocumentFlow:
         candidate = self.h.write(f".build/operations/{self.operation}/authored-rule.md", self.h.card("rule", bundle))
         self.state.update(self.call("view-materialize", {
             "semantic_plan_ref": self.state["semantic_plan_ref"],
-            "decisions": [{"candidate_id": unit_id, "decision": "create", "reason": "Planned P4 authoring",
+            "decisions": [{"candidate_id": unit_id, "decision": "create", "reason": "Planned P3 authoring",
                 "card_inputs": [candidate]}],
         })["data"])
         self.take("ready")

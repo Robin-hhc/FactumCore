@@ -1,4 +1,4 @@
-"""Real public P5 backedges preserve the original observation and frozen rounds."""
+"""Real public P4 backedges preserve the original observation and frozen rounds."""
 import copy
 import importlib.util
 from pathlib import Path
@@ -18,7 +18,7 @@ def replan(pipeline, operation, old_plan, material_ref, previous):
     return request
 
 
-@pytest.mark.parametrize("return_to", ["P2", "P3", "P4"])
+@pytest.mark.parametrize("return_to", ["P1", "P2", "P3"])
 def test_review_backedge_creates_a_new_frozen_round_without_rescanning_original(tmp_path, return_to):
     pipeline = fixture.Pipeline(tmp_path)
     calls, actual_call = [], pipeline.call
@@ -28,7 +28,7 @@ def test_review_backedge_creates_a_new_frozen_round_without_rescanning_original(
         return actual_call(skill, request, action, expected)
 
     pipeline.call = call
-    if return_to == "P2":
+    if return_to == "P1":
         seed_bundle_ref, seed_bundle = pipeline.capture("seed", b"# Older topic\nEarlier related protocol.\n", "seed-source")
         seed_view = pipeline.view("seed", seed_bundle_ref, "seed-rule", pipeline.card("seed-rule", seed_bundle))
         pipeline.apply("seed", seed_view)
@@ -44,14 +44,14 @@ def test_review_backedge_creates_a_new_frozen_round_without_rescanning_original(
         "semantic_plan_ref": first_view["semantic_plan_ref"], "sampled_unit_ids": unit_ids,
         "unreviewed_unit_ids": [], "reason": "Read the actual complete first candidate",
         "findings": [{"unit_id": unit_ids[0], "return_to": return_to,
-            "reason": "Read the existing seed card" if return_to == "P2" else "Correct the authored judgment" if return_to == "P3" else "Clarify the candidate description",
-            "evidence": [{"reference": "knowledge/rules/seed-rule.md" if return_to == "P2" else first_view_ref}]}]}, "review", expected=1)
+            "reason": "Read the existing seed card" if return_to == "P1" else "Correct the authored judgment" if return_to == "P2" else "Clarify the candidate description",
+            "evidence": [{"reference": "knowledge/rules/seed-rule.md" if return_to == "P1" else first_view_ref}]}]}, "review", expected=1)
     assert failure["data"]["return_to"] == [return_to]
     assert failure["data"]["fixed_checks_executed"] is False
     assert not (pipeline.root / "knowledge/rules/roundtrip-rule.md").exists()
-    previous = {"previous_view_ref": first_view_ref, "revision_reason": "P5 returned this exact candidate to " + return_to}
+    previous = {"previous_view_ref": first_view_ref, "revision_reason": "P4 returned this exact candidate to " + return_to}
     return_call_index = len(calls)
-    if return_to == "P2":
+    if return_to == "P1":
         assert "seed-rule" not in {row["card_id"] for row in pipeline.record(material_ref)["candidates"]}
         supplemented = pipeline.call("knowledge-source", {"operation_id": "round-b",
             "existing_material_ref": material_ref, "scan_ref": scan_ref, "candidate_card_ids": ["seed-rule"],
@@ -62,7 +62,7 @@ def test_review_backedge_creates_a_new_frozen_round_without_rescanning_original(
         material_ref = supplemented
         semantic_ref = pipeline.call("knowledge-change-plan", replan(pipeline, "round-b", first_plan, material_ref, previous),
                                      "plan")["data"]["semantic_plan_ref"]
-    elif return_to == "P3":
+    elif return_to == "P2":
         request = replan(pipeline, "round-b", first_plan, material_ref, previous)
         missing = pipeline.call("knowledge-change-plan", {key: value for key, value in request.items()
             if key not in {"previous_view_ref", "revision_reason"}}, "plan", expected=2)
@@ -80,7 +80,7 @@ def test_review_backedge_creates_a_new_frozen_round_without_rescanning_original(
         assert missing["diagnostics"][0]["code"] == "PLAN_OPERATION_MISMATCH"
     material = pipeline.record(material_ref)
     card = pipeline.card("roundtrip-rule", pipeline.record(material["bundle_ref"]))
-    if return_to == "P4":
+    if return_to == "P3":
         card = card.replace(b"summary: Isolated capture marker rule", b"summary: Clarified candidate description")
     draft = pipeline.write(".build/candidates/round-b/roundtrip-rule.md", card)
     produced = pipeline.call("knowledge-view-materialize", {"operation_id": "round-b", "semantic_plan_ref": semantic_ref,
@@ -92,9 +92,9 @@ def test_review_backedge_creates_a_new_frozen_round_without_rescanning_original(
     assert second_view["scan_ref"] == scan_ref and second_view["origin_scan_operation_id"] == "round-a"
     assert [row["unit_id"] for row in pipeline.record(semantic_ref)["units"]] == unit_ids
     # The material-return route invokes only the independent prepare action;
-    # grouping P1/P2 into one node must not restart a scan or default run.
+    # the P1 source node must not restart a scan or default run.
     source_calls = [action for skill, action in calls[return_call_index:] if skill == "knowledge-source"]
-    assert source_calls == (["prepare"] if return_to == "P2" else [])
+    assert source_calls == (["prepare"] if return_to == "P1" else [])
     pipeline.review("round-b", second_view_ref)
     pending_ref = pipeline.pending_record("round-b", second_view_ref)
     pending = pipeline.record(pending_ref)

@@ -1,4 +1,4 @@
-"""Saved seven-stage stops are observations, never replay or fresh index health."""
+"""Saved six-node stops are observations, never replay or fresh index health."""
 
 import hashlib
 import json

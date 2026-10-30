@@ -746,14 +746,14 @@ def run(view, rules, inputs=None, scope=None, *, query_context=None):
                                     + ", Claims=" + str(outcome["actual_claim_ids"]), candidate.get("semantic_plan_ref", ""))
                             by_group["index"]["findings"][-1].update(
                                 case_id=outcome["case_id"], purpose=outcome["purpose"], expected=outcome["expected"],
-                                actual=outcome["actual"], actual_claim_ids=outcome["actual_claim_ids"], return_to="P3")
+                                actual=outcome["actual"], actual_claim_ids=outcome["actual_claim_ids"], return_to="P2")
         except (v.ContractError, OSError, ValueError, ImportError) as exc:
             caught("index", exc)
     return _finish_report(report)
 
 
 def report_complete(report):
-    """Keep P5 input gaps visible even when a semantic failure wins status."""
+    """Keep P4 input gaps visible even when a semantic failure wins status."""
     if any(row["status"] == "incomplete" for row in report["checks"]):
         return False
     for row in report["checks"]:

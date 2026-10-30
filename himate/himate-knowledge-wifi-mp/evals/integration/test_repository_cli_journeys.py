@@ -33,12 +33,9 @@ def test_repository_only_document_publication_and_receipt_read(tmp_path, monkeyp
         queries=[{"id": "find-repository", "query": "capture", "required": ["repository-card"]}],
     )
     p.review("repository-document", view_ref)
-    prepared = p.prepared["repository-document"]
-    record_ref = p.call("knowledge-source", {
-        "operation_id": "repository-document", "scan_ref": prepared["scan_ref"],
-        "view_ref": view_ref,
-        "disposition_preview_ref": p.record(view_ref)["disposition_preview_ref"],
-    }, "record")["data"]["ingest_record_ref"]
+    record_ref = p.call("knowledge-record", {
+        "operation_id": "repository-document", "view_ref": view_ref,
+    })["data"]["ingest_record_ref"]
     result = p.call("knowledge-apply", {
         "operation_id": "repository-document", "view_ref": view_ref,
         "ingest_record_ref": record_ref,

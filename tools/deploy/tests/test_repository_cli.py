@@ -3,13 +3,109 @@
 from __future__ import annotations
 
 import json
+import shutil
 
 import pytest
+import yaml
 
 from test_deploy import (
     DOMAIN, all_target_bytes, assert_no_targets, cli, invoke, put, tree,
     write_runtime, write_runtime_manifest,
 )
+
+
+def source_with_combined_record(source):
+    """An eight-package synthetic release with record still inside source."""
+    packages = source / "skills/common/knowledge"
+    former = packages / "hs-knowledge-new-0"
+    package = packages / "hs-knowledge-source"
+    assert former.resolve().is_relative_to(source.resolve())
+    assert package.resolve().is_relative_to(source.resolve()) and not package.exists()
+    former.rename(package)
+    put(package, "SKILL.md", "---\nname: hs-knowledge-source\ndescription: fixture source and record\n---\n")
+    contract = yaml.safe_load((package / "artifacts/result.yaml").read_bytes())
+    contract.update(id="hs-knowledge-source-record-result", required=True,
+                    applies_to={"node_ids": ["record_ingest"]}, required_on={"exit_ids": ["recorded"]})
+    old = yaml.safe_dump(contract).encode()
+    put(package, "artifacts/record-result.yaml", old)
+    for name in ("hs-knowledge-ingest", "hs-knowledge-lint"):
+        path = source / "workflows/common/knowledge" / name / "workflow.yaml"
+        workflow = yaml.safe_load(path.read_bytes())
+        workflow["nodes"] = [{"id": "record_ingest", "type": "skill", "skill": "hs-knowledge-source"}]
+        path.write_text(yaml.safe_dump(workflow), encoding="utf-8")
+    return old
+
+
+def split_record_package(source):
+    packages = source / "skills/common/knowledge"
+    source_package = packages / "hs-knowledge-source"
+    record_package = packages / "hs-knowledge-record"
+    declaration = (source_package / "artifacts/record-result.yaml").read_bytes()
+    put(record_package, "SKILL.md", "---\nname: hs-knowledge-record\ndescription: fixture record\n---\nknowledge record\n")
+    shutil.copytree(source_package / "references/results", record_package / "references/results")
+    put(record_package, "artifacts/result.yaml", declaration)
+    (source_package / "artifacts/record-result.yaml").unlink()
+    for name in ("hs-knowledge-ingest", "hs-knowledge-lint"):
+        path = source / "workflows/common/knowledge" / name / "workflow.yaml"
+        workflow = yaml.safe_load(path.read_bytes())
+        workflow["nodes"][0]["skill"] = "hs-knowledge-record"
+        path.write_text(yaml.safe_dump(workflow), encoding="utf-8")
+
+
+def test_nine_instruction_packages_install_the_record_host_identity(source, targets):
+    original = source_with_combined_record(source)
+    split_record_package(source)
+    code, result = cli(source, targets)
+    assert (code, result["status"]) == (0, "deployed")
+    assert len(result["packages"]["skills"]) == 9
+    installed = targets["skills_root"] / "hs-knowledge-record"
+    assert (installed / "artifacts/result.yaml").read_bytes() == original
+    assert (installed / "artifacts/templates/result.md").read_bytes() == (installed / "references/results/templates/result.md").read_bytes()
+    assert not (targets["skills_root"] / "hs-knowledge-source/artifacts/record-result.yaml").exists()
+
+
+@pytest.mark.parametrize("fail", [False, True])
+def test_eight_to_nine_package_upgrade_moves_record_resources_atomically(
+    backend, monkeypatch, capsys, source, targets, fail,
+):
+    original = source_with_combined_record(source)
+    assert cli(source, targets)[0] == 0
+    knowledge = targets["project_root"] / DOMAIN
+    business = {
+        "logs/ingest/keep.yaml": b"synthetic established business record\n",
+        "docs-raw/sources/dbox.local.yml": b"synthetic private source configuration\n",
+    }
+    for name, data in business.items():
+        put(knowledge, name, data)
+    before = all_target_bytes(targets)
+    split_record_package(source)
+    destination = targets["skills_root"] / "hs-knowledge-record/artifacts/result.yaml"
+    if fail:
+        real_write = backend._write_atomic
+
+        def interrupted(path, data, *args):
+            real_write(path, data, *args)
+            if path == destination:
+                raise OSError("Synthetic stop while moving the record declaration")
+
+        monkeypatch.setattr(backend, "_write_atomic", interrupted)
+    code, result = invoke(backend, capsys, source, targets)
+    if fail:
+        assert (code, result["status"], result["rolled_back"]) == (3, "failed", True)
+        assert all_target_bytes(targets) == before
+    else:
+        assert (code, result["status"]) == (0, "deployed")
+        assert len(result["packages"]["skills"]) == 9
+        assert destination.read_bytes() == original
+        assert not (targets["skills_root"] / "hs-knowledge-source/artifacts/record-result.yaml").exists()
+        for name, data in business.items():
+            assert (knowledge / name).read_bytes() == data
+        for name in ("hs-knowledge-ingest", "hs-knowledge-lint"):
+            installed = targets["workflows_root"] / name / "workflow.yaml"
+            assert yaml.safe_load(installed.read_bytes())["nodes"][0]["skill"] == "hs-knowledge-record"
+        repeated = cli(source, targets)
+        assert repeated[0] == 0
+        assert repeated[1]["write_count"] == repeated[1]["delete_count"] == repeated[1]["remove_directory_count"] == 0
 
 
 def test_canonical_result_references_materialize_the_host_view(source, targets):

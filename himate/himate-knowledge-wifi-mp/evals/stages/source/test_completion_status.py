@@ -201,7 +201,7 @@ def test_real_independent_activation_without_regression_binding_rejects_forged_c
 
     if completion_kind == "batch":
         # Stop before indexing/query execution with a real IO blocker. The
-        # independently built/activated generation below has no P7 regression.
+        # independently built/activated generation below has no P6 regression.
         planned_flow.produce("applied")
         operation, view_ref = planned_flow.operation, planned_flow.state["view_ref"]
     else:
@@ -302,7 +302,7 @@ def test_default_empty_raw_scope_is_valid_and_status_is_readonly(harness):
 
 def test_portable_formal_only_history_is_visible_without_private_tail_requirement(harness):
     # Explicit legacy apply-run compatibility: a formal ingest record alone
-    # does not assert the new P7 publication/retrieval/cleanup completion.
+    # does not assert the new P6 publication/retrieval/cleanup completion.
     applied_batch(harness)
     # Model a consuming clone that retains shared records and current knowledge.
     _remove_private_tree(harness.root, ".build")

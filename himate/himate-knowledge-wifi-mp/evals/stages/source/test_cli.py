@@ -107,7 +107,7 @@ def test_prepare_reads_all_card_states_and_each_adopted_version(harness):
 
     _, first = harness.capture("first", b"# Source\nOld first version.\n")
     _, second = harness.capture("second", b"# Source\nOld second version.\n")
-    # Explicit synthetic pre-existing formal state, not a P2 publication.
+    # Explicit synthetic pre-existing formal state, not a P1 publication.
     # Old originals must remain available after the current path changes.
     for bundle in (first, second):
         for entry in bundle["staged_objects"]:
@@ -152,7 +152,7 @@ def test_record_only_defer_is_portable_and_remains_unfinished(harness):
     assert record["content_view_digest"] is None
     assert not (harness.root / "logs/ingest").exists()
     assert not (harness.root / "knowledge").exists()
-    # P7 owns the formal write. A portable unresolved record cannot suppress work.
+    # P6 owns the formal write. A portable unresolved record cannot suppress work.
     harness.write(record["target_path"], (harness.root / result["data"]["record_ref"]).read_bytes())
     later = harness.run("source", {"operation_id": "later"}, "scan")
     assert harness.record(later["data"]["scan_ref"])["units"][0]["change"] == "unfinished"
@@ -169,7 +169,7 @@ def persist_defer(harness, operation, progress="blocked"):
                           "progress": progress, "card_refs": [], "claim_refs": []}],
     }, "record")
     record = harness.record(response["data"]["record_ref"])
-    # Isolated formalization fixture: only P7 owns this write in production.
+    # Isolated formalization fixture: only P6 owns this write in production.
     record["status"] = "recorded"
     record["progress"] = {"apply": {"status": "recorded", "operation_id": operation, "view_digest": None}}
     record.pop("digest")
@@ -380,7 +380,7 @@ def persist_skip(harness, operation, source=None):
                            "dispositions": dispositions, "skip_sample": {"independent": True, "reviewer": "separate-reviewer", "reason": "Synthetic full risk sample",
                            "sampled_unit_ids": [u["unit_id"] for u in scan["units"]], "unreviewed_unit_ids": []}}, "record")
     record = harness.record(response["data"]["record_ref"])
-    # Fixture P7 formalization: preserve disposition facts, add real stage fact.
+    # Fixture P6 formalization: preserve disposition facts, add real stage fact.
     record["status"] = "recorded"
     record["progress"] = {"apply": {"status": "recorded", "operation_id": operation, "view_digest": None}}
     record.pop("digest")

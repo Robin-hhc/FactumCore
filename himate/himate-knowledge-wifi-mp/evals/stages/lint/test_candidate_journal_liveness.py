@@ -1,4 +1,4 @@
-"""Candidate quality reads explicit inputs; writer barriers belong to P7."""
+"""Candidate quality reads explicit inputs; writer barriers belong to P6."""
 import hashlib
 import json
 

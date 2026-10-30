@@ -1,4 +1,4 @@
-"""Merge/split run through installed dbox CLIs, exact evidence and P7 cleanup."""
+"""Merge/split run through installed dbox CLIs, exact evidence and P6 cleanup."""
 
 import importlib.util
 from pathlib import Path

@@ -1,28 +1,43 @@
 ---
 name: hs-knowledge-apply
-description: Safely execute a local knowledge batch and its indexing, declared queries and activation; also build indexes, check regressions and describe scoped submissions independently.
+description: 将已确定的知识批次及处理记录安全落位，完成索引、冻结查询、激活和本批收尾；也处理明确指定的索引或事务维护任务。
 ---
 
-执行入口为实际知识根的 `python K/knowledge.py apply`；K内Windows可用 `.\knowledge.cmd apply`，POSIX可用 `sh ./knowledge.sh apply`。一次注册后可用裸knowledge。Skill只提供指令与文本契约，实现与依赖锁随K/runtime分发；复杂请求保留--input/--output，CLI自动固定省略的根、操作和结果路径并返回真实引用。
+# 发布与检索收尾
 
-已有项目上下文时直接复用；缺少入口信息才使用已安装的 `hs-knowledge-explore` 做只读发现。首次部署或本机依赖缺项时，按知识根使用说明运行分发仓根 `deploy.ps1`，不自动执行 pip 或远端 setup；远端任务另核实际执行端的 Python、依赖和仓内 CLI。
+## 目标与输入
 
-本机数据使用本机知识根 K 的仓内 CLI。代码仓在服务器或 Windows 仅经 Samba 映射访问时，通过 OpenFlow／宿主已有 SSH MCP 在服务器原生 K 路径运行 CLI 并核对实际结果；不自动连接 SSH，不推断映射关系。本机与服务器分别准备 Python 和配套依赖，远端不需要安装或上传 Skill 脚本。请求、稿件和结果继续放实际知识根已有的 `.build/`、`logs/`、`artifacts/`。
+P6 发布本批已经确定的字节和处理事实，完成适用检索收尾。接收本次 `view_ref` 和 P5 的 `ingest_record_ref`；不重判内容、不重新生成稿件或重复 P4 质量审阅。
 
-本 Skill 可由人工单独调用。只校验本次业务输入、实际文件及输出，不检查 Workflow 顺序或上游通过凭证。流程顺序、角色分工与交棒合法性由 OpenFlow 的 Workflow 管理；人工测试时由人选择顺序。
+K 是已确认的实际知识根，在数据所在执行端调用仓内 CLI；入口不明时先用 `hs-knowledge-explore` 定位。
 
-`batch` requires `operation_id` and the exact P4 `view_ref`; an authored v3 batch also supplies its pending P6 `ingest_record_ref` so content and processing facts land together. This is business data, not a credential that a prior node passed. The compatibility `run` action also accepts a record-only `ingest_record_ref` without a content view. Review and lint results are optional supporting data; any supplied records must retain their exact business bindings.
+## 正常入库
 
-The seven-stage ingest uses `--action batch`. It checks the actual input snapshot, allowed targets, exact old/new bytes and recoverability, then applies the content and processing record together. It builds and fully verifies the actual candidate index, checks the author's frozen query cases and same-generation reads, and activates with the original expected-active baseline. These steps run in one process. Knowledge quality and independent content/code review belong to P5 lint; the new batch does not rerun full-library quality checks and does not require a passing lint receipt, Workflow identity or reviewer chain. Its transaction tier is `transaction_bytes_only`, not semantic acceptance.
+```text
+python K/knowledge.py apply --action batch --input REQUEST.json --json
+```
 
-The existing default `run` remains a compatibility action and retains its full fixed business checks. Request JSON cannot change that action to safety-only execution. It never infers independent review or writes a supported acceptance summary merely because bytes were applied. OpenFlow decides when review, lint and other workflow nodes must have run.
+REQUEST.json 传 `operation_id`、本批实际 `view_ref` 和 `ingest_record_ref`。CLI 在一次调用中执行：
 
-Writes retain the cooperative writer lock, full-write-set CAS, durable backups and recovery journal. Originals stay read-only. A conflict leaves external edits untouched. `committed` means local transaction completion; Git submission and merge remain human actions.
+1. 核对输入与旧基线，安全落位冻结内容、必要证据和处理记录。
+2. 为内容批构建并完整验证真实索引，执行 P2 原冻结查询及同代精读，按原活动指针基线激活。
+3. 保存正式发布／完成记录，清理本批明确可删的暂存；借用或受保护材料保留并说明。
 
-Use `--action batch|index-build|index-verify|index-activate|regression|regression-verify|prepare-submission|verify-submission` for the new public uses; see [actions and recovery](references/execution.md). Independent index and regression actions accept actual formal assets, generation and explicit cases without a producer view or private processing history. Query behavior is shared through public domain functions, never another Skill CLI.
+沿用真实返回引用与原查询预期，不手工拼装摘要、放宽断言或替换激活基线。仅记录批保留处置及欠账，不建索引。
 
-Keep `--action run|inspect|resume|rollback|verify-result` for existing transaction uses. Inspect unclear interrupted state before recovery. A committed transaction is changed through a new operation. `verify-result` checks recorded transaction bytes and exact current or retained historical content; it does not grant workflow eligibility or certify reviewer identity. Fault injection stays restricted to isolated synthetic fixtures.
+## 判断完成
 
-Use the execution host global Python with `python K/knowledge.py apply --input REQUEST.json --output RESPONSE.json --knowledge-root K`. `--rules-digest` optionally fixes the actual framework lock; omission still verifies the locked business rules. Read status/phase, diagnostics and returned references. See [artifact contract](artifacts/result.yaml).
+- `batch_complete: true` 才表示本批适用落位、检索收尾和清理完成；记录批按其实际结果交付。
+- `published`／`content_applied` 与 `batch_complete` 分别报告。已发布但 `cleanup_pending` 时保留发布事实，按同一操作重试缺失收尾或清理。
+- 查询失败、输入冲突或运行故障时保留实际停点和诊断；不要重复发布已落位内容、另选激活基线或回滚已经成功发布的批次。
 
-P7按冻结stage→final映射发布已审原字节及必要证据，内容落位并核验后发布正式成功record；适用索引、冻结查询和激活完成后才清本批可删owned暂存。正式结果在 `logs/publications/<op>/`，必要证据在 `logs/evidence/published/`。published/content_applied成功与cleanup_pending分开，清理失败不回滚已发布知识，batch_complete仍为false；重入只补缺失收尾／清理。借用、保护及用途不明项保留并说明，小型最终CLI响应仍可在.build。新事务与backups在本批transaction子目录，稳定writer锁不随批清理。正式结果读取、verify-result和提交核对不要求已清的旧view；旧事务仅按明确原ref与配套版本恢复，不自动迁移。
+交付实际 `publication_ref`、`completion_ref`、索引／查询结果及剩余事项。`committed` 仅表示本地事务状态，Git 提交、CI 和合入另行处理。
+
+## 按需维护
+
+- 中断事务、旧事务或发布后重试：[执行与恢复](references/execution.md#中断与恢复)。先按确切操作观察，再选择恢复；旧历史不迁移、不改签。
+- 明确要求独立建库、校验或激活：[索引维护](references/shared-publication.md#独立索引动作)。
+- 明确要求独立查询回归：[回归请求](references/regression.md)。正常 batch 已包含原冻结用例，不再另跑一套。
+- 准备或核对人工 Git 提交范围：[提交核对](references/execution.md#提交核对)。这些动作本身不提交或推送。
+
+写锁、完整写集 CAS、备份和落盘核验由 CLI 执行。保留冲突处的外部修改；原件、正式证据、其他操作和运行环境不属于本批清理目标。

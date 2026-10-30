@@ -1,7 +1,7 @@
 """Behavioral cases; shared synthetic materials live under evals/support."""
 
 from support.stages.apply_publication_cli import (
-    P7,
+    P6,
     assert_transport_denied,
     json,
     manual_pending,
@@ -16,7 +16,7 @@ from support.stages.apply_publication_cli import (
 
 
 def test_publication_batch_cleans_owned_draft_and_reentry_uses_formal_result(tmp_path):
-    trial = P7.PublicP7(tmp_path)
+    trial = P6.PublicP7(tmp_path)
     request = publication_content(trial)
     result = trial.call("batch", request)
     assert result["data"]["published"] is True and result["data"]["batch_complete"] is True, result
@@ -38,7 +38,7 @@ def test_publication_batch_cleans_owned_draft_and_reentry_uses_formal_result(tmp
 
 
 def test_publication_cleanup_failure_retries_without_rebuilding_index(tmp_path):
-    trial = P7.PublicP7(tmp_path)
+    trial = P6.PublicP7(tmp_path)
     request = publication_content(trial)
     probe = tmp_path / "probe"
     probe.mkdir()
@@ -64,7 +64,7 @@ Path.unlink = denied
 
 
 def test_actual_git_submission_verification_after_publication_cleanup(tmp_path):
-    trial = P7.PublicP7(tmp_path)
+    trial = P6.PublicP7(tmp_path)
     request = publication_content(trial)
     trial.git("init", "-b", "main")
     trial.git("add", "governance", "knowledge/index.md", "docs-raw")
@@ -82,7 +82,7 @@ def test_actual_git_submission_verification_after_publication_cleanup(tmp_path):
 
 
 def test_record_only_publishes_debt_then_cleans_owned_proposal(tmp_path):
-    trial = P7.PublicP7(tmp_path)
+    trial = P6.PublicP7(tmp_path)
     ctx = trial.context("facts")
     inventory = ctx.seal({"scope": ["docs-raw/specs"], "full_scan": False, "complete": True, "units": [{
         "unit_id": "one", "source_id": "raw", "path": "docs-raw/specs/a.md", "observed_fingerprint": "a" * 64,
@@ -100,7 +100,7 @@ def test_record_only_publishes_debt_then_cleans_owned_proposal(tmp_path):
 
 
 def test_content_publication_with_no_new_event_proposal_rechecks_mechanical_block(tmp_path):
-    trial = P7.PublicP7(tmp_path)
+    trial = P6.PublicP7(tmp_path)
     ctx = trial.context("batch")
     state = trial.modules["maintenance"].state(ctx)
     state.update(validity_epoch=1, blocked_claims=[{
@@ -170,7 +170,7 @@ sys.setprofile(replace_pending)
 
 
 def test_historical_verify_result_rejects_another_real_publication(tmp_path):
-    trial = P7.PublicP7(tmp_path)
+    trial = P6.PublicP7(tmp_path)
     first = trial.call("batch", publication_content(trial))["data"]
     second = trial.call("batch", publication_content(trial, "other"))["data"]
     correct = trial.call("verify-result", {"operation_id": "batch", "purpose": "historical",
@@ -182,7 +182,7 @@ def test_historical_verify_result_rejects_another_real_publication(tmp_path):
 
 
 def test_first_null_baseline_survives_manifest_failure_and_retry_omission(tmp_path):
-    trial = P7.PublicP7(tmp_path)
+    trial = P6.PublicP7(tmp_path)
     request = publication_content(trial)
     probe = tmp_path / "probe"
     probe.mkdir()
@@ -206,7 +206,7 @@ sys.setprofile(reject)
 
 
 def test_unactivated_publication_cannot_complete_by_resealing_only_completion(tmp_path):
-    trial = P7.PublicP7(tmp_path)
+    trial = P6.PublicP7(tmp_path)
     request = publication_content(trial)
     probe = tmp_path / "probe"
     probe.mkdir()
@@ -224,7 +224,7 @@ sys.setprofile(reject)
         "content_digest": manifest["content_digest"], "published": True, "batch_complete": True, "phase": "completed",
         "data": {"activated": True}, "retrieval": {"complete": True},
         "cleanup": {"status": "done", "owned": [], "deleted": [], "retained": [], "failed": []}}, "artifact_manifest")
-    trial.write("logs/publications/batch/completion.json", P7.HELPER.canonical(forged))
+    trial.write("logs/publications/batch/completion.json", P6.HELPER.canonical(forged))
     denied = trial.call("batch", {"operation_id": "batch"}, expected=2)
     assert denied["diagnostics"][0]["code"] == "PUBLICATION_COMPLETION_CHANGED"
     assert not (trial.root / "artifacts/indexes/local/active.json").exists()
@@ -232,22 +232,22 @@ sys.setprofile(reject)
 
 @pytest.mark.parametrize("damage", ["missing_report", "inline_regression"])
 def test_completed_publication_requires_unchanged_formal_retrieval_facts(tmp_path, damage):
-    trial = P7.PublicP7(tmp_path)
+    trial = P6.PublicP7(tmp_path)
     result = trial.call("batch", publication_content(trial))["data"]
     if damage == "missing_report":
         (trial.root / result["report_ref"]).unlink()
     else:
         completion = trial.record(result["completion_ref"])
         completion["retrieval"]["regression"]["cases"][0]["query"] = "replacement query"
-        trial.write(result["completion_ref"], P7.HELPER.canonical(trial.modules["records"].seal(completion)))
+        trial.write(result["completion_ref"], P6.HELPER.canonical(trial.modules["records"].seal(completion)))
     denied = trial.call("batch", {"operation_id": "batch"}, expected=2)
     assert denied["status"] == "error"
 
 
 def test_historical_completion_survives_rules_identity_and_local_index_changes(tmp_path):
-    trial = P7.PublicP7(tmp_path)
+    trial = P6.PublicP7(tmp_path)
     result = trial.call("batch", publication_content(trial))["data"]
-    publication = P7.HELPER.load_contract("publication")
+    publication = P6.HELPER.load_contract("publication")
     ctx = trial.context("reader")
     ctx.args.rules_digest = "f" * 64
     shutil.rmtree(trial.root / "artifacts")
@@ -257,13 +257,13 @@ def test_historical_completion_survives_rules_identity_and_local_index_changes(t
 
 
 def test_rules_upgrade_keeps_historical_verification_without_current_eligibility(tmp_path):
-    trial = P7.PublicP7(tmp_path)
+    trial = P6.PublicP7(tmp_path)
     result = trial.call("batch", publication_content(trial))["data"]
     contract = trial.root / "governance/contracts/indexing.py"
     contract.write_bytes(contract.read_bytes() + b"\n# Synthetic infrastructure-only rules upgrade.\n")
     lock_path = trial.root / "governance/framework.lock.yaml"
     lock = yaml.safe_load(lock_path.read_bytes())
-    lock["files"]["contracts/indexing.py"]["sha256"] = P7.HELPER.sha(contract.read_bytes())
+    lock["files"]["contracts/indexing.py"]["sha256"] = P6.HELPER.sha(contract.read_bytes())
     lock_path.write_text(yaml.safe_dump(lock, sort_keys=False), encoding="utf-8")
     refused = trial.call("verify-result", {"operation_id": "batch", "publication_ref": result["publication_ref"]}, expected=2)
     assert refused["diagnostics"][0]["code"] == "STALE_RULES"
@@ -271,12 +271,12 @@ def test_rules_upgrade_keeps_historical_verification_without_current_eligibility
         "purpose": "historical"})["data"]
     assert historical["result_verified"] is True and historical["eligible_files"] == []
     assert historical["historical_files"] == [{"path": "knowledge/rules/batch-card.md",
-        "sha256": P7.HELPER.sha((trial.root / "knowledge/rules/batch-card.md").read_bytes())}]
+        "sha256": P6.HELPER.sha((trial.root / "knowledge/rules/batch-card.md").read_bytes())}]
 
 
 @pytest.mark.parametrize("destination", ["logs/events/response.json", ".build/operations/another/response.json", "artifacts/response.json"])
 def test_batch_transport_rejects_other_knowledge_paths_before_business_write(tmp_path, destination):
-    trial = P7.PublicP7(tmp_path)
+    trial = P6.PublicP7(tmp_path)
     # The guard precedes the business handler. No capture/view is needed to
     # exercise its real CLI boundary; all business-path tests above retain it.
     request = {"operation_id": "batch"}
@@ -289,7 +289,7 @@ def test_batch_transport_rejects_other_knowledge_paths_before_business_write(tmp
 
 
 def test_batch_own_transport_request_is_cleaned_but_final_envelope_does_not_recreate_ledger(tmp_path):
-    trial = P7.PublicP7(tmp_path)
+    trial = P6.PublicP7(tmp_path)
     request = publication_content(trial)
     incoming = trial.root / ".build/operations/batch/request.json"
     outgoing = trial.root / ".build/operations/batch/final.json"
@@ -304,7 +304,7 @@ def test_batch_own_transport_request_is_cleaned_but_final_envelope_does_not_recr
     "owned-files.json", "batch-intent.json", "batch-build.json", "batch-complete.json", "view.json",
     "final-view.json", "plan.json", "disposition-preview.json", "view-summary.json", "revision.json"])
 def test_batch_response_cannot_recreate_reserved_protocol_slots(tmp_path, slot):
-    trial = P7.PublicP7(tmp_path)
+    trial = P6.PublicP7(tmp_path)
     request = {"operation_id": "batch"}
     output = trial.root / ".build/operations/batch" / slot
     if slot in {"owned-files.json", "view.json"}:
@@ -316,7 +316,7 @@ def test_batch_response_cannot_recreate_reserved_protocol_slots(tmp_path, slot):
 
 
 def test_actual_source_defer_state_is_submitted_and_survives_git_clone(tmp_path):
-    trial = P7.PublicP7(tmp_path)
+    trial = P6.PublicP7(tmp_path)
     initial = publication_content(trial)
     trial.git("init", "-b", "main")
     trial.git("add", "governance", "knowledge/index.md", "docs-raw", "runtime",
@@ -341,27 +341,27 @@ def test_actual_source_defer_state_is_submitted_and_survives_git_clone(tmp_path)
     lock["snapshots"] = list(snapshots.values())
     ctx = trial.context("deferred")
     adopted = trial.modules["input_snapshot"].capture_inputs(ctx, bundle=bundle, material={
-        "current_files": [{"path": "docs-raw/specs/raw.md", "sha256": P7.HELPER.sha(changed)}]})
+        "current_files": [{"path": "docs-raw/specs/raw.md", "sha256": P6.HELPER.sha(changed)}]})
     view_ref = trial.view("deferred", {"governance/sources.lock.yaml": yaml.safe_dump(lock, sort_keys=False).encode()},
         snapshots=bundle["snapshots"], snapshot=adopted)
     view = trial.record(view_ref)
     view.update(staged_objects=bundle["staged_objects"], event_proposals=bundle["event_proposals"],
         owned_files=ctx.owned_files(), target_queries=[{"id": "debt", "query": "capture marker", "forbidden": ["batch-card"]}])
-    publication = P7.HELPER.load_contract("publication")
+    publication = P6.HELPER.load_contract("publication")
     view["publication_plan"] = publication.prepare_plan(ctx, view)
     view["content_digest"] = view["publication_plan"]["content_digest"]
     view = ctx.modules["records"].seal(view)
-    raw = P7.HELPER.canonical(view)
+    raw = P6.HELPER.canonical(view)
     trial.write(view_ref, raw)
     ctx.register_owned(view_ref, raw)
     inventory = ctx.seal({"scope": ["docs-raw/specs"], "full_scan": False, "complete": True, "units": [{
-        "unit_id": "changed", "source_id": "raw", "path": "docs-raw/specs/raw.md", "observed_fingerprint": P7.HELPER.sha(changed),
-        "previous_fingerprint": P7.HELPER.sha(previous), "change": "changed", "progress": None, "read_error": None}]}, "source_inventory")
+        "unit_id": "changed", "source_id": "raw", "path": "docs-raw/specs/raw.md", "observed_fingerprint": P6.HELPER.sha(changed),
+        "previous_fingerprint": P6.HELPER.sha(previous), "change": "changed", "progress": None, "read_error": None}]}, "source_inventory")
     scan_ref = ctx.save(ctx.base + "/inventory.json", inventory)
     record = ctx.seal({"record_id": "deferred", "target_path": "logs/ingest/deferred.yaml", "batch_kind": "content",
         "status": "pending", "progress": {}, "scan_ref": scan_ref, "scan_digest": inventory["digest"], "inventory": inventory,
         "content_view_digest": view["digest"], "dispositions": [{"unit_id": "changed", "action": "defer",
-        "reason": "Read the real changed source; defer updating its old Claim", "observed_fingerprint": P7.HELPER.sha(changed),
+        "reason": "Read the real changed source; defer updating its old Claim", "observed_fingerprint": P6.HELPER.sha(changed),
         "adopted_fingerprint": None, "progress": "blocked", "card_refs": [], "claim_refs": []}]}, "ingest_record")
     record_ref = ctx.save(ctx.base + "/record.json", record)
     result = trial.call("batch", {"operation_id": "deferred", "view_ref": view_ref, "ingest_record_ref": record_ref})["data"]
@@ -378,7 +378,7 @@ def test_actual_source_defer_state_is_submitted_and_survives_git_clone(tmp_path)
     trial.git("clone", "--no-hardlinks", str(trial.root), str(clone))
     assert json.loads((clone / "logs/events/state.json").read_bytes()) == state
     assert not (clone / ".build").exists()
-    consumer = P7.PublicP7.__new__(P7.PublicP7)
+    consumer = P6.PublicP7.__new__(P6.PublicP7)
     consumer.base, consumer.root, consumer.calls = tmp_path / "consumer-io", clone, 0
     consumer.repository_cli = True
     consumer.base.mkdir()

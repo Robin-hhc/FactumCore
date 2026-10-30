@@ -1,5 +1,7 @@
-# Writing guide
+# 结果写作
 
-Report the actual CLI status, phase, diagnostics and returned business file references. Use the output of this invocation; do not invent a passing result. OpenFlow owns run/node/attempt tracking and transition checks.
+使用本次 CLI 的实际 `status`、`phase`、诊断和引用。
 
-For run, show actual scan/material references, prepared versus truly unchanged, or stopped_stage and the saved scan on failure. An unchanged result has no material or processing record. Independent scan shows execution_history=not_inspected and compatible empty finalization arrays. For status, state targeted exact-ref inspection versus explicit global overview. A P6 record is pending publication, not formal success.
+- `prepared`：列出 `scan_ref/material_ref`、实际范围及缺口，交 P2 判断。
+- `unchanged`：说明本次观察完整且确无事项；不补写材料或处理记录引用。
+- 失败：保留诊断、`stopped_stage` 和实际已保存引用，不把部分产物写成准备成功。

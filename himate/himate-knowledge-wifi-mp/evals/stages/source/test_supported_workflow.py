@@ -51,7 +51,7 @@ def test_explicit_current_p7_stop_resumes_without_p1_history_route(planned_flow,
     assert details["completion"]["published"] is True
     assert details["completion"]["batch_complete"] is False
     assert details["completion"]["next_action"] == "resume_batch"
-    # Resume the explicitly known current P7, without a new Workflow adopting it.
+    # Resume the explicitly known current P6, without a new Workflow adopting it.
     assert flow.current == next_node
     flow.finish()
     assert flow.trace == PLANNED_DOCUMENT_NODES[:prefix_count] + ["apply_view"]

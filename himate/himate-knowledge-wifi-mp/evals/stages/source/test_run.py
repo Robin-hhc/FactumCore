@@ -1,7 +1,7 @@
 """Combined public preparation, frozen retries and real post-publication no-ops.
 
 Edited inventories below are explicitly synthetic fault inputs, never processing
-or review success records. The true no-op oracle uses the real public P7 fixture.
+or review success records. The true no-op oracle uses the real public P6 fixture.
 """
 
 import copy

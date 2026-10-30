@@ -1,4 +1,4 @@
-"""Public P5/P7 reject adopted dbox drift without rescanning its whole tree."""
+"""Public P4/P6 reject adopted dbox drift without rescanning its whole tree."""
 
 import importlib.util
 import json
@@ -22,7 +22,7 @@ def cli(pipeline, skill, action, request, *, expected=0, environment=None):
     pipeline.sequence += 1
     incoming = pipeline.base / f"stage-input-{pipeline.sequence}.json"
     outgoing = pipeline.base / f"stage-output-{pipeline.sequence}.json"
-    incoming.write_bytes(journey.existing.P7.HELPER.canonical(request))
+    incoming.write_bytes(journey.existing.P6.HELPER.canonical(request))
     process = subprocess.run(
         [sys.executable, str(pipeline.root / "knowledge.py"), skill, "--json",
          "--knowledge-root", str(pipeline.root), "--rules-digest", pipeline.rules,
@@ -55,7 +55,7 @@ def before_review(tmp_path):
         operation, bundle_ref, "dbox-rule", pipeline.card("dbox-rule", pipeline.record(bundle_ref)),
         scan_ref=prepared["scan_ref"], material_ref=prepared["material_ref"],
     )
-    # Preserve the exact original public P4 request for a genuine reentry below.
+    # Preserve the exact original public P3 request for a genuine reentry below.
     materialize_request = json.loads((pipeline.base / f"manual-in-{pipeline.sequence}.json").read_bytes())
     view = pipeline.record(view_ref)
     semantic = pipeline.record(view["semantic_plan_ref"])

@@ -1,7 +1,3 @@
-# Review guide
+# 发现结果核对
 
-Check the actual result and relevant card/source/view/index bytes. State unresolved gaps. Workflow order, role assignment and handoff validation belong to OpenFlow. A successful business check does not prove semantic correctness, deployment or Git merge.
-
-CodeGraph readiness and symbol navigation are separate observations. Confirm that code_ref tasks use the actual target Skill/common rules and do not silently initialize a graph, install tooling or configure remote CI. No internal graph node ID should become a card reference.
-
-Report current context discovery only; do not turn an old private operation into a resumed Workflow.
+核对项目、配置、K和实际入口是否一致；所选能力是否对应用户目标。已有有效上下文时无需重复发现。缺项按实际结果说明，旧操作或模块标签不补作当前事实。

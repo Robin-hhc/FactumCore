@@ -39,7 +39,7 @@ def batch(pipeline, request, *, environment=None, expected=0, action="batch"):
     pipeline.sequence += 1
     incoming = pipeline.base / f"batch-input-{pipeline.sequence}.json"
     outgoing = pipeline.base / f"batch-output-{pipeline.sequence}.json"
-    incoming.write_bytes(existing.P7.HELPER.canonical(request))
+    incoming.write_bytes(existing.P6.HELPER.canonical(request))
     process = subprocess.run([sys.executable, str(pipeline.root / "knowledge.py"), "apply", "--json",
         "--knowledge-root", str(pipeline.root), "--input", str(incoming), "--output", str(outgoing),
         "--action", action], capture_output=True, env=environment, timeout=120)

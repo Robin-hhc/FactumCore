@@ -1,57 +1,57 @@
-# Material preparation, capture and exact-source resolution
+# 来源材料操作
 
-Use explicit `--action prepare` for independent material preparation. Default / `run` first observes current inputs as described in [normal preparation](request.md). Supply `operation_id` and one of:
+## 材料输入
 
-- `scan_ref`, optionally `unit_ids`: consume those actual fixed inventory units. Omitted `unit_ids` selects non-unchanged units. It does not evaluate a passed ticket or require a Workflow identity. Every selected current original must still match its observed fingerprint.
-- `targets`: explicit raw or configured code selections without a preceding scan. A raw selection has `source_path`, optional `source_id`, explicit `attachments`, `version`, `context_ref` and `expected_fingerprint`; a code selection has `kind:"code"`, `repo_id`, `relative_path`, optional `source_id`, `text_encoding`, `version` and `context_ref`. Source IDs reuse the unique registered path identity or a deterministic logical identity. `target_id` may explicitly bind an addition; it cannot be reused for a different target.
-- Explicit `candidate_card_ids`, `topics` and/or `code_bundle_refs`: acquire the clearly requested reading material. `code_bundle_refs` may be strings or `{bundle_ref,bundle_digest}` and must contain current authorized code only.
+`prepare` 直接准备指定阅读材料，不先强制扫描。以下输入按实际任务选用：
 
-`existing_material_ref` requests an immutable supplement. Before candidate freezing, the same operation may add explicit targets, topics or candidate IDs. Returning from P5 after a candidate exists uses a **new operation** with `previous_view_ref` and a nonempty `revision_reason`; that exact previous view must adopt the supplied old material and original scan. Cross-operation adoption without that business link is rejected. Original scan, targets and adopted fingerprints remain fixed; no source inventory is rewritten or re-signed. The new material keeps `previous_material_ref/previous_material_digest`, the exact previous view and `origin_scan_operation_id`. Replacing a fixed scan or reusing a target identity for different inputs is rejected. Supplementation does not invoke a raw inventory scan. Drift of adopted sources, formal candidates, configuration, rules or previous candidate inputs stops with `SOURCE_CHANGED` and `data:{needs_scan:true,affected_scope:[...]}`. A changed explicit code bundle remains `CURRENT_CODE_REQUIRED`.
+| 选择方式 | 请求内容 |
+|---|---|
+| 固定扫描清单 | `scan_ref`，可选 `unit_ids`；省略单元选择时采用非 `unchanged` 单元 |
+| 明确 raw 目标 | `targets` 中提供 `source_path`，可附 `source_id/attachments/version/context_ref/expected_fingerprint` |
+| 明确代码目标 | `targets` 中提供 `kind:"code"`、`repo_id`、`relative_path`，可附 `source_id/text_encoding/version/context_ref` |
+| 明确卡片、主题或代码包 | `candidate_card_ids`、`topics`、`code_bundle_refs`；代码包必须是本次授权范围内的当前代码 |
 
-The `prepared` response contains `material_ref/material_digest`, `bundle_ref`, optional `scan_ref` and `gaps`. Material preserves selected `unit_ids` and/or explicit `targets`, exact individual `bundles`, `candidates` with immutable card copies and full adopted old originals, `current_code`, `current_files`, `adopted_objects` and explicit gaps. Explicit targets do not fabricate `scan_ref`, inventory completeness or change classifications. Material and combined bundle use `.build/operations/<operation>/materials/<digest>/...`; consumers must follow returned references. Missing adopted historical material is an explicit gap, never an implicit latest substitution.
+`source_path` 相对 K；代码 `repo_id` 使用项目发现返回的实际模块身份，`relative_path` 相对该模块。`code_bundle_refs` 可为引用字符串或 `{bundle_ref,bundle_digest}`。使用本次返回的身份和引用，不猜机器路径或另建来源登记。
 
-When a project context is adopted, P2 reads its actual record and fixes `context_ref/context_digest` in both the material and combined bundle. A supplement cannot replace that adopted context. These are exact business-input bindings for P4 and later byte checks, without a role, Workflow or passed-step credential.
+输出 `prepared` 包含 `material_ref/material_digest`、`bundle_ref`、适用的 `scan_ref` 和 `gaps`。材料保存新旧原文、完整候选旧卡、定位、采用版本和缺口；候选关联只是阅读线索，由 P2 决定是否修改。独立目标不伪造全库扫描、变化分类或完整性。
 
-Candidate discovery decodes formal card data and follows adopted sources, requested topics/IDs and downstream `requires/derived_from` relations across all lifecycle states. Ordinary `related` does not imply a mandatory dependency. Only selected candidates acquire full old originals. P2 does not repeat whole-library Profile/Claim quality checks; P5 owns those checks.
+## 补料与返工
 
-Existing `sources[].code_ref` values are retained in adopted old-source records. They describe symbols only for registered code resources; authors fill new values in the P4 card from actual prepared source, following K's `governance/specs/cards.md`. Capture requests and immutable snapshots do not acquire a separate symbol registry. A resolved source may also return `code_navigation`; it describes the current configured file separately from the exact retained snapshot and `current_source_matches`.
+| 当前状态 | 调用方式 |
+|---|---|
+| 语义计划及候选尚未冻结 | `prepare` 可在当前操作用 `existing_material_ref` 和明确补充目标保存新材料版本 |
+| 已有候选 view，明确返回补料 | 新 `operation_id`，传 `existing_material_ref`、实际 `previous_view_ref`、非空 `revision_reason` 和补充目标 |
+| P2计划已冻结，但P3尚无view | 保留实际停点；不能承诺同操作换材料后可重写计划，也不能编造前序view开启返工 |
 
-`--action capture` retains the original independent capture behavior below.
+已有候选的补料沿用它绑定的原扫描及处理单元身份，保留旧工件。新材料必须继续显式传给后续计划与稿件，不能重新采用旧材料引用冒充补料结果。采用来源、旧卡、代码、配置或规则已经变化时，按 `SOURCE_CHANGED` 等诊断刷新实际输入；不沿失效清单假称已补齐。
 
-Capture request: `operation_id`, `source_path`, `source_id`; optional `version`, explicit `attachments`, `context_ref`. Sources are the original six in-repository raw directories or logical `docs-raw/sources/dbox/<relative-path>` through the K-specific local mapping. Main documents and relative attachments stay within that same source root; dbox attachments may traverse parents only within the mapped root. No native link/junction traversal or expanded code authorization. Primary MD/TXT must be nonempty UTF-8, PDF needs a text layer on every page, DOCX supports paragraphs/tables with explicit visual gaps. No URLs, platform API, OCR, active content, network access or writes to originals.
+原失败的确定重试与新一轮观察分开处理。材料仍有缺口时如实交作者，不能为继续流程伪造原文、摘要或通过声明。
 
-The current dbox execution binding travels with adopted material and current_files; it is separate from logical source/snapshot identity and shared workspace config_digest. Independent capture/prepare may fix a new binding when they do not adopt existing current inputs. Reusing an existing material/view must inherit and recheck its original binding; changing to an identical-byte directory is still drift. P4/P5/P7 check adopted inputs at their existing checkpoints, without rescanning the entire directory. P7 publishes exact retained objects, not private root/configuration data or an entire dbox mirror. Missing current mapping does not prevent recovery of fixed published evidence, but cannot establish current applicability.
+## 巡检备料
 
-Code request: `operation_id`, `kind:"code"`, `repo_id`, `relative_path`, `source_id`; `context_ref` is optional. For `code_root`/`modules` workspaces use the logical scope ID returned by workspace discovery and a source path relative to that scope. The root config is discovered by its exact knowledge-root mapping; no catalog, upstream context record or duplicated policy registration is required. The shared mapping restricts reads to declared modules, excluding more specific nested scopes and repository-management paths. Capture freezes selected bytes with before/after checks, file hashes and exact locators. File-workspace evidence is based on the mapped source files rather than repository-manager integration. `code_identity` retains the compatible `kind:"export"` with `evidence_basis:"filesystem"`; revision is null and version stays unknown unless explicitly supplied. Current static source checks can verify actual bytes with unknown repository version. Labels do not establish builds, macros, Target applicability or semantic correctness; those require the actual Claim context and independent review. Resource identities use logical scope/path rather than machine paths.
+使用 patrol 返回的 `source_request` 调用 `prepare`。保留变化 raw、待修卡来源和当前代码目标的明确并集；纯代码修订可以有 `unit_ids: []`，不能省略这个选择而扩成默认范围。
 
-Legacy explicit repository requests retain their existing code-policy and Git-recovery behavior for old evidence. The Git-specific paragraphs below apply only to that legacy format; do not introduce them when processing a module workspace.
+仅请求显式启用时采用 `tolerate_source_errors` 或 `collect_local_attachments`。前者保留不可读／不支持材料的逐项欠账，不能吞掉指纹或配置漂移；后者枚举已落地 Markdown 的安全本地附件，不获取远端内容或宣称识别图片语义。巡检借用的固定库存不属于本次 P6 可清理暂存。
 
-Optional `version` records a label supplied from explicit source material. Preserve the original material and its provenance in the workflow evidence, keep the observed label type, and leave omitted identity or state unknown. The capture script records the supplied label without authenticating its meaning. Current source integrity continues to depend on exact file bytes and locators.
+## 确切来源操作
 
-Optional code-only `text_encoding` is exactly `utf-8` (default) or `gb18030`; encoding is never guessed. Explicit encodings decode strictly and reject invalid bytes or NUL with `UNREADABLE_CODE_TEXT`; unknown encodings return `INVALID_CODE_ENCODING`. Without this option, the original UTF-8 behavior remains: opaque/non-UTF-8 bytes are retained with no interpreted text. The original file is never transcoded. A GB18030 selection freezes UTF-8 derived text, line locators and adapter `code-gb18030:1`; UTF-8 retains `code-utf8:1` and its existing snapshot identity. Exact Git restoration can rebuild either fixed adapter and must match the frozen text/locator hashes without the first machine's caches.
+### capture：独立捕获
 
-Read-only Git calls trust only the exact already-authorized repository through a per-command `safe.directory`; they do not add a wildcard or modify user/global Git configuration. Root, origin, module and exact-byte checks still apply when filesystem ownership differs from the current account.
+raw 请求使用 `source_path/source_id`；代码请求使用 `kind:"code"/repo_id/relative_path/source_id`。可选 `version` 仅记录明确提供的版本线索，缺失保持未知。
 
-For an authorized Git code checkout, when the selected committed HEAD blob exactly equals the captured bytes, the node automatically registers `recovery:{kind:git,method:git,repo_id,commit,path,status:available}` and verifies it through the common exact resolver. A separate `local_recovery` retains the exact captured object if present-day configuration or the Git object becomes unavailable. P7 may use a locally recoverable object after checking its hash, size and locator; code eligibility still requires the applicable exact repository context and independent Claim review. Capturing dirty or export bytes alone does not establish that eligibility. Local fallback does not prove cross-machine recovery, which remains a human publishing responsibility. With no first-machine text/locator cache, supported `code-utf8:1` or `code-gb18030:1` extraction is rebuilt from the exact Git original and checked against its frozen text and locator fingerprints; incompatible extraction remains unavailable.
+支持非空 UTF-8 MD/TXT、具有文字层的 PDF、DOCX 段落和表格；图片等未解释内容保留限制。代码的 `text_encoding` 可明确为 `utf-8` 或 `gb18030`，不猜编码、不转写原文件。代码模块按根 `config.yml` 的真实映射授权，标签或符号定位不能证明宏、构建或当前产品适用性。
 
-The configured WiFi root must match the explicit knowledge root. A supplied receipt `commit` or `head` must match actual Git HEAD; unknown remains unknown. Both capture and current-byte comparison verify actual Git top-level and a declared expected origin. Missing, mismatched or invalid present-day authorization yields null current status during historical recovery, while the exact retained evidence stays readable.
+### resolve 与 resolve-source：恢复原版
 
-`--action resolve`: `operation_id`, `bundle_ref`; verifies retained original, extraction and locator digests. `--action resolve-source`: `operation_id`, `source_ref:{evidence_ref,source_id,snapshot_id,locator}` and optional candidate `bundle_ref`. Without a bundle, resolution uses the exact formally registered snapshot, never implicit latest.
+- `resolve`：给出确切 `bundle_ref`。
+- `resolve-source`：给出 `source_ref:{evidence_ref,source_id,snapshot_id,locator}`，可附确切 `bundle_ref`；未提供包时读取正式登记的指定快照。
 
-The result includes `source_kind`, the logical `resource`, immutable original bytes, selected `text`, original locator, snapshot identity and limitations. `current_source_matches` is true/false/null after separately comparing current authorized source bytes. Missing code authorization returns null while retained historical evidence remains readable. A successful historical replay does not prove current applicability. MD/TXT and UTF-8 code use `lines` start/end; PDF uses `page`; DOCX uses `paragraph` or `table_row` with table/row. Opaque attachments return no interpreted text.
+使用返回的 `original_ref`、`text`、定位和限制。`current_source_matches` 单独说明当前授权文件是否仍匹配，可能为 true、false 或 null；历史恢复成功不证明当前适用。
 
-Machine code-change verification may use a code-only `bytes` locator with zero-based half-open start/end, including the empty range of an empty file. It returns `text:null` and exact original bytes with an explicit interpretation limitation; it does not assert a text location or positive semantic support.
+CLI 可从固定保留对象、确切本地 Git 对象或登记路径的匹配字节恢复原版，并核对提取与定位。缺旧版就保留缺口，不拿新版、同名文件或其他执行目录顶替。MD/TXT/文本代码按行，PDF 按页，DOCX 按段落／表格行解释；不透明附件不产生解释文本，字节定位也不冒充语义证据。
 
-Changed registered raw sources produce frozen old-to-new event proposals in the current operation stage. P7 publishes the corresponding formal event after content validation; capture does not register formal event state. Independent explicit maintenance registration keeps its own business effect. Capture never writes sources.lock, formal cards or indexes.
+## 原件与输出边界
 
-For ordinary in-repository raw originals, capture automatically checks the configured workspace Git HEAD. Only when the exact committed blob equals the bytes read does it register `recovery:{method:git,kind:git,commit:<full object ID>,path:<workspace-relative file>,status:available}`. Otherwise it retains an exact local evidence object, which may support local ingest after the applicable review and checks. Human publishing must separately provide the exact originals for fixed CI and cross-machine recovery. No commit, network fetch or service startup occurs.
+原件只读，材料与请求／响应使用本次 K 下的操作暂存。dbox 是逻辑来源目录，私人映射只留执行端；附件不得越出实际来源根或跟随链接。需要旧规则、旧版本或来源恢复时只采用明确引用，不搜索“最近一次”私有执行。
 
-Git recovery selects repository roots from the actual `config.yml`, never a source-supplied root. Ordinary raw Git paths stay within the six K raw directories; code recovery additionally requires a configured `repo_id`. Dbox uses published exact objects or an exact-hash mapped current file, never Git history under its virtual prefix. Only fixed local commit/blob reads run, with lazy fetch, prompts, protocols and hooks disabled. Missing first-machine extraction caches may be reproduced from the exact Git original only when the frozen text and locator digests still match. Full old originals are distinct from current working-tree bytes.
-
-Clean checkouts do not need the producer's `.build/`, `artifacts/`, transaction logs or source caches. If a retained object is absent, the formal source lock may resolve its uniquely registered current raw/attachment path or configured code module file only when both byte hash and size exactly match the requested snapshot. This also covers originals first committed after ingest. It never searches for another file or substitutes newer bytes. The returned `original_ref` identifies the actual recovered source. Fixed raw Git recovery also works with `code_root` / `modules`; it does not require business code to use Git.
-
-For a missing or changed registered in-repository raw file, recovery may inspect up to 1000 local commits affecting that exact registered path and select only bytes matching the snapshot hash and size. This covers a source first committed together with the formal ingest result and later upgraded. It does not follow renames, invoke signature verification, fetch missing history or rewrite the source lock. Missing/truncated history remains unavailable.
-
-Absent extraction and locator caches are reconstructed from verified exact bytes and checked against their frozen fingerprints. A missing old version, incompatible extraction or unavailable configured module remains an explicit gap. Keep adopted build/runtime materials and effective maintenance restrictions separately; clearing source caches does not make those inputs optional.
-
-Ingest capture stages original/attachment bytes, extraction and locator objects, retained cards, checked code and proposed events under the current operation. It does not publish formal event state or evidence before P7. The exact stage-to-final mapping fixes durable `logs/evidence/published/` references in the authored payload; publication copies identical bytes. Explicit historical recovery is distinct from searching old execution directories. Borrowed previous material is retained, never owned by the borrowing operation cleanup.
+已有 `sources[].code_ref` 随旧材料保留，新代码引用由 P3 作者依据实际源码填写。此处不替作者判断 Claim，不运行整库质量检查，也不写正式卡、来源锁、处理记录或索引。

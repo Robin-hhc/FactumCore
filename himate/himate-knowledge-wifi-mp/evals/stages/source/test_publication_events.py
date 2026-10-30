@@ -38,7 +38,7 @@ def published_fixture(harness, *, install=True):
                        "card_inputs": [draft]}],
     })["data"]
     view = harness.record(produced["view_ref"])
-    # Model exact content commit only; this is not an end-to-end P7 success.
+    # Model exact content commit only; this is not an end-to-end P6 success.
     if install:
         for row in view["writes"]:
             harness.write(row["path"], base64.b64decode(row["bytes_b64"]))

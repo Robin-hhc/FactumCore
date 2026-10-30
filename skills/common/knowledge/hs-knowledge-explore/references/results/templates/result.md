@@ -1,8 +1,6 @@
-# Node result
+# 项目发现结果
 
-- Operation and requested action:
-- Actual status / phase:
-- Business output file references:
-- Diagnostics and remaining gaps:
-
-Use the actual CLI response. OpenFlow records its own execution identities.
+- 用户目标与所选能力：
+- 实际项目、执行端和知识根：
+- 本次上下文引用：
+- 缺口与后续动作：

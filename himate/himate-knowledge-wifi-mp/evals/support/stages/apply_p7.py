@@ -1,4 +1,4 @@
-"""Actual public P7 CLIs over isolated raw/card bytes and local Git objects."""
+"""Actual public P6 CLIs over isolated raw/card bytes and local Git objects."""
 
 import base64
 import importlib.util

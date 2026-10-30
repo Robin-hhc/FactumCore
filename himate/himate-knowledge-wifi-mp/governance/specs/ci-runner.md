@@ -33,4 +33,4 @@ request = {"inputs": {
 
 将占位替换为记录中实际的 snapshot ID 和 SHA-256，文件路径必须为绝对路径。旧卡文件按整份原字节核验 hash，再解析 Card ID 与实际 Claim；不加载其中的程序，不接受 JSON Python callback。对象只有正文／hash 身份，不能把它套上调用者请求的路径来证明该路径存在。有验收摘要时还须与其 Card ID／SHA／Claim 一致。完全虚构的目标是阻断错误；缺少必需旧正文是未完成（退出 2）。
 
-相同 `inputs` 可写入手动 lint 的 REQUEST JSON，无需 catalog。正式 `logs/ingest/` 记录检查最终 P7 状态、完整固定清单、真实卡／Claim 引用和处理前驱；P6 的 `.build` 中间记录不按最终状态验收。`pending` 是对象数组；明确 Card/Claim 必须成对并带未解 outcome，普通原件／范围待办不靠自由文本推断成 Claim 限制。
+相同 `inputs` 可写入手动 lint 的 REQUEST JSON，无需 catalog。正式 `logs/ingest/` 记录检查最终 P6 状态、完整固定清单、真实卡／Claim 引用和处理前驱；P5 的 `.build` 中间记录不按最终状态验收。`pending` 是对象数组；明确 Card/Claim 必须成对并带未解 outcome，普通原件／范围待办不靠自由文本推断成 Claim 限制。

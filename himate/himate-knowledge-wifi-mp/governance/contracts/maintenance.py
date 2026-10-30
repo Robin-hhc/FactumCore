@@ -92,7 +92,7 @@ def project_state(view, source_lock, cards, previous, *, current_source_matches)
     The caller has validated the view, cards, lock and exact source objects;
     this function cannot publish events, seal records or advance durable state.
     Only query-visible fields are returned, without a maintenance-record digest
-    or a predicted durable watermark. P7 remains the publication authority.
+    or a predicted durable watermark. P6 remains the publication authority.
     """
     proposals = view.get("event_proposals", [])
     if (not isinstance(proposals, list)
@@ -350,7 +350,7 @@ def _current_raw(context, reference, binding):
 
 
 def publish_changes(context, proposals):
-    """Publish frozen P7 transitions; caller already holds the cooperative lock.
+    """Publish frozen P6 transitions; caller already holds the cooperative lock.
 
     The current formal lock is the installed output, never the source of the old
     transition. The exact reviewed view supplies the original lock CAS binding.

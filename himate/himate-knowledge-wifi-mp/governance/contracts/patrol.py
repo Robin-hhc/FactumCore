@@ -18,7 +18,7 @@ STATE_REF = ".build/runtime/patrol-state.json"
 
 
 def _base(ctx):
-    # P7 owns and removes producer-private files. Governance observations must
+    # P6 owns and removes producer-private files. Governance observations must
     # survive that cleanup so completion can verify the original handoff.
     return "logs/patrol/" + ctx.operation
 
@@ -372,7 +372,7 @@ def plan(ctx):
     metadata_cards = {row["card_id"] for row in structural_findings}
     metadata_cards.update(row["card_id"] for row in references
                           if not row["claims"] and row["effect"].endswith("needs_review"))
-    # The existing P3 contract authors maintenance work by actual Claim ID.
+    # The existing P2 contract authors maintenance work by actual Claim ID.
     # Metadata defects are review tasks for that card's real Claims, without
     # inventing a raw document or asserting that its guidance text is false.
     for card in cards:
@@ -481,7 +481,7 @@ def _completion_publication(ctx, planned):
         # object's batch_complete or passed booleans as evidence.
         parts = supplied_completion.split("/")
         if len(parts) != 4 or parts[:2] != ["logs", "publications"] or parts[-1] != "completion.json":
-            raise NodeError("PATROL_COMPLETION_INVALID", "Expected a formal P7 completion_ref")
+            raise NodeError("PATROL_COMPLETION_INVALID", "Expected a formal P6 completion_ref")
         if operation and operation != parts[2]:
             raise NodeError("PATROL_COMPLETION_INVALID", "Completion and producer operation disagree")
         operation = parts[2]
@@ -492,7 +492,7 @@ def _completion_publication(ctx, planned):
     manifest = publication.read_manifest(ctx, ref, verify_files=True)
     completion = publication.read_completion(ctx, manifest)
     if not completion or completion.get("batch_complete") is not True:
-        raise NodeError("PATROL_P7_INCOMPLETE", "Real P7 retrieval/cleanup has not completed", ref)
+        raise NodeError("PATROL_P7_INCOMPLETE", "Real P6 retrieval/cleanup has not completed", ref)
     if manifest["rules_digest"] != ctx.args.rules_digest:
         raise NodeError("PATROL_P7_RULES_CHANGED", "Publication uses another rules identity")
     return manifest, completion
@@ -513,7 +513,7 @@ def complete(ctx):
             ctx.modules["records"].validate_ingest_record(record, rules=ctx.rules)
             if (record.get("scan_digest") != planned["scan_digest"]
                     or record.get("scan_ref") != planned["scan_ref"]):
-                raise NodeError("PATROL_SCAN_NOT_COVERED", "P7 processing record belongs to another source inventory")
+                raise NodeError("PATROL_SCAN_NOT_COVERED", "P6 processing record belongs to another source inventory")
             dispositions = {row["unit_id"]: row for row in record.get("dispositions", [])}
             if record.get("pending") or any(row.get("outcome") in {"defer", "failed", "uncovered"}
                                              for row in record.get("maintenance_dispositions", [])):

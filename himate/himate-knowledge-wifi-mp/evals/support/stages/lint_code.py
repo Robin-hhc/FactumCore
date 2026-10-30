@@ -562,7 +562,7 @@ class PublicCodeGateTests(unittest.TestCase):
         draft_ref = ".build/candidates/fixture-code-flow.md"
         (self.root / draft_ref).parent.mkdir(parents=True)
         (self.root / draft_ref).write_bytes(draft)
-        # Byte production belongs to P4; the independent legacy-run/index
+        # Byte production belongs to P3; the independent legacy-run/index
         # portion below deliberately tests those standalone public purposes.
         materialized = self.invoke("hs-knowledge-view-materialize", request={"operation_id": "op", "v3_required": True,
             "semantic_plan_ref": semantic_ref, "material_ref": material_ref,

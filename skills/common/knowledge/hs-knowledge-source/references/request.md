@@ -1,50 +1,60 @@
-# Public request
+# 来源请求与独立动作
 
-Common inputs: `operation_id` and the actual knowledge root. The current framework lock is loaded by default; `--rules-digest` can pin it explicitly. Catalog and Workflow execution identities are not required.
+## 通用调用
 
-- `configure`: use a separate setup operation on the actual execution host. Optional explicit `path` creates or updates the fixed `K/docs-raw/sources/dbox.local.yml`; omit it to check existing configuration only. The file has exactly `schema_version: '1.0'` and one native absolute directory `path`. Unknown/duplicate keys, wrong versions, relative/empty/non-string paths and linked roots are invalid. Before writing in Git, require an untracked local file with effective exact ignore; absent protection or a changed original-file baseline stops without overwriting it. Same-address updates preserve the original bytes. Non-Git workspaces may configure but must report ignore verification unavailable. The root is checked without recursively scanning documents; this does not prove ingestion or complete subtree access. Template and precise ignore ship, private mapping never ships or joins formal source records, owned/cleanup or submission lists. Windows deployment reports `pending_execution_host`; Linux invokes this installed public entry directly, without copying private deployment tools. Default run never configures or installs implicitly.
+```text
+python K/knowledge.py source --action ACTION --input REQUEST.json --json
+```
 
-  Example: `{"operation_id":"configure-dbox-unique","path":"ACTUAL_DBOX_DIRECTORY"}`. Replace the directory with that host's actual absolute path. Invoke `python K/knowledge.py source --action configure --input REQUEST.json --output RESPONSE.json --knowledge-root K`; the action is selected by the CLI argument, not a JSON field. Requests/results can stay under this setup operation's `.build/operations/` slot.
+K 是实际执行端的知识根；可显式传 `--knowledge-root K`、`--output RESPONSE.json`。请求使用本次 `operation_id`；当前规则锁默认加载，只有需要固定版本时才传 `--rules-digest`。动作由 CLI 参数选择，不在 JSON 中另写动作。
 
-- Default / `run`: observe current inputs and prepare actual material in the same process. Returns `prepared` with actual scan/material references, or `unchanged` only when the observation is complete, no raw/context/maintenance debt or gap remains and no explicit material/revision target exists. An empty actionable list alone is insufficient. Explicit targets, candidate cards, topics, code bundles, selected units or previous-material revision requests keep preparation actionable.
+## 正常观察与备料
 
-  The only run inventory slot is `.build/operations/<operation_id>/source-inventory.json`. Existing slots are validated for digest, shape, rules and unique unit identities. Scope/full-scan must match the current request. A retry reuses that exact observation and rechecks selected inputs before preparation; it never searches other operations or rewrites the scan. A supplied `scan_ref` must equal this slot. Adopt external/original scans with `prepare`. A saved no-op returns `FRESH_OBSERVATION_REQUIRED`, requiring a new operation rather than relabeling an old observation as current.
+省略 `--action` 等同 `run`。
 
-  Explicit `unit_ids` are passed unchanged. With `candidate_card_ids` and a source scope, run passes that scope's actual observed unit IDs, retaining their original change classifications. Without a source scope, it matches only those cards' real source IDs to observed units. Unmatched cards return `REVISION_SOURCE_REQUIRED` with `needs_explicit_source`; no unit is invented. Topics do not implicitly broaden selection.
+| 请求项 | 用途 |
+|---|---|
+| `source` | 可选 `string`，限定相对 K 的一个 raw 文件或目录 |
+| `unit_ids` | 明确选择实际库存单元，不重新编造单元 |
+| `candidate_card_ids`、`topics` | 明确修卡或找卡线索；主题不自行扩大扫描范围 |
+| `targets`、`code_bundle_refs` | 明确需要的原文或当前代码材料，格式见[材料输入](materials.md#材料输入) |
 
-  Failures keep their original diagnostics and add `data.stopped_stage: scan|prepare`, plus an actually saved `scan_ref`. Successful prepared responses combine scan completeness, actionable/unchanged IDs, affected Claims and context gaps with the actual material output. A saved scan or material gap is not a successful content judgment.
+默认扫描六类仓内 raw 和逻辑目录 `docs-raw/sources/dbox`，对照正式处理记录及维护限制。指定普通 raw 范围不依赖无关 dbox 配置。读取失败或扫描不完整不会被当作全部删除或无需更新。
 
-- `scan`: optional `source` (raw file or directory relative to K), optional `prior_record_refs` only for explicit recovery; default reads formal `logs/ingest/*.yaml`. Returns sealed `scan_ref`/`scan_digest`, including exact scope and completeness. `new`, `changed`, `missing`, `unchanged`, `unfinished`, `read_failed` are observations, not semantic decisions. Incomplete scans never infer missing files.
+`prepared` 返回实际扫描与材料引用；`unchanged` 只表示这次完整观察确无事项。空 `actionable_unit_ids` 不能单独证明无需处理，来源未变也可以有明确修卡任务。
 
-  Default full scope includes the original six directories and `docs-raw/sources/dbox`. The latter is a logical prefix resolved through that K's fixed local mapping, not a physical folder to inspect under sources. Select a logical dbox child to scan only that child; an ordinary raw scope does not load unrelated dbox configuration. No mapping, inaccessible root, linked paths and traversal failures are explicit gaps, not an empty complete inventory. Logical paths and source identities omit private locations; the local execution binding fixes config bytes and root identity for retry/preparation, including same-byte root replacement. Templates, local configuration and other reserved slots are not source units.
+### 重试与漂移
 
-  An explicitly absent `source` without formal deletion history returns `RAW_SCOPE_NOT_FOUND`; absent default raw directories are allowed. Complete no-op observations create no processing debt. Ordinary scan reads formal `logs/ingest/`, current originals and formal maintenance restrictions, not old `.build/operations`, producer journals or derived generations. Compatibility fields `finalization_pending` and `historical_finalization_unknown` are always `[]`; `execution_history` is `{"status":"not_inspected"}`. Explicit scan returns `scanned` without preparing material. The standalone ingest Workflow's `prepare_sources` node calls default/run and has `prepared` / `unchanged` exits; the governance Workflow explicitly calls prepare with its fixed patrol inventory. Source fingerprints cannot infer an unrecorded prior wording revision. Explicitly requested revisions remain actionable even when the source is unchanged.
+同一操作重试只采用该操作已保存的观察，范围保持不变；要采用别的库存或定向补料，调用 `prepare`。`FRESH_OBSERVATION_REQUIRED` 表示旧无变化观察不能代表现在，应新建操作重新观察。`REVISION_SOURCE_REQUIRED` 表示修卡目标缺少可匹配的实际来源，应补充明确来源或改用定向 `prepare`。
 
-- `prepare`: independent material preparation without an implicit scan. Explicit `scan_ref` receives the same digest/rules/shape/unit-identity validation; it need not be complete or belong to the current operation merely to prepare reading material. Exact cross-round adoption still requires the actual previous-view/material bindings at the applicable business stage. See [material inputs and source operations](materials.md); these share this package's CLI and do not dispatch another entry.
+失败响应保留原诊断，`data.stopped_stage` 指明停在 `scan` 或 `prepare`。有 `needs_scan/affected_scope` 时区分 raw、卡片、代码、配置或规则的实际变化；不能盲目重扫、覆盖旧产物或把所有路径都传给 `source`。
 
-  Governance may explicitly use `tolerate_source_errors: true` to retain each unreadable/unsupported unit or target as `CURRENT_ORIGINAL_UNAVAILABLE` debt while preparing readable inputs. Default preparation retains its existing strict behavior. Fixed primary/code fingerprint drift, configuration/rule drift and integrity conflicts still stop preparation; tolerance is not permission to claim completion. `collect_local_attachments: true` mechanically enumerates landed Markdown dependencies through the existing safe raw resolver, never fetches remote URLs, follows linked directories or claims image semantics. Standalone media units need an authored disposition explaining any attachment coverage or remaining limitation. Supplemented material preserves the old artifact and only replaces an unresolved attempted target/gap when it is actually recaptured.
+## 独立动作
 
-  The patrol supplies the exact union of changed/unfinished raw and repair-card raw as `unit_ids`, plus explicit current-code `targets` and candidate cards. Its inventory may be borrowed from local `logs/patrol/`; do not switch to run's default candidate narrowing or invent raw units for a code-only repair. Patrol inventories retain explicit selected-source coverage. Ordinary scan/run limit current dbox observations to the requested logical dbox coverage: `dbox_observation_scope` controls these observations, and an explicit ordinary-raw scope does not read unrelated dbox configuration or files. Other existing maintenance checks keep their original scope, and existing formal restrictions remain recorded.
+以下动作只在当前任务明确需要时使用。
 
-  A repeated absent file becomes unchanged only after its exact absence has a real terminal published disposition under the same rules and unambiguous identity. An unresolved deletion, read failure or incomplete observation remains actionable. `defer/failed/uncovered` actions remain unfinished even when an older record also labels progress skipped/withdrawn; historical records are not rewritten. A deleted file that reappears is changed again.
-- `record` normally receives `view_ref`, optional explicit `semantic_plan_ref` and `disposition_preview_ref` (defaulting to the view's exact references). The fixed P3 plan supplies `scan_ref`. P6 checks the preview's operation, semantic digest, input snapshot and exact unit/maintenance/card-decision copies, then transcribes them. Content units require P3's fixed `record_action`, `card_refs` and `claim_refs`; a mixed set of card decisions is never guessed into update. `authored_units` and `preview_card_decisions` retain the complete exact inputs. A supplied `dispositions` list may only equal the mechanical result; P6 cannot replace the authored decision.
+### configure：配置 dbox
 
-  Independent legacy `scan_ref` plus explicit `dispositions` remains a business-data utility without a review assertion. `lint_ref` and `skip_sample` are optional supporting data, not passing-step prerequisites. Each disposition has `unit_id`, action/reason, observed/adopted fingerprints, progress, card_refs and claim_refs. Include explicit coverage, pending and next_step when incomplete. P6 does not run lint or ask another Skill to review content. The proposed JSON-compatible YAML contains the sealed inventory so another clone can understand it without local `.build/`. Returns `ingest_record_ref`, `record_ref`, digest and formal `record_path`; P7 alone applies the formal record in the same batch as knowledge.
+需要使用 dbox 且实际执行端尚未配置时调用。请求可提供 `path`，值为该执行端可读的原生绝对目录；省略 `path` 只检查原配置。
 
-  A new return round may adopt the original scan without changing its bytes or operation identity. P6 requires the new view's exact previous-view/revision, semantic and material references and digests, and copies `origin_scan_operation_id` from the actual original inventory. An origin label alone cannot authorize cross-operation adoption. The record belongs to the new operation and embeds the unchanged original inventory; after final application, the original raw obligation is closed by that new record. Target status never searches all successors to infer adoption; consuming clones need no producer-private artifacts.
+```json
+{"operation_id":"configure-dbox","path":"ACTUAL_ABSOLUTE_DIRECTORY"}
+```
 
-  When context Claims are affected, pass the bound `semantic_plan_ref`; P6 copies its separate `maintenance_units` into shared `maintenance_dispositions` and preserves defer/failure/uncovered pending facts. Each uses `maintenance:<card>#<claim>` and binds the exact `scan.current_context.affected_claims` set. These do not become raw units; code-only work can have an empty raw list.
+把示例目录换成实际地址。配置固定保存在 `K/docs-raw/sources/dbox.local.yml`，包含 `schema_version: '1.0'` 和 `path`；私人文件不入库。CLI 核对目录和忽略保护后保存，同地址保留原字节。配置成功只证明根目录可用，不等于文档已扫描或入库。正常 `run` 不隐式配置或安装环境。
 
-- `status`: optional `target_operation_id`; returns `operations[].facts`, `stage_status`, `completion`, `catalog_gaps` and explicit unverified submission/CI/merge state. It does not write or resume anything.
+### scan：只观察
 
-  With a target, only that operation's fixed protocol slots and exact referenced artifacts are read. A new published operation uses `logs/publications/<op>/manifest.json` and `completion.json`; cleaned private view/journal/receipt paths are not required. Publication success and `cleanup_pending` remain distinct: published content is retained while `batch_complete` is false until applicable retrieval and eligible cleanup finish. Damaged selected formal publication data is a gap, never permission to adopt another operation or trust a private success summary.
+可传 `source` 限定范围，返回 `scanned`、`scan_ref`、摘要、范围和完整性，不准备材料。`new/changed/missing/unchanged/unfinished/read_failed` 是观察事实，作者仍需判断处理方式。
 
-  A legacy target can inspect its own inventory/material versions/plan/view/review/lint/record/journal and exact batch intent/build/completion chain. Intent without a transaction yields `resume_batch`; an unfinished journal yields `recover_transaction`; committed batch content without a build yields `rebuild_index`; the exact saved build yields `resume_queries` with the original `expected_active`, including null. A consistent saved terminal batch is an execution observation (`saved_facts_only`, `index_health: not_examined`). It is not a new full database-health assertion. Legacy independent indexes/regressions without an explicit batch chain remain unknown; matching filenames, operation labels or a global passing report do not create a chain. Formal-only processing history cannot prove local index readiness.
+完整的可读空范围有效；明确指定一个不存在且没有正式删除历史的文件会返回 `RAW_SCOPE_NOT_FOUND`。只有完整扫描才能据“未见”推断缺失。`prior_record_refs` 仅供明确的记录恢复用途，普通调用读取正式记录。
 
-  Without a target, `status` explicitly requests a global saved-history overview and may enumerate old operations, generations and reports. It reports corrupt entries in `catalog_gaps` while retaining readable operations. Top-level `complete` only describes readable fact collection, not workflow completion or knowledge health. Targeted status is isolated from unrelated catalog gaps. Ordinary scan still rejects invalid formal processing records it actually depends on.
+### capture、resolve、resolve-source：确切来源
 
-  A verified `rolled_back` journal is terminal (`not_applicable`, `scope: rolled_back`); retrying the content request requires a new operation. An unreadable selected journal remains unknown and requires inspection. Neither discovery nor compatibility changes the writer's real recovery/CAS gates. Explicit old formats keep their original bytes, rules and references; new Workflow discovery never silently adopts them.
+捕获或恢复原文时读[确切来源操作](materials.md#确切来源操作)。正常 `run/prepare` 已准备的材料不再重复捕获。
 
-Observed fingerprints and adopted versions are distinct. Unchanged input with unfinished processing or current-context restrictions remains actionable. Substantive skip uses `kind: substantive`; scan skips use `kind: scan_unchanged`. A record reports actual progress and does not itself approve the content or authorize Git publication. History follows explicit record predecessors per covered path; a narrow scan never erases earlier observations outside its scope, and conflicting branches remain unfinished.
+### status：观察已有执行事实
 
-A complete scan's genuine `missing` observation, explicitly handled as `deprecate`, records `progress: withdrawn` with no adopted fingerprint. Read failures and incomplete scans cannot use this absence disposition. The authored decision and exact reviewed view still bind the record; P7 establishes actual publication.
+需要查某次执行时提供 `target_operation_id`；只读取该操作及其确切引用。已发布操作可从正式 publication 读取，旧暂存已清理不等于发布失败。省略目标是明确的全局历史概览，可能返回 `catalog_gaps`。
+
+读取 `facts/stage_status/completion` 与真实缺口。保存的完成事实不代表当前索引健康，`cleanup_pending` 也不抹去已发布内容。此动作不恢复事务、重建索引或改变文件；需要这些操作时交对应维护任务处理。

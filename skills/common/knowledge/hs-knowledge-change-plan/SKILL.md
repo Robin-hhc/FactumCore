@@ -1,34 +1,33 @@
 ---
 name: hs-knowledge-change-plan
-description: Freeze Agent-authored Claim decisions, explicit source and maintenance dispositions, card actions and representative query expectations before drafting.
+description: 阅读新旧材料，确定逐Claim结论、来源处置、卡片动作及查询预期；用于入库和巡检的P2内容规划。
 ---
 
-执行入口为实际知识根的 `python K/knowledge.py change-plan`；K内Windows可用 `.\knowledge.cmd change-plan`，POSIX可用 `sh ./knowledge.sh change-plan`。一次注册后可用裸knowledge。Skill只提供指令与文本契约，实现与依赖锁随K/runtime分发；复杂请求保留--input/--output，CLI自动固定省略的根、操作和结果路径并返回真实引用。
+# 制定内容计划
 
-P3 是作者的内容决策入口。已有项目与规则上下文直接复用；缺入口时按已安装的 `hs-knowledge-explore` 指引定位实际知识根和配置。使用执行端已有的全局 Python，材料与结果放知识根现有 `.build/`、`logs/`、`artifacts/`。
+## 目标与输入
 
-本机数据使用本机知识根 K 的仓内 CLI。代码仓在服务器或 Windows 仅经 Samba 映射访问时，通过 OpenFlow／宿主已有 SSH MCP 在服务器原生 K 路径运行 CLI 并核对实际结果；不自动连接 SSH，不推断映射关系。本机与服务器分别准备 Python 和配套依赖，远端不需要安装或上传 Skill 脚本。
+根据本次 `material_ref` 和适用的 `scan_ref`，决定知识应如何新增、修改、保留或暂缓。脚本保存作者判断，不代替阅读与推理。
 
-Agent 先阅读实际原文、各卡采用旧版、完整旧卡及需要的源码／配置，再判断新增、更新、保留、退役或欠账，保存逐单元处置、逐 Claim 理由、卡动作及目标查询预期。脚本检查这些业务数据并固定内容，不生成知识断言或替代独立审阅。
+K 是实际执行端的知识根；已有上下文直接复用，入口不明时用 `hs-knowledge-explore` 定位。只读取本次明确引用的材料。
 
-`plan` 成功即保存并冻结本批语义计划，同一 `operation_id` 下不可追加或覆盖。请先汇总核对本批全部卡、Claim、处置和查询，再提交完整计划；不得用部分卡试跑校验后再扩充。
+## 作者判断
 
-默认动作 `plan`：
+1. 阅读实际新原文、采用的旧版本、完整旧卡及必要代码／配置，区分事实变化、条件变化和材料缺口。
+2. 对每个来源和维护单元给出 `content/skip/defer/failed/uncovered` 及理由。缺材料先返回 source 补料；已有材料不足以支持结论时保留欠账。
+3. 逐 Claim 说明修改前后、条件、依据与保留范围；为相关卡选择新建、更新、合并、拆分、退役或暂缓，保留身份及旧 Claim 去向。
+4. 固定代表性查询和明确预期，覆盖本批实际卡片；按目标 Claim 的用途及证据选择 `purpose`，不为获得通过弱化查询。
+
+编写请求前读[计划字段](references/request.md#计划字段)；内容批再读[查询用途与预期](references/request.md#查询用途与预期)。汇总核对完整批次后再提交；`plan` 成功即冻结材料绑定和计划，同一操作不能追加或覆盖。
+
+## 保存与交接
 
 ```text
-python K/knowledge.py change-plan --action plan --input REQUEST.json --output RESPONSE.json --knowledge-root K
+python K/knowledge.py change-plan --input REQUEST.json --json
 ```
 
-正常主线输入真实 `scan_ref` 与 `material_ref`。独立备料可只提供明确目标的 `material_ref`，按材料中的实际 `units` 覆盖，不要求 P1 通过票据、不伪造全库扫描。必须给出完整 `units`、`claim_changes`、`card_actions` 及适用的 `target_queries`；维护单元与 raw 单元分开。输出 `semantic_plan_ref`、内容绑定和冻结查询，阶段为 `content_planned`。
+`content_planned` 时将真实 `semantic_plan_ref` 交 P3。计划记录作者决定，不代表已独立审阅或发布。失败时保留诊断；材料变了不能给旧计划换一个材料引用继续。
 
-冻结查询先明确要验证哪条结论，再选择 `purpose` 和实际上下文。`implementation` 要求 Claim 具备实现或测量依据；代码链接只提供定位，不能把设计依据提升为实现依据。设计背景通常用 `guidance`；只有 `usage: current` 且适用范围匹配的结论才能按 `current` 检索。对新增／修改结论的正向用例，建议用 `expected_claim_ids` 指明 `CardID#ClaimID`；负向用例保留排除或空结果断言，不强填正向 Claim。用途和例子见 [request contract](references/request.md)。P5 会在最终候选上实际执行原冻结查询，预期不满足时回 P3 重判，不自动改用途凑通过。
+已有候选的内容重判使用新操作、真实 `previous_view_ref` 和 `revision_reason`，详见[返工](references/request.md#返工)。旧材料、计划和视图保持原字节。
 
-每个来源／维护单元固定记录动作和实际卡／Claim 引用。内容单元只有一种实际卡动作时可自动归一化；同时涉及多种动作时，作者必须明确选定其中一种 `record_action`。非内容单元沿用实际处置结果，P6 只转写，不代作者选择。
-
-P5 退回补料或重判时，使用新 `operation_id`，显式给出原 `previous_view_ref` 和实际 `revision_reason`。可以采用该旧稿精确绑定且未变化的材料，或 P2 保存的补料新版本；原 `scan_ref`、扫描摘要和处理单元 ID 保持不变。新计划记录原扫描操作及前序引用，不覆盖旧计划、旧稿或旧审阅。来源范围／字节已变则回 P1，不能用新操作伪造一次未执行的扫描。
-
-字节装配交给 P4 `hs-knowledge-view-materialize` 的 `run`；独立计划／skip／成稿审阅交给 P5 `hs-knowledge-lint`。本包的旧字节 `run/verify/rederive` 输入明确报告迁移位置，不委派兄弟 Skill；旧 `review` 不再是主线入口。来源指令不授予执行、联网或发布权限，本节点不提交或推送。
-
-详见 [request contract](references/request.md)。查看实际 ResultEnvelope 和引用文件；退出 0 不表示已审阅、入库、启用索引或合入。
-
-P3的新计划、请求和输出只写本批stage，不提前写正式事件、记录或证据。材料必须来自本次明确ref；不自动选最近旧计划。所用正式证据地址与stage映射继续传给P4，P7不会改写已审内容。
+本步不生产完整卡稿、不执行独立审阅或正式发布；P3 按计划成稿，P4 审实际内容。

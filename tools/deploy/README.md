@@ -8,11 +8,11 @@ powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 
 脚本询问三个目标，回车接受默认值：
 
-| 目标 | 默认值 |
+| 目标 | 默认值／填写方式 |
 |---|---|
 | Skill 安装根 | `~\.openflow\config\skills` |
 | Workflow 模板安装根 | `~\.openflow\config\workflow-templates` |
-| 代码仓／知识项目根 | `Y:\thursday\work_code` |
+| 代码仓／知识项目根 | 选择实际项目根，默认见脚本提示；下文以 `repo/` 示意 |
 
 第三项是项目根，不是知识子目录。分发源码位于 `repo/himate/himate-knowledge-wifi-mp/`；新项目默认安装到同样的 `himate/himate-knowledge-wifi-mp/`，模块列表为空，等待维护者按真实代码填写。已有 `config.yml` 时沿用其中安全的 `knowledge_roots.wifi`，包括原平铺路径或其他多级目录，保留配置与业务记录原字节，不自动搬迁已部署知识库；`himate/` 下其他组的目录也不在更新范围。`~` 按当前 Windows 用户目录展开；OpenFlow 使用自定义用户根时，请相应修改安装路径。
 
@@ -34,11 +34,11 @@ dbox仅分发知识根下的 `docs-raw/sources/dbox.example.yml` 与同目录精
 .\deploy.ps1 -NonInteractive `
   -SkillsRoot 'SKILLS_ROOT' `
   -WorkflowsRoot 'WORKFLOWS_ROOT' `
-  -ProjectRoot 'Y:\thursday\work_code' `
+  -ProjectRoot 'PROJECT_ROOT' `
   -Python 'PATH_TO_PYTHON'
 ```
 
-将 `PATH_TO_PYTHON`、`SKILLS_ROOT`、`WORKFLOWS_ROOT` 替换为实际路径。`-SourceRoot` 可指定完整分发源码根。路径中的空格请加引号；运行前确认映射盘在当前 PowerShell 用户会话可访问。
+将 `PATH_TO_PYTHON`、`SKILLS_ROOT`、`WORKFLOWS_ROOT`、`PROJECT_ROOT` 替换为实际路径。`-SourceRoot` 可指定完整分发源码根。路径中的空格请加引号；运行前确认映射盘在当前 PowerShell 用户会话可访问。
 
 Skill源包以 `SKILL.md` 与 `references/` 为主体，`artifacts/` 仅保存宿主产物YAML声明。写作／复核指南与模板的唯一源码在 `references/results/`；声明中的安全相对路径仍表示宿主安装包的 `artifacts/` 视图。打包时按声明从唯一参考源物化该视图，保留原声明身份、节点／出口和模板引用，不在源码中维护第二份Markdown。缺失资源、旧目录重复正文、非法引用或二进制内容会在写目标前阻断。
 
@@ -78,3 +78,5 @@ python -m pytest tools/deploy/tests -q
 这些用例使用隔离合成目录；实际 Samba、OpenFlow 加载和服务器环境需要另行核验。
 
 日常在K内用Windows `.\knowledge.cmd`、POSIX `sh ./knowledge.sh` 或明确的 `python K/knowledge.py`；一次注册后可用裸knowledge。Samba远端由宿主已有SSH在服务器原生K目录执行同一CLI，不自动连接、不猜驱动器映射，服务器无需安装或逐次上传Skill脚本。每个执行端首次分别准备Python与 `K/runtime/requirements.lock.txt` 依赖；`python K/knowledge.py doctor`只读核对实际环境，不自动安装。统一入口不等于SMB提速，实际收益须按执行端实测。
+
+分发从实际包发现十三项能力。P4使用 `hs-knowledge-review` 与 `knowledge review`；升级移除旧 `hs-knowledge-lint` Skill，保留同名治理 Workflow，审阅结果仍使用原宿主ID。治理 Workflow 的同步、计划、索引修复、完成核验分别绑定四个 `hs-knowledge-patrol-*` Skill，maintain仅保留独立维护。P5继续使用 `hs-knowledge-record` 与 `knowledge record`，升级移除source包内旧受管record声明并保留原记录ID。业务记录、旧工具身份和历史工件不改写。

@@ -1,4 +1,4 @@
-"""An actual stopped public P2 process cannot mark uncommitted sources handled."""
+"""An actual stopped public P1 process cannot mark uncommitted sources handled."""
 
 import importlib.util
 import json

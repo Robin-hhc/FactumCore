@@ -1,5 +1,5 @@
 id: hs-knowledge-explore-result
-title: 知识库项目入口：首次准备环境，后续定位代码仓与知识根并加载上下文。
+title: 项目发现结果
 required: true
 template: templates/result.md
 writing_guide: writing-guide.md

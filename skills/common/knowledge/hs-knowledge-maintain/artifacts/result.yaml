@@ -1,23 +1,10 @@
 id: hs-knowledge-maintain-result
-title: maintain result
+title: 独立来源维护结果
 required: true
 applies_to:
-  node_ids:
-  - sync_workspace
-  - plan_patrol
-  - refresh_index
-  - complete_patrol
+  node_ids: []
 required_on:
-  exit_ids:
-  - synced
-  - skipped
-  - needs_ingest
-  - needs_index
-  - unchanged
-  - blocked
-  - indexed
-  - completed
-  - pending
+  exit_ids: []
 template: templates/result.md
 writing_guide: writing-guide.md
 review_guide: review-guide.md

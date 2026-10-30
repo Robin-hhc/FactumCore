@@ -1,42 +1,39 @@
-# Public P7 actions
+# 批次执行与恢复
 
-All references are relative to the actual knowledge root. Every request has an explicit `operation_id`. The installed CLI accepts `--input`, `--output`, `--knowledge-root` and optional `--rules-digest`; existing response-path retry rules remain in force.
+## 批次请求
 
-| Action | Business input | Result and effects |
-|---|---|---|
-| `batch` | Exact `view_ref`, its `input_snapshot`, and the pending `ingest_record_ref` for a v3 batch; optional actual code contexts or shared publication inputs | Frozen identical-byte publication and postwrite content verification, formal processing facts/evidence, actual index and frozen queries, original-baseline activation, then bounded owned-stage cleanup |
-| `index-build` | Formal shared assets and actual material contexts; optional local/shared channel and repository snapshot data | A fully verified immutable candidate generation and its original `expected_active`; does not write knowledge or activate |
-| `index-verify` | Exact `generation_ref` | Verify schema, complete rows, database and card blobs, plus applicable shared publication data; does not activate |
-| `index-activate` | Exact `generation_ref` and original `expected_active` | Verify, then check writer barriers, actual indexed inputs and baseline under the writer lock; CAS activate and save the actual pointer observation |
-| `regression` | Exact `generation_ref`, original `expected_active`, and nonempty `cases`; a batch view/apply result may supply the cases as optional business data | Check declared card/Claim expectations, no truncation, and same-generation reads; failed cases never activate; passing cases use the original CAS baseline |
-| `regression-verify` | Exact `report_ref`, optionally the same original generation/cases/baseline | Re-execute the report's original assertions without activating; callers cannot replace the original case set or generation |
-| `prepare-submission` | Exact formal publication or selected legacy `view_ref`, optionally its actual `apply_result_ref` | Read actual selected local files/deletions and processing record, return `commit_files`; does not commit, push, merge or certify CI |
-| `verify-submission` | The same selected bytes and exact `commit_sha` | Read actual HEAD Git blobs/deletions and changed-file scope; only then report `submitted`; never performs a Git write |
+正常 P6 显式使用 `apply --action batch`。请求至少含本轮操作和实际产物：
 
-Cases retain `id`, `query`, `purpose`, `context`, `top_k`, required/forbidden card IDs, explicit expected order and optional expected/forbidden `card#claim` IDs. `expected_order: []` is a meaningful declared empty result. An empty case set or a case with no expected behavior is rejected. A failed query cannot be repaired by changing purpose, loosening assertions or replacing `expected_active`.
+```json
+{"operation_id":"本轮操作ID","view_ref":"实际P3视图引用","ingest_record_ref":"实际P5待发布记录引用"}
+```
 
-`batch` always uses the query expectations frozen in the selected view. A request cannot replace those cases. Batch success means publication, applicable observed retrieval activation and eligible owned-stage cleanup completed; it does not mean P5, CI, Git submission or merge has been independently proved. `committed` alone only describes the transaction.
+CLI 核对本批输入、冻结字节和真实旧基线后发布；内容批继续真实索引、原冻结查询、同代读取与原基线激活，再清理可删暂存。传入的检查／代码材料必须保持实际绑定；不以某个 passed 字段或宿主身份放行。
 
-## Recovery
+仅记录批可以只提供确切 `ingest_record_ref`；已有空视图时保留其绑定。它发布处理与欠账事实，不建索引、不声称内容完成。旧 `run` 接口保留原完整固定检查语义，普通新批次使用 `batch`。
 
-New transactions use `.build/operations/<operation_id>/transaction/journal.json`, `apply-result.json` and `backups/`. The stable cooperative writer lock is `.build/runtime/writer.lock` and is excluded from cleanup. Old actual `logs/operations/<operation_id>/journal.json` transactions remain explicit compatibility inputs; conflicting old/new journals for one operation are refused. New batch transactions explicitly record the checks actually performed. Existing `run` keeps full-check semantics; only the new batch's internal call selects its safety-only path. Request JSON is never a bypass flag.
+## 发布与清理结果
 
-Batch intent, built-generation reference/original active baseline, and completion are saved separately under `.build/operations/<operation_id>/batch-intent.json`, `batch-build.json` and `batch-complete.json`. They are business observations, not upstream authorization tickets. Missing producer-private records do not create obligations for another clean checkout.
+`publication_ref`、`completion_ref` 指向 `logs/publications/<操作>/` 的正式结果；必要证据位于 `logs/evidence/published/`。P6 发布已冻结的同字节内容，不重新成稿或重做 P4。
 
-After an interrupted write, resume or roll back the original journal and preserve external edits. A pending legacy transaction must use its matching entry/version. After a committed write, retrying the batch rechecks actual installed bytes and continues index/query/activation without applying again. After a lost activation response, inspect the actual pointer and stored activation observation; do not replace the original baseline or blindly replay activation.
+分别读取发布事实、检索收尾与 `batch_complete`。清理只作用于本批明确拥有且可删的文件；借用材料、其他操作、运行锁、正式依据和开发环境保留。保留文件与删除失败是两种结果。
 
-Activation history is rooted in the actual active pointer and its immutable predecessor links under `artifacts/indexes/<channel>/activations/`. A standalone `.build` observation does not prove activation. Completed published batches retain formal completion bindings to their actual generation, write/query execution and original baseline; normal historical result/status reads do not require producer-private files to remain. Another activated generation cannot stand in for this batch execution. An explicitly supplied baseline is frozen in the first batch intent even when a retry omits it.
+`cleanup_pending` 保持已发布事实和 `batch_complete:false`。同操作重试只补实际缺失的收尾／清理，不再次写内容或重建已经完成的索引。清后可由正式发布闭包读结果，无需恢复生产者旧 view 或 journal。历史正式结果按原协议读取，不改签。
 
-The prewrite snapshot describes the old formal tree. After application the candidate captures a separate postwrite snapshot including this batch's files. Process-local index verification can be reused only while the actual generation fingerprints still match. A restarted process fully verifies the generation again; a JSON `passed` field cannot serve as that in-memory observation.
+## 中断与恢复
 
-Only record-only batches finish without indexing. Their records retain unresolved/deferred facts and do not claim content completion. Once committed, content corrections use a new operation rather than undoing history or deleting formal records.
+| 已确认的状态 | 处理 |
+|---|---|
+| 写入事务未完成 | 对确切原操作使用 `inspect` 观察，再选择 `resume` 或 `rollback`；保留外部修改 |
+| 内容已发布，索引／查询／激活尚未完成 | 同操作重试 `batch`，读取实际剩余步骤；沿用原冻结查询和原 `expected_active` |
+| 激活响应丢失 | 检查真实活动指针与保存的激活观察，不替换原基线盲目重放 |
+| 已发布且仅清理失败 | 同操作重试缺失清理，保留正式内容 |
+| 已完成批次需要改内容 | 新操作走正常修订，不撤销历史或删除正式处理记录 |
 
-## Formal publication and cleanup
+旧事务只按明确原引用与配套版本恢复；不搜索并采用无关旧操作。`verify-result` 核实际当前／历史内容完整性，不等于知识质量、CI 或合入验收。输入冲突或罕见部分写入无法安全恢复时，保留真实状态，不承诺自动修复。
 
-P1–P6 new ingest business payloads, reports, checked code/material copies and request/response files stay in the current operation stage. P4/P5 freeze final references and exact stage-to-final hashes; P7 copies identical bytes without rematerializing reviewed cards or replacing source addresses. Necessary formal evidence is published under `logs/evidence/published/`; the content manifest and final completion are `logs/publications/<op>/manifest.json` and `completion.json`. Formal successful ingest records are written only after corresponding content publication and validation. Applicable index/query/activation then finish before cleanup.
+## 提交核对
 
-New publication protocol 1.2 retains `content_basis`, the exact public inputs to the original `content_digest`, and binds `publication_protocol` in the formal processing record. Readers check the complete write set and body hashes against that basis before recovering a historical card body. Record-only batches and references to an existing card not written by the batch keep their original evidence resolution. Protocols 1.0/1.1 remain readable without rewriting history; an old manifest lacking this basis supplies no new historical-body authority. An empty record-only view takes its exact pending record from the `batch` request and still verifies the record/view/operation binding; the sealed P4 view remains unchanged.
+`prepare-submission` 接收确切 `publication_ref`，或明确的旧 `view_ref/apply_result_ref`，返回本批实际 `commit_files`。`verify-submission` 再接确切 `commit_sha`，核真实 Git 对象、删除项和变更范围后才报告 submitted。
 
-Cleanup deletes only explicitly owned, eligible files of this operation. Borrowed previous materials, protected/known-use/unknown-use files remain with reasons; runtime locks, formal evidence, other operations and development environments are excluded. A final tiny CLI envelope may remain in `.build`. Eligible deletion failure keeps `published/content_applied` true and reports `cleanup_pending` with `batch_complete=false`; a retry verifies the formal binding and only retries missing tail/cleanup, never reapplies published bytes or rebuilds an already completed index. A retained file is distinct from a deletion failure.
-
-Result reads, `verify-result`, target status and submission preparation/verification use the exact formal publication closure after stage cleanup. Actual Git HEAD/commit/blob/deletion/scope checks remain mandatory for submitted claims; publication alone is not Git submission. New Workflows do not discover or adopt old draft operations. Explicit current Workflow continuation and matching old transaction recovery preserve their safety gates. Rare P7 partial multi-file repair, whole-directory atomic switching and abandoned-stage periodic GC are outside this cleanup contract.
+这些接口只读核对，不提交、推送、触发 CI 或合入。正式发布、Git 提交及远端合入分别报告；独立索引动作见[索引维护](shared-publication.md)，独立检索断言见[回归请求](regression.md)。

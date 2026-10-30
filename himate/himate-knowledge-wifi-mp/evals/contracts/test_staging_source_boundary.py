@@ -59,7 +59,7 @@ def test_existing_snapshot_keeps_old_fields_and_published_hash_recovers(tmp_path
     bundle = json.loads((tmp_path / output["bundle_ref"]).read_bytes())
     assert bundle["snapshots"] == [snapshot]
     assert resources.recover_snapshot(tmp_path, snapshot, staged_objects=bundle["staged_objects"]) == raw
-    # Simulate only the explicit P7 mapped object publication; remove current raw.
+    # Simulate only the explicit P6 mapped object publication; remove current raw.
     for row in bundle["staged_objects"]:
         write(tmp_path, row["final_ref"], (tmp_path / row["stage_ref"]).read_bytes())
     (tmp_path / source).unlink()

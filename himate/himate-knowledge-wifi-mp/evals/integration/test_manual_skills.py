@@ -37,7 +37,7 @@ def test_manual_document_scan_record_apply_index_query_keeps_business_checks(tmp
         staged_calls.append((slug, action))
         return response
 
-    # Each real P1-P6 public call may write only the disposable stage tree.
+    # Each real P1-P5 public call may write only the disposable stage tree.
     p.call = staged_call
     prepared = p.call("knowledge-source", {"operation_id": "manual"}, "run")
     assert prepared["phase"] == "prepared"
@@ -50,15 +50,14 @@ def test_manual_document_scan_record_apply_index_query_keeps_business_checks(tmp
         queries=[{"id": "find-manual", "query": "capture", "required": ["manual-rule"]}])
     p.review("manual", view_ref)
     unit = scan["units"][0]
-    record_ref = p.call("knowledge-source", {
-        "operation_id": "manual", "scan_ref": scan_ref, "view_ref": view_ref,
-        "disposition_preview_ref": p.record(view_ref)["disposition_preview_ref"],
-    }, "record")["data"]["ingest_record_ref"]
+    record_ref = p.call("knowledge-record", {
+        "operation_id": "manual", "view_ref": view_ref,
+    })["data"]["ingest_record_ref"]
     assert "lint_ref" not in p.record(record_ref)
     assert {slug for slug, _ in staged_calls} >= {"knowledge-source",
         "knowledge-change-plan", "knowledge-view-materialize", "knowledge-lint"}
-    assert ("knowledge-source", "record") in staged_calls
-    # A new operation cannot mistake the pending P6 record for published work.
+    assert ("knowledge-record", None) in staged_calls
+    # A new operation cannot mistake the pending P5 record for published work.
     fresh = p.call("knowledge-source", {"operation_id": "fresh-before-p7"}, "scan")["data"]
     fresh_unit = p.record(fresh["scan_ref"])["units"][0]
     assert fresh_unit["path"] == source_path and fresh_unit["change"] == "new"
@@ -122,10 +121,9 @@ def test_manual_document_scan_record_apply_index_query_keeps_business_checks(tmp
     p.review("manual-correction", correction_view)
     corrected_unit = correction_scan["units"][0]
     assert corrected_unit["change"] == "unchanged"
-    correction_record = p.call("knowledge-source", {
-        "operation_id": "manual-correction", "scan_ref": correction_scan_ref, "view_ref": correction_view,
-        "disposition_preview_ref": p.record(correction_view)["disposition_preview_ref"],
-    }, "record")["data"]["ingest_record_ref"]
+    correction_record = p.call("knowledge-record", {
+        "operation_id": "manual-correction", "view_ref": correction_view,
+    })["data"]["ingest_record_ref"]
     corrected = p.call("knowledge-apply", {
         "operation_id": "manual-correction", "view_ref": correction_view, "ingest_record_ref": correction_record,
     }, "batch")

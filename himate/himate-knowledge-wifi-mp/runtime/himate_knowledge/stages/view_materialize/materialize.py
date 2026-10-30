@@ -1,4 +1,4 @@
-"""P4 directly assembles, revises and describes its owned candidate bytes."""
+"""P3 directly assembles, revises and describes its owned candidate bytes."""
 
 from .support import NodeError
 

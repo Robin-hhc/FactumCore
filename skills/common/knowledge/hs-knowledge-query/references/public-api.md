@@ -1,204 +1,64 @@
-# Search and same-generation read
+# 搜索与同代精读 API
 
-Use this package's public `python K/knowledge.py query` with input/output and the actual K.
-Rules default to the actual framework lock; no catalog is required. Actions are `search`, `read`, `receipt`.
+## 搜索请求
 
-## Search request
-
-The CLI defaults to `search`. Its JSON request uses these main fields:
-
-| Field | Meaning |
-|---|---|
-| `operation_id` | A unique ID for this call; do not reuse another query's mutable output. |
-| `query` | Nonempty search text. |
-| `purpose` | Defaults to `current`; choose it from the question's intended use, not to obtain hits. |
-| `context` | Query scope, such as `chip`, `side` and `features`; omitted fields are not wildcards for declared constraints. |
-| `top_k` | Optional result limit, default 5. |
-
-| `purpose` | Qualification |
-|---|---|
-| `current` | Only `usage: current` Claims with valid current evidence and applicable scope. |
-| `implementation` | The `current` requirements plus implementation or measurement evidence. |
-| `guidance` | Background/design guidance; retains evidence checks and scope restrictions, without proving current implementation. |
-| `historical` | Exact evidence from the selected generation, including eligible retired content; does not establish current applicability. |
-
-A `constrained` scope must match at least one nonempty declared context group.
-Every declared constraint in that group must match: scalar fields such as
-`chip`/`side` match exactly, all `features_all` entries must occur in
-`context.features`, and no `features_none` entry may occur. A nonempty feature
-constraint requires an explicit features list; a missing list is not a wildcard.
-Other declared version/build constraints still apply. `guidance` does not bypass
-constrained scopes; `unknown` scope is eligible only for guidance/historical use.
-
-This **HWDL example** assumes the question's documented scope is chip07c/host
-with the HWDL feature condition. It is not a fixed project configuration or
-evidence that the macro is enabled:
+`query` 默认执行 `search`；也可使用 `python K/knowledge.py search "关键词" --purpose guidance --json`。复杂范围用 `--input` 提供 JSON：
 
 ```json
-{
-  "operation_id": "query-hwdl-guidance-1",
-  "query": "HWDL transmit flow",
-  "purpose": "guidance",
-  "context": {"chip": "chip07c", "side": "host", "features": ["_PRE_WLAN_FEATURE_HWDL"]}
-}
+{"query":"问题关键词","purpose":"guidance","context":{},"top_k":5}
 ```
 
-Take scope from the user's question and sourced project/material context; do not
-infer enabled macros from module labels or copy a card's conditions just to make
-it match. For empty matches, check intended purpose, supplied scope and actual
-diagnostics before changing search terms. Report unknown scope or unavailable
-evidence. A current/implementation question must not silently fall back to
-guidance/historical to manufacture an answer.
+`operation_id` 可显式固定本次调用；省略时由 CLI 生成并返回。复用项目上下文与实际规则锁即可，不需要 catalog。
 
-A formal `search` chooses the actual active generation. Its immutable
-`search_receipt` stores effective `request_binding` (action, query, budgets,
-channel, generation, purpose and Target context), request/result digests, the
-generation-manifest digest and the active-pointer observation read at search
-time. Matches include exact `card_digest` and the eligible `claim_ids`. Only
-these query fields are retained; arbitrary extra request fields and credentials
-are not copied into the binding. Context contains query scope, never credentials.
-
-## Card content and source addresses
-
-`search` keeps card IDs, eligible `claim_ids`, allowed titles/summaries, logical
-card `path`, score and exact `card_digest`, and adds `card_ref` for the exact
-card file retained in the selected generation. `read` returns the eligible
-Claim text with both card addresses. `path` and `card_ref` are relative to the
-actual knowledge root K. A logical path may now hold a newer formal card; use
-the original receipt's read result and `card_ref` for the same-generation bytes.
-Opening a card file does not enlarge the original eligible Claim set.
-
-Both actions return `source_links` instead of expanded `sources`. Each link has
-`evidence_ref` and `kind`, an `evidence` address for the fixed original, and a
-separate `current` address when available. An address uses `base`, `path` and
-an applicable `locator`; a Git address also retains the necessary `commit` and
-`repo_id`. Evidence may include its exact original `sha256` without expanding
-the snapshot object. Address bases are explicit:
-
-| `base` | Interpret `path` from |
+| purpose | 采用条件 |
 |---|---|
-| `knowledge_root` | The actual knowledge root K; raw/current paths and retained local evidence objects use this base. |
-| `workspace` | The project root selected by the actual `config.yml`; module paths may be nested under its `code_root`. |
-| `repository` | The authorized repository/scope identified by `repo_id`; do not join it to K. |
-| `git` | The exact local `commit` and repository-relative `path`; code evidence supplies `repo_id`, while its omission selects the workspace Git repository for raw evidence. |
-| `absolute` | A currently readable dbox file's native absolute path on the actual execution host. It may also address the exact registered original when retained evidence is missing and the observed bytes match the frozen snapshot. Do not join it to K or reinterpret a server path on the caller's machine. |
+| `current`（默认） | 具有有效当前证据且范围匹配的 current Claim |
+| `implementation` | 满足 current 条件，且有实现或测量依据 |
+| `guidance` | 背景／设计用途，仍检查证据及声明的范围 |
+| `historical` | 所选代次的确切旧证据，可含合格退役内容，不证明当前适用 |
 
-Do not assume K's parent is the project or repo root. A configured
-`code:<repo_id>:<path>` recovery reference is exposed as its resolved workspace
-or repository address, not as a path to append to K.
+`context` 从问题和已核材料填写。constrained 范围须完整匹配至少一个声明的条件组：chip/side 等标量精确匹配，`features_all` 全部出现，`features_none` 均不出现；缺字段不是通配。unknown 范围只适合 guidance／historical。
 
-Configured dbox files keep their fixed evidence in the published objects under
-K. Their `current` address, when available, uses `absolute`; its hash and optional
-locator come from the same actual observation. A changed document has no current
-locator borrowed from its old version. Without a readable local mapping,
-`current` and `current_source_matches` are null while exact retained evidence may
-remain readable. Historical/guidance queries retain their existing qualification
-rules; current/implementation queries still require actual current evidence.
-If the retained original is unavailable, recovery may use only the unique
-registered dbox location whose actual bytes match the frozen hash and size. In
-that case `evidence` also uses `absolute`, with the same checked path and hash;
-an arbitrary absolute file is not an accepted recovery location. These addresses
-may appear in this response and its private query receipt, never in formal source
-identities or publication assets.
+背景问题若原本就有芯片／端／特性条件，也要按实填写；不要照抄卡的门槛、猜宏开启或切换用途来制造答案。
 
-A query compares its dbox directory binding between initial qualification,
-fresh qualification and the final source check. Switching to another root with
-identical bytes during that call requires retry. A later search or receipt-bound
-read observes that call's actual local mapping; the producer's or a previous
-query's private directory binding is not a permanent consumption prerequisite.
+## 同代精读
 
-Code links retain `navigation_status` and `current_source_matches`. Navigation
-is `resolved`, `missing`, `ambiguous` or `unavailable` when a symbol is declared;
-raw and legacy no-symbol references use `not_applicable`. Only a resolved
-current symbol supplies its current range. A legacy no-symbol code reference
-may reuse its old locator only when the current bytes match exactly. The
-evidence locator still describes the fixed old source; changed raw text does
-not inherit its old line numbers. For declared-symbol code, the `current`
-path, locator and `sha256` come from the same actual `code_navigation` file
-observation, including any path selected by a legacy locator. `missing` or
-`unavailable` without an actual file digest returns `current: null`; an
-`ambiguous` result with a file digest may return the file address with
-`locator: null`. The external `current_source_matches` compares this current
-file digest with the fixed evidence digest, and is null when `current` is null.
-This projection does not change the internal resource-based qualification
-checks. Current position, whole-file byte equality and semantic applicability
-are different observations.
+用原搜索的 `receipt_ref` 和命中 `card_id`：
 
-Locators keep the original source format: lines for readable code/MD/TXT,
-pages for PDF, and paragraphs/table rows for DOCX. A retained evidence object
-may require the existing exact-source recovery capability to interpret it;
-native page or paragraph locators are not line numbers in an extracted TXT.
-Evidence addresses identify the actual original object, rather than silently
-substituting extracted text for that original.
+```text
+python K/knowledge.py read CARD_ID --receipt SEARCH_RECEIPT --json
+```
 
-The response and newly sealed `receipt.result` contain card content and these
-addresses. They omit recovered source text, original bytes/Base64 and complete
-`source_ref`, `snapshot`, `resource` or `code_ref` objects. The Agent opens the
-returned locations only when the question needs source detail. A link is not a
-claim that its target has been read by the Agent. If exact recovery metadata is
-needed, read the card's governed source binding and use the existing explicit
-source-recovery capability; query does not introduce another lookup action.
+或以 `query --action read --input` 传 `{"receipt_ref":"实际搜索回执","card_id":"实际命中ID"}`。省略的 channel／purpose／context／generation 沿用原搜索；显式冲突被拒绝。可选 `claim_ids` 仅能是原命中合格 Claim 的非空子集。
 
-Source recovery, hash/size checks, symbol checks, qualification and the final
-current-state recheck still run internally before output. P2's independent
-source-resolution result retains its existing contract.
+读取依据是原搜索回执，不是 read 回执或评估结果。活动代切换后，原搜索仍固定原代次；确切卡或回执依赖已不可用时保持诊断并重新查询，不猜历史关联。没有 `receipt_ref` 的底层 read 读取当前活动代，不能声称同代精读。
 
-## Same-generation receipt reads
+## 卡与返回字段
 
-To read a search hit after active changes, call `read` with a new `operation_id`,
-the original `receipt_ref`, and `card_id`. Missing channel/purpose/context and
-generation are inherited from the original search. Explicit differences are
-rejected. Optional `claim_ids` must be a nonempty subset of the original hit;
-reads never add claims that were absent from that search. Exact card bytes and
-the original generation manifest must still match. Legacy receipts without
-these bindings require a fresh search.
+`search` 返回卡身份、合格 `claim_ids`、允许显示的标题／摘要、分数和 `receipt_ref`；`read` 返回该次合格 Claim 正文。`path` 是相对 K 的逻辑卡路径，`card_ref` 指向所选代次的确切卡。逻辑路径可能已经是新版，回答原搜索时使用原回执与同代内容。
 
-Existing bound receipts with expanded source results remain readable after
-their original record/result digests and current rules binding pass validation.
-This preserves the old result shape, not an exemption from `STALE_RULES`; a rules
-upgrade does not authorize stale receipts. Old records are not edited or
-re-signed. A new read emits the compact result and seals its new receipt from
-that actual result.
+返回的 `source_links` 提供来源地址，未内嵌原件全文或原始字节。打开完整卡或链接不扩大原查询用途及合格 Claim 集合。
 
-The original record must be a successful, non-evaluation `search` receipt, not a
-read receipt or an evaluation result. A candidate `generation_ref` remains
-evaluation-only when supplied directly. A formal receipt read stays formal and
-retains the original generation even after a new generation activates.
+## 来源地址与代码入口
 
-Receipt hashes and active-pointer observations provide integrity and lineage
-under the existing local artifact trust model. They are not origin signatures,
-ACLs or independent content/code review. They retain data integrity, source and dependency checks. Skill calls do not
-require upstream passed reports or a Workflow qualification chain. Current reads check actual
-source/configuration bytes; historical reads keep the exact retained source. If no
-original record or eligible claim remains, the read is refused.
+每条链接将固定 `evidence` 与可取得的 `current` 分开。按地址的 `base` 解释 `path`：
 
-If a public source-resolution call times out, search, receipt and read return
-`status: blocked` with the original backend timeout diagnostic and no answer
-data. The same applies while qualifying dependencies or rechecking a result
-before output. A timeout is not a stale-source finding or a valid zero-hit
-answer. Normal source absence and non-current source qualification retain
-their existing per-Claim filtering and gap reports. This handling adds no
-Workflow identity, predecessor or handoff checks.
+| base | 路径基准 |
+|---|---|
+| `knowledge_root` | 实际 K |
+| `workspace` | 实际 config.yml 选定的项目根 |
+| `repository` | `repo_id` 对应的已配置仓／模块范围 |
+| `git` | 确切本地 commit 的仓内路径；代码另带 repo_id，raw省略时用项目Git |
+| `absolute` | 执行端实际可读的 dbox 原生绝对路径，不拼到 K 下 |
 
-Without `receipt_ref`, `read` keeps the existing behavior of using the current
-active generation. A `read` receipt links back to its source search for audit;
-use the original search receipt for subsequent reads.
+K 的父目录不一定是项目根。页、段落、表格行与源码行段按原件格式读取，不能把 PDF 页号当提取文本行号。需要完整旧版解析时，使用卡内确切来源绑定与 source 的恢复能力。
 
-Shared repository snapshots bind an explicit Git commit and card hashes. The consumer verifies actual Git blobs, current record
-bytes, rules, source references and Claim scope; another machine's private
-operation log or `.build` directory is not required. A digest alone or an
-uncommitted local record does not establish a repository snapshot. Code/current use also
-requires the current configuration fingerprint and actual referenced code
-bytes to match; unknown or changed context restricts those Claims.
+代码链接的 `navigation_status` 为 resolved／missing／ambiguous／unavailable；未声明符号的旧来源可为 not_applicable。只用实际返回的当前路径与定位：缺当前文件时为 null，歧义地址没有定位。`current_source_matches` 表示当前整文件是否匹配固定证据，缺当前地址时为 null；符号存在不等于 Claim 当前仍成立。
 
-A source declaring `code_ref` is checked through the common resolver's internal `code_navigation`. Active-card code sources require the field at fixed lint/CI; historical recovery and deprecated cards remain compatible with four-field references. The external `source_links` projects the actual status and addresses from that checked result. Navigation is rechecked during the query; changed identity/status is not silently substituted between qualification and output. Guidance source-file drift does not by itself negate the document's background conclusion; current/implementation qualification keeps its existing source/configuration/build checks. A symbol result does not prove semantics or which conditional definition is active.
+dbox 的固定证据可保留在正式对象中；本机映射不可读时，当前地址可能为空。query 内部重新核资格、来源、符号和当前字节，Agent 无需复现这套实现检查。链接只说明位置，回答需注明实际读过什么。
 
-The same code_ref is stored in card metadata and compiled Claim.source_records, so no new query index table, card-level symbol registry or CodeGraph node ID is needed. Rebuild derived indexes after adopting new locked rules; do not modify old generations. CodeGraph may assist the Agent with candidates and call relationships, but public fixed checks do not call MCP or install/build a graph.
+## 空命中与运行问题
 
-P2 maintenance candidate discovery is exposed by `hs-knowledge-source` and
-the shared knowledge relation functions. It includes non-answer states and
-does not relax this query API's answer eligibility. New-search index freshness
-checking is outside this change; generation integrity and same-generation
-read checks remain mandatory.
+先核用途、真实范围、关键词和响应诊断。空 `matches` 或空 `gaps` 不证明资料不存在；截断也不能当完整召回。需要调整条件时应有用户问题或实际材料依据。
 
-After P7 cleanup, normal reads use the published source/material closure and the selected real generation. Soft producer stage/view references do not require reopening those paths. Explicit receipt reads retain their exact generation dependencies; missing retained generations require a fresh query rather than history guessing.
+缺索引、规则变化、来源解析超时等保持真实阻断，不当成有效零命中。规则升级后的旧回执不能通过改签继续使用；缺必要代次或依赖时重新查询。普通查询不自动入库、建图或重建索引，索引维护作为明确的独立任务处理。

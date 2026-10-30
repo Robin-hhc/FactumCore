@@ -1,5 +1,5 @@
 id: hs-knowledge-view-materialize-result
-title: assembled candidate and disposition preview
+title: 完整候选稿与处置预览
 required: true
 applies_to:
   node_ids:

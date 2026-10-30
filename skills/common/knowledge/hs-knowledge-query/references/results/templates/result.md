@@ -1,11 +1,7 @@
-# Node result
+# 知识检索结果
 
-- Operation and requested action:
-- Actual status / phase:
-- Business output file references:
-- Card text / permitted summary, logical path and exact-generation card_ref:
-- Source links actually opened, including the address base and locator:
-- Fixed evidence addresses and separate current code navigation status / positions / whole-file match (null without a verified current file):
-- Diagnostics and remaining gaps:
-
-Use the actual CLI response. OpenFlow records its own execution identities.
+- 问题、用途与已知范围：
+- 基于实际精读的答案：
+- 卡／Claim、搜索回执与同代卡引用：
+- 实际核对的来源及必要链接：
+- 未覆盖部分、缺口和诊断：

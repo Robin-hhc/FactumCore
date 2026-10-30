@@ -1,33 +1,53 @@
-# Authored semantic plan
+# 内容计划请求
 
-Default/public action: `plan`. Common inputs are `operation_id`, the actual knowledge root and current locked rules. No catalog, workflow identity, prior passing report or reviewer identity is required.
+## 计划字段
 
-Request: `material_ref`, optional real `scan_ref`, descriptive `author_id`, `units`, `claim_changes`, `card_actions`, and content-dependent `target_queries`.
+默认动作 `plan`。使用当前操作、实际知识根和本次材料；可显式传 `--output` 保存响应。
 
-- In the normal workflow the material binds the actual `scan_ref/scan_digest`; every fixed scan unit has exactly one outcome and reason. Explicit P2 targets instead use the material's actual `units`; no change, progress or full-scan success is invented. Their semantic plan records `observation_basis: explicit_material_targets` and the exact observation digest.
-- Each source outcome is `content/skip/defer/failed/uncovered`. A Claim comparison declares `unit_ids/card_id/claim_id/action/before/after/conditions/evidence/preserved/reason`; Claim actions are `create/update/preserve/retire`.
-- Each final card action declares `card_id/decision/author_id/unit_ids/reason`; the six actions remain `create/update/merge/split/deprecate/defer`. Related old Claims need explicit preserve/change/retire judgments; final draft fidelity is checked at P5.
-- Each frozen source/maintenance unit includes `record_action/card_refs/claim_refs`. Non-content actions equal their outcome. A content unit with one actual non-defer card decision inherits that action; with multiple decisions the author must supply an explicit `record_action` belonging to that unit's actual decision set. Card and Claim references are derived from the exact linked judgments. P6 only transcribes these fields.
-- `maintenance_units` separately cover the exact affected `card_id/claim_id` with canonical `maintenance:<card>#<claim>` IDs. They do not invent raw sources.
-- Content plans require representative `target_queries` with unique IDs/questions and explicit required/forbidden/order expectations. Purposes are `current/implementation/guidance/historical`; omitted purpose retains current. Deprecation tests current exclusion or historical behavior. Claim expectations identify authored `CardID#ClaimID` pairs.
-
-Choose the purpose from the intended Claim, not from the presence of a code link:
-
-| Purpose | Expected qualification |
+| 字段 | 内容 |
 |---|---|
-| `current` | The Claim has `usage: current`, matching scope/context and valid current evidence. A `design` Claim is not excluded merely by its evidence kind. |
-| `implementation` | The current requirements above, plus `evidence_kind: implementation` or `measurement`. A code navigation link does not satisfy this evidence requirement. |
-| `guidance` | Background or guidance within its declared conditions, including unknown applicability; it does not prove current product behavior. |
-| `historical` | The selected historical Claim and recoverable exact evidence; it does not assert current applicability. |
+| `material_ref` | 本次阅读材料引用，必填 |
+| `scan_ref` | 材料绑定的真实扫描，正常 Workflow 使用；独立材料目标不伪造全库扫描 |
+| `author_id` | 负责本批判断的作者标识，必填，不作身份认证 |
+| `units` | 实际来源单元各一次处置：`unit_id/outcome/reason` |
+| `maintenance_units` | 实际受影响卡／Claim的独立处置，`unit_id` 为 `maintenance:<card>#<claim>` |
+| `claim_changes` | 逐 Claim 的明确比较，字段见下文 |
+| `card_actions` | 每个目标卡的明确动作，字段见下文 |
+| `target_queries` | 内容批必填的代表查询与预期；纯处置批没有内容查询 |
 
-For a positive case about a new or changed conclusion, prefer `expected_claim_ids` so another eligible Claim on the same card cannot satisfy the intended test by accident. For example, a design-background case can be `{"id":"design-flow","query":"flow background","purpose":"guidance","required":["flow-card"],"expected_claim_ids":["flow-card#design-flow"]}` when those IDs and words belong to the actual authored content. Negative cases keep their explicit forbidden/order expectations and need no positive Claim assertion. Mixed-Claim cards are judged against each case's expected Claims, not rejected merely because some other Claim has design evidence.
+来源与维护单元的 `outcome` 为 `content/skip/defer/failed/uncovered`。完整覆盖本次实际观察，不凭已有卡引用就声称整份来源完成。
 
-P3 checks the plan structure and coverage; P5 runs these unchanged cases against the final candidate, including scope/source qualification, retrieval and same-candidate reads. An unmet expectation returns to P3 before formal publication. Do not automatically weaken the purpose or replace a frozen expectation to obtain a pass.
+### Claim 与卡片动作
 
-Result: `semantic_plan_ref/semantic_plan_digest`, unchanged query cases and `phase: content_planned`. This is authored business data, not approval or an executable byte plan.
+`claim_changes` 每项包含 `unit_ids`、`card_id`、`claim_id`、`action`、`before`、`after`、`conditions`、`evidence`、`preserved`、`reason`；动作是 `create/update/preserve/retire`。同一 Claim 的多源判断合成一项，不丢失保留部分或旧依据。
 
-After P5 returns a candidate, use a new operation and explicitly supply `previous_view_ref/revision_reason`. Unchanged old materials may be adopted only from that exact view. P2 supplementation returns a new material version linking the same view/digest and previous material/digest. The original scan remains immutable: its unit IDs and scan digest are reused as business observations, while the new semantic plan records `origin_scan_operation_id`, `previous_view_ref/previous_view_digest` and the previous semantic reference/digest. Changed source/range observations need P1; do not fabricate a new scan for an unchanged observation.
+`card_actions` 每项包含 `card_id/decision/author_id/unit_ids/reason`。六类决定为 `create/update/merge/split/deprecate/defer`。同主题重复才合并，独立主题混装才拆分；普通更新保留稳定身份，旧 Claim 明确保留、改变或退役。
 
-The old byte request (`bundle_ref/decisions/card_inputs`), verify and rederive return `BYTE_PRODUCTION_MOVED`: send authored bytes directly to P4 `hs-knowledge-view-materialize run`. Old review returns `CONTENT_REVIEW_MOVED`; P5 owns declared independent review and fixed checks. The package never starts either sibling entry.
+每个单元还固定 `record_action/card_refs/claim_refs`，供 P5 直接转写。只有一种实际卡动作时脚本可归一化；同单元涉及多种卡动作时，作者须明确指定实际动作之一作为 `record_action`，不能留给 P5 猜。
 
-Staging boundary: requests, responses and new business payloads stay under this operation's `.build/operations/<op>/`. Follow the exact returned material/view references; never discover a latest private operation. Final evidence references and stage-to-final hashes are fixed before P5 and may not be rewritten by P7. Explicit revision/adoption preserves old immutable inputs, which are not this operation's owned cleanup set.
+## 查询用途与预期
+
+每例使用唯一 `id`、实际 `query` 和可检查预期：`required`、`forbidden` 或 `expected_order` 至少一种。卡身份用实际 CardID；需要锁定目标结论时使用 `expected_claim_ids`／`forbidden_claim_ids` 中的 `CardID#ClaimID`。
+
+| `purpose` | 要验证的结论 |
+|---|---|
+| `current` | 当前用途，Claim的 `usage`、范围／上下文与当前证据须匹配 |
+| `implementation` | 满足当前用途，且依据为 `implementation` 或 `measurement` |
+| `guidance` | 声明条件内的背景或指导；未知适用性不等于当前产品行为 |
+| `historical` | 指定历史结论与可恢复原版依据，不声称当前适用 |
+
+省略 `purpose` 默认 `current`，因此应主动按目标 Claim 选择。代码链接仅提供定位，不能把设计依据提升为实现依据。
+
+新增／修改结论的正向用例宜声明目标 Claim，避免同卡其他结论偶然满足查询；负向用例可只声明排除或明确空结果。退役卡验证当前排除或历史行为。P4 在最终候选上执行原查询及同代精读；预期不满足回作者重判，不自动换用途或修改预期凑通过。
+
+## 结果与返工
+
+成功返回 `semantic_plan_ref/semantic_plan_digest`、原查询和 `content_planned`。这是本次作者数据，完整卡稿由 P3 生产。
+
+### 返工
+
+已有候选的重判使用新 `operation_id`、真实 `previous_view_ref` 和非空 `revision_reason`。材料未变可明确采用前序视图绑定的材料；已补料则采用新版本。沿用仍有效的原扫描及单元身份，不伪造新观察，也不覆盖旧计划。
+
+计划已保存而尚无前序 view 时，不能重写同操作计划或编造 view 解决补料问题，应保留不可变绑定的实际停点。来源范围或字节已变时回来源阶段刷新相应输入。
+
+请求、响应和新计划只写本操作暂存，正式事实由后续发布建立。旧字节生产或审阅请求不在本入口继续执行，分别使用 P3 或 P4 对应能力。

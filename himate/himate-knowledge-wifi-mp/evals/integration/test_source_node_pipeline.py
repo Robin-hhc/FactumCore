@@ -1,4 +1,4 @@
-"""The merged preparation node uses the real source run, then P3 through P7."""
+"""The merged preparation node uses the real source run, then P2 through P6."""
 
 import importlib.util
 from pathlib import Path
@@ -40,7 +40,7 @@ def test_combined_source_node_completes_real_six_node_public_chain(tmp_path):
     assert result["data"]["activated"] is True
     assert calls == [("knowledge-source", "run"), ("knowledge-change-plan", "plan"),
         ("knowledge-view-materialize", "run"), ("knowledge-lint", "review"),
-        ("knowledge-source", "record"), ("knowledge-apply", "batch")]
+        ("knowledge-record", None), ("knowledge-apply", "batch")]
     assert not pipeline.skills.exists()
     hit = pipeline.call("knowledge-query", {"operation_id": "read-combined", "query": "combined rule"}, "search")["data"]
     assert [row["card_id"] for row in hit["matches"]] == ["combined-rule"]

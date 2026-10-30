@@ -10,9 +10,9 @@
 
 `resolve-source` 按明确 `bundle_ref`／`source_ref` 校验对象、提取文本、locator 和资源／快照一致性。即使原件已移走，仍须返回被固定的旧字节证据；不可得时报告缺口。摘要证明内容一致性，不认证发布者；权限由外部部署承担。
 
-新 ingest 的原件、提取和定位只暂存于 `.build/operations/<op>/`。bundle 的 `staged_objects` 显式绑定 `stage_ref`、`final_ref`、`kind`、`sha256`、`bytes`、`owner_operation_id`；来源声明预先使用正式地址。P1—P6 解析只采用本次明确映射，不发现其他操作的暂存。每个文本 locator 保留原字节与提取字符／行区间，原始 BOM／换行不因提取而改写。
+新 ingest 的原件、提取和定位只暂存于 `.build/operations/<op>/`。bundle 的 `staged_objects` 显式绑定 `stage_ref`、`final_ref`、`kind`、`sha256`、`bytes`、`owner_operation_id`；来源声明预先使用正式地址。P1—P5 解析只采用本次明确映射，不发现其他操作的暂存。每个文本 locator 保留原字节与提取字符／行区间，原始 BOM／换行不因提取而改写。
 
-P7 按冻结发布计划将必要原件、旧卡、提取及定位原样发布到 `logs/evidence/published/{objects,cards,extractions,locators}/`，核验后保存正式处理记录和 `logs/publications/<op>/` 发布闭包；正常消费与提交不得依赖随后清理的 stage。新捕获只产生冻结的来源变化提案，不提前登记正式维护事件。内容批发布来源锁后，P7 按原 old→new 转换登记事件；仅记录批不登记未被正式来源锁接纳的版本。
+P6 按冻结发布计划将必要原件、旧卡、提取及定位原样发布到 `logs/evidence/published/{objects,cards,extractions,locators}/`，核验后保存正式处理记录和 `logs/publications/<op>/` 发布闭包；正常消费与提交不得依赖随后清理的 stage。新捕获只产生冻结的来源变化提案，不提前登记正式维护事件。内容批发布来源锁后，P6 按原 old→new 转换登记事件；仅记录批不登记未被正式来源锁接纳的版本。
 
 捕获不修改 `governance/sources.lock.yaml`、knowledge 或导航；它不证明来源语义正确。来源锁由明确 ChangeSet 经独立内容复核和固定检查后事务落位。
 
@@ -22,7 +22,7 @@ P7 按冻结发布计划将必要原件、旧卡、提取及定位原样发布�
 
 旧 `logs/evidence/{objects,checked-code,extractions,locators}/` 是本机缓存；新 `logs/evidence/published/` 是正式随仓依据，不能按缓存忽略或删除。旧声明的恢复路径缺失时，可按冻结 SHA 精确读取正式 published 对象，不搜索目录、不重签旧 snapshot。提取文本与定位图缺失时，从已核验的确切原版按配套适配器重建，结果仍须匹配原冻结指纹；不能复现或旧版不可得时报告未完成。显式构建／运行材料及有效限制状态继续按其原契约保全。
 
-活动卡的每个代码来源须按[卡片规范](cards.md#代码来源的可选符号补充)填写 `code_ref`；缺失由公共固定检查报 `CODE_REF_REQUIRED`，不受 review_mode 限制。它补充该项的符号身份，不改变来源资源、快照、提取器或历史定位；历史记录、旧来源恢复和 deprecated 卡仍允许原四字段。P2 保留已有来源项并提供实际源码材料，作者在 P4 填写符号；捕获成功不会自动生成或批准一个符号引用。纯文档不强制连代码，但已登记代码来源不能用整文件或行段兜底绕过符号要求。
+活动卡的每个代码来源须按[卡片规范](cards.md#代码来源的可选符号补充)填写 `code_ref`；缺失由公共固定检查报 `CODE_REF_REQUIRED`，不受 review_mode 限制。它补充该项的符号身份，不改变来源资源、快照、提取器或历史定位；历史记录、旧来源恢复和 deprecated 卡仍允许原四字段。P1 保留已有来源项并提供实际源码材料，作者在 P3 填写符号；捕获成功不会自动生成或批准一个符号引用。纯文档不强制连代码，但已登记代码来源不能用整文件或行段兜底绕过符号要求。
 
 来源恢复分别报告旧证据与当前导航：先核确切快照和原 `locator`，声明 `code_ref` 时核其在旧证据中的绑定；再按当前配置和登记路径读取实际文件，返回 `code_navigation` 的状态、字节指纹及匹配位置。当前导航不以旧文件 hash 未变为前提，也不更新旧锁或旧定位。`current_source_matches` 的 true／false／null 保持原字节比较含义，导航状态不解除 current／implementation 结论原有的代码、配置、构建或运行限制。
 

@@ -1,0 +1,16 @@
+id: hs-knowledge-patrol-sync-result
+title: L1 工作区同步结果
+required: true
+applies_to:
+  node_ids:
+  - sync_workspace
+required_on:
+  exit_ids:
+  - synced
+  - skipped
+template: templates/result.md
+writing_guide: writing-guide.md
+review_guide: review-guide.md
+default_location:
+  kind: markdown_file
+  path: node-result.md

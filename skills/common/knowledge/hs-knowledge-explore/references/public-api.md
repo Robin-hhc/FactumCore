@@ -1,25 +1,22 @@
-# Read-only project discovery interface 2.0
+# 只读项目发现
 
-This CLI supplies optional project discovery for the Agent-facing [knowledge task entry](../SKILL.md). It does not implement ingest/query/lint/status routing, and an already valid project context does not require another discovery call. The Agent reads the actual knowledge root's `AGENTS.md` and documentation entry, then uses the relevant installed capability.
+仅在缺少项目位置或配置上下文时使用。已有有效上下文直接进入业务能力。
 
-Invoke `python K/knowledge.py explore --input request.json --output response.json`. Request:
-
-```json
-{"operation_id":"bind-session","target_path":"<explicit existing code/workspace path>","target_id":"chip12-host"}
+```text
+python K/knowledge.py explore --input REQUEST.json --json
 ```
 
-`target_id` is optional and selects a logical chip/side combination. Module labels do not prove a build or enabled macros. The CLI defaults to the actual framework lock and verifies its files; `--rules-digest SHA256` can explicitly pin it. No catalog or registry is required. An explicit `config_path` limits discovery to that config; otherwise search target ancestors. Multiple workspace matches block. Running from another current working directory does not change a resolved mapping.
+```json
+{"operation_id":"discover-project","target_path":"<执行端已存在的项目或代码路径>"}
+```
 
-Only verified domain contract bytes execute. A successful discovery returns `phase: context_loaded`, `context_ref` and `context_digest`. The immutable record contains actual AGENTS bytes/hashes, the original config hash, resolved module paths and labels, internally derived scope IDs and explicit gaps. `repos` is a dictionary of logical file scopes keyed by stable IDs; the name does not imply repository-manager integration. Chip/side relationships are derived for internal checks without user-written Target/pair tables. File-workspace discovery provides file scopes and labels; repository identity, dirty state, build and enabled macros remain unknown without separate evidence. Code capture fixes actual selected source hashes and conditions when needed.
+| 输入 | 用途 |
+|---|---|
+| `target_path` | 必需；实际存在的项目、目录或文件 |
+| `config_path` | 可选；明确采用哪份根配置 |
+| `target_id` | 可选；选择逻辑芯片/端组合，标签不证明构建或宏状态 |
+| `--rules-digest` | 可选；固定本次实际规则摘要 |
 
-The public module shape is `code_root: main` plus `modules: [{path: relative/directory, chips: [chip12], sides: [host], features: [], description: purpose}]`. `code_root` is relative to the config directory; module `path` is relative to `code_root`. Only path is required per module. Empty modules allow document work without implicitly authorizing all code. Specific nested modules own their files; a parent identity cannot borrow them. No expected Git URL or duplicate code-policy registration is required. A file capture checks current scope and original config bytes; an earlier discovery record is optional. Legacy explicit repository configuration remains readable for historical compatibility.
+成功为 `context_loaded`，返回 `context_ref/context_digest`。读取记录中的项目根、K、模块范围、实际入口说明与缺口，再选择业务能力。找不到唯一配置、实际入口或必要规则时报告诊断，不拿 `.example` 代替实际 `AGENTS.md`。
 
-Workflow identities and transition checks belong to OpenFlow. This CLI returns its actual context and result directly; it does not validate Workflow IDs or create a per-attempt workflow manifest. Exit 2 is invalid input and 3 is a missing business prerequisite.
-
-First-time deployment and local dependency repair use the distribution checkout's Windows `deploy.ps1`, described in [deployment and execution](setup.md). Ordinary discovery remains read-only and does not install dependencies. Use repository `python K/knowledge.py doctor` for read-only execution-host diagnostics. Skill packages contain instructions and text contracts; repository runtime and its dependency lock are distributed with K. No installed Skill scripts are required on the SSH host.
-
-When the target code repository is remote, use OpenFlow's or the host's configured SSH MCP to run discovery and business scripts from the remote project root. Check that execution host's Python, dependencies and installed Skill paths separately; Windows deployment does not validate the remote runtime. Caller-side paths are not remote paths. The host manages the SSH connection; the Skill has no separate SSH configuration or dispatch mode. Shared project/module configuration remains in config.yml. The fixed K/docs-raw/sources/dbox.local.yml separately maps one private execution-host directory; source.configure prepares it explicitly, and discovery does not merge its private path into project identity/config_digest. Generated artifacts stay in the knowledge root's existing .build/logs/artifacts locations.
-
-The context CLI above retains its read-only discovery role. It loads the actual framework lock by default; no catalog registration is required. Actual host triggering and independent content review require their own real execution evidence.
-
-Ordinary discovery uses current project/configuration inputs. It neither lists old operations nor adopts their drafts. A missing context record may be recreated; it is not a formal processing obligation or part of another batch cleanup.
+模块配置使用 `code_root` 和 `modules[].path`；空模块列表可处理文档，但不授权读取全部代码。代码版本、宏、构建和运行条件按实际证据保留未知，不由模块标签推断。发现过程不安装依赖、建库或恢复旧操作。

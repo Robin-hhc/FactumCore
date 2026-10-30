@@ -1,4 +1,4 @@
-"""One-pass authored byte assembly for P4; full quality rules belong to P5."""
+"""One-pass authored byte assembly for P3; full quality rules belong to P4."""
 from __future__ import annotations
 
 import base64
@@ -327,7 +327,7 @@ def _reading_card_refs(ctx, material):
 
 
 def assemble(ctx, request=None):
-    """Produce the exact authored batch once; do not execute P5 quality rules."""
+    """Produce the exact authored batch once; do not execute P4 quality rules."""
     request = request if request is not None else ctx.request
     previous = revision_view(ctx, request)
     repeated = _reenter(ctx, request)
@@ -459,7 +459,7 @@ def assemble(ctx, request=None):
                   and not row["final_ref"].startswith("logs/evidence/published/cards/"))
               or row["sha256"] in retained_cards]
     # Retain the exact preimage before an update replaces its only formal copy.
-    # This also covers P4 callers that supplied a bundle without P2 materials.
+    # This also covers P3 callers that supplied a bundle without P1 materials.
     for identity in sorted(set(proposed) & set(existing)):
         card = existing[identity]
         if card["sha256"] in retained_cards:
@@ -527,7 +527,7 @@ def assemble(ctx, request=None):
                         "baseline_digest": view["baseline_digest"], "review_mode": review_mode,
                         "batch_kind": view["batch_kind"], "disposition_preview_ref": preview_ref,
                         "input_snapshot_digest": snapshot["snapshot_digest"],
-                        "limitations": ["Describes authored bytes; P5 owns quality and OpenFlow owns ordering"]}, "artifact_manifest")
+                        "limitations": ["Describes authored bytes; P4 owns quality and OpenFlow owns ordering"]}, "artifact_manifest")
     ctx.save(summary_ref, summary)
     if revision_ref:
         ctx.save(revision_ref, ctx.seal({"purpose": "candidate_revision", "previous_view_ref": request["previous_view_ref"],
@@ -627,7 +627,7 @@ def _validate_dispositions(ctx, view, plan, semantic):
 
 
 def validate_candidate(ctx, view, plan=None, semantic=None, *, cards=None):
-    """Check authored production judgments at P5, never during assembly.
+    """Check authored production judgments at P4, never during assembly.
 
     Generic Profile/source/relation checks remain in checks.run.  This function
     preserves the additional plan-to-draft, old-Claim preservation, replacement

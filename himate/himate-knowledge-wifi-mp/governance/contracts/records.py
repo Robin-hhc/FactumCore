@@ -187,7 +187,7 @@ def validate_ingest_record(record, scan=None, view=None, rules=None, *, version_
         expected = "recorded" if record.get("batch_kind") == "record_only" else "applied"
         stage = record.get("progress", {}).get("apply", {}) if isinstance(record.get("progress"), dict) else {}
         if not isinstance(stage, dict) or record.get("batch_kind") not in {"record_only", "content"} or record.get("status") != expected or stage.get("status") != expected or stage.get("operation_id") != record["operation_id"]:
-            raise ContractError("RECORD_NOT_FINAL", "Formal processing records must contain the final P7 application fact")
+            raise ContractError("RECORD_NOT_FINAL", "Formal processing records must contain the final P6 application fact")
         if record["batch_kind"] == "content" and (not record.get("content_view_digest") or stage.get("view_digest") != record["content_view_digest"]):
             raise ContractError("RECORD_NOT_FINAL", "The applied content view must match the formal record")
     ids = [item.get("unit_id") for item in record["dispositions"]]

@@ -275,6 +275,8 @@ def test_mixed_query_report_retains_each_incomplete_case(fixture, monkeypatch, r
     assert report["complete"] is False
     assert {(finding["code"], finding["case_id"]) for finding in report["findings"]} == {
         ("TARGET_QUERY_EXPECTATION_FAILED", "semantic"), ("TARGET_QUERY_INPUT_UNAVAILABLE", "missing")}
+    semantic = next(item for item in report["findings"] if item["case_id"] == "semantic")
+    assert semantic["return_to"] == "P2"
     unavailable = next(item for item in report["findings"] if item["case_id"] == "missing")
     expected_gap = next(item["gaps"] for item in outcomes if item["case_id"] == "missing")
     assert unavailable["purpose"] == "current" and unavailable["gaps"] == expected_gap

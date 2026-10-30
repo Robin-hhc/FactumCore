@@ -1,5 +1,5 @@
 id: hs-knowledge-query-result
-title: 按用途、Target、Claim 和证据资格检索正式知识，同代精读并输出可追溯回执。
+title: 知识检索与同代精读结果
 required: true
 template: templates/result.md
 writing_guide: writing-guide.md

@@ -105,7 +105,7 @@ def metadata(raw):
 
 
 def finish(pipeline, prepared, relative, identity, sentence, decision="create", before=None, batch_expected=0):
-    """Author the exact Claim and disposition coverage, then really run P3--P7."""
+    """Author the exact Claim and disposition coverage, then really run P2--P6."""
     operation = pipeline.record(prepared["data"]["scan_ref"])["operation_id"]
     scan = pipeline.record(prepared["data"]["scan_ref"])
     material_ref = prepared["data"]["material_ref"]
@@ -152,7 +152,7 @@ def finish(pipeline, prepared, relative, identity, sentence, decision="create", 
         "semantic_plan_ref": semantic, "material_ref": material_ref,
         "decisions": [candidate_decision]}, "run")["data"]["view_ref"]
     view = pipeline.record(view_ref)
-    # P1's proven, terminal unchanged scan-skips are outside P5's risk sample.
+    # P1's proven, terminal unchanged scan-skips are outside P4's risk sample.
     # Review every adopted/affected unit; no content unit is left unreviewed.
     assert all(row == unit or (row["change"] == "unchanged"
                               and row["progress"] in {"completed", "skipped", "withdrawn"})

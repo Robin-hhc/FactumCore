@@ -1,33 +1,54 @@
-# One-pass authored candidate
+# 候选稿请求
 
-## Produce: run
+## 成稿请求
 
-Normal request: `operation_id`, `semantic_plan_ref`, optional `material_ref` (otherwise from that plan), authored `decisions`, and actual current `context_ref` when needed. `bundle_ref` can come from the material. A legacy authored `bundle_ref/decisions` request can be moved directly here; no sibling plan verification runs.
+默认动作 `run`，正常请求使用：
 
-When the material or its captured bundle already fixes a context, the request cannot substitute another `context_ref`; any declared `context_digest` must match the actual loaded project context. Use new materials for a changed adopted context.
+| 字段 | 内容 |
+|---|---|
+| `operation_id` | 本次操作 |
+| `semantic_plan_ref` | 已保存的作者内容计划 |
+| `material_ref` | 可省略，默认取计划绑定的材料；显式值仍须匹配 |
+| `cards` 或 `decisions` | 本次实际完整卡稿和卡动作，见下文 |
+| `context_ref` | 需要时使用本次实际代码／配置上下文；不能替换材料已采用的上下文 |
 
-Each decision has `candidate_id/decision/reason/card_inputs`, plus explicit `replaces`, `claim_mapping`, `retired_claim_ids`, `related_card_inputs`, or defer owner/next-step where applicable. Safe destination, distinct identity and write cardinality are production invariants. Six actions remain create/update/merge/split/deprecate/defer. Full Claim destination, preservation and impact-closure checks belong to P5.
+材料已经绑定 `bundle_ref` 时从实际材料解析，勿重新捕获。P2 的原查询随计划保留，不在 P3 改写。
 
-Every registered code `sources[]` item on an active (non-deprecated) card requires `code_ref`, following K's card specification. Pure-document cards need no invented code links; P5 reviews whether actual content omits a necessary entry point. Use supported symbols, never file/range fallbacks. Historical source recovery and deprecated cards retain the original four-field contract. Keep evidence_ref/source_id/snapshot_id/locator and Claim.source_refs unchanged. P4 preserves the complete metadata and freezes it in the card/view bytes; it does not infer symbols, relocate historical locators or certify navigation. No new card-level reference field or snapshot payload is required.
+### 简单卡稿与显式动作
 
-Simple create/update/defer may use `cards: {CardID: draft_ref}` or a list of card inputs with semantic actions. Merge/split/retirement need explicit decisions. Existing Card IDs retain their path; new IDs cannot overwrite other cards or control files. Drafts remain under `.build/`.
+`create/update/defer` 可用 `cards: {CardID: draft_ref}`，或卡稿输入列表；稿件引用指向 K 内 `.build/` 的完整 Markdown 文件。
 
-Result phase ready: `plan_ref/plan_digest`, `view_ref/view_digest/review_mode`, `batch_kind`, `disposition_preview_ref`, `summary_ref`. The view also freezes `material_ref/material_digest`, and revisions preserve `previous_view_ref/previous_view_digest`, actual reason and original scan identity. The card byte plan and complete view are frozen once. Navigation/source-lock writes occur only in content batches. A record-only batch has an empty write set, review_mode record_only and the exact disposition preview; it does not claim content quality passed.
+合并、拆分、退役须显式提供 `decisions`。每项使用 `candidate_id/decision/reason/card_inputs`，按动作补充 `replaces`、`claim_mapping`、`retired_claim_ids`、`related_card_inputs`；暂缓说明 `owner/next_step`。`card_inputs` 可为稿件引用字符串，或含 `path`、可选 `target_path` 的对象。
 
-The view embeds `input_snapshot`: rules identity, complete formal file membership/hashes, business records, adopted originals/old cards and selected current files. It is business binding, not a passing report or role credential. P5/P7 independently compare observed inputs. The postwrite index uses its own new formal baseline.
+六种动作保持 `create/update/merge/split/deprecate/defer`。现有卡保留身份与路径；新卡不覆盖其他卡或控制文件。合并、拆分及旧 Claim 去向来自作者明确决定，不由装配脚本猜测。P4 再审实际稿件是否忠实执行这些决定。
 
-`disposition-preview.json` copies the semantic plan's exact source/maintenance units, including fixed `record_action/card_refs/claim_refs`, binds its semantic digest, and retains every actual card decision (including mapping/retirement details); P6 mechanically transcribes. `view-summary.json` describes exact source set, baseline and limitations. Neither qualifies Workflow handoff.
+### 来源与代码引用
 
-## Revise: revise
+按卡片规范保存 `evidence_ref/source_id/snapshot_id/locator` 和 `Claim.source_refs`。活动卡中的代码来源需要实际支持符号及必要消歧的 `code_ref`，不能用 file／range兜底；同文件多符号使用不同 `evidence_ref`。历史恢复和 deprecated 卡保留原兼容契约。
 
-Add `previous_view_ref` and nonempty `revision_reason`, use a NEW operation_id, and provide new authored/material inputs as for run. Old view is read-only linkage, never current approval. The same assembler saves the candidate and revision_ref. It does not silently recapture sources, inherit an old code context or replay an applied operation.
+CodeGraph 仅辅助定位，实际代码和适用条件仍来自本次材料；不保存内部图节点 ID、不推断宏或构建。纯文档无需虚构代码来源。P3 保存完整声明与字节，符号解析、证据支持和质量复核交 P4。
 
-For a P4-only return, the new candidate may explicitly adopt the exact unchanged semantic plan and material bound by `previous_view_ref`; the new view and P5 review remain distinct. Returns to P2/P3 first freeze their new material/plan versions under the new operation. All paths preserve the original scan and processing-unit identities, record `origin_scan_operation_id`, and require P5 to review the actual new view. P6 transcribes into the new operation's pending record while binding that real original scan.
+## 结果与交接
 
-## Describe: describe
+成功阶段 `ready` 返回 `plan_ref/plan_digest`、`view_ref/view_digest`、`disposition_preview_ref`、`summary_ref`、`batch_kind` 和 `review_mode`。跟随实际结果引用读取，不手工拼接输出文件名。
 
-Request: operation_id and saved view_ref. Returns existing references, source set, baseline and limitations; no writes or quality checking. Missing/misbound views are errors. Caller names the view's actual business operation; no author/reviewer identity or upstream passing status is inspected.
+候选保存完整 `input_snapshot` 与将发布的字节、最终引用映射；P6 发布同一内容，不在发布时修补卡稿。处置预览保留计划的单元、动作及卡／Claim引用，供 P5 机械转写。
 
-Identical run reentry checks saved input/display binding and returns existing outputs without rederiving a plan. Changed requests or observed inputs require a new operation. P5 independently reviews content; P7 protects actual writes.
+`record_only` 批只保存空写集和已定处置预览，不产生内容稿件或内容检查通过声明。所有新稿和请求／输出留在本操作暂存，正式卡、导航、来源锁与证据在 P6 前保持原状。
 
-Staging boundary: requests, responses and new business payloads stay under this operation's `.build/operations/<op>/`. Follow the exact returned material/view references; never discover a latest private operation. Final evidence references and stage-to-final hashes are fixed before P5 and may not be rewritten by P7. Explicit revision/adoption preserves old immutable inputs, which are not this operation's owned cleanup set.
+## 修订
+
+```text
+python K/knowledge.py view-materialize --action revise --input REQUEST.json --json
+```
+
+使用新 `operation_id`、实际 `previous_view_ref`、非空 `revision_reason`，其余作者输入与正常成稿一致。
+
+- 仅 P3 改稿：明确采用前序视图绑定且未变化的计划与材料。
+- 返回 P1/P2：先采用它们产出的新材料／计划，再保存新稿。
+
+原扫描与处理单元身份保持，旧工件不覆盖；新视图重新交 P4。原计划已冻结但尚无 view 时，不能靠改材料、重写计划或伪造前序 view 接续，保留实际停点。
+
+## 只读描述
+
+`--action describe` 接收实际操作和 `view_ref`，只报告该已保存候选的引用、来源、基线与限制。缺失或绑定不符就返回真实错误，不重新成稿或替代质量审阅。

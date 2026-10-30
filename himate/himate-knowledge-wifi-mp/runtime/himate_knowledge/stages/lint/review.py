@@ -1,4 +1,4 @@
-"""Deterministic P5 data checks; the host supplies the independent reviewer."""
+"""Deterministic P4 data checks; the host supplies the independent reviewer."""
 
 from pathlib import Path
 
@@ -84,7 +84,7 @@ def run(ctx):
     view = ctx.record(request["view_ref"], "final_view")
     semantic_ref = request.get("semantic_plan_ref") or view.get("semantic_plan_ref")
     if not semantic_ref:
-        raise modules["runtime"].NodeError("SEMANTIC_PLAN_REQUIRED", "P5 needs the actual authored plan")
+        raise modules["runtime"].NodeError("SEMANTIC_PLAN_REQUIRED", "P4 needs the actual authored plan")
     review_request = {**request, "semantic_plan_ref": semantic_ref}
     review_data, _ = modules["review_inputs"].content_review(ctx, review_request)
     review_record = ctx.record(review_data["content_review_ref"], "content_review")
@@ -133,7 +133,7 @@ def run(ctx):
                 else:
                     add_finding(report, "source.references", getattr(code_error, "code", "CODE_REVIEW_UNAVAILABLE"),
                                 str(code_error), incomplete=True)
-    query_returns = {"P3" for row in report["findings"] if row.get("code") == "TARGET_QUERY_EXPECTATION_FAILED"}
+    query_returns = {"P2" for row in report["findings"] if row.get("code") == "TARGET_QUERY_EXPECTATION_FAILED"}
     report["review"] = {**review_data, "fixed_checks_executed": fixed_executed,
                         "sampled_unit_ids": review_record["sampled_unit_ids"],
                         "unreviewed_unit_ids": review_record["unreviewed_unit_ids"],

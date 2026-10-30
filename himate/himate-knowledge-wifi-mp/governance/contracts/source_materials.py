@@ -29,7 +29,7 @@ def _source_changed(message, paths):
 
 
 def domain_cards(context):
-    """Decode card data for discovery without repeating P5 quality checks."""
+    """Decode card data for discovery without repeating P4 quality checks."""
     root = safe(context.root, "knowledge")
     cards = []
     if root.exists():
@@ -419,7 +419,7 @@ def prepare(context):
                               "locator": {"kind": "bytes", "start": 0, "end": snapshot["bytes"]}}
                 resolved = operations.resolve_source(context, source_ref, bundle)
                 if resolved.get("source_kind") != "code" or resolved.get("current_source_matches") is not True:
-                    raise NodeError("CURRENT_CODE_REQUIRED", "Historical or unauthorized code cannot serve as current P2 material", blocked=True)
+                    raise NodeError("CURRENT_CODE_REQUIRED", "Historical or unauthorized code cannot serve as current P1 material", blocked=True)
                 raw = base64.b64decode(resolved["bytes_b64"], validate=True)
                 original_ref = context.base + "/material/code/" + sha(raw) + ".bin"
                 _save_bytes(context, original_ref, raw)

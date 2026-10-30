@@ -174,7 +174,7 @@ def _projection(view):
 
 
 def publish_manifest(ctx, view, plan=None, *, processing_record=None, event_refs=(), applied=None, index_inputs=None):
-    """Seal only the formal byte set already installed and checked by P7."""
+    """Seal only the formal byte set already installed and checked by P6."""
     plan = plan or validate_plan(ctx, view)
     files = []
     for expected in plan["payloads"]:
@@ -244,7 +244,7 @@ def publish_manifest(ctx, view, plan=None, *, processing_record=None, event_refs
 
 
 def publish_processing_record(ctx, view, reference, *, expected_digest=None):
-    """Add actual apply facts only after P7 has verified its complete payload."""
+    """Add actual apply facts only after P6 has verified its complete payload."""
     if not reference:
         return None
     safe(ctx.root, reference, [ctx.base])

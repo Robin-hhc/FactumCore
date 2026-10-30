@@ -1,4 +1,4 @@
-"""P5-only query evaluation over a fully checked, private candidate database.
+"""P4-only query evaluation over a fully checked, private candidate database.
 
 The observation is an in-process object, never an input request credential.
 Ranking, qualifications, source recovery and read behavior remain query_runtime's.

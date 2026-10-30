@@ -46,7 +46,7 @@ def publication_case(tmp_path):
 
 
 def installed_publication(case, *, record_only=False):
-    """Install exact synthetic bytes to test metadata, not P7 semantic checks."""
+    """Install exact synthetic bytes to test metadata, not P6 semantic checks."""
     ctx, view, entry, raw = case
     publication = HELPER.load_contract("publication")
     if record_only:

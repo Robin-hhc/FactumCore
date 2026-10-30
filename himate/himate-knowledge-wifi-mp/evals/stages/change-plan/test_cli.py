@@ -1,4 +1,4 @@
-"""P3 public semantic-plan entry and explicit retirement of byte operations."""
+"""P2 public semantic-plan entry and explicit retirement of byte operations."""
 import json
 import subprocess
 import sys

@@ -1,4 +1,4 @@
-"""P7 business execution over exact bytes, with independently durable substeps."""
+"""P6 business execution over exact bytes, with independently durable substeps."""
 
 import base64
 import copy
@@ -435,7 +435,7 @@ def execute_batch(ctx, *, transact):
         applied = _committed(ctx, view, journal)
     elif journal and journal.get("status") not in {"committed", "rolled_back"}:
         if journal.get("execution_checks") != "safety_only":
-            raise NodeError("LEGACY_RECOVERY_REQUIRED", "Recover the old transaction with its matching entry before P7", blocked=True)
+            raise NodeError("LEGACY_RECOVERY_REQUIRED", "Recover the old transaction with its matching entry before P6", blocked=True)
         applied = transact("resume")
     else:
         applied = transact("run")
@@ -515,4 +515,4 @@ def execute(ctx, *, transact=None):
         data = function(ctx, ctx.request)
         phase = data.pop("phase")
         return data, phase
-    raise NodeError("INVALID_ACTION", "Unknown P7 public action", action)
+    raise NodeError("INVALID_ACTION", "Unknown P6 public action", action)

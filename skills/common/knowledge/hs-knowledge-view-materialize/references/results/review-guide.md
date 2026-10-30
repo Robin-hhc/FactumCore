@@ -1,9 +1,5 @@
-# Review guide
+# 结果核对
 
-Check the actual result and relevant card/source/view/index bytes. State unresolved gaps. Workflow order, role assignment and handoff validation belong to OpenFlow. A successful business check does not prove semantic correctness, deployment or Git merge.
+核本次保存结果及其实际视图、输入绑定、稿件和处置预览一致，引用可供 P4 使用。代码声明按本次实际稿件报告，不在此重做符号解析或整库 lint。
 
-Check that the saved view, display bytes, source set, input snapshot, authored record preview and summary describe the actual request. Reentry returns frozen outputs only while inputs remain unchanged. Do not rerun full lint or claim independent review at this production step.
-
-Check that every active-card code source has its required `sources[].code_ref` in the complete saved card, attached to the intended evidence_ref. Exact card/view bytes bind the field; a snapshot-only source_set digest is not a substitute for checking those bytes. Historical recovery remains compatible with the original four fields. Symbol resolution and quality checks remain P5's work.
-
-Report the frozen stage-to-final mapping and exact reviewed bytes. P7 cannot rewrite references. Distinguish borrowed immutable material from this operation owned outputs.
+P3 输出候选字节，P4 负责独立审阅，P6 才正式发布；不得提前声称审阅或落位完成。

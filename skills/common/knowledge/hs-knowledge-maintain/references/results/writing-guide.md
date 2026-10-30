@@ -1,7 +1,3 @@
-# Writing guide
+# 来源维护结果说明
 
-Report the actual CLI status, phase, diagnostics and returned business file references. Use the output of this invocation; do not invent a passing result. OpenFlow owns run/node/attempt tracking and transition checks.
-
-Separate independent explicit event/watermark writes from read-only reports and ingest pending event drafts. Do not describe this action as regular stage cleanup.
-
-For patrol, include the exact plan_ref/report_ref, counts, coverage, fallback reasons and unresolved items. Hand source_request verbatim to source.prepare. Separate observed changes from actual P7 completion and the successful baseline CAS; pending is not completed. Use exact resume_request for an unfinished publication, never invent an old producer or replay its writes.
+按实际 action/phase 和结果引用报告观察或写入事实。区分机械来源限制与语义问题；未解决项保留。只读引用审计使用其独立报告声明。

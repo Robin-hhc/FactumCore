@@ -1,4 +1,4 @@
-"""Real P2/P4 algorithms retain necessary old cards, not reading candidates."""
+"""Real P1/P3 algorithms retain necessary old cards, not reading candidates."""
 
 from support import staging as fixture
 import base64
@@ -101,7 +101,7 @@ def test_published_input_projection_does_not_require_unmodified_candidate_copy(t
         "candidate_id": "new", "decision": "create", "reason": "New authored card", "card_inputs": [draft]}]))
     view = json.loads((tmp_path / output["view_ref"]).read_bytes())
     # Install only the explicit payload bytes to exercise the postwrite
-    # projection. This is not a P7/transaction/index acceptance claim.
+    # projection. This is not a P6/transaction/index acceptance claim.
     for row in view["writes"]:
         fixture.write(tmp_path, row["path"], base64.b64decode(row["bytes_b64"], validate=True))
     for row in view["staged_objects"]:

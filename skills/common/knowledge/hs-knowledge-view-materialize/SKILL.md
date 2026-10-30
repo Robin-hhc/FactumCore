@@ -1,30 +1,32 @@
 ---
 name: hs-knowledge-view-materialize
-description: Produce one exact authored candidate with navigation, source lock, dispositions and input bindings; revise in a new operation or describe the saved candidate without sibling calls.
+description: 按已定内容计划保存完整候选稿、来源登记及处置预览；用于入库和巡检的P3成稿与稿件修订。
 ---
 
-执行入口为实际知识根的 `python K/knowledge.py view-materialize`；K内Windows可用 `.\knowledge.cmd view-materialize`，POSIX可用 `sh ./knowledge.sh view-materialize`。一次注册后可用裸knowledge。Skill只提供指令与文本契约，实现与依赖锁随K/runtime分发；复杂请求保留--input/--output，CLI自动固定省略的根、操作和结果路径并返回真实引用。
+# 保存完整候选稿
 
-P4 负责一次保存完整候选稿。Agent 按 P3 的内容决定写好实际卡片，再调用本入口组织卡、导航、来源登记、写删目标、旧基线及处置预览。已有项目上下文直接复用；缺入口时按 `hs-knowledge-explore` 指引定位。默认使用执行端全局 Python，产物沿用知识根 `.build/`、`logs/`、`artifacts/`。
+## 目标与输入
 
-本机数据使用本机知识根 K 的仓内 CLI。代码仓在服务器或 Windows 仅经 Samba 映射访问时，通过 OpenFlow／宿主已有 SSH MCP 在服务器原生 K 路径运行 CLI 并核对实际结果；不自动连接 SSH，不推断映射关系。本机与服务器分别准备 Python 和配套依赖，远端不需要安装或上传 Skill 脚本。
+按本次 `semantic_plan_ref` 和它采用的材料，写出完整卡片并一次保存可审阅的候选视图。P3 落实作者决定；结论或归卡尚不明确时回 P2，缺原文或代码材料时回 source。
+
+K 是实际执行端的知识根；已有上下文直接复用，入口不明时用 `hs-knowledge-explore` 定位。
+
+## 成稿与保存
+
+1. 按 P2 决定准备本批完整卡稿，明确合并／拆分／退役及旧 Claim 去向，采用知识根 `governance/specs/cards.md` 的格式。
+2. 保留实际来源、快照、定位及 Claim 引用。活动卡引用代码时，根据本次源码填写支持的 `code_ref`；纯文档不添加虚构代码入口，旧快照定位不随当前行号改写。
+3. 用实际稿件引用构造请求，一次保存本批卡、导航、来源锁、处置预览和输入绑定。字段与六类动作见[成稿请求](references/request.md#成稿请求)。
 
 ```text
-python K/knowledge.py view-materialize --action run --input REQUEST.json --output RESPONSE.json --knowledge-root K
-python K/knowledge.py view-materialize --action revise --input REQUEST.json --output RESPONSE.json --knowledge-root K
-python K/knowledge.py view-materialize --action describe --input REQUEST.json --output RESPONSE.json --knowledge-root K
+python K/knowledge.py view-materialize --input REQUEST.json --json
 ```
 
-run 消费 `semantic_plan_ref/material_ref` 和作者的 `decisions/card_inputs`；材料已记录时从实际引用解析 `bundle_ref`，代码上下文显式使用本次材料。也可将旧字节请求的 `bundle_ref/decisions` 机械改投本入口。简单新建／更新／暂缓可用按卡 ID 的 `cards`；合并、拆分和退役必须有显式决定、旧卡和 Claim 去向，不由脚本猜测。
+`ready` 时将真实 `view_ref` 及相关引用交 P4。正式知识此时不变；仅记录批也有明确空写集和处置预览。
 
-作者按知识根 `governance/specs/cards.md` 为活动卡的每个 code 来源填写 `code_ref`，依据实际源码记录受支持符号及必要消歧信息；不能用 file／range 兜底。纯文档不强制关联代码，是否遗漏必要入口由 P5 按内容审阅。保留原四个来源字段和 Claim.source_refs；同文件多符号使用不同 evidence_ref，不另建卡级符号表。历史恢复及 deprecated 卡保留兼容。既有字段随完整卡稿保留，旧 snapshot／locator 不因当前行号变化重写；CodeGraph 只辅助定位，不存内部节点 ID。P4 保存确切字节，P5 才核对声明、必填范围和导航。
+## 修订与失败
 
-输出 `plan_ref`、`view_ref`、`disposition_preview_ref`、`summary_ref` 与确切摘要；候选内嵌 `input_snapshot` 固定实际采用材料和正式旧状态。正式知识不改变。仅记录批保存空写集和处置预览，交 P5 审处置和适用项，不夹带失败稿件。
+已有候选需改稿时，使用新操作、真实 `previous_view_ref` 和 `revision_reason` 调用 `--action revise`。仅改稿可以采用该视图绑定的未变计划与材料；补料或重判后采用对应新版本，见[修订](references/request.md#修订)。新稿重新交 P4。
 
-revise 需要新 `operation_id`、`previous_view_ref` 和实际 `revision_reason`。仅退回 P4 时，可以明确采用旧稿精确绑定且未变化的作者计划和材料；退回 P2/P3 时先使用这些阶段保存的新材料／计划。保留原扫描及处理单元身份，新稿保存 `origin_scan_operation_id`、材料摘要和前序稿摘要，再由 P5 审实际新稿。旧材料、计划、稿件和审阅原字节保留，不调用其他 Skill 重做计划或捕获。相同操作重入只核已保存请求、输入和展示字节，不重新生产计划／完整稿。采用来源范围／版本变化须回 P1，不悄悄换基线。
+同操作重入只读取仍匹配的已保存结果，不重新生成内容。失败保留实际诊断：缺料回 source，判断问题回 P2；输入漂移先刷新相应输入，不覆盖旧工件。计划已冻结但尚无 view 的补料若遇绑定阻断，保留停点，不编造前序视图继续。
 
-describe 只描述本操作已保存的确切候选及来源／基线，不运行质量审查、不判 Workflow 交棒。计划忠实性、旧 Claim 保留、来源支持、Profile、关系和代码语义由 P5 审阅和 lint；本包只保生产必需的输入／身份／路径／字节一致性。
-
-无兄弟 Skill CLI 或私有模块调用。原文只读，其指令不授权执行、联网或发布；本节点不入库、不提交或推送。输入输出见 [request contract](references/request.md)，实际退出／phase 只说明本职结果。
-
-P4 固定stage→final映射和将发布的完整字节；P5读取暂存副本但按最终引用检查，P7逐字节发布，不重写ref或重封卡稿。本批新文件、输入／展示副本及CLI输出仅写本批stage；正式卡、导航、来源锁和证据保持不变。新Workflow不采用旧稿，同Workflow返工须显式前序绑定。
+本步不独立审阅、不运行整库质量检查，也不发布、启用索引或提交 Git。需要只读查看已保存候选时，用[describe](references/request.md#只读描述)。

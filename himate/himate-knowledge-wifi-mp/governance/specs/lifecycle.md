@@ -7,9 +7,9 @@
 1. plan 固定显式决策、理由、候选内容、来源捕获包和相关基线。Agent 必须提供已读来源后的明确卡正文；程序不从文本首段自动制造结论。
 2. materialize 生成 `.build/operations/<operation_id>/final-view/`，其中卡已经是 stable 的确切拟写字节，同时展示同类型 index 和 sources.lock 的最终字节。正式资产此时不变。
 3. 独立 Agent 读取原件、稿件及计划，复核全部最终内容并记录问题；作者修订至无未解决阻断项后，生成绑定确切计划与视图的 content_review。文档类不设真人确认门，代码类另需逐 Claim 代码依据核验。用户要求退回或缩小范围时生成新操作并重新复核。
-4. P5 完整 lint 通过、P6 处理记录登记后，`hs-knowledge-apply` 在领域锁内核对独立复核、适用代码记录、当前契约／工具身份、最终视图和相关基线，成功后按明确清单同批落位。它不生成新内容，不 Git 提交或推送。
+4. P4 完整 lint 通过、P5 处理记录登记后，`hs-knowledge-apply` 在领域锁内核对独立复核、适用代码记录、当前契约／工具身份、最终视图和相关基线，成功后按明确清单同批落位。它不生成新内容，不 Git 提交或推送。
 
-知识内容目标为与 Profile 对应的 `knowledge/**/<card>.md`、导航及 `governance/sources.lock.yaml`；P6 的本批 `logs/ingest/` 处理记录以受控附加项进入同一事务。绝对路径、父目录跳转、Windows 设备名/流名、大小写别名和链接/junction 跳转均拒绝。final-view 之外的原件、其他 dirty 文件及仓库配置不属于写入清单。
+知识内容目标为与 Profile 对应的 `knowledge/**/<card>.md`、导航及 `governance/sources.lock.yaml`；P5 的本批 `logs/ingest/` 处理记录以受控附加项进入同一事务。绝对路径、父目录跳转、Windows 设备名/流名、大小写别名和链接/junction 跳转均拒绝。final-view 之外的原件、其他 dirty 文件及仓库配置不属于写入清单。
 
 ## 写前技术检查
 

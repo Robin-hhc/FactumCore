@@ -1,4 +1,4 @@
-"""Migrated byte/action oracles at the P4 public boundary; P5 owns quality."""
+"""Migrated byte/action oracles at the P3 public boundary; P4 owns quality."""
 import json
 import pytest
 import yaml

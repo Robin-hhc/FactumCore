@@ -29,8 +29,8 @@ import uuid
 import zipfile
 
 
-# Distribution source and the default for new projects. Existing projects keep
-# the independently validated knowledge_roots.wifi path from their config.
+# Distribution source and default destination, relative to the code project.
+# Explicit custom roots and existing legacy-only installations remain supported.
 KNOWLEDGE = "himate/himate-knowledge-wifi-mp"
 RECEIPT = ".factum-knowledge-deploy.json"
 FRAMEWORK_TREES = ("contracts", "schemas", "specs", "templates")
@@ -460,6 +460,44 @@ def _runtime_payload(source):
         raise DeploymentError("Invalid repository runtime manifest: " + str(exc)) from exc
 
 
+def _knowledge_destination(project_root, relative):
+    """Recognize only historical aliases of this distribution's standard root."""
+    parts = _relative(relative).parts
+    standard = PurePosixPath(KNOWLEDGE)
+    container, leaf = standard.parts
+    flat = parts == (leaf,)
+    repeated = len(parts) > 2 and parts[-1] == leaf and all(part == container for part in parts[:-1])
+    if parts == (container,) or repeated:
+        return KNOWLEDGE
+    if flat:
+        canonical = _check_chain(project_root / KNOWLEDGE)
+        legacy = _check_chain(project_root / relative)
+        if canonical.is_dir() or not legacy.is_dir():
+            return KNOWLEDGE
+    return PurePosixPath(*parts).as_posix()
+
+
+def _updated_knowledge_config(raw, value, relative):
+    """Replace the selected scalar, keeping business formatting and other keys."""
+    import yaml
+
+    try:
+        text = raw.decode("utf-8")
+        document = yaml.compose(text)
+        roots = next(node for key, node in document.value if key.value == "knowledge_roots")
+        node = next(node for key, node in roots.value if key.value == "wifi")
+        replacement = (json.dumps(relative, ensure_ascii=False) if node.style == '"' else
+                       "'" + relative.replace("'", "''") + "'" if node.style == "'" else relative)
+        updated = (text[:node.start_mark.index] + replacement + text[node.end_mark.index:]).encode("utf-8")
+        expected = {**value, "knowledge_roots": {**value["knowledge_roots"], "wifi": relative}}
+        # Anchors/aliases must not silently change another project's setting.
+        if _yaml_load(updated, "updated project config") != expected:
+            raise DeploymentError("Knowledge path repair would change other project settings")
+        return updated
+    except (UnicodeError, AttributeError, StopIteration, TypeError, yaml.YAMLError) as exc:
+        raise DeploymentError("Cannot repair knowledge_roots.wifi without changing other configuration: " + str(exc)) from exc
+
+
 def _knowledge_payload(source_root, project_root):
     import yaml
 
@@ -473,7 +511,11 @@ def _knowledge_payload(source_root, project_root):
         value = _yaml_load(config_baseline, "project config")
         roots = value.get("knowledge_roots") if isinstance(value, dict) else None
         relative = roots.get("wifi") if isinstance(roots, dict) else None
-        knowledge_rel = _relative(relative).as_posix()
+        knowledge_rel = _knowledge_destination(project_root, relative)
+        if knowledge_rel != relative:
+            # Install the config repair with the same guards/backup/rollback as
+            # its framework update; --plan must never rewrite it eagerly.
+            payload["config.yml"] = _updated_knowledge_config(config_baseline, value, knowledge_rel)
     else:
         config_baseline = None
         knowledge_rel = KNOWLEDGE

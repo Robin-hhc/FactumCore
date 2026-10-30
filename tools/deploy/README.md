@@ -12,9 +12,9 @@ powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 |---|---|
 | Skill 安装根 | `~\.openflow\config\skills` |
 | Workflow 模板安装根 | `~\.openflow\config\workflow-templates` |
-| 代码仓／知识项目根 | 选择实际项目根，默认见脚本提示；下文以 `repo/` 示意 |
+| 代码仓根 | 选择包含 `himate/` 的实际 `repo/`，默认见脚本提示；不要填写 `repo/himate/` 或知识根本身 |
 
-第三项是项目根，不是知识子目录。分发源码位于 `repo/himate/himate-knowledge-wifi-mp/`；新项目默认安装到同样的 `himate/himate-knowledge-wifi-mp/`，模块列表为空，等待维护者按真实代码填写。已有 `config.yml` 时沿用其中安全的 `knowledge_roots.wifi`，包括原平铺路径或其他多级目录，保留配置与业务记录原字节，不自动搬迁已部署知识库；`himate/` 下其他组的目录也不在更新范围。`~` 按当前 Windows 用户目录展开；OpenFlow 使用自定义用户根时，请相应修改安装路径。
+第三项始终是代码仓根。新项目默认安装到其下的 `himate/himate-knowledge-wifi-mp/`，已有对应知识根时在该目录更新受管框架；模块列表初始为空，等待维护者按真实代码填写。有效自定义知识根继续沿用；当前标准名的陈旧容器、重复前缀或旧平铺映射按[目标路径规则](../../himate/himate-knowledge-wifi-mp/docs-llm-wiki/使用说明.md#2-首次环境安装)有界纠正，只改配置中的 `knowledge_roots.wifi` 标量，其余字节保留。旧目录与业务数据不迁移、合并或删除，`himate/` 下其他组也不在更新范围。`~` 按当前 Windows 用户目录展开；OpenFlow 使用自定义用户根时，请相应修改安装路径。
 
 dbox仅分发知识根下的 `docs-raw/sources/dbox.example.yml` 与同目录精确 `.gitignore`，不分发私人 `dbox.local.yml` 或整个资料目录；已有local地址保持原字节，自定义ignore只安全补精确项。部署JSON的 `source_setup.status: pending_execution_host`、`configuration_checked: false` 表示来源尚待实际执行端配置。Windows `deployed`不代表SSH服务器目录可用。
 
@@ -59,9 +59,10 @@ Skill ZIP只含指引、参考和上述生成的宿主适配文本，不含scrip
 | 共享设计文档、治理入口、检查脚本等 | 只更新明确列出的分发文件；保留 `docs-llm-wiki/sdd/`、`task.md` 和其他文件 |
 | `docs-raw/`、`knowledge/` 及各级导航 | 保留已有原件、附件、知识和导航；仅补初始骨架；dbox 空模板按分发更新 |
 | `logs/`、`.build/`、`artifacts/` | 保留历史处理、发布／证据、未完事务、稳定写锁、巡检成功基线、索引与查询回执；部署不做运行数据清理 |
-| `governance/sources.lock.yaml`、`dbox.local.yml`、项目配置与真实业务入口 | 保留原字节；dbox 同目录 `.gitignore` 沿用精确追加规则 |
+| 项目 `config.yml` | 保留原字节；仅上述陈旧路径纠正可替换 `knowledge_roots.wifi` 标量，其他字段、注释及换行不变 |
+| `governance/sources.lock.yaml`、`dbox.local.yml` 与真实业务入口 | 保留原字节；dbox 同目录 `.gitignore` 沿用精确追加规则 |
 
-可先运行 `-Plan`，查看 `files` 的 `write`／`delete` 和 `directories` 的 `remove`。`write_count`、`delete_count`、`remove_directory_count` 分别统计本次更新；无变化时三者均为 0。删除和替换均先备份，受管树最终核对包含文件字节及目录集合；受控失败会恢复已删文件和空目录。存在并发修改或恢复冲突时保留备份与清单并报告失败，不能把部分更新当作成功；升级不是整目录原子切换。
+可先运行 `-Plan`，只读核对 `targets.project_root`、最终 `targets.knowledge_root`，以及 `files` 中的 `config.yml` 修正和其他 `write`／`delete`、`directories` 的 `remove`。`write_count`、`delete_count`、`remove_directory_count` 分别统计本次更新；无变化时三者均为 0。删除和替换均先备份，受管树最终核对包含文件字节及目录集合；受控失败会恢复已删文件和空目录。存在并发修改或恢复冲突时保留备份与清单并报告失败，不能把部分更新当作成功；升级不是整目录原子切换。
 
 部署前先停用正在使用这些能力的宿主任务，结束同一项目的业务写入；已知未完事务先用原版本处理。不要并行编辑这些目标，也不要从多台机器同时部署到同一目标。检测到中断或写入冲突时，按报告核对恢复结果和保留的备份；强制结束进程或断电后的状态不能据“命令已停止”推断。
 

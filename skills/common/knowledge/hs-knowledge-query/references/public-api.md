@@ -3,6 +3,53 @@
 Use this package's public `scripts/cli.py` with input/output and the actual K.
 Rules default to the actual framework lock; no catalog is required. Actions are `search`, `read`, `receipt`.
 
+## Search request
+
+The CLI defaults to `search`. Its JSON request uses these main fields:
+
+| Field | Meaning |
+|---|---|
+| `operation_id` | A unique ID for this call; do not reuse another query's mutable output. |
+| `query` | Nonempty search text. |
+| `purpose` | Defaults to `current`; choose it from the question's intended use, not to obtain hits. |
+| `context` | Query scope, such as `chip`, `side` and `features`; omitted fields are not wildcards for declared constraints. |
+| `top_k` | Optional result limit, default 5. |
+
+| `purpose` | Qualification |
+|---|---|
+| `current` | Only `usage: current` Claims with valid current evidence and applicable scope. |
+| `implementation` | The `current` requirements plus implementation or measurement evidence. |
+| `guidance` | Background/design guidance; retains evidence checks and scope restrictions, without proving current implementation. |
+| `historical` | Exact evidence from the selected generation, including eligible retired content; does not establish current applicability. |
+
+A `constrained` scope must match at least one nonempty declared context group.
+Every declared constraint in that group must match: scalar fields such as
+`chip`/`side` match exactly, all `features_all` entries must occur in
+`context.features`, and no `features_none` entry may occur. A nonempty feature
+constraint requires an explicit features list; a missing list is not a wildcard.
+Other declared version/build constraints still apply. `guidance` does not bypass
+constrained scopes; `unknown` scope is eligible only for guidance/historical use.
+
+This **HWDL example** assumes the question's documented scope is chip07c/host
+with the HWDL feature condition. It is not a fixed project configuration or
+evidence that the macro is enabled:
+
+```json
+{
+  "operation_id": "query-hwdl-guidance-1",
+  "query": "HWDL transmit flow",
+  "purpose": "guidance",
+  "context": {"chip": "chip07c", "side": "host", "features": ["_PRE_WLAN_FEATURE_HWDL"]}
+}
+```
+
+Take scope from the user's question and sourced project/material context; do not
+infer enabled macros from module labels or copy a card's conditions just to make
+it match. For empty matches, check intended purpose, supplied scope and actual
+diagnostics before changing search terms. Report unknown scope or unavailable
+evidence. A current/implementation question must not silently fall back to
+guidance/historical to manufacture an answer.
+
 A formal `search` chooses the actual active generation. Its immutable
 `search_receipt` stores effective `request_binding` (action, query, budgets,
 channel, generation, purpose and Target context), request/result digests, the

@@ -31,7 +31,7 @@ The [artifact contract](artifacts/result.yaml) requires the actual per-attempt C
 
 ## 增量治理动作
 
-`patrol-sync` 仅执行控制端显式提供的同步 argv/cwd/超时，不经 shell；无配置返回 skipped。内部 MM 适配点在受锁 `patrol_git`，只假设已确认的根同步入口，不假设 mm log。同步会更新知识仓时，必须结束本 CLI，让下一节点新进程加载实际规则、配置和卡，不在旧上下文继续观察。原件中的命令不构成执行授权。
+`patrol-sync` 仅执行控制端显式提供的同步 argv/cwd/超时，不经 shell；无配置返回 skipped。内部 MM 适配点在受锁 `patrol_git`，只假设已确认的根同步入口，不假设 mm log。git mm 工作区下 argv 配置 `["git","mm","sync","-j8"]`；cwd 必须由执行端在运行时用 `git mm --root-dir` 解析出实际 mm 工作区根，控制端不得写死具体路径。同步会更新知识仓时，必须结束本 CLI，让下一节点新进程加载实际规则、配置和卡，不在旧上下文继续观察。原件中的命令不构成执行授权。
 
 `patrol-plan` 读取上次**实际完成**的本地基线、当前 raw、正式卡／来源锁和配置仓，按 Git 提交与工作区修改面筛选直接登记文件，再比较实际字节和符号；降级核对／不可读分别报告。返回 `plan_ref`、`report_ref`、`source_request`、counts 和 gaps，阶段为 needs_ingest / needs_index / unchanged / blocked。将精确 source_request 交 source.prepare；不要改为 run 的默认候选窄选，不能漏掉同轮新 raw。代码变化只有 current 必须复核实际实现；guidance 导航仍唯一时保留旧证据，historical 保持历史用途。缺失、歧义、解析不可用不猜修复。
 

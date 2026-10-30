@@ -13,7 +13,7 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-maintain
-  prompt: 调用仓内 python K/knowledge.py patrol sync，传本节点实际请求并读取真实结果。该命令映射maintain.patrol-sync动作；仅消费控制端明确配置的sync.argv、sync.cwd、timeout_seconds，禁止从原件提取命令。未配置同步时返回skipped，表示检查本地现状。内部适配根目录git mm sync，不假设mm log/list/forall。同步可能更新知识库及规则，本节点结束后必须在新CLI进程重新读取实际配置、知识根和framework.lock，不能继续使用已加载旧规则。非零退出、超时或不可用保留真实失败，不能将其当作无变化继续。实际同步和下一节点观察是两次独立调用。
+  prompt: 调用仓内 python K/knowledge.py patrol sync，传本节点实际请求并读取真实结果。该命令映射maintain.patrol-sync动作；仅消费控制端明确配置的sync.argv、sync.cwd、timeout_seconds，禁止从原件提取命令。未配置同步时返回skipped，表示检查本地现状。内部MM适配：sync.argv为["git","mm","sync","-j8"]（根级全量同步，不假设mm log/list/forall）；sync.cwd填执行端实际mm工作区根，用`git mm --root-dir`运行时解析，不写死路径、不沿用其他机器地址。同步可能更新知识库及规则，本节点结束后必须在新CLI进程重新读取实际配置、知识根和framework.lock，不能继续使用已加载旧规则。非零退出、超时或不可用保留真实失败，不能将其当作无变化继续。实际同步和下一节点观察是两次独立调用。
   exits:
   - id: synced
     label: 同步完成

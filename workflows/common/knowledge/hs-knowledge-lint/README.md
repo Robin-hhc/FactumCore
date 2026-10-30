@@ -2,7 +2,7 @@
 
 用于个人本地及外部半日／每日调度：自动发现 raw 未入库变化、直接登记的代码文件变化与旧欠账，并复用 ingest 能力处理。公开 Skill 仍为八个；同名 lint Skill 继续提供独立只读检查及 P5 review。
 
-1. `sync_workspace` 调用已安装 maintain 的 `patrol-sync`。配置来自控制端的 `sync.argv/cwd/timeout_seconds`；未配置同步时为 skipped，仅检查本地现状。内部可适配根目录 `git mm sync`，其它 MM 子命令不作假设。
+1. `sync_workspace` 调用已安装 maintain 的 `patrol-sync`。配置来自控制端的 `sync.argv/cwd/timeout_seconds`；未配置同步时为 skipped，仅检查本地现状。git mm 工作区下 argv 配置 `["git","mm","sync","-j8"]`，cwd 由执行端用 `git mm --root-dir` 运行时解析实际工作区根、不写死路径；其它 MM 子命令不作假设。
 2. `plan_patrol` **另起 CLI 进程**，重新加载实际规则／配置／知识仓，调用 `patrol-plan`。脚本比较上次成功水位与各仓 HEAD，合并未提交修改，再只对命中登记文件核 hash／符号；首轮或缺历史等情况回退全部登记文件精确核对。读取实际 `plan_ref/report_ref/source_request/counts/gaps`。
 3. 有内容事项时，`prepare_sources` 直接用 `source_request` 调用 source.prepare。请求明确取“变化 raw + 待修旧卡对应 raw”的并集，纯代码可使用空 raw 加明确 targets。逐单元坏材料保留 gap，漂移仍阻断。
 4. 复用 ingest 的 P3、P4、独立 reviewer P5、P6、P7；算法和返工边相同，仅 P7 完成后回 `complete_patrol`。不嵌套 Workflow，也不复制 Python 内容生产算法。

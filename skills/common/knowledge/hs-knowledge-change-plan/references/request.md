@@ -21,6 +21,8 @@
 
 `claim_changes` 每项包含 `unit_ids`、`card_id`、`claim_id`、`action`、`before`、`after`、`conditions`、`evidence`、`preserved`、`reason`；动作是 `create/update/preserve/retire`。同一 Claim 的多源判断合成一项，不丢失保留部分或旧依据。
 
+`card_id/claim_id/action/conditions/reason` 均为非空字符串；`conditions` 用文字说明条件，不传数组或对象。`unit_ids` 是非空的实际单元 ID 数组，`evidence` 提供非空真实依据。`before/after/preserved` 三个键必填；新建时可用 `null` 或 `[]` 明示没有旧结论或保留项，不编造前态。
+
 `card_actions` 每项包含 `card_id/decision/author_id/unit_ids/reason`。六类决定为 `create/update/merge/split/deprecate/defer`。同主题重复才合并，独立主题混装才拆分；普通更新保留稳定身份，旧 Claim 明确保留、改变或退役。
 
 每个单元还固定 `record_action/card_refs/claim_refs`，供 P5 直接转写。只有一种实际卡动作时脚本可归一化；同单元涉及多种卡动作时，作者须明确指定实际动作之一作为 `record_action`，不能留给 P5 猜。

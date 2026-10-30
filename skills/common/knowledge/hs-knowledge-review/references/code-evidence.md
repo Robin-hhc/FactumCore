@@ -6,13 +6,17 @@
 
 在 `review` 的 `code_review` 对象中提供 `context_ref` 和 `semantic_report_ref`。本轮 `operation_id` 与确切 `view_ref` 由 P4 传入。代码／混合稿核本次代码门禁卡，同时绑定完整候选。
 
-`context_ref` 指向 P1/P3 已固定的项目配置、实际代码文件及采用材料；E0 项目发现结果不能冒充完整代码上下文。模块工作区按配置范围和文件指纹核验，版本或 Git 身份未知不妨碍有依据的静态检查。
+`context_ref` 指向本批已固定的项目配置、实际代码文件及采用材料；E0 项目发现的文件清单为空，不能冒充完整代码上下文。该输入由调用方按 K 的 `governance/schemas/records.schema.json` 的 `project_context` 契约准备，须有实际 `workspace_id/entries/config_digest`、采用文件 SHA-256、规则绑定及真实生成工具身份；它是待核验数据，不是通过凭据。模块工作区按配置范围和文件指纹核验，版本或 Git 身份未知不妨碍有依据的静态检查。
 
 ## 逐 Claim 技术判断
 
 `semantic_report_ref` 指向 `semantic_review` 记录，含 `schema_version:"2.0"` 和 `payload`。payload 保留 `view_digest`、`context_digest`、`mode`、`issued_at`、`findings` 及 `claims`。
 
+外层还须有 `record_kind:"semantic_review"`。P4 的 `mode` 为 `local`，独立 `code-recheck` 为 `merge`；`issued_at` 是实际 Unix 秒数（整数或小数），不传日期字符串。`findings` 明确列出实际问题，仍有问题时交回修订。
+
 每个 Claim 写 `card_id`、`claim_id`、`status`、非空 `reason` 和绑定实际快照、定位、SHA-256 的 `evidence`；空问题列表不能替代具体理由和依据。
+
+`evidence` 为非空对象数组，每项含实际 `source_id/snapshot_id/locator/sha256`；逐一覆盖该 Claim 采用的全部来源，`locator` 沿用卡中原对象，`sha256` 是原件字节摘要。当前代码已经漂移时另提供绑定实际上下文的 `checked_snapshot`；不能改旧快照或补造当前依据。
 
 | 声明的要求 | 需要什么依据 |
 |---|---|
@@ -25,6 +29,8 @@
 活动卡代码 Claim 逐项 `supported`；最终退役卡可用 `retired`，说明实际退役理由及替代去向并核原始证据，不要求旧断言仍被当前代码支持。
 
 ## 符号定位与语义分开
+
+本次独立代码核验读 `code_review.check_status` 及其真实检查记录。顶层 `code_check_status` 只描述固定检查中 current Claim 的代码 checkout 分支；全为 guidance 时可为 `not_applicable`，不表示独立代码审阅没有执行。
 
 每个活动卡的 code 来源均需 `sources[].code_ref`，包括未被 Claim 采用的来源。缺失报 `CODE_REF_REQUIRED`；supported 写法以 K 的 `governance/specs/cards.md` 为准，不用 file/range 兜底。
 

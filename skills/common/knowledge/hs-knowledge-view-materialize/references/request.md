@@ -14,6 +14,8 @@
 
 材料已经绑定 `bundle_ref` 时从实际材料解析，勿重新捕获。P2 的原查询随计划保留，不在 P3 改写。
 
+代码门禁稿须提供完整 `project_context`。若上游没有该输入，调用方需按 K 的 `governance/schemas/records.schema.json` 准备独立记录，固定实际配置、入口、模块和采用文件 SHA-256，保留未知构建条件，并注明真实生成者及工具身份；不修改 E0 记录或冒充 CLI 自动生成。当前 CLI 没有自动生成完整文件清单的动作，缺少该材料时明确交付缺口，不伪造通过记录。
+
 ### 简单卡稿与显式动作
 
 `create/update/defer` 可用 `cards: {CardID: draft_ref}`，或卡稿输入列表；稿件引用指向 K 内 `.build/` 的完整 Markdown 文件。

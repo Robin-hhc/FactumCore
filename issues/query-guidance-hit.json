@@ -1,0 +1,48 @@
+{
+  "matches": [
+    {
+      "card_id": "hwdl-frame-protocol",
+      "title": "HWDL 帧体协议机制（AWDL 私有帧收发）",
+      "path": "knowledge/concepts/protocols/hwdl-frame-protocol.md",
+      "summary": "<a id=\"hwdl-frame-protocol-claim-1\"></a>",
+      "score": 22,
+      "claim_ids": [
+        "knowledge"
+      ]
+    },
+    {
+      "card_id": "hwdl-rx-flow",
+      "title": "HWDL RX 流程（空口 → 芯片 → 协议栈）",
+      "path": "knowledge/concepts/flows/hwdl-rx-flow.md",
+      "summary": "<a id=\"hwdl-rx-flow-claim-1\"></a>",
+      "score": 22,
+      "claim_ids": [
+        "knowledge"
+      ]
+    },
+    {
+      "card_id": "hwdl-tx-command",
+      "title": "hwdl_tx 测试命令（HWDL TX 全链路测试入口）",
+      "path": "knowledge/commands/hwdl-tx-command.md",
+      "summary": "<a id=\"hwdl-tx-command-claim-1\"></a>",
+      "score": 22,
+      "claim_ids": [
+        "knowledge"
+      ]
+    },
+    {
+      "card_id": "hwdl-tx-flow",
+      "title": "HWDL TX 流程（协议栈 → 芯片 → 空口）",
+      "path": "knowledge/concepts/flows/hwdl-tx-flow.md",
+      "summary": "<a id=\"hwdl-tx-flow-claim-1\"></a>",
+      "score": 22,
+      "claim_ids": [
+        "knowledge"
+      ]
+    }
+  ],
+  "purpose": "guidance",
+  "gaps": [],
+  "truncated": false,
+  "report_ref": "artifacts/query/7fb9c887bfdb481d9dcab012afde7cd1.json"
+}

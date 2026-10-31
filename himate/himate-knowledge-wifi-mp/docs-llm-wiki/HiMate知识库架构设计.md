@@ -76,9 +76,9 @@ flowchart LR
 
 ### 5.2 运行位置与组件分发
 
-命令在数据所在执行端的原生目录运行。执行端取得仓库代码、准备 Python 3.10—3.12 及锁定依赖，并配置实际项目和知识根。远端任务由宿主已有 SSH 能力调用同一仓内 CLI。
+命令在数据所在执行端的原生目录运行。执行端取得仓库代码、选用已有 Python 3.10—3.12，并配置实际项目和知识根。远端任务由宿主已有 SSH 能力调用同一仓内 CLI。
 
-Skill 源码位于项目的 `skills/common/knowledge/`，部署脚本将其复制到指定能力目录，并用指定 Python 安装运行依赖。Workflow 定义位于 `workflows/common/knowledge/`，由宿主导入；仓库代码通过项目自身的代码获取和更新方式维护。
+Skill 源码位于项目的 `skills/common/knowledge/`，Workflow 模板位于 `workflows/common/knowledge/`。部署脚本先收集本次包并校验目标路径，再依次执行：向选定 Python 安装一次锁定运行依赖、删除全部本次同名包目录、复制全部新包。pip 失败时保留旧包；同名包完整替换，源码与目标根其他包保留，宿主加载运行。脚本不下载 Python、不创建虚拟环境；仓库代码通过项目自身的代码获取和更新方式维护。
 
 ### 5.3 HiMate Knowledge目录架构
 
@@ -87,7 +87,7 @@ repo/
 ├── AGENTS.md / config.yml              项目入口与实际路径配置
 ├── skills/common/knowledge/            Skill 分发源码
 ├── workflows/common/knowledge/         Workflow 定义
-├── tools/deploy/                       Skill 安装工具及其测试
+├── tools/deploy/                       Skill 与 Workflow 模板安装工具及其测试
 └── himate/
     └── himate-knowledge-wifi-mp/        领域知识根
         ├── knowledge.py / knowledge.cmd / knowledge.sh

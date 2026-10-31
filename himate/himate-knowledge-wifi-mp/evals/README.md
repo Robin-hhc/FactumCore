@@ -35,13 +35,13 @@ python -m pytest himate/himate-knowledge-wifi-mp/evals -q
 python -m pytest tools/deploy/tests -q
 ```
 
-quick 仅选每个功能目录排序后的首个测试文件，是明确的局部冒烟。`--groups` 同样是局部范围；验证按实际修改范围选择，不把每次局部工作都扩成全量测试。部署仅保留复制 Skill 和 pip 安装，不在每次安装后追加验证。
+quick 仅选每个功能目录排序后的首个测试文件，是明确的局部冒烟。`--groups` 同样是局部范围；验证按实际修改范围选择，不把每次局部工作都扩成全量测试。部署依次执行一次锁定依赖的 pip 安装、删除本次全部同名 Skill 和 Workflow 包目录、复制全部新包，宿主加载运行，不在每次安装后追加验证。
 
 输出目录必须全新。运行器保留每组 JUnit、stdout/stderr、实际选择和 `summary.json`；超时、收集失败、空测试组和无效报告不能算通过。`--jobs` 控制测试组并行，不表示生产 ingest/lint 支持并发写入。性能统计只作观察，不设速度门禁；`--baseline` 仅在环境和选择一致时比较。
 
 ## 验证边界
 
-独立算法检查、隔离 CLI 测试和公司实际环境分别记录。`tools/deploy/tests/test_install_skills.py` 仅用临时目录和模拟 pip 验证 Skill 覆盖复制、无关能力包保留与解释器选择；部署不再分发知识仓或 ZIP。该冒烟不代表真实安装环境、OpenFlow 宿主触发或业务知识验收。
+独立算法检查、隔离 CLI 测试和公司实际环境分别记录。`tools/deploy/tests/test_install_skills.py` 仅用临时目录和模拟 pip 验证三步顺序、pip 失败时旧包保留、同名包完整替换、其他包与源码保留及解释器选择；部署不分发知识仓或 ZIP。该冒烟不代表真实安装环境、OpenFlow 宿主触发或业务知识验收。
 
 P2、P3 由作者执行，P4 由独立 reviewer 读计划、旧卡、新稿和依据。合成脚本测试可以验证角色与返工配置，不能替代真实内容审阅质量。真实 Linux、公司文档、代码实现和权限效果由实际试用单列验收。
 

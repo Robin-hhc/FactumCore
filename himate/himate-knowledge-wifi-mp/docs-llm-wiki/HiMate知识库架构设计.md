@@ -84,7 +84,7 @@ repo/
 ├── deploy.ps1 / deploy.sh              Windows / Linux 部署入口
 ├── skills/common/knowledge/            Skill 分发源码
 ├── workflows/common/knowledge/         Workflow 定义
-├── tools/deploy/                       Skill 与 Workflow 模板安装工具及其测试
+├── tools/deploy/                       Skill 与 Workflow 模板安装实现与说明
 └── himate/
     └── himate-knowledge-wifi-mp/        领域知识根
         ├── knowledge.py / knowledge.cmd / knowledge.sh
@@ -115,7 +115,8 @@ repo/
         │   ├── source-read/           隔离的临时原件阅读任务与到期租约
         │   ├── patrol/                巡检统计
         │   └── models/                独立准备和维护的本地解析模型
-        ├── evals/                     开发测试与公共夹具
+        ├── evals/                     全部开发测试与公共夹具
+        │   └── deploy/                部署工具测试
         └── docs-llm-wiki/              设计与使用说明
 ```
 

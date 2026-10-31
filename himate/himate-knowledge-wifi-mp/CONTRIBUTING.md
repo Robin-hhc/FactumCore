@@ -2,7 +2,7 @@
 
 开发前从[领域入口](AGENTS.md)和[文档路由](docs-llm-wiki/README.md)定位规则，结合当前共享设计、源码及适用测试确定修改范围。
 
-业务执行与共用算法在runtime/governance，Skill只写必要指引与reference，Workflow只维护顺序、角色和出口。业务测试统一在evals；部署工具测试在repo/tools/deploy/tests。
+业务执行与共用算法在runtime/governance，Skill只写必要指引与reference，Workflow只维护顺序、角色和出口。开发测试统一在evals，部署工具测试位于evals/deploy；repo/tools/deploy只保留部署实现与说明。
 
 通过公开 CLI 验证单文件入库、引用查询、六决策、整卡检索、旧卡读取、P4 返工和 P5 重试，按变更范围选择测试。新卡字段与旧知识迁移以[卡片规范](governance/specs/cards.md)为准；读取和重建索引不批量改写正式卡或推进来源处理版本。业务行为测试与独立算法测试分别组织，执行方式见 [evals/README.md](evals/README.md)。测试、文档与发行锁随对应行为一同更新。
 

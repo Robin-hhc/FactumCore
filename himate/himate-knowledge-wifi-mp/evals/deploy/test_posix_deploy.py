@@ -10,7 +10,7 @@ import pytest
 
 
 pytestmark = pytest.mark.skipif(os.name != "posix", reason="POSIX wrapper targets Linux")
-WRAPPER = Path(__file__).resolve().parents[3] / "deploy.sh"
+WRAPPER = Path(__file__).resolve().parents[4] / "deploy.sh"
 
 
 def recorder(path):

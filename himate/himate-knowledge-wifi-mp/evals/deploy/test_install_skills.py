@@ -13,7 +13,7 @@ import pytest
 @pytest.fixture
 def distribution(tmp_path):
     spec = importlib.util.spec_from_file_location(
-        "skill_deploy", Path(__file__).resolve().parents[1] / "deploy.py"
+        "skill_deploy", Path(__file__).resolve().parents[4] / "tools/deploy/deploy.py"
     )
     backend = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(backend)
@@ -182,7 +182,7 @@ def test_powershell_forwards_workflow_destination(tmp_path, explicit_workflow_ro
     source = tmp_path / "source root"
     skills = tmp_path / "skills root"
     workflows = tmp_path / "workflow root"
-    wrapper = Path(__file__).resolve().parents[3] / "deploy.ps1"
+    wrapper = Path(__file__).resolve().parents[4] / "deploy.ps1"
     command = [powershell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(wrapper),
                "-NonInteractive", "-SkillsRoot", str(skills), "-Python", str(recorder),
                "-SourceRoot", str(source)]

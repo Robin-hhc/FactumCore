@@ -48,4 +48,4 @@ python tools/deploy/deploy.py --skills-root SKILLS_ROOT --workflows-root WORKFLO
 
 目标直接按包名展开，例如 `<WorkflowsRoot>/hs-knowledge-ingest/workflow.yaml`；模板的 `layouts.yaml`、`README.md` 一同复制。同名包完整替换，包内旧文件全部清除；源码和目标根中的其他包保留。宿主从目标目录加载能力和模板。知识仓、项目入口及配置由项目自身管理；安装器不创建业务配置或知识根、不配置远端 SSH、不制作压缩包、不注册宿主，也不追加部署后验证。未列入本次部署的旧能力包由维护者按需处理。
 
-开发冒烟位于 `tests/`，使用临时目录与模拟 pip 验证三步顺序、pip 失败时旧包保留、同名包完整替换、其他包与源码保留，以及 Linux/PowerShell 入口的参数和退出码传递；不会向本机环境实际安装依赖。部署后的日常操作见[使用说明](../../himate/himate-knowledge-wifi-mp/docs-llm-wiki/使用说明.md)。
+开发测试统一位于 [evals/deploy/](../../himate/himate-knowledge-wifi-mp/evals/deploy/)，从项目根通过 [evals 运行器](../../himate/himate-knowledge-wifi-mp/evals/README.md#执行) 的 `--groups deploy` 执行。测试使用临时目录、模拟 pip 和解释器记录器，验证三步顺序、pip 失败时旧包保留、同名包完整替换、其他包与源码保留，以及 Linux/PowerShell 入口的参数和退出码传递；不会向本机环境实际安装依赖。部署后的日常操作见[使用说明](../../himate/himate-knowledge-wifi-mp/docs-llm-wiki/使用说明.md)。

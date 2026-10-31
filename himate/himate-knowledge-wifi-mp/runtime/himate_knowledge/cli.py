@@ -26,11 +26,15 @@ def parser():
     result.add_argument("command", choices=COMMANDS)
     result.add_argument("arguments", nargs="*")
     for name in ("action", "input", "output", "knowledge-root", "rules-digest",
-                 "source", "path", "purpose", "receipt", "bin-dir"):
+                 "source", "path", "receipt", "bin-dir"):
         result.add_argument("--" + name)
+    # Recognize the removed option only to explain the new contract, including
+    # the old flag without a value; never silently broaden an old query.
+    result.add_argument("--purpose", nargs="?", const="", help=argparse.SUPPRESS)
     result.add_argument("--top-k", type=int)
     result.add_argument("--json", action="store_true")
     result.add_argument("--add-path", action="store_true")
+    result.add_argument("--include-deprecated", action="store_true", default=None)
     return result
 
 
@@ -52,7 +56,7 @@ def _request(args):
             raise CommandError("INVALID_INPUT", "The request must be a JSON object")
     else:
         value = {}
-    for name in ("source", "path", "purpose", "top_k"):
+    for name in ("source", "path", "top_k", "include_deprecated"):
         item = getattr(args, name)
         if item is not None:
             if name in value and value[name] != item:
@@ -82,6 +86,10 @@ def _output(path, value):
 
 def execute(args, root):
     request = _request(args)
+    if args.command in {"query", "search", "read"} and (
+            args.purpose is not None or "purpose" in request or "context" in request):
+        raise CommandError("QUERY_PARAMETERS_REMOVED",
+                           "purpose/context are removed; search by query and optional tags, then read the card's conditions")
     modules, rules = domain(root, args.rules_digest or sha((root / "governance/framework.lock.yaml").read_bytes()))
     ingest, library = modules["ingest"], modules["library"]
     words = list(args.arguments)

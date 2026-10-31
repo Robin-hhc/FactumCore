@@ -257,9 +257,9 @@ def test_card_decisions_publish_complete_cards_and_reference_sets(tmp_path, deci
         draft(root, "old", [primary["id"], other["id"]], body="Updated waiting knowledge.")
         expected = {"old"}
     elif decision == "merge":
-        draft(root, "merged", [primary["id"], other["id"]], body="Merged waiting knowledge.")
-        deletes = ["knowledge/old.md", "knowledge/duplicate.md"]
-        expected = {"merged"}
+        draft(root, "old", [primary["id"], other["id"]], body="Merged waiting knowledge; retain the principal card identity.")
+        deletes = ["knowledge/duplicate.md"]
+        expected = {"old"}
     elif decision == "split":
         draft(root, "waiting", [primary["id"]], body="Waiting knowledge.")
         draft(root, "diagnosis", [other["id"]], body="Independent diagnosis knowledge.")
@@ -267,8 +267,9 @@ def test_card_decisions_publish_complete_cards_and_reference_sets(tmp_path, deci
         expected = {"waiting", "diagnosis"}
     else:
         draft(root, "replacement", [primary["id"], other["id"]], body="Replacement waiting knowledge.")
-        draft(root, "old", [primary["id"], other["id"]], body="Deprecated. Use replacement.",
-              lifecycle="deprecated", replacement="replacement", deprecation_reason="New design replaces the old rule.")
+        draft(root, "old", [primary["id"], other["id"]],
+              body="Deprecated: the new design replaces this rule. Use [replacement](replacement.md).",
+              lifecycle="deprecated")
         expected = {"old", "replacement"}
     if deletes:
         (root / ".build/changes.json").write_text(json.dumps({"delete": deletes}))
@@ -348,7 +349,10 @@ def code_project(tmp_path):
     return root, code, doc["id"], source["id"]
 
 
-def test_code_patrol_detects_inserted_lines_and_check_requires_updated_location(tmp_path):
+@pytest.mark.parametrize("selector", [{"symbol": "wait_reply"},
+                                      {"selector": {"kind": "function", "name": "wait_reply"}}],
+                         ids=["symbol", "selector-without-symbol"])
+def test_code_patrol_detects_inserted_lines_and_check_requires_updated_location(tmp_path, selector):
     root, code, doc_id, code_id = code_project(tmp_path)
     code.write_text("// Added header\n// Added explanation\nint wait_reply(void) {\n    return 5;\n}\n")
     planned, status = module("library").patrol(root, "plan", {})
@@ -357,12 +361,12 @@ def test_code_patrol_detects_inserted_lines_and_check_requires_updated_location(
     task = scan(root, code_id)
     assert task["source"]["kind"] == "code"
     draft(root, "waiting", [doc_id], code_refs=[{
-        "code_id": code_id, "line_start": 1, "line_end": 3, "symbol": "wait_reply"}])
+        "code_id": code_id, "line_start": 1, "line_end": 3, **selector}])
     write_plan(root, [("waiting", "knowledge/waiting.md")])
     checked, status = module("ingest").check(root, {})
     assert status == "failed", checked
     draft(root, "waiting", [doc_id], code_refs=[{
-        "code_id": code_id, "line_start": 3, "line_end": 5, "symbol": "wait_reply"}])
+        "code_id": code_id, "line_start": 3, "line_end": 5, **selector}])
     checked, status = module("ingest").check(root, {})
     assert status == "passed", checked
 
@@ -411,3 +415,41 @@ def test_p4_rejects_line_ranges_outside_a_document(tmp_path):
     checked, status = module("ingest").check(root, {})
     assert status == "failed", checked
     assert any(item["code"] == "SOURCE_RANGE_INVALID" for item in checked["findings"])
+
+
+@pytest.mark.parametrize("extra", [{"aliases": ["old_alias"]}, {"summary": "Old summary"},
+                                    {"scope": {"applicability": "unknown", "contexts": []}}])
+def test_p4_rejects_legacy_fields_in_new_candidate_but_formal_copy_remains_readable(tmp_path, extra):
+    root = library_root(tmp_path)
+    put_doc(root)
+    task = scan(root)
+    identity = task["source"]["doc_id"]
+    old = formal(root, "old", [identity], **extra)
+    before = old.read_bytes()
+    checked, status = module("ingest").check(root, {"formal": True})
+    assert status == "passed", checked
+    draft(root, "old", [identity], **extra)
+    write_plan(root, [("old", "knowledge/old.md")])
+    checked, status = module("ingest").check(root, {})
+    assert status == "failed", checked
+    assert checked["findings"]
+    assert old.read_bytes() == before
+
+
+def test_typo_update_of_deprecated_card_preserves_explicit_lifecycle(tmp_path):
+    root = library_root(tmp_path)
+    put_doc(root)
+    with module("catalog").Catalog(root) as catalog:
+        catalog.register("raw", "docs-raw/design.md", source_id="doc-design")
+    formal(root, "old", ["doc-design"], lifecycle="deprecated", body="Historical waiting requirment.")
+    scan(root)
+    draft(root, "old", ["doc-design"], lifecycle="deprecated", body="Historical waiting requirement; retired with no replacement.")
+    write_plan(root, [("old", "knowledge/old.md")], body="Fix spelling; keep the whole card retired.")
+    checked, phase = module("ingest").check(root, {})
+    assert phase == "passed", checked
+    result, phase = module("ingest").commit(root, {})
+    assert phase == "completed", result
+    read, phase = module("library").query(root, {"card_id": "old"}, read=True)
+    assert phase == "read" and read["lifecycle"] == "deprecated"
+    searched, _ = module("library").query(root, {"query": "requirement"})
+    assert searched["matches"] == []

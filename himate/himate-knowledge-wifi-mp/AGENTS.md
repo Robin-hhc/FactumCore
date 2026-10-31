@@ -10,7 +10,7 @@
 
 .build只保存本轮暂存，P1会清空。P5失败直接重试，不能先回P1。数据库在artifacts/knowledge.sqlite，独立搜索报告在artifacts/query，巡检汇总在artifacts/patrol。query可与写流程共存；lint与ingest串行运行，运行环境和正式记录在.build以外。
 
-来源与卡头使用真实ID和定位；日常scan直接比较SHA-256，Git按需回看旧版。设计、实现和测量依据分清；未知构建、宏和适用条件不补造。配置只描述真实工作区与模块。
+来源与卡头使用真实ID和定位；新卡字段见governance/specs/cards.md，条件、依据和缺口放正文，旧知识正常更新时完整保留。搜索返回整卡相关候选，精读后核对适用性；代码引用不证明已实现。日常scan直接比较SHA-256，Git按需回看旧版。未知构建、宏和适用条件不补造。配置只描述真实工作区与模块。
 
 框架源码、业务规则、测试与部署归属见[架构设计](docs-llm-wiki/HiMate知识库架构设计.md#53-himate-knowledge目录架构)。开发约定见[CONTRIBUTING](CONTRIBUTING.md)，测试入口见[evals README](evals/README.md)。
 

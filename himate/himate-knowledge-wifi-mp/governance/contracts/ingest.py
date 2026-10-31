@@ -269,11 +269,11 @@ def scan(root, request):
         return {**task, "task_ref": ".build/task.json", "pending_at_least": len(pending)}, "prepared"
 
 
-def _drafts(root, catalog, rules=None):
+def _drafts(root, catalog, rules=None, *, concise_only=False):
     directory = safe_path(root, ".build/cards")
     lookup = {row["id"]: row for row in catalog.list_files()}
     return [parse_card(path.read_bytes(), "knowledge/" + path.relative_to(directory).as_posix(), rules,
-                       source_lookup=lookup)
+                       source_lookup=lookup, concise_only=concise_only)
             for path in sorted(directory.rglob("*.md"))] if directory.exists() else []
 
 
@@ -329,14 +329,14 @@ def _reference_check(root, source, reference, staged=None, *, extractor=None):
     if source["kind"] == "code":
         text, _ = source_resources.extract_code_text(data, extractor or "code-utf8:1")
         symbol = reference.get("symbol")
-        if symbol:
+        if symbol or reference.get("selector"):
             from .code_symbols import resolve
 
             selector = reference.get("selector") or (symbol if isinstance(symbol, dict)
                                                       else {"kind": "function", "name": symbol})
             result = resolve(data, selector, path=source["path"], extractor=extractor)
             if result["status"] != "resolved":
-                raise ContractError("CODE_SYMBOL_" + result["status"].upper(), str(symbol), source["path"])
+                raise ContractError("CODE_SYMBOL_" + result["status"].upper(), str(symbol or selector), source["path"])
             if "line_start" in reference and (
                 reference["line_start"] != result["range"]["start_line"]
                 or reference["line_end"] != result["range"]["end_line"]
@@ -346,8 +346,14 @@ def _reference_check(root, source, reference, staged=None, *, extractor=None):
         addresses = []
     else:
         text, addresses, _, _ = source_resources.extract_document(data, path.suffix.lower())
-        if reference.get("locator"):
-            source_resources.document_segments(addresses, reference["locator"], path.suffix.lower())
+        # Native page/paragraph addresses belong to PDF/DOCX; text line and
+        # section references retain the ordinary checks below.
+        locator = reference.get("locator")
+        if locator and locator.get("kind") not in {"lines", "section"}:
+            if path.suffix.lower() in {".pdf", ".docx"}:
+                source_resources.document_segments(addresses, locator, path.suffix.lower())
+            else:
+                raise ContractError("INVALID_SOURCE_LOCATOR", "Text sources need line or section addresses", source["path"])
     if "line_start" in reference:
         if not 1 <= reference["line_start"] <= reference["line_end"] <= len(text.splitlines()):
             raise ContractError("SOURCE_RANGE_INVALID", "Line range is outside its source", source["path"])
@@ -371,7 +377,8 @@ def check(root, request, rules=None):
                               "path": str(getattr(error, "path", "")), "message": str(error)}]}, "failed"
     with catalog:
         try:
-            drafts = catalog.all_cards() if request.get("formal") else _drafts(root, catalog, rules)
+            drafts = (catalog.all_cards() if request.get("formal")
+                      else _drafts(root, catalog, rules, concise_only=True))
             deletes = set() if request.get("formal") else set(_deletes(root))
             overlap = deletes & {card["path"] for card in drafts}
             if overlap:

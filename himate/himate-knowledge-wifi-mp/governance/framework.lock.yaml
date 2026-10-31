@@ -1,13 +1,13 @@
 schema_version: '2.0'
 contract_family: aiot-wifi
-tool_version: 0.13.2
+tool_version: 0.14.0
 files:
   contracts/__init__.py:
     path: governance/contracts/__init__.py
     sha256: ccc90c8e3b38e19264e3c6843099880b6f293779fc7222051ea5a47c3316c8db
   contracts/cards_v3.py:
     path: governance/contracts/cards_v3.py
-    sha256: 6a09afbe32f611b67da7e59c8168f9c91ce06612c7b6710a9213d30325932f3f
+    sha256: 6815be9758aee3f037662254f6c70fdc5629b5c3f5964b0e149ed3fa3e01078a
   contracts/catalog.py:
     path: governance/contracts/catalog.py
     sha256: b1c4f2141fb54636cec83306258dea27693c16fec81fe13df036eead4029cb12
@@ -19,13 +19,13 @@ files:
     sha256: a4c76455e14dcd0265c26f221f01a18890afda781a112e58facc53ced5bdd83e
   contracts/ingest.py:
     path: governance/contracts/ingest.py
-    sha256: b8e21d5a28586f9f205bf668a5688b924d0ad9ea2c198d9c2a93da45d4613f58
+    sha256: adfd9ad15df00c8ee19c37e8e7b432c8a56ff6f16d8eeaf807ca5c7199b33282
   contracts/knowledge.py:
     path: governance/contracts/knowledge.py
-    sha256: 304769b321863d0e1e918e5178da387fd6dbb20aab56eef624eb0422ebd9474d
+    sha256: 2b165355fa1548c9c5e58bc9fe3e0c0802d0e02bdbc61c498b37424785faebe9
   contracts/library.py:
     path: governance/contracts/library.py
-    sha256: 82943fc93a570c99cf2217983bfd620327774ec45924f2f85289f39d27bd10b3
+    sha256: 8cd7d8bbf72e15e1a03f5f677557345f1a5269bbc507d81426a1e968897a7939
   contracts/runtime.py:
     path: governance/contracts/runtime.py
     sha256: 29d30672e95806e22836f4a69ce1ff6d47baccd27716a0a975894a2a88759f9a
@@ -43,7 +43,7 @@ files:
     sha256: 6a4341a05243b24ba37c91691a2900b34673f7dd02dc747df7745a8c1118daec
   schemas/frontmatter.schema.json:
     path: governance/schemas/frontmatter.schema.json
-    sha256: 8ac0e1680f8493e6420c0eae28253e3444cde4972949942435faf04a072275cd
+    sha256: de61b5f6b9b23dc9a9a114a49f6d541c2e2c94ab8ac283ca136d27ec5e36b59c
   schemas/profiles.yaml:
     path: governance/schemas/profiles.yaml
     sha256: ec9eae684e484dd79cfe0f546a336d95d68ba5da7345f88e93733483d0d638be
@@ -61,34 +61,34 @@ files:
     sha256: f8d0d2162931e7c10e6b9b24c3ecc4e8b1e7614ee2723dce2687bca73e298e6a
   templates/command.md:
     path: governance/templates/command.md
-    sha256: 303c94831e45133eb8a181e9b45034dc9ec9611423f896523c72bb3fe35203ca
+    sha256: 2b8b51b8bc22a4eb5c854fdcdd67a60febd6dd8eddbb0528343abf5feb1faecf
   templates/entity.md:
     path: governance/templates/entity.md
-    sha256: 5378a8c85d037ea7be50f0334d92512119ea54ec67165cd8b0769075f1e5df4c
+    sha256: 175ab208b1303a4ff0ac5c3f1ed2c2cd697bb2597325a0bd11b63fb88cebeb5f
   templates/flow.md:
     path: governance/templates/flow.md
-    sha256: 91524da3b698dc1adc1381be0b6983ab002705b2fe1ddd5ded365f4af584c27e
+    sha256: 4dce6c3f3d7d425a5e62e29a1649f2196269770296aaa7873e1a36d90cea8288
   templates/glossary.md:
     path: governance/templates/glossary.md
-    sha256: bb89501d0574c86d128579d1527ac3c57d83548ce21ee8538c797bad4760dc7d
+    sha256: cb0d87c140cd9ec2f06f5d638c030681b371d7d18fb0b9f9da070a357e263f78
   templates/index.md:
     path: governance/templates/index.md
     sha256: 7ba64999733b1e8bc4b2e98fff159afcfed3a4690339998dc94bd717d0013da9
   templates/protocol.md:
     path: governance/templates/protocol.md
-    sha256: ecc48ba52b77ec502bd20c63b0f6c765675a111ee0364bc6fe01fa739b8ff642
+    sha256: e376ddd6f79b20faa1c4541fb7c977509667ce41cf19d940f570cfff1f236fd3
   templates/rule.md:
     path: governance/templates/rule.md
-    sha256: db1b0486af97c6c3c7f5c3ede266e7339ffaadb45b33b8e8efa671a056e0cffb
+    sha256: 432985c0d4f02e2f6ec170002e391e827567f76f6f90362d63d4368055155c12
   templates/runbook.md:
     path: governance/templates/runbook.md
-    sha256: 15b21bcf23ef974c0984e2948b02c2340e5ff644d2d330126a0c735337099c42
+    sha256: 76c3cddfcea803eb1af282a7973d4c2dcc087a6a45be4700984dbbc680784b5d
   specs/cards.md:
     path: governance/specs/cards.md
-    sha256: afea9c712fe21430ac1df8a1c484651cfc3451b46c7b4d401091a5d4f8ad5c9e
+    sha256: 9b9cbdbd46d6973530bd076f79946127e24650d7a45cf12fbe34c617a2fd51c1
   specs/lifecycle.md:
     path: governance/specs/lifecycle.md
-    sha256: 9fccfe46e88dbe94215ea738afb020532f2c6035be00584d76ca3bc54c46e6c1
+    sha256: ab8fa5e5c1c342b5b7f5b6f5bad3557452290b0c7bc86e9e73a59906fb609a77
   specs/records.md:
     path: governance/specs/records.md
     sha256: 172dd77ec62da15990f2384ab0dac7750e1a7e425a00ce1ff92cd133c9b7c006

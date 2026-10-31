@@ -47,7 +47,7 @@ def register(root, name="design.md", identity="doc-design"):
 
 
 def query(root, text, **request):
-    data, status = module("library").query(root, {"query": text, "purpose": "guidance", **request})
+    data, status = module("library").query(root, {"query": text, **request})
     assert status == "searched", data
     return data
 
@@ -89,7 +89,7 @@ def test_search_uses_exact_identifier_tokens_and_requires_all_query_terms(tmp_pa
     assert query(root, "rx_timeout", tags=["bluetooth"])["matches"] == []
 
 
-def test_query_purposes_preserve_claim_scope_and_read_reports_eligible_claims(tmp_path):
+def test_legacy_claim_conditions_remain_readable_without_query_qualification(tmp_path):
     root = root_at(tmp_path / "library")
     document(root)
     source = register(root)
@@ -102,17 +102,15 @@ def test_query_purposes_preserve_claim_scope_and_read_reports_eligible_claims(tm
     card(root, "design", source["id"], "rx_timeout design.", scope=scope, claims=claims("design"))
     card(root, "implementation", source["id"], "rx_timeout implementation.", scope=scope, claims=claims("implementation"))
     card(root, "old", source["id"], "rx_timeout prior implementation.", scope=scope, claims=claims("implementation"), lifecycle="deprecated")
-    context = {"chip": "chip12", "side": "host", "features": ["retry"]}
-    current = query(root, "rx_timeout", purpose="current", context=context)
-    assert {item["card_id"] for item in current["matches"]} == {"design", "implementation"}
-    actual = query(root, "rx_timeout", purpose="implementation", context=context)
-    assert [item["card_id"] for item in actual["matches"]] == ["implementation"]
-    assert query(root, "rx_timeout", purpose="current", context={"chip": "chip12", "side": "host"})["matches"] == []
-    history = query(root, "rx_timeout", purpose="historical", context=context)
+    current = query(root, "rx_timeout")
+    assert {item["card_id"] for item in current["matches"]} == {"guidance", "design", "implementation"}
+    history = query(root, "rx_timeout", include_deprecated=True)
     assert {item["card_id"] for item in history["matches"]} == {"guidance", "design", "implementation", "old"}
-    read, status = module("library").query(root, {"card_id": "implementation", "purpose": "implementation", "context": context}, read=True)
+    read, status = module("library").query(root, {"card_id": "implementation"}, read=True)
     assert status == "read"
-    assert read["eligible_claim_ids"] == ["answer"]
+    assert read["metadata"]["claims"] == claims("implementation")
+    assert read["metadata"]["scope"] == scope
+    assert "eligible_claim_ids" not in read
     assert [item["id"] for item in read["sources"]] == [source["id"]]
 
 
@@ -253,7 +251,7 @@ def test_p4_cannot_accept_a_section_added_only_after_p1(tmp_path):
     assert any(item["code"] == "SOURCE_SECTION_MISSING" for item in checked["findings"])
 
 
-def test_new_reference_header_cannot_hide_another_claim_source(tmp_path):
+def test_new_candidate_cannot_keep_legacy_source_and_claim_headers(tmp_path):
     root = root_at(tmp_path / "library")
     document(root)
     document(root, "other.md", "# Other\n\nA different requirement.\n")
@@ -318,13 +316,7 @@ def test_legacy_struct_reference_retains_its_symbol_kind_in_public_check(tmp_pat
                  + "---\n# Packet\n\n<a id=\"answer\"></a>\nThe packet has a size field.\n").encode("utf-8")
     formal = root / "knowledge/packet.md"
     formal.write_bytes(old_bytes)
-    _, status = module("ingest").scan(root, {"source": source["id"]})
-    assert status == "prepared"
-    target = root / ".build/cards/packet.md"
-    target.write_bytes(old_bytes)
-    write_plan(root, [("packet", "knowledge/packet.md")])
-    checked, status = module("ingest").check(root, {})
+    checked, status = module("ingest").check(root, {"formal": True})
     assert status == "passed", checked
     assert formal.read_bytes() == old_bytes
-    assert target.read_bytes() == old_bytes
     assert code.read_bytes() == code_bytes

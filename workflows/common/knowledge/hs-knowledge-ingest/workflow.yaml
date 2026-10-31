@@ -30,7 +30,7 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-change-plan
-  prompt: '使用 hs-knowledge-change-plan 以本轮 task 的来源为范围阅读全文和关联卡，完成六决策、新增主题查重及简短计划；不沿用前次问答主题作筛选。plan.md 开头的 YAML frontmatter 用 cards 列出本轮完整候选的 id/path；更新保留原路径，新卡按现有类型导航选目录，无候选写 cards: []。
+  prompt: '使用 hs-knowledge-change-plan 以本轮 task 的来源为范围阅读全文和关联卡，完成六决策、新增主题查重及简短计划；不沿用前次问答主题作筛选。plan.md 开头的 YAML frontmatter 用 cards 列出本轮完整候选的 id/path；更新保留原路径和原生命周期，标签或状态变化由 P2 明确决定；新卡按现有类型导航选目录，无候选写 cards: []。
 
     content_planned 交 P3；必要依据不足则 deferred，说明缺口并保留未完成文件，不推进成功 hash。'
   exits:
@@ -47,7 +47,7 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-view-materialize
-  prompt: '使用 hs-knowledge-view-materialize 按本轮计划 cards 的既定 id/path 和模板写完整候选卡；将 knowledge/ 前缀替换为 .build/cards/，不重选目录或给卡头增加 path。明确旧卡去向与必须移除的文件。
+  prompt: '使用 hs-knowledge-view-materialize 按本轮计划 cards 的既定 id/path 和模板写完整候选卡；将 knowledge/ 前缀替换为 .build/cards/，不重选目录或给卡头增加 path。条件、依据和缺口写正文，正常更新时完整迁入旧结构知识并保留有效定位和锚点；明确旧卡去向与必须移除的文件。
 
     ready 交 P4；偏离计划的落位拼写在 P3 修正，计划决定需要改变才回 P2，同轮更新计划，不另建冻结轮次。'
   exits:
@@ -64,7 +64,7 @@ nodes:
   type: skill
   owner: reviewer
   skill: hs-knowledge-review
-  prompt: '由独立 reviewer 使用 hs-knowledge-review，沿用已交接的 CLI 先运行 ingest check，由机器一一核对计划 cards 与候选 id/path，不另行推断路径类型；再独立阅读来源，对照计划、旧卡与新稿，空候选也检查全文新主题。
+  prompt: '由独立 reviewer 使用 hs-knowledge-review，沿用已交接的 CLI 先运行 ingest check，由机器一一核对计划 cards 与候选 id/path，不另行推断路径类型；再独立阅读来源，对照计划、旧卡与新稿，核对旧知识保留、整卡退役及状态决定，空候选也检查全文新主题。
 
     通过后交 P5；计划决定需改变回 P2、成稿或落位拼写问题回 P3，新稿重新审阅。不替作者改稿。'
   exits:
@@ -85,7 +85,7 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-apply
-  prompt: '使用 hs-knowledge-apply 调用 ingest commit，复制候选并刷新关系和检索索引，最后保存本文件成功 hash。
+  prompt: '使用 hs-knowledge-apply 调用 ingest commit，复制候选并刷新关系和检索索引，最后保存本文件成功 hash；不重复质量检查。
 
     失败保留本轮暂存并直接重试 P5，不回 P1 清理。需要改稿时回 P3 再审。成功以 commit 回执交付，不用 scan 验证；本节点不提交或推送 Git。'
   exits:

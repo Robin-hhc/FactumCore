@@ -11,11 +11,13 @@ from uuid import uuid4
 import yaml
 
 from .catalog import Catalog
-from . import indexing, knowledge, ingest, source_resources
-from .validation import ContractError, safe_path
+from . import indexing, ingest, source_resources
+from .validation import ContractError, safe_path, validate_id
 
 
-PURPOSES = {"current", "implementation", "guidance", "historical"}
+SEARCH_VERSION = "card-v1"
+SEARCH_COLUMNS = [("token", 1), ("card_id", 2), ("field", 3)]
+SEARCH_WEIGHTS = {"title": 8, "tags": 5, "body": 1}
 
 
 def _signature(catalog):
@@ -25,66 +27,80 @@ def _signature(catalog):
 
 def search_stale(catalog):
     catalog.connection.execute("CREATE TABLE IF NOT EXISTS search_state(key TEXT PRIMARY KEY,value TEXT)")
-    row = catalog.connection.execute("SELECT value FROM search_state WHERE key='cards'").fetchone()
-    return row is None or row[0] != _signature(catalog)
+    state = dict(catalog.connection.execute("SELECT key,value FROM search_state"))
+    columns = [(row["name"], row["pk"]) for row in catalog.connection.execute("PRAGMA table_info(search_terms)")]
+    return (state.get("format") != SEARCH_VERSION or columns != SEARCH_COLUMNS
+            or state.get("cards") != _signature(catalog))
+
+
+def _search_fields(card):
+    metadata = card["metadata"]
+    body = [card["body"]]
+    if card["legacy"]:
+        # Retain old declared lookup terms, without interpreting their Claims
+        # as search qualifications or multiplying scores by Claim count.
+        body.extend([metadata.get("summary", ""), *metadata.get("aliases", []),
+                     *metadata.get("search_terms", [])])
+        for claim in metadata.get("claims", []):
+            body.extend(claim.get("search_terms", []))
+    return {"title": card["title"], "tags": " ".join(metadata.get("tags", [])), "body": "\n".join(body)}
 
 
 def build_search(catalog):
-    """Reuse the deterministic tokenizer; no active-generation protocol."""
+    """Rebuild only derived search tables, atomically, including old formats."""
     cards = catalog.all_cards()
     with catalog.transaction():
         catalog.connection.execute("CREATE TABLE IF NOT EXISTS search_state(key TEXT PRIMARY KEY,value TEXT)")
-        catalog.connection.execute("""CREATE TABLE IF NOT EXISTS search_terms(
-            token TEXT,card_id TEXT,claim_id TEXT,field TEXT,
-            PRIMARY KEY(token,card_id,claim_id,field))""")
-        catalog.connection.execute("CREATE INDEX IF NOT EXISTS search_token ON search_terms(token)")
-        catalog.connection.execute("DELETE FROM search_terms")
+        catalog.connection.execute("DROP TABLE IF EXISTS search_terms")
+        catalog.connection.execute("""CREATE TABLE search_terms(
+            token TEXT,card_id TEXT,field TEXT,
+            PRIMARY KEY(token,card_id,field))""")
+        catalog.connection.execute("CREATE INDEX search_token ON search_terms(token)")
         rows = []
         for card in cards:
-            meta = card["metadata"]
-            fields = {"title": meta["title"], "summary": meta["summary"],
-                      "aliases": " ".join(meta.get("aliases", [])),
-                      "search_terms": " ".join(meta.get("search_terms", []))}
-            for field, text in fields.items():
-                rows.extend((term, card["id"], "*", field) for term in indexing.lexical(text))
-            for claim in card["claims"]:
-                rows.extend((term, card["id"], claim["id"], "body") for term in indexing.lexical(claim["text"]))
-                rows.extend((term, card["id"], claim["id"], "search_terms")
-                            for term in indexing.lexical(" ".join(claim.get("search_terms", []))))
-        catalog.connection.executemany("INSERT OR IGNORE INTO search_terms VALUES(?,?,?,?)", rows)
+            for field, text in _search_fields(card).items():
+                rows.extend((term, card["id"], field) for term in indexing.lexical(text))
+        catalog.connection.executemany("INSERT INTO search_terms VALUES(?,?,?)", rows)
         catalog.connection.execute("INSERT OR REPLACE INTO search_state VALUES('cards',?)", (_signature(catalog),))
+        catalog.connection.execute("INSERT OR REPLACE INTO search_state VALUES('format',?)", (SEARCH_VERSION,))
     return {"cards": len(cards), "terms": len(rows)}
 
 
-def _purpose(request):
-    purpose = request.get("purpose", "current")
-    if purpose not in PURPOSES:
-        raise ContractError("INVALID_PURPOSE", "Use current, implementation, guidance or historical")
-    return purpose
-
-
-def _eligible(card, request):
-    purpose = _purpose(request)
-    if card["metadata"].get("lifecycle") == "deprecated" and purpose != "historical":
-        return []
-    context = request.get("context", {})
-    if not isinstance(context, dict):
-        raise ContractError("INVALID_QUERY_CONTEXT", "context must be an object")
-    return [claim for claim in card["claims"] if knowledge.match_scope(claim, context, purpose)]
+def _query_options(request, *, read):
+    if "purpose" in request or "context" in request:
+        raise ContractError("QUERY_PARAMETERS_REMOVED",
+                            "purpose/context are removed; search by query and optional tags, then read the card's conditions")
+    allowed = {"card_id"} if read else {"query", "tags", "top_k", "include_deprecated"}
+    if set(request) - allowed:
+        raise ContractError("INVALID_QUERY_REQUEST", "Unsupported fields: " + ", ".join(sorted(set(request) - allowed)))
+    if read:
+        validate_id(request.get("card_id"))
+        return
+    if not isinstance(request.get("query"), str) or not request["query"].strip():
+        raise ContractError("QUERY_REQUIRED", "Pass a nonempty query")
+    tags = request.get("tags", [])
+    if not isinstance(tags, list) or any(not isinstance(tag, str) or not tag.strip() for tag in tags):
+        raise ContractError("INVALID_QUERY_TAGS", "tags must be an array of nonempty strings")
+    top_k = request.get("top_k", 10)
+    if type(top_k) is not int or not 1 <= top_k <= 100:
+        raise ContractError("INVALID_TOP_K", "top_k must be 1..100")
+    if type(request.get("include_deprecated", False)) is not bool:
+        raise ContractError("INVALID_INCLUDE_DEPRECATED", "include_deprecated must be a boolean")
 
 
 def query(root, request, *, read=False):
-    purpose = _purpose(request)
+    _query_options(request, read=read)
     with Catalog(root) as catalog:
         if read:
             card = catalog.get_card(request.get("card_id"))
             if card is None:
                 raise ContractError("CARD_NOT_FOUND", str(request.get("card_id")))
-            eligible = _eligible(card, request)
             return {"card_id": card["id"], "path": card["path"], "title": card["title"],
                     "body": card["body"], "metadata": card["metadata"],
                     "sources": catalog.files_for(card["id"]),
-                    "eligible_claim_ids": [claim["id"] for claim in eligible], "purpose": purpose}, "read"
+                    "doc_ref": card["doc_ref"], "code_ref": card["code_ref"],
+                    "tags": card["metadata"].get("tags", []),
+                    "lifecycle": card["metadata"].get("lifecycle", "stable")}, "read"
         text = request.get("query", "")
         groups = indexing.term_groups(text)
         if not groups:
@@ -94,7 +110,7 @@ def query(root, request, *, read=False):
         terms = sorted(set().union(*groups))
         placeholders = ",".join("?" for _ in terms)
         rows = list(catalog.connection.execute(
-            f"SELECT token,card_id,claim_id,field FROM search_terms WHERE token IN ({placeholders})", terms))
+            f"SELECT token,card_id,field FROM search_terms WHERE token IN ({placeholders})", terms))
         hits = {}
         for row in rows:
             hits.setdefault(row["card_id"], []).append(dict(row))
@@ -104,25 +120,18 @@ def query(root, request, *, read=False):
             tags = set(card["metadata"].get("tags", []))
             if not set(request.get("tags", [])).issubset(tags):
                 continue
-            eligible = _eligible(card, request)
-            matching_claims, score = [], 0
-            for claim in eligible:
-                selected = [row for row in found if row["claim_id"] in {"*", claim["id"]}]
-                present = {row["token"] for row in selected}
-                if not all(group & present for group in groups):
-                    continue
-                matching_claims.append(claim["id"])
-                score += sum({"title": 8, "aliases": 6, "summary": 4, "search_terms": 5, "body": 1}[row["field"]]
-                             for row in selected)
-            if matching_claims:
-                matches.append({"card_id": identity, "title": card["title"], "path": card["path"],
-                                "summary": card["metadata"]["summary"], "score": score,
-                                "claim_ids": matching_claims})
+            lifecycle = card["metadata"].get("lifecycle", "stable")
+            if lifecycle == "draft" or lifecycle == "deprecated" and not request.get("include_deprecated", False):
+                continue
+            present = {row["token"] for row in found}
+            if not all(group & present for group in groups):
+                continue
+            matches.append({"card_id": identity, "title": card["title"], "path": card["path"],
+                            "tags": card["metadata"].get("tags", []), "lifecycle": lifecycle,
+                            "score": sum(SEARCH_WEIGHTS[row["field"]] for row in found)})
         top_k = request.get("top_k", 10)
-        if isinstance(top_k, bool) or not isinstance(top_k, int) or not 1 <= top_k <= 100:
-            raise ContractError("INVALID_TOP_K", "top_k must be 1..100")
         matches.sort(key=lambda item: (-item["score"], item["card_id"]))
-        result = {"matches": matches[:top_k], "purpose": purpose, "gaps": [],
+        result = {"matches": matches[:top_k],
                   "truncated": len(matches) > top_k,
                   "report_ref": f"artifacts/query/{uuid4().hex}.json"}
         ingest.write_json(safe_path(root, result["report_ref"]), result)

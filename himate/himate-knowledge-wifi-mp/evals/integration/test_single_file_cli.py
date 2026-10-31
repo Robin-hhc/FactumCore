@@ -11,6 +11,7 @@ import subprocess
 import sys
 
 import pytest
+import yaml
 
 
 SOURCE = Path(__file__).resolve().parents[2]
@@ -155,6 +156,86 @@ def test_query_can_save_its_actual_response_in_query_artifacts(knowledge):
     assert status == 0, report
     assert json.loads((knowledge / "artifacts/query/answer.json").read_bytes()) == report
     assert not (knowledge / ".build").exists()
+
+
+def test_public_three_field_card_is_private_until_commit_then_searchable_without_purpose(knowledge):
+    (knowledge / "docs-raw/specs/a.md").write_text(
+        "# RX design\n\nThe RX design budget is 8 ms; no timing measurement is supplied.\n", encoding="utf-8")
+    status, scanned = invoke(knowledge, "ingest", "scan", "--source", "docs-raw/specs/a.md")
+    assert status == 0, scanned
+    source_id = scanned["data"]["source"]["doc_id"]
+    metadata = {"id": "rx-flow", "doc_ref": [{"doc_id": source_id, "line_start": 1, "line_end": 3}], "code_ref": []}
+    draft = knowledge / ".build/cards/rx-flow.md"
+    draft.write_text("---\n" + yaml.safe_dump(metadata, sort_keys=False)
+                     + "---\n# RX design budget\n\nrx_budget is 8 ms by design.\n\n"
+                     "Timing has not been measured; implementation applicability is unknown.\n", encoding="utf-8")
+    (knowledge / ".build/plan.md").write_text(
+        "---\ncards:\n- id: rx-flow\n  path: knowledge/rx-flow.md\n---\nCreate the documented design budget.\n", encoding="utf-8")
+    expected = draft.read_bytes()
+    status, before = invoke(knowledge, "search", "rx_budget")
+    assert status == 0 and before["data"]["matches"] == []
+    status, checked = invoke(knowledge, "ingest", "check")
+    assert status == 0, checked
+    status, committed = invoke(knowledge, "ingest", "commit")
+    assert status == 0, committed
+    assert (knowledge / "knowledge/rx-flow.md").read_bytes() == expected
+    status, result = invoke(knowledge, "query", "rx_budget")
+    assert status == 0, result
+    hit = result["data"]["matches"][0]
+    assert hit["card_id"] == "rx-flow"
+    assert set(hit) == {"card_id", "path", "title", "tags", "lifecycle", "score"}
+    assert "purpose" not in result["data"]
+    status, read = invoke(knowledge, "read", "rx-flow")
+    assert status == 0, read
+    assert read["data"]["metadata"] == metadata
+    assert read["data"]["code_ref"] == []
+    assert "not been measured" in read["data"]["body"]
+    assert "eligible_claim_ids" not in read["data"]
+    assert read["data"]["sources"][0]["processed_hash"] == scanned["data"]["source"]["hash"]
+
+
+@pytest.mark.parametrize("arguments", [
+    ("search", "RX", "--purpose", "current"), ("query", "RX", "--purpose", ""),
+    ("read", "absent", "--purpose", "guidance"), ("query", "read", "absent", "--purpose", ""),
+])
+def test_public_old_purpose_option_reports_migration_before_search(knowledge, arguments):
+    status, result = invoke(knowledge, *arguments)
+    assert status == 2, result
+    assert result["status"] == "error"
+    assert result["diagnostics"][0]["code"] == "QUERY_PARAMETERS_REMOVED"
+    assert not (knowledge / "artifacts/query").exists()
+    assert not (knowledge / ".build").exists()
+
+
+@pytest.mark.parametrize("extra", [{"purpose": None}, {"purpose": ""}, {"purpose": "current"}, {"context": {}}, {"context": None}])
+@pytest.mark.parametrize("command", ["search", "read"])
+def test_public_old_json_fields_report_migration_even_when_empty(knowledge, extra, command):
+    request = {"query": "RX"} if command == "search" else {"card_id": "absent"}
+    request_path = knowledge.parent / "request.json"
+    request_path.write_text(json.dumps({**request, **extra}), encoding="utf-8")
+    status, result = invoke(knowledge, command, "--input", str(request_path))
+    assert status == 2, result
+    assert result["diagnostics"][0]["code"] == "QUERY_PARAMETERS_REMOVED"
+    assert not (knowledge / "artifacts/query").exists()
+
+
+def test_public_include_deprecated_flag_adds_retired_cards_without_changing_read_state(knowledge):
+    (knowledge / "docs-raw/specs/a.md").write_text("# RX\n\nRX history.\n", encoding="utf-8")
+    status, scanned = invoke(knowledge, "ingest", "scan")
+    assert status == 0, scanned
+    source_id = scanned["data"]["source"]["doc_id"]
+    for identity, lifecycle in (("normal", "stable"), ("old", "deprecated")):
+        header = {"id": identity, "doc_ref": [{"doc_id": source_id, "line_start": 1, "line_end": 3}],
+                  "code_ref": [], "tags": ["RX"], "lifecycle": lifecycle}
+        (knowledge / "knowledge" / (identity + ".md")).write_text(
+            "---\n" + yaml.safe_dump(header) + "---\n# RX history\n\nrx_timeout history.\n", encoding="utf-8")
+    status, result = invoke(knowledge, "search", "rx_timeout")
+    assert status == 0 and [hit["card_id"] for hit in result["data"]["matches"]] == ["normal"]
+    status, result = invoke(knowledge, "search", "rx_timeout", "--include-deprecated")
+    assert status == 0, result
+    assert {hit["card_id"] for hit in result["data"]["matches"]} == {"normal", "old"}
+    status, result = invoke(knowledge, "read", "old")
+    assert status == 0 and result["data"]["lifecycle"] == "deprecated"
 
 
 @pytest.mark.parametrize("invalid_card,expected", [(False, 0), (True, 1)])

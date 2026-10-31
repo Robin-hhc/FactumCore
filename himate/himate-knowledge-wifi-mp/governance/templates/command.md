@@ -5,11 +5,12 @@ doc_ref:
     line_start: 1
     line_end: 1
 code_ref: []
+tags: []
+lifecycle: stable
 ---
 # {{title}}
 
-<a id="{{claim_id}}"></a>
-{{claim_text}}
+概述主题结论，明确设计、规范、代码观察或测量依据及必要缺口。
 
 ## 语法
 

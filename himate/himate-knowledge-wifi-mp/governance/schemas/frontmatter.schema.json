@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "HiMate concise Card references with legacy Card/Claim support",
+  "title": "HiMate complete cards with read-only legacy declarations",
   "type": "object",
   "properties": {
     "schema_version": {
@@ -625,6 +625,9 @@
         "evidence_ref": {
           "type": "string",
           "minLength": 1
+        },
+        "locator": {
+          "$ref": "#/$defs/document_locator"
         }
       },
       "anyOf": [
@@ -643,6 +646,11 @@
         {
           "required": [
             "section"
+          ]
+        },
+        {
+          "required": [
+            "locator"
           ]
         }
       ],
@@ -679,16 +687,278 @@
         "evidence_ref": {
           "type": "string",
           "minLength": 1
+        },
+        "selector": {
+          "$ref": "#/$defs/code_ref"
         }
       },
       "additionalProperties": false
+    },
+    "document_locator": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "page",
+            "pages",
+            "paragraph",
+            "paragraphs",
+            "table_row"
+          ]
+        },
+        "page": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "paragraph": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "start": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "end": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "table": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "row": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "properties": {
+            "kind": {
+              "enum": [
+                "page",
+                "pages"
+              ]
+            }
+          },
+          "propertyNames": {
+            "enum": [
+              "kind",
+              "page",
+              "start",
+              "end",
+              "number",
+              "id"
+            ]
+          },
+          "anyOf": [
+            {
+              "required": [
+                "page"
+              ]
+            },
+            {
+              "required": [
+                "start"
+              ]
+            },
+            {
+              "required": [
+                "number"
+              ]
+            },
+            {
+              "required": [
+                "id"
+              ]
+            }
+          ]
+        },
+        {
+          "properties": {
+            "kind": {
+              "enum": [
+                "paragraph",
+                "paragraphs"
+              ]
+            }
+          },
+          "propertyNames": {
+            "enum": [
+              "kind",
+              "paragraph",
+              "start",
+              "end",
+              "number",
+              "id"
+            ]
+          },
+          "anyOf": [
+            {
+              "required": [
+                "paragraph"
+              ]
+            },
+            {
+              "required": [
+                "start"
+              ]
+            },
+            {
+              "required": [
+                "number"
+              ]
+            },
+            {
+              "required": [
+                "id"
+              ]
+            }
+          ]
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "table_row"
+            }
+          },
+          "propertyNames": {
+            "enum": [
+              "kind",
+              "table",
+              "row"
+            ]
+          },
+          "required": [
+            "table",
+            "row"
+          ]
+        }
+      ]
     }
   },
   "anyOf": [
     {
       "required": [
+        "id",
         "doc_ref",
         "code_ref"
+      ],
+      "propertyNames": {
+        "enum": [
+          "id",
+          "doc_ref",
+          "code_ref",
+          "tags",
+          "lifecycle"
+        ]
+      },
+      "properties": {
+        "lifecycle": {
+          "enum": [
+            "stable",
+            "deprecated"
+          ]
+        },
+        "tags": {
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
+        }
+      }
+    },
+    {
+      "required": [
+        "id",
+        "doc_ref",
+        "code_ref"
+      ],
+      "anyOf": [
+        {
+          "required": [
+            "schema_version"
+          ]
+        },
+        {
+          "required": [
+            "profile"
+          ]
+        },
+        {
+          "required": [
+            "title"
+          ]
+        },
+        {
+          "required": [
+            "summary"
+          ]
+        },
+        {
+          "required": [
+            "review_mode"
+          ]
+        },
+        {
+          "required": [
+            "owner"
+          ]
+        },
+        {
+          "required": [
+            "scope"
+          ]
+        },
+        {
+          "required": [
+            "aliases"
+          ]
+        },
+        {
+          "required": [
+            "sources"
+          ]
+        },
+        {
+          "required": [
+            "claims"
+          ]
+        },
+        {
+          "required": [
+            "relations"
+          ]
+        },
+        {
+          "required": [
+            "replacement"
+          ]
+        },
+        {
+          "required": [
+            "deprecation_reason"
+          ]
+        },
+        {
+          "required": [
+            "search_terms"
+          ]
+        }
       ]
     },
     {
@@ -706,7 +976,44 @@
         "sources",
         "claims",
         "relations"
-      ]
+      ],
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "doc_ref"
+            ]
+          },
+          {
+            "required": [
+              "code_ref"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "description": "Read-only compatibility for existing concise draft cards.",
+      "required": [
+        "id",
+        "doc_ref",
+        "code_ref",
+        "lifecycle"
+      ],
+      "propertyNames": {
+        "enum": [
+          "id",
+          "doc_ref",
+          "code_ref",
+          "tags",
+          "lifecycle"
+        ]
+      },
+      "properties": {
+        "lifecycle": {
+          "const": "draft"
+        }
+      }
     }
   ]
 }

@@ -34,7 +34,7 @@ def write_card(root, source, text, *, stage=False):
 
 
 def search(root, text):
-    data, phase = module("library").query(root, {"query": text, "purpose": "guidance"})
+    data, phase = module("library").query(root, {"query": text})
     assert phase == "searched"
     return data
 
@@ -105,7 +105,7 @@ def test_query_started_before_writer_keeps_a_complete_catalog(tmp_path, monkeypa
     thread.start()
     try:
         if read:
-            result, phase = library.query(root, {"card_id": "rule", "purpose": "guidance"}, read=True)
+            result, phase = library.query(root, {"card_id": "rule"}, read=True)
             assert phase == "read"
             assert "oldtoken" in result["body"]
         else:
@@ -133,7 +133,7 @@ def test_query_leaves_ingest_workspace_unchanged_and_candidates_private(tmp_path
     before = snapshot()
     assert search(root, "newtoken")["matches"] == []
     assert [item["card_id"] for item in search(root, "oldtoken")["matches"]] == ["rule"]
-    module("library").query(root, {"card_id": "rule", "purpose": "guidance"}, read=True)
+    module("library").query(root, {"card_id": "rule"}, read=True)
     assert snapshot() == before
 
 
@@ -165,8 +165,8 @@ def test_query_waits_for_commit_then_reads_completed_publication(tmp_path, monke
     def reader():
         try:
             reader_started.set()
-            outcomes["query"] = (library.query(root, {"card_id": "rule", "purpose": "guidance"}, read=True)
-                                 if read else library.query(root, {"query": "newtoken", "purpose": "guidance"}))
+            outcomes["query"] = (library.query(root, {"card_id": "rule"}, read=True)
+                                 if read else library.query(root, {"query": "newtoken"}))
         except BaseException as error:
             failures.append(error)
         finally:

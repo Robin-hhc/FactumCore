@@ -1,17 +1,14 @@
-"""Card/Claim parsing, complete relationships and conservative scope matching."""
+"""Read-only checks for explicit legacy card declarations and body spans."""
 
 from __future__ import annotations
+
 import re
-from .validation import (
-    ContractError,
-    load_yaml,
-    sha256_bytes,
-    validate_id,
-    validate_shape,
-)
+
+from .validation import ContractError, validate_id
 
 
-def _unfenced(body):
+def unfenced(body):
+    """Hide fenced text without changing offsets used by legacy anchors."""
     result, fence = [], None
     for line in body.splitlines(keepends=True):
         match = re.match(r"^\s*(`{3,}|~{3,})", line)
@@ -21,305 +18,85 @@ def _unfenced(body):
                 fence = (token[0], len(token))
             elif token[0] == fence[0] and len(token) >= fence[1]:
                 fence = None
-            result.append(
-                " " * len(line.rstrip("\r\n")) + line[len(line.rstrip("\r\n")) :]
-            )
+            result.append(" " * len(line.rstrip("\r\n")) + line[len(line.rstrip("\r\n")):])
         elif fence:
-            result.append(
-                " " * len(line.rstrip("\r\n")) + line[len(line.rstrip("\r\n")) :]
-            )
+            result.append(" " * len(line.rstrip("\r\n")) + line[len(line.rstrip("\r\n")):])
         else:
             result.append(line)
     return "".join(result)
 
 
-def _unique(items, field):
-    values = [item[field] if isinstance(item, dict) else item for item in items]
-    if len(values) != len(set(values)):
-        raise ContractError("DUPLICATE_ID", field)
-    return set(values)
+def _records(value, field, identity, path):
+    if not isinstance(value, list) or any(not isinstance(item, dict) for item in value):
+        raise ContractError("INVALID_LEGACY_DECLARATION", f"{field} must contain objects", path)
+    values = [item.get(identity) for item in value]
+    if any(not isinstance(item, str) or not item.strip() for item in values):
+        raise ContractError("INVALID_LEGACY_DECLARATION", f"{field} needs {identity}", path)
+    if len(set(values)) != len(values):
+        raise ContractError("DUPLICATE_ID", identity, path)
+    return {item[identity]: item for item in value}
 
 
-def parse_card(data, path, rules):
-    """Full card quality validation, used by lint and trusted fixed CI."""
-    return _decode_card(data, path, rules, quality=True)
+def _references(value, field, available, path):
+    if (not isinstance(value, list) or any(not isinstance(item, str) for item in value)
+            or len(set(value)) != len(value)):
+        raise ContractError("INVALID_LEGACY_DECLARATION", f"{field} must contain unique references", path)
+    if available is not None and not set(value).issubset(available):
+        code = "UNKNOWN_EVIDENCE_REF" if field == "source_refs" else "UNKNOWN_CONTEXT_REF"
+        raise ContractError(code, field, path)
 
 
-def decode_card(data, path, rules):
-    """Decode exact card data and spans without re-running quality policy.
+def validate_legacy(metadata, body, path):
+    """Check only declarations the author supplied; never add Claim semantics."""
+    sources = _records(metadata.get("sources", []), "sources", "evidence_ref", path)
+    for source in sources.values():
+        validate_id(source.get("source_id"))
+        if not isinstance(source.get("locator"), dict) or not source["locator"]:
+            raise ContractError("INVALID_LEGACY_DECLARATION", "sources needs a locator", path)
+        if "code_ref" in source:
+            from .code_symbols import validate_code_ref
 
-    Producers, indexing and consumers need unambiguous identity/span data.
-    Profile, completeness and whole-library quality remain lint's work.
-    """
-    return _decode_card(data, path, rules, quality=False)
-
-
-def _decode_card(data, path, rules, *, quality):
-    try:
-        text = data.decode("utf-8-sig")
-    except UnicodeError as exc:
-        raise ContractError("INVALID_CARD_ENCODING", exc, path) from exc
-    if "\x00" in text:
-        raise ContractError("NUL_INPUT", "Invalid card text", path)
-    match = re.match(r"\A---\r?\n(.*?)\r?\n---(?:\r?\n|$)", text, re.S)
-    if not match:
-        raise ContractError("FRONTMATTER_REQUIRED", "Expected YAML frontmatter", path)
-    meta = load_yaml(match.group(1))
-    if quality:
-        validate_shape("card", meta, rules)
-    elif not isinstance(meta, dict) or not all(key in meta for key in
-            ("id", "profile", "title", "summary", "scope", "sources", "claims", "relations")):
-        raise ContractError("CARD_DATA_REQUIRED", "Card data cannot be decoded", path)
-    body, visible = text[match.end() :], _unfenced(text[match.end() :])
-    sections = set(re.findall(r"^#{1,6}\s+(.+?)\s*#*\s*$", visible, re.M))
-    missing = (set(rules["profiles"]["profiles"][meta["profile"]]["required_sections"]) - sections
-               if quality else set())
-    if missing:
-        raise ContractError("MISSING_SECTIONS", ", ".join(sorted(missing)), path)
-    validate_id(meta["id"])
-    _unique(meta["claims"], "id")
-    _unique(meta["scope"]["contexts"], "context_id")
-    contexts = {c["context_id"]: c for c in meta["scope"]["contexts"]}
-    if quality and any(not _has_condition(c) for c in contexts.values()):
-        raise ContractError(
-            "EMPTY_CONTEXT", "A context must constrain a real dimension", path
-        )
-    if quality and meta["scope"]["applicability"] == "constrained" and not contexts:
-        raise ContractError(
-            "EMPTY_SCOPE", "Constrained scope requires conditions", path
-        )
-    _unique(meta["sources"], "evidence_ref")
-    sources = {s["evidence_ref"]: s for s in meta["sources"]}
-    anchors = list(
-        re.finditer(
-            r"^[ \t]*<a id=[\"']([^\"']+)[\"']></a>[ \t]*(?:\r?\n|$)", visible, re.M
-        )
-    )
-    if len({a.group(1) for a in anchors}) != len(anchors):
+            validate_code_ref(source["code_ref"])
+    # Mixed headers sometimes named old evidence implicitly. Keep those author
+    # declarations readable without inventing names for their concise references.
+    evidence = set(sources) if "sources" in metadata else None
+    scope = metadata.get("scope", {})
+    if not isinstance(scope, dict):
+        raise ContractError("INVALID_LEGACY_DECLARATION", "scope must be an object", path)
+    contexts = _records(scope.get("contexts", []), "contexts", "context_id", path)
+    claims = _records(metadata.get("claims", []), "claims", "id", path)
+    visible = unfenced(body)
+    anchors = list(re.finditer(
+        r"^[ \t]*<a id=[\"']([^\"']+)[\"']></a>[ \t]*(?:\r?\n|$)", visible, re.M))
+    if len({anchor.group(1) for anchor in anchors}) != len(anchors):
         raise ContractError("DUPLICATE_ANCHOR", "Explicit anchor repeats", path)
-    spans = {
-        a.group(1): (
-            a.end(),
-            anchors[i + 1].start() if i + 1 < len(anchors) else len(body),
-        )
-        for i, a in enumerate(anchors)
-    }
-    claims = []
-    for claim in meta["claims"]:
+    spans = {anchor.group(1): (
+        anchor.end(), anchors[index + 1].start() if index + 1 < len(anchors) else len(body))
+        for index, anchor in enumerate(anchors)}
+    lines = body.splitlines(keepends=True)
+    for claim in claims.values():
         validate_id(claim["id"])
-        if not claim["source_refs"] or len(claim["source_refs"]) != len(
-            set(claim["source_refs"])
-        ):
-            raise ContractError("INVALID_CLAIM_SOURCES", claim["id"], path)
-        if not set(claim["source_refs"]).issubset(sources):
-            raise ContractError("UNKNOWN_EVIDENCE_REF", claim["id"], path)
-        if not set(claim["context_ids"]).issubset(contexts):
-            raise ContractError("UNKNOWN_CONTEXT_REF", claim["id"], path)
-        ref = claim["text_ref"]
-        if ref.startswith("#") and ref[1:] in spans:
-            start, end = spans[ref[1:]]
-        elif re.fullmatch(r"lines:\d+-\d+", ref):
-            first, last = map(int, ref[6:].split("-"))
-            lines = body.splitlines(keepends=True)
+        if "source_refs" in claim:
+            if not claim["source_refs"]:
+                raise ContractError("INVALID_CLAIM_SOURCES", claim["id"], path)
+            _references(claim["source_refs"], "source_refs", evidence, path)
+        if "context_ids" in claim:
+            _references(claim["context_ids"], "context_ids", contexts, path)
+        reference = claim.get("text_ref")
+        if isinstance(reference, str) and reference.startswith("#") and reference[1:] in spans:
+            start, end = spans[reference[1:]]
+        elif isinstance(reference, str) and re.fullmatch(r"lines:\d+-\d+", reference):
+            first, last = map(int, reference[6:].split("-"))
             if not 1 <= first <= last <= len(lines):
-                raise ContractError("INVALID_CLAIM_SPAN", ref, path)
-            start, end = len("".join(lines[: first - 1])), len("".join(lines[:last]))
+                raise ContractError("INVALID_CLAIM_SPAN", reference, path)
+            start, end = len("".join(lines[:first - 1])), len("".join(lines[:last]))
         else:
-            raise ContractError("INVALID_CLAIM_SPAN", ref, path)
+            raise ContractError("INVALID_CLAIM_SPAN", reference, path)
         if not body[start:end].strip():
-            raise ContractError("EMPTY_CLAIM_TEXT", ref, path)
-        compiled = dict(claim)
-        compiled.update(
-            text=body[start:end],
-            span={"start": start, "end": end},
-            scope={
-                "applicability": meta["scope"]["applicability"],
-                "contexts": [contexts[c] for c in claim["context_ids"]],
-            },
-            source_records=[sources[s] for s in claim["source_refs"]],
-        )
-        if (
-            quality and compiled["scope"]["applicability"] == "constrained"
-            and not compiled["scope"]["contexts"]
-        ):
-            raise ContractError("CLAIM_SCOPE_REQUIRED", claim["id"], path)
-        claims.append(compiled)
-    for relation in meta["relations"]:
-        if not set(relation["context_ids"]).issubset(contexts):
-            raise ContractError("UNKNOWN_CONTEXT_REF", "relation", path)
-    return {
-        "metadata": meta,
-        "body": body,
-        "raw": data,
-        "path": str(path),
-        "claims": claims,
-        "sha256": sha256_bytes(data),
-        "body_digest": sha256_bytes(body.encode("utf-8")),
-    }
-
-
-def validate_card(card, view=None, rules=None):
-    if rules:
-        validate_shape("card", card.get("metadata", card), rules)
-        from .source_resources import read_source_lock, validate_source_ref
-
-        source_lock = rules.get("source_lock")
-        if source_lock is None:
-            source_lock = read_source_lock(rules["knowledge_root"])
-        for source in card.get("metadata", card)["sources"]:
-            validate_source_ref(source, source_lock)
-    if view is not None:
-        validate_relations(view)
-    return card
-
-
-def validate_relations(view):
-    values = list(view.values()) if isinstance(view, dict) else list(view)
-    metadata = [c.get("metadata", c) for c in values]
-    if len({c["id"] for c in metadata}) != len(metadata):
-        raise ContractError("DUPLICATE_CARD_ID", "Card IDs must be domain-unique")
-    by_id, edges = {c["id"]: c for c in metadata}, {}
-    for card in metadata:
-        edges[card["id"]] = []
-        replacements = card.get("replacement") or []
-        if isinstance(replacements, str):
-            replacements = [replacements]
-        for target_id in replacements:
-            if target_id not in by_id:
-                raise ContractError("DANGLING_RELATION", target_id)
-            edges[card["id"]].append(target_id)
-        for relation in card["relations"]:
-            target = by_id.get(relation["target_card_id"])
-            if target is None:
-                raise ContractError("DANGLING_RELATION", relation["target_card_id"])
-            if relation.get("target_claim_id") and relation["target_claim_id"] not in {
-                c["id"] for c in target["claims"]
-            }:
-                raise ContractError(
-                    "DANGLING_CLAIM_RELATION", relation["target_claim_id"]
-                )
-            if relation["type"] in ("requires", "replacement"):
-                edges[card["id"]].append(target["id"])
-    visiting, visited = set(), set()
-
-    def visit(node):
-        if node in visiting:
-            raise ContractError("RELATION_CYCLE", node)
-        if node in visited:
-            return
-        visiting.add(node)
-        for other in edges[node]:
-            visit(other)
-        visiting.remove(node)
-        visited.add(node)
-
-    for node in edges:
-        visit(node)
-    return view
-
-
-def maintenance_candidates(cards, source_ids=(), topics=(), candidate_card_ids=()):
-    """Rebuild reading candidates from canonical cards without answer filtering.
-
-    Reasons are discovery evidence, never a semantic update decision. A requires
-    edge A -> B makes A a downstream reading candidate when B is selected.
-    """
-    values = list(cards.values()) if isinstance(cards, dict) else list(cards)
-    by_id = {card["metadata"]["id"]: card for card in values}
-    selected, source_ids = {}, set(source_ids)
-
-    def add(identity, reason):
-        if identity not in by_id:
-            raise ContractError("UNKNOWN_READING_CANDIDATE", identity)
-        reasons = selected.setdefault(identity, [])
-        if reason not in reasons:
-            reasons.append(reason)
-
-    for card in values:
-        meta = card["metadata"]
-        for source in meta["sources"]:
-            if source["source_id"] in source_ids:
-                claims = [claim["id"] for claim in meta["claims"] if source["evidence_ref"] in claim["source_refs"]]
-                add(meta["id"], {"kind": "source", "source_id": source["source_id"],
-                                  "snapshot_id": source["snapshot_id"], "claim_ids": claims})
-        searchable = "\n".join((meta["title"], meta.get("summary", ""), *meta.get("aliases", []), card["body"])).casefold()
-        for topic in topics:
-            if not isinstance(topic, str) or not topic.strip():
-                raise ContractError("INVALID_AUTHORING_TOPIC", "Nonempty topic text required")
-            if topic.casefold() in searchable:
-                add(meta["id"], {"kind": "topic", "topic": topic})
-    for identity in candidate_card_ids:
-        add(identity, {"kind": "agent_candidate"})
-    changed = True
-    while changed:
-        changed = False
-        for card in values:
-            identity = card["metadata"]["id"]
-            for relation in card["metadata"]["relations"]:
-                if relation["type"] not in {"requires", "derived_from"} or relation["target_card_id"] not in selected:
-                    continue
-                newly_selected = identity not in selected
-                add(identity, {"kind": "dependency", "target_card_id": relation["target_card_id"],
-                               "target_claim_id": relation.get("target_claim_id")})
-                changed = changed or newly_selected
-    return [{"card_id": identity, "card": by_id[identity], "reasons": selected[identity]}
-            for identity in sorted(selected)]
-
-
-def _has_condition(group):
-    return any(
-        group.get(key)
-        for key in (
-            "target_id",
-            "chip",
-            "side",
-            "build_profile",
-            "pairing_id",
-            "revision",
-            "features_all",
-            "features_none",
-            "protocol_versions",
-        )
-    )
-
-
-def match_scope(claim, context, purpose="current"):
-    if purpose in ("current", "implementation") and claim.get("usage") != "current":
-        return False
-    if purpose == "implementation" and claim.get("evidence_kind") not in (
-        "implementation",
-        "measurement",
-    ):
-        return False
-    scope = claim.get("scope", {})
-    mode = scope.get("applicability", "unknown")
-    if mode == "unknown":
-        return purpose in ("guidance", "historical")
-    if mode == "universal":
-        return True
-    for group in scope.get("contexts", []):
-        if not _has_condition(group):
-            continue
-        if any(
-            group.get(k) is not None and context.get(k) != group[k]
-            for k in ("target_id", "chip", "side", "build_profile", "pairing_id")
-        ):
-            continue
-        if (group.get("features_all") or group.get("features_none")) and not isinstance(context.get("features"), list):
-            continue
-        features = set(context.get("features") or [])
-        if (
-            not set(group.get("features_all", [])).issubset(features)
-            or set(group.get("features_none", [])) & features
-        ):
-            continue
-        if group.get("protocol_versions") and not set(
-            group["protocol_versions"]
-        ).issubset(context.get("protocol_versions") or []):
-            continue
-        if group.get("revision_policy") == "pinned" and (
-            not group.get("revision") or context.get("revision") != group["revision"]
-        ):
-            continue
-        return True
-    return False
+            raise ContractError("EMPTY_CLAIM_TEXT", reference, path)
+    relations = metadata.get("relations", [])
+    if not isinstance(relations, list) or any(not isinstance(item, dict) for item in relations):
+        raise ContractError("INVALID_LEGACY_DECLARATION", "relations must contain objects", path)
+    for relation in relations:
+        if "context_ids" in relation:
+            _references(relation["context_ids"], "context_ids", contexts, path)

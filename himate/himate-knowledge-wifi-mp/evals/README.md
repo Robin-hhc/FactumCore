@@ -8,7 +8,7 @@
 |---|---|
 | `catalog/` | 卡头解析、来源身份、文件与卡双向关系、成功 hash、数据库重建 |
 | `ingest/` | 单文件扫描、六决策落位、脚本检查、无卡成功、失败重试及删除 |
-| `query/` | 精确词项、purpose、适用条件及公开查询行为 |
+| `query/` | 整卡精确词项、AND 标签、排序、显式退役筛选、完整读取、旧参数错误及搜索缓存升级 |
 | `contracts/` | 继续复用的代码符号、来源定位、配置映射等独立算法 |
 | `cli/` | doctor、命令错误与目标目录边界 |
 | `workflows/` | 五节点顺序、作者与独立审阅职责、返工目标、能力包归属 |
@@ -16,7 +16,7 @@
 | `tooling/` | 测试发现、超时及 JUnit/汇总报告 |
 | `support/` | 公共开发夹具和规则装载助手，不含业务测试 |
 
-新增测试按功能放置。`stages/` 的旧八阶段套件、不可变视图、前序票据、应用事务 journal、索引代启用、跨轮恢复链及旧 Pipeline 助手随生产流程退场。保留的是可观察业务预期，不为保持历史测试数量继续约束已删除的机制。具体覆盖见 [SCENARIOS.md](SCENARIOS.md)。
+新增测试按功能放置，以可观察业务行为为预期，不按历史测试数量约束实现。旧卡与历史来源的有效兼容行为继续验证；用途/Claim 资格门不属于新搜索契约。具体覆盖见 [SCENARIOS.md](SCENARIOS.md)。
 
 ## 执行
 
@@ -31,7 +31,7 @@ python himate/himate-knowledge-wifi-mp/evals/run_acceptance.py --output-dir .scr
 ```text
 python himate/himate-knowledge-wifi-mp/evals/run_acceptance.py --groups ingest query --output-dir .scratch/focused-new
 python himate/himate-knowledge-wifi-mp/evals/run_acceptance.py --profile quick --output-dir .scratch/quick-new
-python -m pytest himate/himate-knowledge-wifi-mp/evals -q
+python -m pytest himate/himate-knowledge-wifi-mp/evals/ingest -q
 python -m pytest tools/deploy/tests -q
 ```
 

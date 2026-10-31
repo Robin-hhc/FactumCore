@@ -295,8 +295,9 @@ def test_legacy_rich_claims_and_original_bytes_are_preserved():
     assert card["metadata"] == metadata
     assert card["doc_ref"][0]["snapshot_id"] == "old-doc"
     assert card["code_ref"][0]["symbol"] == "wait_reply"
-    assert card["claims"][0]["scope"]["contexts"][0]["features_all"] == ["timeout"]
-    assert card["claims"][0]["usage"] == "current"
+    assert card["metadata"]["scope"]["contexts"][0]["features_all"] == ["timeout"]
+    assert card["metadata"]["claims"][0]["usage"] == "current"
+    assert "claims" not in card
 
 
 def test_schema_accepts_concise_header_and_keeps_legacy_symbol_shape():
@@ -308,3 +309,89 @@ def test_schema_accepts_concise_header_and_keeps_legacy_symbol_shape():
     Draft202012Validator(source_schema).validate({"evidence_ref": "e", "source_id": "c", "snapshot_id": "s",
                                                 "locator": {"kind": "lines", "start": 1, "end": 4},
                                                 "code_ref": {"kind": "function", "name": "wait_reply"}})
+
+
+@pytest.mark.parametrize("code_refs", [[], [{"code_id": "code", "line_start": 1, "line_end": 4, "symbol": "handle"}]])
+def test_concise_parser_preserves_raw_header_without_synthetic_semantics(code_refs):
+    import yaml
+    metadata = {"id": "concise", "doc_ref": [{"doc_id": "doc", "section": "Design"}], "code_ref": code_refs}
+    raw = ("---\n" + yaml.safe_dump(metadata, sort_keys=False) + "---\n# Concise title\n\nA design requirement.\n").encode()
+    card = module("cards_v3").parse_card(raw, "knowledge/concise.md", concise_only=True)
+    assert card["raw"] == raw
+    assert card["metadata"] == metadata
+    assert card["title"] == "Concise title"
+    assert card["metadata"].get("tags", []) == []
+    assert card["metadata"].get("lifecycle", "stable") == "stable"
+    assert not {"claims", "scope", "usage", "profile", "summary"} & set(card)
+
+
+def test_legacy_concise_draft_is_readable_without_added_scope_or_claims():
+    import json
+    import yaml
+
+    metadata = {"id": "draft", "doc_ref": [{"doc_id": "doc", "section": "Design"}],
+                "code_ref": [], "lifecycle": "draft"}
+    raw = ("---\n" + yaml.safe_dump(metadata) + "---\n# Draft\nA retained draft.\n").encode()
+    schema = json.loads((Path(__file__).resolve().parents[2] / "governance/schemas/frontmatter.schema.json").read_text())
+    card = module("cards_v3").parse_card(raw, "knowledge/draft.md", {"schemas": {"card": schema}})
+    assert card["legacy"] is True
+    assert card["raw"] == raw
+    assert card["metadata"] == metadata
+    assert not {"scope", "claims", "usage"} & set(card)
+
+
+def test_legacy_concise_draft_cannot_pass_new_candidate_format_check():
+    raw = b"---\nid: draft\ndoc_ref:\n- doc_id: doc\n  section: Design\ncode_ref: []\nlifecycle: draft\n---\n# Draft\nA retained draft.\n"
+    with pytest.raises(ValueError, match="INVALID_CARD_LIFECYCLE"):
+        module("cards_v3").parse_card(raw, "knowledge/draft.md", concise_only=True)
+
+
+@pytest.mark.parametrize("extra", [
+    {"title": "Old title"}, {"summary": "Old summary"}, {"profile": "rule"},
+    {"aliases": ["old_name"]}, {"claims": []}, {"scope": {"applicability": "unknown", "contexts": []}},
+    {"usage": "guidance"}, {"owner": "someone"}, {"unknown_field": "value"},
+])
+def test_new_candidate_parser_enforces_five_fields_even_without_loaded_rules(extra):
+    import yaml
+    metadata = {"id": "c", "doc_ref": [{"doc_id": "doc", "section": "Design"}], "code_ref": [], **extra}
+    raw = ("---\n" + yaml.safe_dump(metadata) + "---\n# Card\nA requirement.\n").encode()
+    with pytest.raises(ValueError):
+        module("cards_v3").parse_card(raw, "knowledge/c.md", concise_only=True)
+
+
+@pytest.mark.parametrize("extra", [
+    {"tags": "RX"}, {"tags": [""]}, {"tags": ["  "]}, {"tags": ["RX", "RX"]}, {"tags": [7]},
+    {"lifecycle": "draft"}, {"lifecycle": None},
+])
+def test_concise_optional_fields_have_mechanical_types(extra):
+    import yaml
+    metadata = {"id": "c", "doc_ref": [{"doc_id": "doc", "section": "Design"}], "code_ref": [], **extra}
+    raw = ("---\n" + yaml.safe_dump(metadata) + "---\n# Card\nA requirement.\n").encode()
+    with pytest.raises(ValueError):
+        module("cards_v3").parse_card(raw, "knowledge/c.md", concise_only=True)
+
+
+def test_mixed_header_retains_explicit_claim_context_and_historical_usage():
+    import yaml
+    metadata = {"id": "mixed", "doc_ref": [{"doc_id": "doc", "section": "Design"}], "code_ref": [],
+                "scope": {"applicability": "constrained", "contexts": [{"context_id": "old", "version": "v1"}]},
+                "claims": [{"id": "a", "text_ref": "#a", "usage": "historical", "context_ids": ["old"],
+                            "evidence_kind": "measurement", "source_refs": ["doc-1"],
+                            "verification_requirements": ["Repeat measurement before applying to v2"]}]}
+    raw = ("---\n" + yaml.safe_dump(metadata) + '---\n# Mixed\n\n<a id="a"></a>\nPrior measured result.\n').encode()
+    card = module("cards_v3").parse_card(raw, "knowledge/mixed.md")
+    assert card["metadata"] == metadata
+    assert card["raw"] == raw
+    assert "claims" not in card
+
+
+def test_formal_compatibility_does_not_accept_arbitrary_unknown_header_fields():
+    raw = b"---\nid: c\ndoc_ref:\n- doc_id: doc\n  section: Design\ncode_ref: []\nunknown_field: value\n---\n# Card\nA requirement.\n"
+    with pytest.raises(ValueError, match="INVALID_CARD_FIELDS"):
+        module("cards_v3").parse_card(raw, "knowledge/c.md")
+
+
+def test_new_card_title_must_be_declared_in_body_h1():
+    raw = b"---\nid: c\ndoc_ref:\n- doc_id: doc\n  section: Design\ncode_ref: []\n---\nA requirement without a title.\n"
+    with pytest.raises(ValueError, match="CARD_TITLE_REQUIRED"):
+        module("cards_v3").parse_card(raw, "knowledge/c.md", concise_only=True)

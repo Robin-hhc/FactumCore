@@ -14,6 +14,10 @@
 
 文档定位至少采用一种现有方式：`line_start/line_end`、`page_start/page_end`、`section`，或已支持的原生 `locator`：PDF 的 page/pages，DOCX 的 paragraph/paragraphs/table_row。例如 DOCX 段落可写 `locator: {kind: paragraph, paragraph: 2}`；正常改写旧卡时可保留原生定位。按原件格式选择，不能把 PDF 页号当提取文本行号。来源 ID 由 CLI 登记返回，不根据标题猜测。同一文件的多个章节或函数可用多个引用项，不新建函数级来源身份。
 
+新格式还支持 `locator: {kind: slide, slide: 2}` 和 `locator: {kind: cell_range, sheet: Sheet1, range: 'A1:D20'}`；分别是实际幻灯片序号和工作表/单元格地址。Docling 元素可用 `element` 定位，包含 `ref`（例如 `#/pictures/0`）、`source_sha256`、`profile_sha256`；非默认解析配置还应在该 locator 的 `parser` 中保存本轮 manifest.profile.options，以便临时材料清理后按同一配置重建。生成稿行号不作为 XLSX/PPTX 原生地址，不将工作表序号解释为打印页号。
+
+正式卡不以 `.build` 或临时 `artifacts/source-read` 图像路径作为永久证据；使用原件 ID 与原文定位。旧 PDF 文本行号、DOCX 段落/表格行和实际保留的历史 snapshot 按原 extractor 与准确旧字节校验，不能由 Docling 新文本替代。
+
 数据库保存 ID 到实际仓库/相对路径的映射，并从最终卡片构建双向关系。同一来源可以被多卡引用，一卡也可以融合多份文档和多个代码入口。已有 `snapshot_id/evidence_ref/selector` 等历史定位仍按实际声明保留，不能将历史证据改成当前位置。
 
 ## 正文与依据

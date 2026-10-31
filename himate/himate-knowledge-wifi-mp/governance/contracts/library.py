@@ -138,7 +138,76 @@ def query(root, request, *, read=False):
         return result, "searched"
 
 
+def _resolve_source(root, source, request):
+    identity = source["source_id"]
+    data, commit = ingest.old_source(root, source, commit=request.get("commit"), expected_hash=request.get("hash"))
+    suffix = Path(source["path"]).suffix
+    component = ingest.sha(identity.encode("utf-8"))[:20]
+    reference = f"artifacts/sources/{component}-{ingest.sha(data)}{suffix}"
+    target = safe_path(root, reference, ["artifacts/sources"])
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(data)
+    result = {"source_id": identity, "original_ref": reference, "hash": ingest.sha(data), "commit": commit}
+    try:
+        if source["kind"] != "code" and suffix.lower() not in {".md", ".txt", ".pdf", ".docx"}:
+            from . import source_read
+
+            reading = source_read.create(root, source, data, options=request.get("parser"))
+            result.update({key: reading[key] for key in ("read_id", "expires_at", "parsed")})
+            result["text_ref"] = reading["parsed"]["text_ref"]
+        else:
+            text = (source_resources.extract_code_text(data, ingest.code_extractor(source))[0]
+                    if source["kind"] == "code" else source_resources.extract_document(data, suffix.lower())[0])
+            text_ref = reference + ".txt"
+            safe_path(root, text_ref).write_text(text, encoding="utf-8")
+            result["text_ref"] = text_ref
+    except (ValueError, ImportError, ContractError) as error:
+        result["gap"] = str(error)
+    return result, "resolved"
+
+
 def sources(root, action, request):
+    if action in {"renew", "release", "cleanup"}:
+        from . import source_read
+
+        if action == "renew":
+            return source_read.renew(root, request.get("read_id"),
+                                     ttl_seconds=request.get("ttl_seconds", 1800)), "renewed"
+        if action == "release":
+            return source_read.release(root, request.get("read_id")), "released"
+        return source_read.cleanup(root), "cleaned"
+    if action in {"resolve", "resolve-source"}:
+        identity = request.get("source_id", request.get("doc_id", request.get("code_id")))
+        with Catalog(root, refresh=False) as catalog:
+            source = catalog.get_file(identity)
+        if source is None:
+            raise ContractError("UNKNOWN_SOURCE_ID", str(identity))
+        return _resolve_source(root, source, request)
+    if action == "extract":
+        from . import source_read
+
+        identity = request.get("source_id", request.get("doc_id", request.get("source")))
+        # Conversion can be expensive. Copy the registered identity, then
+        # release SQLite before reading or converting the document.
+        with Catalog(root, refresh=False) as catalog:
+            source = catalog.get_file(identity)
+        if source is None:
+            raise ContractError("UNKNOWN_SOURCE_ID", str(identity))
+        if source["kind"] == "code":
+            raise ContractError("DOCUMENT_SOURCE_REQUIRED", "Use a registered document for source extract")
+        page_range = None
+        if "page_start" in request or "page_end" in request:
+            first, last = request.get("page_start"), request.get("page_end")
+            if (type(first) is not int or type(last) is not int or not 1 <= first <= last
+                    or Path(source["path"]).suffix.lower() != ".pdf"):
+                raise ContractError("INVALID_PAGE_RANGE", "Use positive PDF page_start/page_end")
+            page_range = first, last
+        try:
+            data = ingest.source_path(root, source).read_bytes()
+        except FileNotFoundError as error:
+            raise ContractError("SOURCE_MISSING", source["path"]) from error
+        return source_read.create(root, source, data, options=request.get("parser"),
+                                  page_range=page_range), "extracted"
     with Catalog(root) as catalog:
         if action == "register":
             kind = request.get("kind", "raw")
@@ -160,27 +229,6 @@ def sources(root, action, request):
                         "cards": [{"id": row["id"], "path": row["path"], "title": row["title"]}
                                   for row in catalog.cards_for(identity)]}, "listed"
             return {"files": catalog.list_files(request.get("kind"), request.get("referenced", False))}, "listed"
-        if action in {"resolve", "resolve-source"}:
-            identity = request.get("source_id", request.get("doc_id", request.get("code_id")))
-            source = catalog.get_file(identity)
-            if source is None:
-                raise ContractError("UNKNOWN_SOURCE_ID", str(identity))
-            data, commit = ingest.old_source(root, source, commit=request.get("commit"), expected_hash=request.get("hash"))
-            suffix = Path(source["path"]).suffix
-            reference = f"artifacts/sources/{identity}-{ingest.sha(data)}{suffix}"
-            target = safe_path(root, reference, ["artifacts/sources"])
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(data)
-            result = {"source_id": identity, "original_ref": reference, "hash": ingest.sha(data), "commit": commit}
-            try:
-                text = (source_resources.extract_code_text(data, ingest.code_extractor(source))[0]
-                        if source["kind"] == "code" else source_resources.extract_document(data, suffix)[0])
-                text_ref = reference + ".txt"
-                safe_path(root, text_ref).write_text(text, encoding="utf-8")
-                result["text_ref"] = text_ref
-            except (ValueError, ImportError, ContractError) as error:
-                result["gap"] = str(error)
-            return result, "resolved"
         if action == "configure":
             path = request.get("path")
             source_resources._dbox_location(root, path)
@@ -188,7 +236,7 @@ def sources(root, action, request):
             config.parent.mkdir(parents=True, exist_ok=True)
             config.write_text(yaml.safe_dump({"schema_version": "1.0", "path": path}, sort_keys=False), encoding="utf-8")
             return {"path": source_resources.DBOX_CONFIG, "configured": True}, "configured"
-    raise ContractError("INVALID_ACTION", "Use source register, list, resolve or configure")
+    raise ContractError("INVALID_ACTION", "Use source register, list, extract, renew, release, cleanup, resolve or configure")
 
 
 def patrol(root, action, request):

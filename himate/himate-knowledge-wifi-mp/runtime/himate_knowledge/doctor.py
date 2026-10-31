@@ -210,10 +210,21 @@ def doctor(root, manifest):
         line = line.strip()
         if not line or line.startswith("#"):
             continue
-        match = re.fullmatch(r"([A-Za-z0-9_.-]+)==([^\s;]+)", line)
+        match = re.fullmatch(r"([A-Za-z0-9_.-]+)==([^\s;*]+)(?:\s*;\s*(.+))?", line)
         if not match:
             raise CommandError("INVALID_RUNTIME_LOCK", "Expected exact runtime dependency pins")
-        name, expected = match.groups()
+        name, expected, marker = match.groups()
+        if marker:
+            try:
+                from packaging.markers import InvalidMarker, Marker
+            except ImportError:
+                gaps.append({"code": "DEPENDENCY_UNAVAILABLE", "message": "packaging is required to evaluate runtime dependency markers"})
+                continue
+            try:
+                if not Marker(marker).evaluate():
+                    continue
+            except InvalidMarker as error:
+                raise CommandError("INVALID_RUNTIME_LOCK", "Invalid runtime dependency marker") from error
         try:
             actual = importlib.metadata.version(name)
         except importlib.metadata.PackageNotFoundError:

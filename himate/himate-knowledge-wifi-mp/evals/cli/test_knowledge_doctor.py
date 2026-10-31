@@ -248,3 +248,18 @@ def test_doctor_never_imports_the_governance_package_even_when_its_bytes_are_loc
     status, report = observe(knowledge)
     assert status == 0, report
     assert not marker.exists()
+
+
+def test_doctor_checks_only_dependencies_for_the_current_python_and_platform(knowledge):
+    lock = knowledge / "runtime/requirements.lock.txt"
+    with lock.open("a", encoding="utf-8") as stream:
+        stream.write('\nnonexistent-other-platform-dependency==1.0 ; python_version < "2.0"\n')
+    # The fixture explicitly installs a new, trusted runtime release containing
+    # the synthetic dependency condition. The command must still be read-only.
+    manifest_path = knowledge / "runtime/manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["files"]["requirements.lock.txt"]["sha256"] = hashlib.sha256(lock.read_bytes()).hexdigest()
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    status, report = observe(knowledge)
+    assert status == 0, report
+    assert all(row["name"] != "nonexistent-other-platform-dependency" for row in report["data"]["dependencies"])

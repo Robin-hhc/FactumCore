@@ -4,7 +4,7 @@
 
 日常文档更新使用hs-knowledge-ingest Workflow，巡检用hs-knowledge-lint Workflow，检索用hs-knowledge-query Skill。首节点复用项目与执行端；缺项时读当前工作区实际AGENTS.md/config.yml，仍不明确才询问用户。
 
-入库P1选一个变化文件、P2决策、P3写卡、P4独立审阅、P5入库。11个Skill按单步职责提供指引，CLI负责机械步骤，不调用模型。详细规则见[文档入口](docs-llm-wiki/README.md)。
+入库P1选一个变化文件、P2决策、P3写卡、P4独立审阅、P5入库。11个Skill按单步职责提供指引，CLI负责机械步骤及预先配置的本地文档/OCR解析，不自主调用生成式模型；看图与知识判断由宿主Agent完成。详细规则见[文档入口](docs-llm-wiki/README.md)。
 
 在数据所在端原生知识根运行knowledge.py或sh ./knowledge.sh；Windows可用.\knowledge.cmd。实际执行端先取得仓库代码，选用已有Python3.10—3.12；需要诊断时运行doctor。部署脚本先向选定Python执行一次锁定依赖的pip安装，再删除本次同名Skill和Workflow包的完整目录，最后复制新包。pip失败不动旧包；源码与目标根其他包保留，宿主加载运行。远端由宿主已有SSH工具执行同一命令，不逐次传Skill脚本。
 

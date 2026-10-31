@@ -9,3 +9,7 @@
 `knowledge source resolve --input SOURCE.json --json` 按来源 ID 和需要的 Git 版本读取原文。恢复只限可用历史中的实际版本；没有提交且没有保存的旧内容无法凭 hash 找回。缺旧版时将缺口交 P2，不冒充已读。
 
 P1 返回的是本次副本和关联卡入口，不要求一次加载全部正文。Git 仅用于按需回看历史，不参与日常变化判定。
+
+`task.source.parsed` 交付本轮文字、Markdown、结构 JSON、原文定位及图片。产物在 `.build/materials/parsed`，与计划、候选一起在 P5 成功后清理；原件和正式卡保留。后续节点使用同一份材料，不能重转后替换已经审阅的依据。
+
+独立回源用 `source extract`，按需指定 PDF 页范围；读取结束用返回的 read_id 执行 `source release`，较长读取先 `source renew`。各读任务使用 `artifacts/source-read/<read_id>/`，不影响当前 `.build` 或其他查询。`source cleanup` 有界回收过期且非转换中的产物。

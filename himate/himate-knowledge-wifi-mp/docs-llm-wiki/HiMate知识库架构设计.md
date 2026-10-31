@@ -41,7 +41,9 @@ Git 用于按需读取已有历史版本。来源提交可以辅助定位原文�
 | 作者 Agent | 阅读材料、选择六决策、按主题写卡 |
 | 审阅 Agent | 独立核对事实、条件、遗漏及知识归属 |
 
-CLI 执行确定性操作，知识判断由 Agent 完成。Skill 包由 `SKILL.md` 和按需阅读的 references 组成；执行代码、依赖和测试集中在对应工程目录。运行包与治理规则分别由 `runtime/manifest.json`、`governance/framework.lock.yaml` 记录版本和文件摘要。
+CLI 执行文件、结构解析、定位与固定检查，可调用预先准备的本地 Docling/OCR 模型；知识判断、图意理解与内容审阅由 Agent 完成，不自动调用远程视觉服务。Skill 包由 `SKILL.md` 和按需阅读的 references 组成；执行代码、依赖和测试集中在对应工程目录。运行包与治理规则分别由 `runtime/manifest.json`、`governance/framework.lock.yaml` 记录版本和文件摘要。
+
+文档解析由统一模块交付 Markdown 阅读稿、结构 JSON、定位、图片及缺口。入库产物位于 `.build/materials/parsed/`，P1 从本轮原字节生成一次，P2—P4 复用，P5 按暂存生命周期清理；不建立跨轮解析档案，不把转换稿重新登记为另一份 raw 来源。图片独立落盘，阅读稿用相对链接引用；OCR 文字和原图共同供 Agent 核对，转换成功不等于图意已经审阅。
 
 ## 4. 核心业务协作
 
@@ -103,10 +105,12 @@ repo/
         │   ├── runbooks/              排查手册
         │   └── glossaries/            术语卡
         ├── .build/                    当前任务材料、计划、候选及审阅意见
+        │   └── materials/parsed/      本轮文档转换稿、结构、定位及图片
         ├── artifacts/
         │   ├── knowledge.sqlite       共用的关系与检索数据库
         │   ├── query/                 每次搜索的独立结果
         │   ├── sources/               按需恢复的来源版本
+        │   ├── source-read/           隔离的临时原件阅读任务与到期租约
         │   └── patrol/                巡检统计
         ├── logs/                      执行记录
         ├── evals/                     开发测试与公共夹具
@@ -120,12 +124,14 @@ repo/
 | 数据 | 生命周期 |
 |---|---|
 | 原件、正式卡、来源登记 | 随知识库长期维护 |
-| `.build/` | 一次文件处理；P1 初始化，P5 成功后清理 |
-| `artifacts/` | 当前执行端的派生索引和查询、回源产物 |
+| `.build/` | 一次文件处理，含解析文字和图片；P1 初始化，P5 成功后清理，失败保留以便同轮重试 |
+| `artifacts/` | 当前执行端的派生索引和查询、回源产物；临时文档阅读使用独立 ID，消费后释放并有界回收过期产物 |
 | `logs/` | 按项目规则保留的执行记录 |
 | Python 环境 | 在 `.build` 之外独立准备和维护 |
 
 执行端保留来源登记和正式卡即可重建查询数据库。原件是否能回到某个旧版本，还取决于对应 Git 历史或已保留材料是否可用。
+
+独立回源使用 `source extract`，在 `artifacts/source-read/<read_id>/` 生成材料，可限制 PDF 页范围；它不清理 `.build`，不推进处理 hash。读取结束使用 `source release` 释放指定 ID，长时间阅读可 `source renew`，`source cleanup` 只回收过期且不在转换中的任务。不同读取目录、入库暂存、检索报告和模型目录互不清理。新执行端从原件重新转换；原件缺失时不把缓存视为永久归档。
 
 ## 6. 运行一致性
 

@@ -706,7 +706,10 @@
             "pages",
             "paragraph",
             "paragraphs",
-            "table_row"
+            "table_row",
+            "slide",
+            "cell_range",
+            "element"
           ]
         },
         "page": {
@@ -740,6 +743,87 @@
         "row": {
           "type": "integer",
           "minimum": 1
+        },
+        "slide": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sheet": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "range": {
+          "type": "string",
+          "pattern": "^[A-Z]{1,3}[1-9][0-9]{0,6}(:[A-Z]{1,3}[1-9][0-9]{0,6})?$"
+        },
+        "ref": {
+          "type": "string",
+          "pattern": "^#/(texts|tables|pictures)/[0-9]+$"
+        },
+        "source_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "profile_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "parser": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "pipeline": {
+              "enum": [
+                "native",
+                "standard"
+              ]
+            },
+            "models_path": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^artifacts/models/"
+            },
+            "ocr_languages": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9:_-]{1,40}$"
+              }
+            },
+            "threads": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 32
+            },
+            "timeout_seconds": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 3600
+            },
+            "max_input_bytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 268435456
+            },
+            "max_pages": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_output_bytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 268435456
+            },
+            "images_scale": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 4
+            }
+          }
         }
       },
       "additionalProperties": false,
@@ -844,6 +928,61 @@
           "required": [
             "table",
             "row"
+          ]
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "slide"
+            }
+          },
+          "propertyNames": {
+            "enum": [
+              "kind",
+              "slide"
+            ]
+          },
+          "required": [
+            "slide"
+          ]
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "cell_range"
+            }
+          },
+          "propertyNames": {
+            "enum": [
+              "kind",
+              "sheet",
+              "range"
+            ]
+          },
+          "required": [
+            "sheet",
+            "range"
+          ]
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "element"
+            }
+          },
+          "propertyNames": {
+            "enum": [
+              "kind",
+              "ref",
+              "source_sha256",
+              "profile_sha256",
+              "parser"
+            ]
+          },
+          "required": [
+            "ref",
+            "source_sha256",
+            "profile_sha256"
           ]
         }
       ]

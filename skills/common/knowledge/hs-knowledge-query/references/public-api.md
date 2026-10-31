@@ -29,4 +29,10 @@
 
 只有需要已处理的旧版本时才用 `knowledge source resolve --input FILE.json --json`；JSON 至少包含实际的 `source_id`，例如 `{"source_id":"doc-example"}`，不能把 ID 当位置参数。历史缺失时保留诊断，不能把当前文本冒充旧版。当前代码位置与历史证据分清；章节、PDF 页和文本行号不混用。
 
+## 文档与图片回源
+
+当前已登记文档可用 `knowledge source extract --input FILE.json --json`。请求示例为 `{"source_id":"doc-example","page_start":10,"page_end":15}`，页范围在实际转换时生效；不需要范围时省略两项。`parser` 可提供明确的本地解析选项，native 不做 OCR，standard 需要预置模型。返回 `read_id`、`expires_at`、原件副本及 `parsed` 阅读稿/JSON/图片入口，目录独立于入库 `.build` 和搜索报告；解析不推进入库成功标记。
+
+消费后以 `{"read_id":"本次返回的ID"}` 调用 `knowledge source release --input FILE.json --json`，只释放该阅读目录；仍需继续时用 `source renew`。ready 租约默认 1800 秒，到期入口失效；`source cleanup --json` 只回收过期且没有活跃转换的来源阅读产物。不要猜 ID、不批量删除 artifacts，也不要把临时图像路径写成正式卡唯一依据。图片需通过宿主实际图片工具读取，Markdown 链接本身不证明 Agent 已看图。
+
 空命中先核关键词、显式标签、退役状态、截断和诊断。运行错误保持错误，不能当零命中。需重新入库或索引维护时使用相应入口。

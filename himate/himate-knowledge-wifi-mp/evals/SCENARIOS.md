@@ -23,6 +23,11 @@
 | P5 失败重试 | 保留本轮稿件，重试相同入库动作可完成；不先回 P1 清理 | `ingest/` |
 | Git 旧文档 | 能取得确切提交中的旧原文；未提交且无副本时准确说明不可恢复 | `ingest/`、`integration/` |
 | 清理暂存 | 新 P1 清理 `.build`，数据库与成功处理事实保留 | `ingest/`、`catalog/` |
+| 多格式与图文材料 | Docling 交付正文、结构、独立图片和原文定位；OCR 与原图共同可读，外链不自动抓取、缺口可见 | `contracts/test_document_parser.py`、`ingest/test_document_extraction.py` |
+| 同轮材料与历史兼容 | P4 复用 P1 固定产物；损坏不静默重转；旧 snapshot 使用准确旧字节与原 extractor | `ingest/test_document_extraction.py`、`ingest/test_legacy_document_refs.py` |
+| 独立来源阅读 | 按页提取不清 `.build`、不推进处理 hash；UUID 隔离、消费后精确释放，续期/过期回收不误删有效或正在转换任务 | `contracts/test_source_read.py`、`ingest/test_source_extract.py` |
+| 转换与查询共存 | 文档转换不持有 Catalog 写事务，长转换期间仍可搜索和读正式卡 | `ingest/test_document_extraction.py`、`ingest/test_source_extract.py` |
+| 图文公开闭环 | Office 原图导出、P4 检查、P5 清理、query/read 与独立提取/释放均通过实际 CLI 入口 | `integration/test_document_materials_cli.py` |
 | 来源稍后再变 | P5 保存 P1 记录的 hash，后续扫描仍能发现新的版本 | `ingest/` |
 | 数据库重建 | 由正式卡和来源登记恢复双向关系及无卡成功事实 | `catalog/` |
 | 工作区和诊断 | doctor 选择确切配置，拒绝无效或歧义映射；错误不创建目标仓 | `cli/`、`contracts/test_workspace_mapping.py` |

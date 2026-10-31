@@ -12,6 +12,12 @@
 
 沿用已有文档提取适配器，文本行段、文档章节与PDF页码按原件格式解释。不支持的提取明确报告缺口，不执行原件。代码只从真实配置和明确登记路径读取，不由同名或模块标签推断实现。
 
+新文档使用 Docling 生成本轮阅读稿、结构 JSON、定位及独立图片；MD/TXT 仍直接读取。产物位于 `.build/materials/parsed`，由 task 保存固定摘要供 P2—P4 复用，P5 成功后清理，不作跨轮缓存或另一个 raw 来源。默认 native 不做 OCR，standard 只使用提前准备的本地模型；外部资源不自动抓取，图片语义由 Agent 实际看图后判断。
+
+`source extract` 为已登记来源生成独立阅读目录 `artifacts/source-read/<read_id>/`，可限制 PDF page_start/page_end；原件副本与解析材料都属于本次读取。它不清理入库 `.build`，不推进处理 hash。消费后 `source release` 精确释放该 ID，`source renew` 为未到期 ready 入口续期，默认 1800 秒；`source cleanup` 及新读取开始时有界回收已过期且非活跃转换的产物，不清理查询报告、模型或其他目录。没有后台清理进程，工作流应主动释放；损坏/未知租约保留诊断且受任务数上限约束。
+
+解析器升级或需要改进已有来源抽取时，以具体来源和 `reprocess: true` 显式开始一次入库，继续经过决策、成稿与独立审阅。单独生成阅读稿不表示重新完成知识入库。
+
 代码默认UTF-8；GB18030来源通过source register请求的encoding字段明确登记。该文件属性随来源ID保存，P1备料、P4定位和历史文本提取复用同一编码；原字节和hash不转码，不用伪造历史snapshot解决新文件编码问题。重新登记编码不推进内容成功标记。
 
 登记请求写入JSON文件，再运行 `knowledge source register --input FILE.json --json`：

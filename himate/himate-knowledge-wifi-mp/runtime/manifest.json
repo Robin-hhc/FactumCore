@@ -21,15 +21,18 @@
       "sha256": "1405b6eabf3adf0e8ba8da131add28e5d269404a520107a46858e46497ceb5f0"
     },
     "himate_knowledge/doctor.py": {
-      "sha256": "52ed12b5fbecd77216036260e470d4205716359aed96e6135d153a70587ae83c"
+      "sha256": "7721a9336ab22a465f5491ffe11f40d6444676ac2d0706dc692b18963db1c55f"
     },
     "himate_knowledge/protocol.py": {
       "sha256": "47bfb4189c9dd570b44cd5993557d950c48b471dfd55360b540d9c2be7918867"
     },
+    "requirements-ocr-cpu-py312.lock.txt": {
+      "sha256": "ddb92bd0b0d23944f94e25f246f8bdd21ae6167c4dd63e672ca113be14af174b"
+    },
     "requirements.lock.txt": {
-      "sha256": "ab8d221ec6319126160697601c30d9fa803e75378908534c194411fbce6ca8be"
+      "sha256": "70c9cbdfd907dcdab59a2db1451537a43d39ee6c70da193db5c33238fd78bc52"
     }
   },
   "schema_version": "1.0",
-  "version": "0.14.1"
+  "version": "0.15.0"
 }

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import math
 import re
 
 from .knowledge import unfenced, validate_legacy
@@ -28,6 +29,36 @@ def _document_locator(locator, path):
     if not isinstance(locator, dict):
         raise ContractError("INVALID_SOURCE_LOCATOR", "Expected a native document locator", path)
     kind = locator.get("kind")
+    if kind == "slide":
+        if set(locator) != {"kind", "slide"} or type(locator.get("slide")) is not int or locator["slide"] < 1:
+            raise ContractError("INVALID_SOURCE_LOCATOR", "Use a positive original slide number", path)
+        return
+    if kind == "cell_range":
+        address = locator.get("range")
+        match = re.fullmatch(r"([A-Z]{1,3})([1-9][0-9]{0,6})(?::([A-Z]{1,3})([1-9][0-9]{0,6}))?", address) if isinstance(address, str) else None
+        if (set(locator) != {"kind", "sheet", "range"} or not isinstance(locator.get("sheet"), str)
+                or not locator["sheet"].strip() or match is None):
+            raise ContractError("INVALID_SOURCE_LOCATOR", "Use an exact sheet name and an A1 cell range", path)
+        def column(value):
+            result = 0
+            for letter in value:
+                result = result * 26 + ord(letter) - ord("A") + 1
+            return result
+        first_col, first_row = column(match[1]), int(match[2])
+        last_col, last_row = column(match[3] or match[1]), int(match[4] or match[2])
+        if not (first_col <= last_col <= 16384 and first_row <= last_row <= 1048576):
+            raise ContractError("INVALID_SOURCE_LOCATOR", "Cell range must be ordered and inside XLSX bounds", path)
+        return
+    if kind == "element":
+        if (set(locator) - {"kind", "ref", "source_sha256", "profile_sha256", "parser"}
+                or not isinstance(locator.get("ref"), str)
+                or not re.fullmatch(r"#/(texts|tables|pictures)/[0-9]+", locator["ref"])
+                or any(not isinstance(locator.get(field), str) or not re.fullmatch(r"[0-9a-f]{64}", locator[field])
+                       for field in ("source_sha256", "profile_sha256"))):
+            raise ContractError("INVALID_SOURCE_LOCATOR", "Element references need their exact source and parser profile digests", path)
+        if "parser" in locator:
+            _parser_options(locator["parser"], path)
+        return
     if kind == "table_row":
         if (set(locator) - {"kind", "table", "row"}
                 or any(type(locator.get(field)) is not int or locator[field] < 1 for field in ("table", "row"))):
@@ -42,6 +73,38 @@ def _document_locator(locator, path):
     last = locator.get("end", first)
     if type(first) is not int or type(last) is not int or not 1 <= first <= last:
         raise ContractError("INVALID_SOURCE_LOCATOR", "Use a positive native document address range", path)
+
+
+def _parser_options(options, path):
+    """Keep only portable, explicit document-parser configuration in a card."""
+    allowed = {"pipeline", "models_path", "ocr_languages", "threads", "timeout_seconds", "max_input_bytes",
+               "max_pages", "max_output_bytes", "images_scale"}
+    if not isinstance(options, dict) or set(options) - allowed:
+        raise ContractError("INVALID_SOURCE_LOCATOR", "Element parser must contain supported portable options", path)
+    if "pipeline" in options and (not isinstance(options["pipeline"], str) or options["pipeline"] not in {"native", "standard"}):
+        raise ContractError("INVALID_SOURCE_LOCATOR", "Element parser pipeline must be native or standard", path)
+    model = options.get("models_path")
+    if model is not None and (not isinstance(model, str) or not model.startswith("artifacts/models/")
+                              or "\\" in model or ":" in model or any(part in {"", ".", ".."} for part in model.split("/"))):
+        raise ContractError("INVALID_SOURCE_LOCATOR", "Element model path must be relative to artifacts/models", path)
+    for field in ("threads", "max_input_bytes", "max_pages", "max_output_bytes"):
+        if field in options and (type(options[field]) is not int or options[field] < 1):
+            raise ContractError("INVALID_SOURCE_LOCATOR", "Element parser " + field + " must be positive", path)
+        if field in {"max_input_bytes", "max_output_bytes"} and field in options and options[field] > 256 * 1024 * 1024:
+            raise ContractError("INVALID_SOURCE_LOCATOR", "Element parser input/output limits cannot exceed 256 MiB", path)
+        if field == "threads" and field in options and options[field] > 32:
+            raise ContractError("INVALID_SOURCE_LOCATOR", "Element parser threads cannot exceed 32", path)
+    for field in ("timeout_seconds", "images_scale"):
+        if field in options and (type(options[field]) not in (int, float) or options[field] <= 0
+                                 or isinstance(options[field], float) and not math.isfinite(options[field])):
+            raise ContractError("INVALID_SOURCE_LOCATOR", "Element parser " + field + " must be positive and finite", path)
+        if field in options and options[field] > {"timeout_seconds": 3600, "images_scale": 4}[field]:
+            raise ContractError("INVALID_SOURCE_LOCATOR", "Element parser " + field + " exceeds its resource limit", path)
+    if "ocr_languages" in options:
+        languages = options["ocr_languages"]
+        if (not isinstance(languages, list) or not languages
+                or any(not isinstance(item, str) or not re.fullmatch(r"[A-Za-z0-9:_-]{1,40}", item) for item in languages)):
+            raise ContractError("INVALID_SOURCE_LOCATOR", "Element parser requires explicit OCR language codes", path)
 
 
 def _references(items, kind, path):

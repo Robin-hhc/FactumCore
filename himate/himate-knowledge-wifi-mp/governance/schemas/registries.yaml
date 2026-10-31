@@ -36,6 +36,9 @@ locator_kinds:
 - table
 - table_row
 - attachment
+- slide
+- cell_range
+- element
 scan_change:
 - new
 - changed

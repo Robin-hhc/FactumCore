@@ -21,7 +21,7 @@ def build(root, version="1.0.0"):
             continue
         if path.is_symlink() or (path.exists() and getattr(path.lstat(), "st_file_attributes", 0) & 0x400):
             raise ValueError("Linked runtime paths cannot be frozen: " + relative.as_posix())
-        if path.is_file() and (path.suffix == ".py" or path.name == "requirements.lock.txt"):
+        if path.is_file() and (path.suffix == ".py" or path.name.endswith(".lock.txt")):
             files[relative.as_posix()] = {"sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
     entries = {}
     for name in ("knowledge.py", "knowledge.cmd", "knowledge.sh"):

@@ -19,11 +19,11 @@ import yaml
 
 from .catalog import Catalog, atomic_write
 from .cards_v3 import parse_card
-from .validation import ContractError, load_yaml, markdown_structure, safe_path, validate_id
-from . import source_resources, workspace_config
+from .validation import ContractError, canonical_bytes, load_yaml, markdown_structure, safe_path, validate_id
+from . import document_parser, source_resources, workspace_config
 
 
-FORMATS = {".md", ".txt", ".pdf", ".docx"}
+FORMATS = document_parser.SUPPORTED_FORMATS
 IGNORED = {"AGENTS.md", "index.md", "README.md", ".gitkeep", "dbox.local.yml", "dbox.local.yml.example"}
 
 
@@ -169,7 +169,7 @@ def _raw_files(root, selected=None):
     return sorted(set(found))
 
 
-def observe(root, catalog, selected=None, *, include_code=False, first=False, keep_content=False):
+def observe(root, catalog, selected=None, *, include_code=False, first=False, keep_content=False, reprocess=False):
     target = catalog.get_file(selected) if selected else None
     selected_path = target["path"] if target else selected
     paths = _raw_files(root, selected_path)
@@ -209,8 +209,9 @@ def observe(root, catalog, selected=None, *, include_code=False, first=False, ke
             data = None
         current = sha(data) if data is not None else None
         exists = data is not None
-        if row.get("processed_exists") is None or bool(row["processed_exists"]) != exists or row.get("processed_hash") != current:
-            change = "deleted" if not exists else "added" if row.get("processed_exists") is None else "modified"
+        if reprocess or row.get("processed_exists") is None or bool(row["processed_exists"]) != exists or row.get("processed_hash") != current:
+            change = ("deleted" if not exists else "reprocess" if reprocess else
+                      "added" if row.get("processed_exists") is None else "modified")
             pending.append({**row, "hash": current, "exists": exists, "change": change,
                             **({"content": data} if keep_content else {})})
             if first:
@@ -227,46 +228,64 @@ def _clear_build(root):
 
 def scan(root, request):
     root = Path(root)
-    _clear_build(root)
+    reprocess = request.get("reprocess", False)
+    if type(reprocess) is not bool:
+        raise ContractError("INVALID_REPROCESS", "reprocess must be a boolean")
     with Catalog(root) as catalog:
-        pending = observe(root, catalog, request.get("source"), first=True, keep_content=True)
+        selected_source = request.get("source")
+        if reprocess:
+            registered = catalog.get_file(selected_source) if isinstance(selected_source, str) else None
+            if registered is None and isinstance(selected_source, str):
+                matches = [row for row in catalog.list_files() if row["path"] == selected_source]
+                registered = matches[0] if len(matches) == 1 else None
+            if registered is None:
+                raise ContractError("REPROCESS_SOURCE_REQUIRED", "Select one explicitly registered source ID or exact path")
+            selected_source = registered["id"]
+        _clear_build(root)
+        pending = observe(root, catalog, selected_source, first=True, keep_content=True, reprocess=reprocess)
         if not pending:
             return {"pending": 0}, "unchanged"
         selected = pending[0]
         catalog.touch_attempt(selected["id"])
         cards = catalog.cards_for(selected["id"])
-        source = {key: value for key, value in selected.items() if key != "content"}
-        source["code_id" if source["kind"] == "code" else "doc_id"] = source["id"]
-        source["source_id"] = source["id"]
-        source["source_commit"] = (source_commit(source_path(root, selected), selected["content"])
-                                   if selected["content"] is not None else None)
-        materials = safe_path(root, ".build/materials")
-        materials.mkdir()
-        gaps = []
-        if selected["content"] is not None:
-            suffix = Path(selected["path"]).suffix.lower()
-            original = materials / ("current" + suffix)
-            original.write_bytes(selected["content"])
-            source["original_ref"] = original.relative_to(root).as_posix()
-            try:
-                if selected["kind"] == "code":
-                    text = source_resources.extract_code_text(selected["content"], code_extractor(selected))[0]
-                    addresses, limitations = [], []
-                else:
-                    text, addresses, _, limitations = source_resources.extract_document(selected["content"], suffix)
-                (materials / "current.txt").write_text(text, encoding="utf-8")
-                source["text_ref"] = ".build/materials/current.txt"
-                if addresses:
-                    write_json(materials / "locators.json", {"locators": addresses})
-                gaps.extend(limitations)
-            except (ValueError, UnicodeError, ImportError, ContractError) as error:
-                gaps.append(str(error))
-        (root / ".build/cards").mkdir()
-        task = {"source": source, "affected_cards": [{"id": card["id"], "path": card["path"],
-                                                     "title": card["title"]} for card in cards],
-                "cards_dir": ".build/cards", "plan_ref": ".build/plan.md", "gaps": gaps}
-        write_json(root / ".build/task.json", task)
-        return {**task, "task_ref": ".build/task.json", "pending_at_least": len(pending)}, "prepared"
+    source = {key: value for key, value in selected.items() if key != "content"}
+    source["code_id" if source["kind"] == "code" else "doc_id"] = source["id"]
+    source["source_id"] = source["id"]
+    source["source_commit"] = (source_commit(source_path(root, selected), selected["content"])
+                               if selected["content"] is not None else None)
+    materials = safe_path(root, ".build/materials")
+    materials.mkdir()
+    gaps = []
+    if selected["content"] is not None:
+        suffix = Path(selected["path"]).suffix.lower()
+        original = materials / ("current" + suffix)
+        original.write_bytes(selected["content"])
+        source["original_ref"] = original.relative_to(root).as_posix()
+        try:
+            if selected["kind"] == "code":
+                text = source_resources.extract_code_text(selected["content"], code_extractor(selected))[0]
+                text_path = materials / ("code-text.txt" if suffix == ".txt" else "current.txt")
+                text_path.write_text(text, encoding="utf-8")
+                source["text_ref"] = text_path.relative_to(root).as_posix()
+            else:
+                parsed = document_parser.parse(root, source, selected["content"], ".build/materials/parsed",
+                                               options=request.get("parser"))
+                source["parsed"] = parsed
+                source["text_ref"] = parsed["text_ref"]
+                # Keep the old entry usable without changing the parser's
+                # manifest-owned files or its text/locator semantics.
+                if suffix != ".txt":
+                    (materials / "current.txt").write_bytes(safe_path(root, parsed["text_ref"]).read_bytes())
+                gaps.extend(item.get("message", str(item)) if isinstance(item, dict) else str(item)
+                            for item in parsed.get("gaps", []))
+        except (ValueError, UnicodeError, ImportError, ContractError) as error:
+            gaps.append(str(error))
+    (root / ".build/cards").mkdir()
+    task = {"source": source, "affected_cards": [{"id": card["id"], "path": card["path"],
+                                                 "title": card["title"]} for card in cards],
+            "cards_dir": ".build/cards", "plan_ref": ".build/plan.md", "gaps": gaps}
+    write_json(root / ".build/task.json", task)
+    return {**task, "task_ref": ".build/task.json", "pending_at_least": len(pending)}, "prepared"
 
 
 def _drafts(root, catalog, rules=None, *, concise_only=False):
@@ -317,15 +336,61 @@ def _deletes(root):
     return value
 
 
-def _reference_check(root, source, reference, staged=None, *, extractor=None):
-    path = source_path(root, source)
+def _parsed_document(root, source, data, context, *, options=None):
+    """Load the author's exact parse, or prepare a distinct secondary source once."""
+    identity, digest = source["source_id"], sha(data)
+    if identity == context.get("primary_id"):
+        if (identity, digest) in context["loaded"]:
+            return context["loaded"][(identity, digest)]
+        # A failed or removed P1 parse is a gap, not permission for P4 to
+        # silently give the reviewer different material from the author.
+        raise ContractError("SOURCE_PARSING_UNAVAILABLE", "P1 has no verified parse for this source", source["path"])
+    options_hash = sha(canonical_bytes(options or {}))
+    key = identity, digest, options_hash
+    if key in context["loaded"]:
+        return context["loaded"][key]
+    if context["formal"]:
+        from . import source_read
+
+        reading = source_read.create(root, source, data, options=options)
+        try:
+            loaded = document_parser.load(root, reading["parsed"], expected_source_id=identity,
+                                          expected_sha256=digest)
+        finally:
+            source_read.release(root, reading["read_id"])
+    else:
+        index_ref = ".build/materials/reference-parses.json"
+        index_path = document_parser.safe_path(root, index_ref, [".build/materials"])
+        index = read_json(index_path) if index_path.is_file() else {}
+        index_key = identity + ":" + digest + ":" + options_hash
+        parsed = index.get(index_key)
+        if parsed is None:
+            component = sha(identity.encode("utf-8"))[:20] + "-" + digest[:16] + "-" + options_hash[:16]
+            parsed = document_parser.parse(root, source, data,
+                                           f".build/materials/references/{component}", options=options)
+            index[index_key] = parsed
+            write_json(document_parser.safe_path(root, index_ref, [".build/materials"]), index)
+        loaded = document_parser.load(root, parsed, expected_source_id=identity, expected_sha256=digest)
+        descriptor_key = identity if identity not in context["descriptors"] else identity + ":" + parsed["profile_sha256"]
+        context["descriptors"][descriptor_key] = parsed
+    context["loaded"][key] = loaded
+    return loaded
+
+
+def _reference_check(root, source, reference, staged=None, *, extractor=None, context=None):
+    path = PurePosixPath(source["path"])
+    context = context if context is not None else {"formal": True, "loaded": {}, "legacy": {}, "data": {}, "descriptors": {}}
+    identity = source["source_id"]
     if staged is not None:
         data = staged
+    elif identity in context["data"]:
+        data = context["data"][identity]
     else:
         try:
-            data = path.read_bytes()
+            data = source_path(root, source).read_bytes()
         except FileNotFoundError:
             data, _ = old_source(root, source)
+        context["data"][identity] = data
     if source["kind"] == "code":
         text, _ = source_resources.extract_code_text(data, extractor or "code-utf8:1")
         symbol = reference.get("symbol")
@@ -345,25 +410,88 @@ def _reference_check(root, source, reference, staged=None, *, extractor=None):
             return result
         addresses = []
     else:
-        text, addresses, _, _ = source_resources.extract_document(data, path.suffix.lower())
-        # Native page/paragraph addresses belong to PDF/DOCX; text line and
-        # section references retain the ordinary checks below.
+        suffix = path.suffix.lower()
         locator = reference.get("locator")
-        if locator and locator.get("kind") not in {"lines", "section"}:
-            if path.suffix.lower() in {".pdf", ".docx"}:
-                source_resources.document_segments(addresses, locator, path.suffix.lower())
+        kind = (locator or {}).get("kind")
+        options = (locator or {}).get("parser") if kind == "element" else None
+        legacy = (suffix in {".md", ".txt"} or
+                  suffix in {".pdf", ".docx"} and
+                  ("line_start" in reference or reference.get("section") or
+                   kind in {"lines", "section", "paragraph", "paragraphs", "table_row"}))
+        if legacy:
+            key = identity, sha(data)
+            if key not in context["legacy"]:
+                context["legacy"][key] = source_resources.extract_document(data, suffix)
+            text, addresses, _, _ = context["legacy"][key]
+        else:
+            loaded = _parsed_document(root, source, data, context, options=options)
+            text, addresses = loaded["text"], []
+        if locator and kind not in {"lines", "section"}:
+            if kind in {"paragraph", "paragraphs", "table_row"}:
+                source_resources.document_segments(addresses, locator, suffix)
             else:
-                raise ContractError("INVALID_SOURCE_LOCATOR", "Text sources need line or section addresses", source["path"])
+                document_parser.select(_parsed_document(root, source, data, context, options=options), locator)
+        if "page_start" in reference and not legacy:
+            document_parser.select(loaded, {"kind": "pages", "start": reference["page_start"],
+                                             "end": reference["page_end"]})
+        if "line_start" in reference and suffix not in {".md", ".txt", ".pdf", ".docx"}:
+            raise ContractError("INVALID_SOURCE_LOCATOR", "Converted text lines are not native source addresses", source["path"])
     if "line_start" in reference:
         if not 1 <= reference["line_start"] <= reference["line_end"] <= len(text.splitlines()):
             raise ContractError("SOURCE_RANGE_INVALID", "Line range is outside its source", source["path"])
-    if "page_start" in reference:
+    if "page_start" in reference and (source["kind"] == "code" or legacy):
         pages = [item.get("page", 0) for item in addresses]
         if not pages or reference["page_end"] > max(pages):
             raise ContractError("SOURCE_RANGE_INVALID", "Page range is outside its source", source["path"])
     if reference.get("section") and reference["section"] not in text:
         raise ContractError("SOURCE_SECTION_MISSING", reference["section"], source["path"])
     return None
+
+
+def _snapshot_reference_check(root, source, reference, snapshot, registry, context):
+    """A real retained document snapshot must never be checked against newer bytes."""
+    frozen = context.setdefault("frozen", {})
+    snapshot_id = snapshot["snapshot_id"]
+    if snapshot_id not in frozen:
+        frozen[snapshot_id] = source_resources.recover_snapshot(root, snapshot)
+    data = frozen[snapshot_id]
+    locator = reference.get("locator")
+    if locator is None:
+        if "line_start" in reference:
+            locator = {"kind": "lines", "start": reference["line_start"], "end": reference["line_end"]}
+        elif "page_start" in reference:
+            locator = {"kind": "pages", "start": reference["page_start"], "end": reference["page_end"]}
+        else:
+            locator = {"kind": "section", "anchor": reference.get("section")}
+    evidence = {"evidence_ref": reference.get("evidence_ref", "document-reference"),
+                "source_id": source["source_id"], "snapshot_id": snapshot_id, "locator": locator}
+    source_resources.validate_source_ref(evidence, registry)
+    suffix = snapshot.get("format", PurePosixPath(source["path"]).suffix.lower())
+    if suffix in {".pdf", ".docx"} and locator.get("kind") in {"lines", "section"}:
+        # The historical binary adapter has native paragraph/page checks and
+        # a separate text view. Bind that text view before using old line or
+        # section semantics; Docling text cannot substitute for it.
+        key = source["source_id"], snapshot["sha256"]
+        if key not in context["legacy"]:
+            context["legacy"][key] = source_resources.extract_document(data, suffix)
+        text, addresses, extractor, _ = context["legacy"][key]
+        retained = snapshot.get("extraction") or {}
+        if extractor != retained.get("extractor"):
+            raise ContractError("SOURCE_ADAPTER_UNAVAILABLE", "Installed document adapter differs from the retained snapshot")
+        locator_hash = sha(canonical_bytes({"locators": addresses}))
+        if (sha(text.encode("utf-8")) != retained.get("text_sha256")
+                or locator_hash != retained.get("locator_sha256")
+                or snapshot.get("locator", {}).get("sha256", locator_hash) != locator_hash):
+            raise ContractError("SOURCE_EXTRACTION_UNAVAILABLE", "Retained document text or native locators differ")
+        text_reference = dict(reference)
+        if locator["kind"] == "lines":
+            text_reference["line_start"] = locator.get("start", locator.get("number"))
+            text_reference["line_end"] = locator.get("end", text_reference["line_start"])
+        elif not text_reference.get("section"):
+            text_reference["section"] = locator.get("section", locator.get("anchor", locator.get("id")))
+        _reference_check(root, source, text_reference, data, context=context)
+    else:
+        source_resources.validate_reference(evidence, registry, lambda _snapshot: data)
 
 
 def check(root, request, rules=None):
@@ -384,15 +512,23 @@ def check(root, request, rules=None):
             if overlap:
                 raise ContractError("WRITE_DELETE_CONFLICT", "A candidate cannot also be deleted", ", ".join(sorted(overlap)))
             staged_sources = {}
+            context = {"formal": bool(request.get("formal")), "loaded": {}, "legacy": {}, "data": {}, "descriptors": {}}
             task_path = safe_path(root, ".build/task.json")
             if not request.get("formal") and task_path.is_file():
                 task = read_json(task_path)
                 source = task["source"]
+                context["primary_id"] = source["source_id"]
                 if source.get("original_ref"):
                     staged_sources[source["source_id"]] = safe_path(
                         root, source["original_ref"], [".build/materials"]
                     ).read_bytes()
-        except (ValueError, ContractError, yaml.YAMLError) as error:
+                    if sha(staged_sources[source["source_id"]]) != source["hash"]:
+                        raise ContractError("SOURCE_CHANGED", "P1 source copy differs from its recorded hash")
+                if source.get("parsed"):
+                    loaded = document_parser.load(root, source["parsed"], expected_source_id=source["source_id"],
+                                                  expected_sha256=source["hash"])
+                    context["loaded"][(source["source_id"], source["hash"])] = loaded
+        except (ValueError, OSError, ContractError, yaml.YAMLError) as error:
             return {"findings": [{"code": getattr(error, "code", "INVALID_CARD"), "message": str(error)}]}, "failed"
         if planned is not None:
             actual = {card["id"]: card["path"] for card in drafts}
@@ -414,57 +550,65 @@ def check(root, request, rules=None):
             candidates[card["id"]] = card
         if len({card["id"] for card in drafts}) != len(drafts):
             findings.append({"code": "DUPLICATE_CARD_ID", "message": "Draft IDs repeat"})
+        source_lookup = {row["source_id"]: row for row in catalog.list_files()}
+        registry = catalog.registry
         snapshots = {row["snapshot_id"]: row for row in catalog.registry.get("snapshots", [])}
-        for card in drafts:
-            for kind in ("doc", "code"):
-                for reference in card[kind + "_ref"]:
-                    identity = reference[kind + "_id"]
-                    source = catalog.get_file(identity)
-                    try:
-                        if source is None:
-                            raise ContractError("UNKNOWN_SOURCE_ID", identity)
-                        if (source["kind"] == "code") != (kind == "code"):
-                            raise ContractError("SOURCE_KIND_MISMATCH", identity)
-                        snapshot = snapshots.get(reference.get("snapshot_id"), {})
-                        extractor = (code_extractor(source, snapshot if snapshot.get("source_id") == identity else None)
-                                     if kind == "code" else None)
-                        _reference_check(root, source, reference, staged_sources.get(identity), extractor=extractor)
-                    except (ValueError, OSError, ContractError, subprocess.TimeoutExpired) as error:
-                        findings.append({"code": getattr(error, "code", "SOURCE_UNAVAILABLE"),
-                                         "path": card["path"], "message": str(error)})
-        structures = {card["path"]: markdown_structure(card["raw"]) for card in candidates.values()}
-        # Check final relationships, including retained cards that link to a
-        # removed card. Their source material does not need to be re-read.
-        for card in candidates.values():
-            for relation in card["metadata"].get("relations", []):
-                if relation.get("target_card_id") not in candidates:
-                    findings.append({"code": "UNKNOWN_RELATED_CARD", "path": card["path"],
-                                     "message": str(relation.get("target_card_id"))})
-            for link in structures[card["path"]]["links"]:
-                target = link["target"]
-                if target is None:
-                    findings.append({"code": "UNKNOWN_LINK_LABEL", "path": card["path"], "message": link["label"]})
-                    continue
-                parsed = urlsplit(target)
-                if parsed.scheme or parsed.netloc:
-                    continue
-                related = ((PurePosixPath(card["path"]).parent / unquote(parsed.path)).as_posix()
-                           if parsed.path else card["path"])
-                normalized = Path(os.path.normpath(related)).as_posix()
-                if normalized.startswith("knowledge/") and normalized.endswith(".md"):
-                    # Navigation is a Markdown link target, not a knowledge
-                    # card. Resolve links from the final file overlay while
-                    # keeping card-ID relationships in the catalog.
-                    if normalized not in structures and normalized not in deletes:
-                        target_path = safe_path(root, normalized, ["knowledge"])
-                        if target_path.is_file():
-                            structures[normalized] = markdown_structure(target_path.read_bytes())
-                    if normalized not in structures or normalized in deletes:
-                        findings.append({"code": "BROKEN_CARD_LINK", "path": card["path"], "message": target})
-                    elif parsed.fragment and unquote(parsed.fragment) not in structures[normalized]["anchors"]:
-                        findings.append({"code": "BROKEN_CARD_ANCHOR", "path": card["path"], "message": target})
-        return {"findings": findings, "card_ids": [card["id"] for card in drafts],
-                "review_required": True}, "failed" if findings else "passed"
+    for card in drafts:
+        for kind in ("doc", "code"):
+            for reference in card[kind + "_ref"]:
+                identity = reference[kind + "_id"]
+                source = source_lookup.get(identity)
+                try:
+                    if source is None:
+                        raise ContractError("UNKNOWN_SOURCE_ID", identity)
+                    if (source["kind"] == "code") != (kind == "code"):
+                        raise ContractError("SOURCE_KIND_MISMATCH", identity)
+                    snapshot = snapshots.get(reference.get("snapshot_id"), {})
+                    if snapshot and snapshot.get("source_id") != identity:
+                        raise ContractError("SOURCE_SNAPSHOT_MISMATCH", "The retained snapshot belongs to another source")
+                    if kind == "doc" and snapshot.get("source_id") == identity:
+                        _snapshot_reference_check(root, source, reference, snapshot, registry, context)
+                        continue
+                    extractor = (code_extractor(source, snapshot if snapshot.get("source_id") == identity else None)
+                                 if kind == "code" else None)
+                    _reference_check(root, source, reference, staged_sources.get(identity), extractor=extractor, context=context)
+                except (ValueError, OSError, ContractError, subprocess.TimeoutExpired) as error:
+                    findings.append({"code": getattr(error, "code", "SOURCE_UNAVAILABLE"),
+                                     "path": card["path"], "message": str(error)})
+    structures = {card["path"]: markdown_structure(card["raw"]) for card in candidates.values()}
+    # Check final relationships, including retained cards that link to a
+    # removed card. Their source material does not need to be re-read.
+    for card in candidates.values():
+        for relation in card["metadata"].get("relations", []):
+            if relation.get("target_card_id") not in candidates:
+                findings.append({"code": "UNKNOWN_RELATED_CARD", "path": card["path"],
+                                 "message": str(relation.get("target_card_id"))})
+        for link in structures[card["path"]]["links"]:
+            target = link["target"]
+            if target is None:
+                findings.append({"code": "UNKNOWN_LINK_LABEL", "path": card["path"], "message": link["label"]})
+                continue
+            parsed = urlsplit(target)
+            if parsed.scheme or parsed.netloc:
+                continue
+            related = ((PurePosixPath(card["path"]).parent / unquote(parsed.path)).as_posix()
+                       if parsed.path else card["path"])
+            normalized = Path(os.path.normpath(related)).as_posix()
+            if normalized.startswith("knowledge/") and normalized.endswith(".md"):
+                # Navigation is a Markdown link target, not a knowledge
+                # card. Resolve links from the final file overlay while
+                # keeping card-ID relationships in the catalog.
+                if normalized not in structures and normalized not in deletes:
+                    target_path = safe_path(root, normalized, ["knowledge"])
+                    if target_path.is_file():
+                        structures[normalized] = markdown_structure(target_path.read_bytes())
+                if normalized not in structures or normalized in deletes:
+                    findings.append({"code": "BROKEN_CARD_LINK", "path": card["path"], "message": target})
+                elif parsed.fragment and unquote(parsed.fragment) not in structures[normalized]["anchors"]:
+                    findings.append({"code": "BROKEN_CARD_ANCHOR", "path": card["path"], "message": target})
+    return {"findings": findings, "card_ids": [card["id"] for card in drafts],
+            "parsed_sources": context["descriptors"],
+            "review_required": True}, "failed" if findings else "passed"
 
 
 def commit(root, request):

@@ -1,5 +1,6 @@
 """Public checks preserve legacy document addresses without rewriting old cards."""
 
+from base64 import b64decode
 from pathlib import Path
 import sys
 
@@ -10,6 +11,36 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "support"))
 from contracts import module, write_plan
+
+
+def test_encrypted_pdf_is_rejected_without_optional_crypto():
+    # Fixed AES-256 blank PDF generated once with pypdf; no crypto is needed to
+    # construct this fixture in the runtime under test.
+    data = b64decode(
+        b"JVBERi0xLjMKJeLjz9MKMSAwIG9iago8PAovUHJvZHVjZXIgPDQ3NDhjYjhiZGY2YWNlMDg0YTdkZmEy"
+        b"OGI1NTRmMTljYzAxY2JjNDRmMmVlZWI5Mzc4Y2U1ZTMzYzdhZDFkOWM+Cj4+CmVuZG9iagoyIDAgb2Jq"
+        b"Cjw8Ci9UeXBlIC9QYWdlcwovQ291bnQgMQovS2lkcyBbIDQgMCBSIF0KPj4KZW5kb2JqCjMgMCBvYmoK"
+        b"PDwKL1R5cGUgL0NhdGFsb2cKL1BhZ2VzIDIgMCBSCj4+CmVuZG9iago0IDAgb2JqCjw8Ci9UeXBlIC9Q"
+        b"YWdlCi9SZXNvdXJjZXMgPDwKPj4KL01lZGlhQm94IFsgMC4wIDAuMCAxMDAgMTAwIF0KL1BhcmVudCAy"
+        b"IDAgUgo+PgplbmRvYmoKNSAwIG9iago8PAovViA1Ci9SIDYKL0xlbmd0aCAyNTYKL1AgNDI5NDk2NzI5"
+        b"MgovRmlsdGVyIC9TdGFuZGFyZAovTyA8ZGI3OGU1ZjM1OWNmZWZhYjgyMGFkMzZkNTZiMTUyZGI0Y2My"
+        b"MWEwYTUyMTQ1ZTAxY2JhNDAwZjAwNjE0MGZiYmNkOTE5YzEzODhlZmYzYmRmNzRjYjc0YWM2OGMwMWU1"
+        b"PgovVSA8ZDA4OGZmOTdmNjhiZTcwZmJiYmVjOGQ5YTg1MmExNzIyZTYzOWI5OGNlOTMwYmI4ZTRlNWIw"
+        b"Nzk1OTQzMDI5N2ZmN2YyMGY5Yzk2YWU4MTY4NGQ1NDRmNWMyNmQ1ZmRkPgovQ0YgPDwKL1N0ZENGIDw8"
+        b"Ci9BdXRoRXZlbnQgL0RvY09wZW4KL0NGTSAvQUVTVjMKL0xlbmd0aCAzMgo+Pgo+PgovU3RtRiAvU3Rk"
+        b"Q0YKL1N0ckYgL1N0ZENGCi9PRSA8OWI4NjJjZjcwNmZiOGE2NzI4Y2EwYmQ5ODYzNTYyZWQyNjUzY2Ez"
+        b"ZDA3YzYxYjkxZjFlODhjNzBkOTc5MDQzNj4KL1VFIDxiNDZiM2VjNGY0ZWQ3NWRkNmIxZTZiZGU2MWE0"
+        b"NWZkZDg4MGM5YTJhZGMzNjQyZTBhMzU1ZDFiYzA5OTk0MGRjPgovUGVybXMgPDY1OGVhN2Q2M2UxYjgz"
+        b"MzAwODJlYTRjODJhMzhjYzc0Pgo+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAow"
+        b"MDAwMDAwMDE1IDAwMDAwIG4gCjAwMDAwMDAxMTMgMDAwMDAgbiAKMDAwMDAwMDE3MiAwMDAwMCBuIAow"
+        b"MDAwMDAwMjIxIDAwMDAwIG4gCjAwMDAwMDAzMTUgMDAwMDAgbiAKdHJhaWxlcgo8PAovU2l6ZSA2Ci9S"
+        b"b290IDMgMCBSCi9JbmZvIDEgMCBSCi9JRCBbIDwzMDM5MzUzMzMxNjY2MzM4NjEzNzMwMzE2MzM3MzA2"
+        b"MjM3NjMzNzMyMzMzMDMwMzYzODM1MzYzMjM2Mzg2NDYzPiA8MzAzOTM1MzMzMTY2NjMzODYxMzczMDMx"
+        b"NjMzNzMwNjIzNzYzMzczMjMzMzAzMDM2MzgzNTM2MzIzNjM4NjQ2Mz4gXQovRW5jcnlwdCA1IDAgUgo+"
+        b"PgpzdGFydHhyZWYKODcwCiUlRU9GCg=="
+    )
+    with pytest.raises(module("validation").ContractError, match="ENCRYPTED_DOCUMENT"):
+        module("source_resources").extract_document(data, ".pdf")
 
 
 @pytest.mark.parametrize("paragraph, expected", [(2, "passed"), (3, "failed")])

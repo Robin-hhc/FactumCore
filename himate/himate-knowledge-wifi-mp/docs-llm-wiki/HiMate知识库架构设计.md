@@ -81,6 +81,7 @@ Skill 源码位于项目的 `skills/common/knowledge/`，Workflow 模板位于 `
 ```text
 repo/
 ├── AGENTS.md / config.yml              项目入口与实际路径配置
+├── deploy.ps1 / deploy.sh              Windows / Linux 部署入口
 ├── skills/common/knowledge/            Skill 分发源码
 ├── workflows/common/knowledge/         Workflow 定义
 ├── tools/deploy/                       Skill 与 Workflow 模板安装工具及其测试
@@ -170,4 +171,4 @@ repo/
 
 不同群组分别管理知识根、可引用代码范围及执行环境，并通过实际存储权限和运行账户控制访问。原件、卡片、数据库、缓存和记录应处于一致的访问边界；标签与检索条件用于选择内容范围。
 
-日常配置、安装和命令示例见[使用说明](使用说明.md)，来源格式及适用条件原则见[知识库关键点](知识库关键点.md)。
+日常部署与 OpenFlow 操作见[使用说明](使用说明.md)，环境配置和手动命令见[运维与命令参考](运维与命令参考.md)，来源格式及适用条件原则见[知识库关键点](知识库关键点.md)。

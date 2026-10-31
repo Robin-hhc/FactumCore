@@ -159,8 +159,13 @@ def extract_document(data, suffix, *, primary=True):
         )
     if suffix == ".pdf":
         from pypdf import PdfReader, __version__
+        from pypdf.errors import DependencyError
 
-        reader = PdfReader(io.BytesIO(data))
+        try:
+            reader = PdfReader(io.BytesIO(data))
+        except DependencyError as error:
+            # AES verification can run inside PdfReader before is_encrypted.
+            raise ContractError("ENCRYPTED_DOCUMENT", "Encrypted PDF is unsupported") from error
         if reader.is_encrypted:
             raise ContractError("ENCRYPTED_DOCUMENT", "Encrypted PDF is unsupported")
         pages = [page.extract_text() or "" for page in reader.pages]

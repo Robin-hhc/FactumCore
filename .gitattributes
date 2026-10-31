@@ -1,5 +1,6 @@
 # Preserve verified hashes of domain rules and capability packages.
 # Line-ending normalization would invalidate the byte-pinned framework and snapshots.
+/deploy.sh text eol=lf
 /himate/himate-knowledge-wifi-mp/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
 /config.yml -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
 /AGENTS.md.example -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

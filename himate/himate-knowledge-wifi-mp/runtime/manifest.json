@@ -27,12 +27,12 @@
       "sha256": "47bfb4189c9dd570b44cd5993557d950c48b471dfd55360b540d9c2be7918867"
     },
     "requirements-ocr-cpu-py312.lock.txt": {
-      "sha256": "ddb92bd0b0d23944f94e25f246f8bdd21ae6167c4dd63e672ca113be14af174b"
+      "sha256": "eb56e428d8ff6998213b6a60980f8e1d5a786c38d3a86572b8ef05fd4a5a03df"
     },
     "requirements.lock.txt": {
-      "sha256": "70c9cbdfd907dcdab59a2db1451537a43d39ee6c70da193db5c33238fd78bc52"
+      "sha256": "d6fe311012be07996b8dfdc1edcfed71d10521851dbeed6f93bf751fd5301ac0"
     }
   },
   "schema_version": "1.0",
-  "version": "0.15.2"
+  "version": "0.15.3"
 }

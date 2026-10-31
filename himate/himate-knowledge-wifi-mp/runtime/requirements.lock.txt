@@ -1,14 +1,14 @@
 # Native document runtime: prepare once on the execution host.
 # Conditional exact pins preserve Python 3.10-3.12 and platform compatibility.
+# Docling roots: format-office,format-web,format-pdf,convert-core; docling-core.
+# Project roots: PyYAML,jsonschema,packaging,pypdf,tree-sitter and C/C++ grammars.
 annotated-doc==0.0.5
 annotated-types==0.8.0
 attrs==25.3.0
 beautifulsoup4==4.15.0
 certifi==2026.10.23
-cffi==2.0.0
 charset-normalizer==3.5.2
 colorama==0.4.6 ; sys_platform == 'win32'
-cryptography==50.0.2
 defusedxml==0.7.1
 doclang==0.8.1
 docling-core==2.105.0
@@ -36,7 +36,6 @@ pandas==3.1.0 ; python_full_version >= '3.11'
 pillow==12.3.0 ; python_full_version < '3.11'
 pillow==13.0.0 ; python_full_version >= '3.11'
 pluggy==1.7.0
-pycparser==2.23
 pydantic==2.13.5
 pydantic-core==2.46.5
 pydantic-settings==2.15.0 ; python_full_version < '3.11'

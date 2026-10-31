@@ -11,6 +11,7 @@ _spec = importlib.util.spec_from_file_location(
 _support = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_support)
 module = _support.module
+write_plan = _support.write_plan
 
 
 def test_public_check_resolves_a_new_gb18030_header_without_dropping_its_symbol(tmp_path):
@@ -41,6 +42,7 @@ def test_public_check_resolves_a_new_gb18030_header_without_dropping_its_symbol(
     candidate.write_text("---\n" + yaml.safe_dump(header, sort_keys=False)
                          + "---\n# Ready\n\nReturn the input value.\n", encoding="utf-8")
     original_draft = candidate.read_bytes()
+    write_plan(root, [("ready", "knowledge/ready.md")])
 
     checked, status = module("ingest").check(root, {})
 

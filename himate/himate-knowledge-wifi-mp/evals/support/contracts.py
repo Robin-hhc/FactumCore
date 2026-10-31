@@ -10,9 +10,21 @@ from pathlib import Path
 import shutil
 import sys
 
+import yaml
+
 
 KNOWLEDGE_ROOT = Path(__file__).resolve().parents[2]
 ROOT = KNOWLEDGE_ROOT.parents[1]
+
+
+def write_plan(root, cards, body="Keep the documented knowledge and its chosen location."):
+    """Write explicit author intent; callers supply expected IDs and final paths."""
+    path = Path(root) / ".build/plan.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("---\n" + yaml.safe_dump({"cards": [
+        {"id": identity, "path": relative} for identity, relative in cards
+    ]}, sort_keys=False) + "---\n" + body + "\n", encoding="utf-8")
+    return path
 
 
 def module(name):

@@ -17,7 +17,7 @@ import yaml
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "support"))
-from contracts import module
+from contracts import module, write_plan
 
 
 def digest(data):
@@ -119,6 +119,7 @@ def test_p5_uses_p1_hash_without_reading_the_changed_source_again(tmp_path, monk
     task = scan(root)
     p1_hash = task["source"]["hash"]
     draft(root, "waiting", [task["source"]["doc_id"]])
+    write_plan(root, [("waiting", "knowledge/waiting.md")])
     checked, status = module("ingest").check(root, {})
     assert status == "passed", checked
     original.write_text("# Waiting\n\nA newer version written after review.\n", encoding="utf-8")
@@ -146,8 +147,10 @@ def test_p5_does_not_repeat_the_p4_check(tmp_path, monkeypatch):
     put_doc(root)
     task = scan(root)
     draft(root, "waiting", [task["source"]["doc_id"]])
+    plan = write_plan(root, [("waiting", "knowledge/waiting.md")])
     checked, status = module("ingest").check(root, {})
     assert status == "passed", checked
+    plan.unlink()
 
     def forbidden(*args, **kwargs):
         raise AssertionError("P5 must not rerun P4 quality checks")
@@ -203,6 +206,7 @@ def test_failed_p5_can_retry_a_card_move_with_its_stable_id(tmp_path, monkeypatc
     extra = candidates / "z-extra.md"
     extra.write_bytes(card_bytes("extra", [source["id"]], body="Independent knowledge."))
     (root / ".build/changes.json").write_text(json.dumps({"delete": ["knowledge/old.md"]}))
+    write_plan(root, [("stable", "knowledge/a-new.md"), ("extra", "knowledge/z-extra.md")])
     checked, phase = ingest.check(root, {})
     assert phase == "passed", checked
     write, failures = ingest.atomic_write, []
@@ -245,7 +249,6 @@ def test_card_decisions_publish_complete_cards_and_reference_sets(tmp_path, deci
     if decision == "merge":
         formal(root, "duplicate", [primary["id"]], body="Repeated waiting knowledge.")
     task = scan(root, "docs-raw/design.md")
-    (root / ".build/plan.md").write_text(f"{decision}: preserve valid knowledge and all required references.\n")
     deletes = []
     if decision == "create":
         draft(root, "new", [primary["id"], other["id"]])
@@ -269,6 +272,8 @@ def test_card_decisions_publish_complete_cards_and_reference_sets(tmp_path, deci
         expected = {"old", "replacement"}
     if deletes:
         (root / ".build/changes.json").write_text(json.dumps({"delete": deletes}))
+    write_plan(root, [(identity, f"knowledge/{identity}.md") for identity in sorted(expected)],
+               body=f"{decision}: preserve valid knowledge and all required references.")
     checked, status = module("ingest").check(root, {})
     assert status == "passed", checked
     result, status = module("ingest").commit(root, {})
@@ -353,6 +358,7 @@ def test_code_patrol_detects_inserted_lines_and_check_requires_updated_location(
     assert task["source"]["kind"] == "code"
     draft(root, "waiting", [doc_id], code_refs=[{
         "code_id": code_id, "line_start": 1, "line_end": 3, "symbol": "wait_reply"}])
+    write_plan(root, [("waiting", "knowledge/waiting.md")])
     checked, status = module("ingest").check(root, {})
     assert status == "failed", checked
     draft(root, "waiting", [doc_id], code_refs=[{
@@ -372,6 +378,7 @@ def test_function_body_change_is_patrol_work_and_not_a_fixed_check_semantic_verd
     task = scan(root, code_id)
     draft(root, "waiting", [doc_id], body="The design requires a wait; implementation changed and needs reviewer judgement.",
           code_refs=[{"code_id": code_id, "line_start": 1, "line_end": 3, "symbol": "wait_reply"}])
+    write_plan(root, [("waiting", "knowledge/waiting.md")])
     checked, status = module("ingest").check(root, {})
     assert status == "passed", checked
     assert checked["review_required"] is True
@@ -388,6 +395,7 @@ def test_deleted_function_is_reported_by_fixed_check(tmp_path):
     scan(root, code_id)
     draft(root, "waiting", [doc_id], code_refs=[{
         "code_id": code_id, "line_start": 1, "line_end": 3, "symbol": "wait_reply"}])
+    write_plan(root, [("waiting", "knowledge/waiting.md")])
     checked, status = module("ingest").check(root, {})
     assert status == "failed", checked
     assert any(item["code"] == "CODE_SYMBOL_MISSING" for item in checked["findings"])
@@ -399,6 +407,7 @@ def test_p4_rejects_line_ranges_outside_a_document(tmp_path):
     task = scan(root)
     data = card_bytes("waiting", [task["source"]["doc_id"]]).replace(b"line_end: 3", b"line_end: 999")
     (root / ".build/cards/waiting.md").write_bytes(data)
+    write_plan(root, [("waiting", "knowledge/waiting.md")])
     checked, status = module("ingest").check(root, {})
     assert status == "failed", checked
     assert any(item["code"] == "SOURCE_RANGE_INVALID" for item in checked["findings"])

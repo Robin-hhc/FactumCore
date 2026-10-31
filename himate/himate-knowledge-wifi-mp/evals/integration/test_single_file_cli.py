@@ -81,6 +81,45 @@ def test_formal_check_reports_invalid_frontmatter_as_a_finding(knowledge):
     assert not (knowledge / ".build").exists()
 
 
+def test_public_p4_blocks_a_misplaced_card_and_p5_copies_the_corrected_path(knowledge):
+    (knowledge / "docs-raw/specs/a.md").write_text("# Reply\n\nWait for a reply.\n", encoding="utf-8")
+    status, scanned = invoke(knowledge, "ingest", "scan", "--source", "docs-raw/specs/a.md")
+    assert status == 0, scanned
+    identity = scanned["data"]["source"]["doc_id"]
+    (knowledge / ".build/plan.md").write_text(
+        "---\ncards:\n- id: waiting\n  path: knowledge/rules/waiting.md\n---\n"
+        "Keep this documented rule under rules.\n", encoding="utf-8")
+    misplaced = knowledge / ".build/cards/waiting.md"
+    misplaced.write_text(
+        "---\nid: waiting\ndoc_ref:\n- doc_id: " + identity
+        + "\n  line_start: 1\n  line_end: 3\ncode_ref: []\n---\n# Waiting\n\nWait for a reply.\n",
+        encoding="utf-8")
+    expected = misplaced.read_bytes()
+
+    status, report = invoke(knowledge, "ingest", "check")
+
+    assert status == 1, report
+    assert report["phase"] == "failed"
+    finding = next(item for item in report["data"]["findings"] if item["code"] == "PLAN_CARD_MISMATCH")
+    assert finding["card_id"] == "waiting"
+    assert finding["expected_path"] == "knowledge/rules/waiting.md"
+    assert finding["actual_path"] == "knowledge/waiting.md"
+    assert not (knowledge / "knowledge/waiting.md").exists()
+    assert not (knowledge / "knowledge/rules/waiting.md").exists()
+    corrected = misplaced.parent / "rules/waiting.md"
+    corrected.parent.mkdir()
+    misplaced.rename(corrected)
+    status, report = invoke(knowledge, "ingest", "check")
+    assert status == 0, report
+    assert report["phase"] == "passed"
+    status, report = invoke(knowledge, "ingest", "commit")
+    assert status == 0, report
+    assert report["phase"] == "completed"
+    assert (knowledge / "knowledge/rules/waiting.md").read_bytes() == expected
+    assert not (knowledge / "knowledge/waiting.md").exists()
+    assert not (knowledge / ".build").exists()
+
+
 @pytest.mark.parametrize("arguments,output", [
     (("search", "fresh"), ".build/task.json"),
     (("query", "fresh"), ".build/task.json"),

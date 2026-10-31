@@ -30,13 +30,13 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-change-plan
-  prompt: '使用 hs-knowledge-change-plan 以本轮 task 的来源为范围阅读全文和关联卡，完成六决策、新增主题查重及简短计划；不沿用前次问答主题作筛选。
+  prompt: '使用 hs-knowledge-change-plan 以本轮 task 的来源为范围阅读全文和关联卡，完成六决策、新增主题查重及简短计划；不沿用前次问答主题作筛选。plan.md 开头的 YAML frontmatter 用 cards 列出本轮完整候选的 id/path；更新保留原路径，新卡按现有类型导航选目录，无候选写 cards: []。
 
     content_planned 交 P3；必要依据不足则 deferred，说明缺口并保留未完成文件，不推进成功 hash。'
   exits:
   - id: content_planned
     label: 编辑计划已明确
-    condition: 本轮 plan.md 已明确卡动作、结论变化、条件、依据和保留部分。
+    condition: 本轮 plan.md 已列明候选 id/path，并明确卡动作、结论变化、条件、依据和保留部分。
     target: materialize_view
   - id: deferred
     label: 本文件暂缓
@@ -47,9 +47,9 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-view-materialize
-  prompt: '使用 hs-knowledge-view-materialize 按本轮计划和模板写完整候选卡；明确旧卡去向与必须移除的文件。
+  prompt: '使用 hs-knowledge-view-materialize 按本轮计划 cards 的既定 id/path 和模板写完整候选卡；将 knowledge/ 前缀替换为 .build/cards/，不重选目录或给卡头增加 path。明确旧卡去向与必须移除的文件。
 
-    ready 交 P4；发现实质决策问题回 P2，同轮更新计划，不另建冻结轮次。'
+    ready 交 P4；偏离计划的落位拼写在 P3 修正，计划决定需要改变才回 P2，同轮更新计划，不另建冻结轮次。'
   exits:
   - id: ready
     label: 完整候选稿已保存
@@ -64,9 +64,9 @@ nodes:
   type: skill
   owner: reviewer
   skill: hs-knowledge-review
-  prompt: '由独立 reviewer 使用 hs-knowledge-review，沿用已交接的 CLI 先运行 ingest check，再独立阅读来源，对照计划、旧卡与新稿；空候选也检查全文新主题。
+  prompt: '由独立 reviewer 使用 hs-knowledge-review，沿用已交接的 CLI 先运行 ingest check，由机器一一核对计划 cards 与候选 id/path，不另行推断路径类型；再独立阅读来源，对照计划、旧卡与新稿，空候选也检查全文新主题。
 
-    通过后交 P5；决策问题回 P2、成稿问题回 P3，新稿重新审阅。不替作者改稿。'
+    通过后交 P5；计划决定需改变回 P2、成稿或落位拼写问题回 P3，新稿重新审阅。不替作者改稿。'
   exits:
   - id: passed
     label: 检查与内容审阅通过
@@ -78,7 +78,7 @@ nodes:
     target: plan_change
   - id: needs_revision
     label: 修订稿件
-    condition: 决定可保留，但表达、格式、定位或组稿需要修订。
+    condition: 决定可保留，但表达、格式、定位、落位拼写或组稿需要修订。
     target: materialize_view
 - id: apply_view
   title: P5 入库并更新索引

@@ -13,7 +13,7 @@ import yaml
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "support"))
-from contracts import module
+from contracts import module, write_plan
 
 
 def root_at(path):
@@ -233,6 +233,7 @@ def test_p4_checks_the_p1_document_copy_when_the_external_file_changes(tmp_path,
     task, status = module("ingest").scan(root, {})
     assert status == "prepared"
     card(root, "waiting", task["source"]["doc_id"], "A valid requirement.", stage=True)
+    write_plan(root, [("waiting", "knowledge/waiting.md")])
     original.write_text(after_scan)
     checked, status = module("ingest").check(root, {})
     assert status == "passed", checked
@@ -246,6 +247,7 @@ def test_p4_cannot_accept_a_section_added_only_after_p1(tmp_path):
     metadata = {"id": "waiting", "doc_ref": [{"doc_id": task["source"]["doc_id"], "section": "LaterSection"}], "code_ref": []}
     target.write_text("---\n" + yaml.safe_dump(metadata) + "---\n# Waiting\n\nLater requirement.\n")
     original.write_text("# Design\n\nLaterSection now exists only in the outside file.\n")
+    write_plan(root, [("waiting", "knowledge/waiting.md")])
     checked, status = module("ingest").check(root, {})
     assert status == "failed", checked
     assert any(item["code"] == "SOURCE_SECTION_MISSING" for item in checked["findings"])
@@ -265,6 +267,7 @@ def test_new_reference_header_cannot_hide_another_claim_source(tmp_path):
                "source_refs": ["legacy-proof"], "context_ids": [], "verification_requirements": []}]
     card(root, "waiting", main["id"], "A claim whose declared evidence is the other document.",
          stage=True, sources=legacy_sources, claims=claims)
+    write_plan(root, [("waiting", "knowledge/waiting.md")])
     checked, status = module("ingest").check(root, {})
     assert status == "failed", checked
 
@@ -319,6 +322,7 @@ def test_legacy_struct_reference_retains_its_symbol_kind_in_public_check(tmp_pat
     assert status == "prepared"
     target = root / ".build/cards/packet.md"
     target.write_bytes(old_bytes)
+    write_plan(root, [("packet", "knowledge/packet.md")])
     checked, status = module("ingest").check(root, {})
     assert status == "passed", checked
     assert formal.read_bytes() == old_bytes

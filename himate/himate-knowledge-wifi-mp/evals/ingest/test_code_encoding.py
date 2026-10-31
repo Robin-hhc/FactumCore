@@ -12,7 +12,7 @@ import yaml
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "support"))
-from contracts import module
+from contracts import module, write_plan
 
 
 CODE = "int wait_reply(void) {\n    /* 等待回复 */\n    return 1;\n}\n"
@@ -83,6 +83,7 @@ def test_new_gb18030_source_is_readable_in_p1_and_checked_by_p4(library):
     candidate.write_text("---\n" + yaml.safe_dump(header, sort_keys=False)
                          + "---\n# Wait reply\n\nThe function returns one.\n", encoding="utf-8")
     draft_bytes = candidate.read_bytes()
+    write_plan(root, [("wait-reply", "knowledge/wait-reply.md")])
 
     checked, status = module("ingest").check(root, {})
 

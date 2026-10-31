@@ -11,7 +11,7 @@ import yaml
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "support"))
-from contracts import module
+from contracts import module, write_plan
 
 
 @pytest.fixture
@@ -49,6 +49,7 @@ def test_check_rejects_deletion_referenced_by_an_unchanged_card(library, body):
     put_card(library, "replacement", "doc-a", "Merged requirement.", stage=True)
     (library / ".build/changes.json").write_text(
         json.dumps({"delete": ["knowledge/a.md"]}), encoding="utf-8")
+    write_plan(library, [("replacement", "knowledge/replacement.md")])
 
     result, status = module("ingest").check(library, {})
 
@@ -65,6 +66,7 @@ def test_check_rejects_writing_and_deleting_the_same_card(library):
     candidate = put_card(library, "a", "doc-a", "Updated requirement.", stage=True)
     (library / ".build/changes.json").write_text(
         json.dumps({"delete": ["knowledge/a.md"]}), encoding="utf-8")
+    write_plan(library, [("a", "knowledge/a.md")])
 
     result, status = module("ingest").check(library, {})
 
@@ -80,6 +82,7 @@ def test_check_rejects_replaced_identity_referenced_by_an_unchanged_card(library
              relations=[{"type": "requires", "target_card_id": "a", "context_ids": []}])
     candidate = put_card(library, "c", "doc-a", "Replacement requirement.", stage=True)
     candidate.rename(candidate.with_name("a.md"))
+    write_plan(library, [("c", "knowledge/a.md")])
 
     result, status = module("ingest").check(library, {})
 
@@ -98,6 +101,7 @@ def test_check_resolves_navigation_links_without_indexing_navigation(library, ta
         "# Navigation\n\nThis hand-maintained page is not a knowledge card.\n", encoding="utf-8")
     put_card(library, "b", "doc-b", "An existing requirement.")
     put_card(library, "a", "doc-a", f"See [navigation]({target}).", stage=True)
+    write_plan(library, [("a", "knowledge/a.md")])
 
     result, actual_status = module("ingest").check(library, {})
 

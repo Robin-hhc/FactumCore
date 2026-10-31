@@ -13,7 +13,7 @@ import yaml
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "support"))
-from contracts import module
+from contracts import module, write_plan
 
 
 def library_at(root):
@@ -124,7 +124,7 @@ def test_query_leaves_ingest_workspace_unchanged_and_candidates_private(tmp_path
     _, phase = module("ingest").scan(root, {})
     assert phase == "prepared"
     write_card(root, source, "newtoken is an unreviewed candidate.", stage=True)
-    (root / ".build/plan.md").write_text("The current source controls this task.\n", encoding="utf-8")
+    write_plan(root, [("rule", "knowledge/rule.md")], body="The current source controls this task.")
 
     def snapshot():
         return {path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()

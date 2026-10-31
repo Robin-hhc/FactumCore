@@ -9,7 +9,7 @@ import yaml
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "support"))
-from contracts import module
+from contracts import module, write_plan
 
 
 @pytest.mark.parametrize("paragraph, expected", [(2, "passed"), (3, "failed")])
@@ -47,6 +47,7 @@ def test_legacy_docx_paragraph_is_checked_against_native_document(tmp_path, para
     assert status == "prepared", task
     draft = root / ".build/cards/requirement.md"
     draft.write_bytes(old_bytes)
+    write_plan(root, [("requirement", "knowledge/requirement.md")])
 
     checked, status = module("ingest").check(root, {})
 

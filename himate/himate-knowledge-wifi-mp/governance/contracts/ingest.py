@@ -19,7 +19,7 @@ import yaml
 
 from .catalog import Catalog, atomic_write
 from .cards_v3 import parse_card
-from .validation import ContractError, load_yaml, markdown_structure, safe_path
+from .validation import ContractError, load_yaml, markdown_structure, safe_path, validate_id
 from . import source_resources, workspace_config
 
 
@@ -277,6 +277,34 @@ def _drafts(root, catalog, rules=None):
             for path in sorted(directory.rglob("*.md"))] if directory.exists() else []
 
 
+def _planned_cards(root):
+    """Read P2's target list; prose remains the author's editable plan."""
+    path = safe_path(root, ".build/plan.md")
+    if not path.is_file():
+        raise ContractError("PLAN_REQUIRED", "P2 must write plan.md with a cards target list", ".build/plan.md")
+    try:
+        match = re.match(r"\A---\r?\n(.*?)\r?\n---(?:\r?\n|$)", path.read_text(encoding="utf-8-sig"), re.S)
+        metadata = load_yaml(match.group(1)) if match else None
+        if not isinstance(metadata, dict) or not isinstance(metadata.get("cards"), list):
+            raise ValueError("Expected YAML frontmatter with cards: [{id, path}], or cards: []")
+        targets, paths = {}, set()
+        for item in metadata["cards"]:
+            if not isinstance(item, dict):
+                raise ValueError("Each planned card needs id and path")
+            identity = validate_id(item.get("id"))
+            reference = item.get("path")
+            safe_path(root, reference, ["knowledge"])
+            if not reference.endswith(".md"):
+                raise ValueError("Planned paths must name knowledge Markdown files")
+            if identity in targets or reference.casefold() in paths:
+                raise ValueError("Planned card IDs and paths must be unique")
+            targets[identity] = reference
+            paths.add(reference.casefold())
+        return targets
+    except (OSError, UnicodeError, ValueError, yaml.YAMLError) as error:
+        raise ContractError("INVALID_PLAN", str(error), ".build/plan.md") from error
+
+
 def _deletes(root):
     path = safe_path(root, ".build/changes.json")
     value = read_json(path).get("delete", []) if path.exists() else []
@@ -336,6 +364,7 @@ def check(root, request, rules=None):
     """Fixed checks only; the independent reviewer judges actual knowledge."""
     findings = []
     try:
+        planned = None if request.get("formal") else _planned_cards(root)
         catalog = Catalog(root)
     except (ValueError, ContractError, yaml.YAMLError) as error:
         return {"findings": [{"code": getattr(error, "code", "INVALID_CARD"),
@@ -358,6 +387,17 @@ def check(root, request, rules=None):
                     ).read_bytes()
         except (ValueError, ContractError, yaml.YAMLError) as error:
             return {"findings": [{"code": getattr(error, "code", "INVALID_CARD"), "message": str(error)}]}, "failed"
+        if planned is not None:
+            actual = {card["id"]: card["path"] for card in drafts}
+            for identity in sorted(planned.keys() | actual.keys()):
+                expected_path, actual_path = planned.get(identity), actual.get(identity)
+                if expected_path != actual_path:
+                    findings.append({"code": "PLAN_CARD_MISMATCH", "card_id": identity,
+                                     "path": actual_path or expected_path,
+                                     "expected_path": expected_path, "actual_path": actual_path,
+                                     "message": "Expected " + (expected_path or "<not planned>")
+                                                + "; found " + (actual_path or "<missing candidate>")
+                                                + ". Fix the candidate in P3; revise P2 only if the target changes."})
         replaced = deletes | {card["path"] for card in drafts}
         candidates = {card["id"]: card for card in catalog.all_cards() if card["path"] not in replaced}
         for card in drafts:

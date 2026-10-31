@@ -6,4 +6,4 @@ L2 的 patrol plan 不创建暂存，返回真实 next_file.source_id；P1 用�
 
 仅索引问题进入 L3；无待办进入 L4。L4 统计剩余事项，不另建全库水位。同步仅执行配置的 argv/cwd；内部 MM 只适配同步，子仓历史使用原生 Git。
 
-没有嵌套 Workflow，也不并发运行另一个 ingest。详细流程见领域[详细设计](../../../../himate/himate-knowledge-wifi-mp/docs-llm-wiki/知识库详细设计.md#31-lint-的检查流程)。
+没有嵌套 Workflow，也不并发运行另一个 ingest。详细流程见领域[详细设计](../../docs-llm-wiki/知识库详细设计.md#31-lint-的检查流程)。

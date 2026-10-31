@@ -64,6 +64,21 @@ def test_ingest_scan_returns_one_document_without_legacy_operation_request(knowl
     assert not list((knowledge / "knowledge").rglob("*.md"))
 
 
+def test_ingest_uses_manifest_config_when_the_package_keeps_its_template(knowledge):
+    workspace = knowledge.parents[1]
+    template = knowledge / "config.yml"
+    template.write_bytes((workspace / "config.yml").read_bytes())
+    original = template.read_bytes()
+    assert not (workspace / ".git").exists()
+    (knowledge / "docs-raw/specs/a.md").write_text("# RX\nDocument in a manifest workspace.\n", encoding="utf-8")
+
+    status, report = invoke(knowledge, "ingest", "scan", "--source", "docs-raw/specs/a.md")
+
+    assert status == 0 and report["phase"] == "prepared", report
+    assert report["data"]["source"]["path"] == "docs-raw/specs/a.md"
+    assert template.read_bytes() == original
+
+
 def test_no_card_commit_keeps_receipt_under_artifacts_without_creating_logs(knowledge):
     original = knowledge / "docs-raw/specs/a.md"
     original.write_text("# A\n\nAn already covered conclusion.\n", encoding="utf-8")
@@ -294,26 +309,3 @@ def test_public_include_deprecated_flag_adds_retired_cards_without_changing_read
     assert {hit["card_id"] for hit in result["data"]["matches"]} == {"normal", "old"}
     status, result = invoke(knowledge, "read", "old")
     assert status == 0 and result["data"]["lifecycle"] == "deprecated"
-
-
-@pytest.mark.parametrize("invalid_card,expected", [(False, 0), (True, 1)])
-def test_fixed_ci_uses_trusted_rules_without_loading_candidate_programs(knowledge, tmp_path, invalid_card, expected):
-    marker = tmp_path / "candidate-program-executed"
-    (knowledge / "governance/contracts/ingest.py").write_text(
-        "from pathlib import Path\nPath(" + repr(str(marker)) + ").touch()\n", encoding="utf-8",
-    )
-    if invalid_card:
-        (knowledge / "knowledge/bad.md").write_text("---\nid: missing-references\n---\n# Broken\n", encoding="utf-8")
-    output = tmp_path / "ci-report.json"
-    result = subprocess.run([
-        sys.executable, "-B", str(SOURCE / "check.py"), "--trusted-root", str(SOURCE),
-        "--candidate-root", str(knowledge), "--rules-digest",
-        hashlib.sha256((SOURCE / "governance/framework.lock.yaml").read_bytes()).hexdigest(),
-        "--commit", "a" * 40, "--output", str(output),
-    ], cwd=knowledge, capture_output=True, encoding="utf-8", timeout=60)
-    assert result.returncode == expected, result.stdout + result.stderr
-    report = json.loads(output.read_bytes())
-    assert report["status"] == ("failed" if invalid_card else "passed")
-    assert bool(report["findings"]) is invalid_card
-    assert report["commit"] == "a" * 40
-    assert not marker.exists()

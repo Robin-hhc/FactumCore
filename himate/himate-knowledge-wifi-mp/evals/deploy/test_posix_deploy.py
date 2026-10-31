@@ -10,7 +10,7 @@ import pytest
 
 
 pytestmark = pytest.mark.skipif(os.name != "posix", reason="POSIX wrapper targets Linux")
-WRAPPER = Path(__file__).resolve().parents[4] / "deploy.sh"
+WRAPPER = Path(__file__).resolve().parents[2] / "deploy.sh"
 
 
 def recorder(path):
@@ -39,6 +39,7 @@ def test_posix_selects_python_and_forwards_paths_from_another_directory(tmp_path
     environment.pop("HIMATE_KNOWLEDGE_PYTHON", None)
     arguments = ["--source-root", str(tmp_path / "source root"),
                  "--skills-root", str(tmp_path / "skills root"),
+                 "--cac-skills-root", str(tmp_path / "cac skill root"),
                  "--workflows-root", str(tmp_path / "workflow root")]
     if selection == "environment":
         environment["HIMATE_KNOWLEDGE_PYTHON"] = str(selected)

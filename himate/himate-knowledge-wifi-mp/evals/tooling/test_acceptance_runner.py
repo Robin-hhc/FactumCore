@@ -14,13 +14,13 @@ import pytest
 EVALS = Path(__file__).resolve().parents[1]
 
 
-def test_development_layout_anchors_the_knowledge_root_and_repository():
+def test_development_layout_anchors_the_package_and_manifest_roots():
     from support.contracts import KNOWLEDGE_ROOT, ROOT
     assert KNOWLEDGE_ROOT == EVALS.parent
     assert ROOT == KNOWLEDGE_ROOT.parents[1]
     assert KNOWLEDGE_ROOT.relative_to(ROOT).as_posix() == "himate/himate-knowledge-wifi-mp"
-    assert (ROOT / "deploy.ps1").is_file()
-    assert (ROOT / "skills/common/knowledge/hs-knowledge-source/SKILL.md").is_file()
+    assert (KNOWLEDGE_ROOT / "deploy.ps1").is_file()
+    assert (KNOWLEDGE_ROOT / "skills/hs-knowledge-source/SKILL.md").is_file()
 
 
 @pytest.mark.parametrize("relative", [

@@ -1,0 +1,13 @@
+schema_version: '2.0'
+workspace_id: himate-wifi-v1
+knowledge_roots:
+  wifi: himate/himate-knowledge-wifi-mp
+code_root: main
+modules:
+- path: hi1102_device
+- path: hi1105_host
+query:
+  default_channel: local
+  allowed_channels:
+  - local
+  - shared

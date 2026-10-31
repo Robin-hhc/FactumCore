@@ -199,6 +199,21 @@ def test_doctor_chooses_one_exact_nested_mapping_over_unrelated_nearer_config(kn
     assert report["data"]["config_path"] == str(config)
 
 
+def test_doctor_ignores_packaged_config_template_in_a_non_git_manifest(knowledge):
+    root, config = nested_knowledge(knowledge)
+    template = root / "config.yml"
+    template.write_bytes(config.read_bytes())
+    original = template.read_bytes()
+    assert not (root.parents[1] / ".git").exists()
+    assert not (root / ".git").exists()
+
+    status, report = observe(root)
+
+    assert status == 0, report
+    assert report["data"]["config_path"] == str(config)
+    assert template.read_bytes() == original
+
+
 @pytest.mark.parametrize("state,doctor_code", [
     ("ambiguous", "CONFIG_AMBIGUOUS"),
     ("invalid", "CONFIG_INVALID"),

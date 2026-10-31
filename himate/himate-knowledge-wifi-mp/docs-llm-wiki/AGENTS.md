@@ -1,6 +1,6 @@
 # HiMate 文档维护路由
 
-本目录面向知识库使用者，描述当前原理、职责和操作。正式知识在 `../knowledge/`。共享示例用 `repo/` 表示项目根，知识根由实际 `config.yml` 选择。
+本目录面向知识库使用者，描述当前原理、职责和操作。正式知识在 `../knowledge/`，Skill 与 Workflow 源码分别在 `../skills/`、`../workflows/`。共享示例用 `repo/` 表示 manifest 工作区根，知识根由项目根实际 `config.yml` 选择；manifest 根不要求自身为 Git 仓。
 
 | 任务 | 先读 |
 |---|---|

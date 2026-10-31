@@ -86,13 +86,12 @@ def load(path):
 def validate(root):
     root = Path(root).resolve(strict=True)
     errors = []
-    knowledge_root = root / "himate/himate-knowledge-wifi-mp"
     for ref in ("knowledge.py", "knowledge.sh", "knowledge.cmd", "runtime/manifest.json",
                 "runtime/requirements.lock.txt", "runtime/himate_knowledge/__init__.py",
                 "runtime/himate_knowledge/cli.py"):
-        if not (knowledge_root / ref).is_file():
+        if not (root / ref).is_file():
             errors.append(f"repository runtime: missing {ref}")
-    package_root = root / "skills/common/knowledge"
+    package_root = root / "skills"
     # A leftover historical directory is not an installed Skill. A package with
     # SKILL.md is active and must belong to the exact final public capability set.
     active_skills = {path.name for path in package_root.glob("*")
@@ -125,7 +124,7 @@ def validate(root):
             errors.append(f"{skill}: {exc}")
     for identity, expected in EDGES.items():
         try:
-            package = root / "workflows/common/knowledge" / identity
+            package = root / "workflows" / identity
             doc = load(package / "workflow.yaml")
             entry_node, entry_skill = WORKFLOW_ENTRIES[identity]
             if (
@@ -206,7 +205,8 @@ def validate(root):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--source-root", type=Path, default=Path(__file__).resolve().parents[3]
+        "--source-root", type=Path, default=Path(__file__).resolve().parents[1],
+        help="Knowledge package containing runtime, skills and workflows",
     )
     args = parser.parse_args()
     errors = validate(args.source_root)

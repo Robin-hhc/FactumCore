@@ -1,6 +1,6 @@
 # HiMate 设计与使用入口
 
-日常从[使用说明](使用说明.md)选择能力。文档用 `repo/` 示意项目根；知识根按项目根 `config.yml` 解析，默认 `repo/himate/himate-knowledge-wifi-mp/`。
+日常从[使用说明](使用说明.md)选择能力。文档用 `repo/` 示意 manifest 工作区根，不要求它自身是 Git 仓；知识根按项目根 `config.yml` 解析，默认 `repo/himate/himate-knowledge-wifi-mp/`。部署入口、Skill、Workflow 和工具均位于知识根内。
 
 | 文档 | 唯一职责 |
 |---|---|

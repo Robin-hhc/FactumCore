@@ -66,7 +66,9 @@ flowchart LR
 
 ### 5.1 路径基准
 
-`repo/` 表示项目根，项目入口为 `AGENTS.md` 和 `config.yml`。`knowledge_roots` 和 `code_root` 相对配置目录，分别选择知识根和代码根；`modules[].path` 相对 `code_root`，描述允许引用的实际模块。`himate/` 是多个领域知识根的容器。
+`repo/` 表示 manifest 工作区根，项目入口为 `AGENTS.md` 和 `config.yml`；该根不要求自身是 Git 仓，代码工作区可包含多个实际仓。`knowledge_roots` 和 `code_root` 相对项目配置目录，分别选择知识根和代码根；`modules[].path` 相对 `code_root`，描述允许引用的实际模块。`himate/` 是多个领域知识根的容器。
+
+知识根内的 `config.yml` 和 `AGENTS-code-root.md` 是部署源模板，分别复制为 `repo/config.yml` 和 `repo/AGENTS.md`。部署目标由知识包根的 `../..` 确定，不通过 Git 查找；运行时按项目配置的准确映射选择知识根。
 
 登记代码时，未填写 `repo_id` 的 `path` 相对项目配置目录；填写 `repo_id` 时，相对对应的已配置代码仓。文档路径相对知识根，位于 `docs-raw/`。路径参数详见[来源规范](../governance/specs/sources.md)。
 
@@ -74,19 +76,26 @@ flowchart LR
 
 命令在数据所在执行端的原生目录运行。执行端取得仓库代码、选用已有 Python 3.10—3.12，并配置实际项目和知识根。远端任务由宿主已有 SSH 能力调用同一仓内 CLI。
 
-Skill 源码位于项目的 `skills/common/knowledge/`，Workflow 模板位于 `workflows/common/knowledge/`。部署脚本先收集本次包并校验目标路径，再依次执行：向选定 Python 安装一次锁定运行依赖、删除全部本次同名包目录、复制全部新包。pip 失败时保留旧包；同名包完整替换，源码与目标根其他包保留，宿主加载运行。脚本不下载 Python、不创建虚拟环境；仓库代码通过项目自身的代码获取和更新方式维护。
+部署入口、分发源码与工具均位于知识根：`deploy.ps1`、`deploy.sh`、`skills/`、`workflows/` 和 `tools/`。Windows 与 Linux 入口共用 Python 后端，交互展示两个 Skill 安装目录和一个 Workflow 模板目录，回车采用默认值，也可输入自定义路径。
+
+默认将 Skill 同时安装到 `~/.openflow/config/skills` 和 `~/.cac/skills`，将 Workflow 安装到 `~/.openflow/config/workflow-templates`。执行前还收集已有项目入口的覆盖选择，默认 `y`，输入 `n` 保留。确认后依次安装锁定依赖、删除全部本次同名包目录、复制全部新包，再按选择将两个源模板复制到 manifest 根；pip 失败不动旧包或入口，其他包与源文件保留。脚本不下载 Python、不创建虚拟环境、不配置远端 SSH 或注册宿主。
 
 ### 5.3 HiMate Knowledge目录架构
 
 ```text
 repo/
 ├── AGENTS.md / config.yml              项目入口与实际路径配置
-├── deploy.ps1 / deploy.sh              Windows / Linux 部署入口
-├── skills/common/knowledge/            Skill 分发源码
-├── workflows/common/knowledge/         Workflow 定义
-├── tools/deploy/                       Skill 与 Workflow 模板安装实现与说明
+├── main/                              实际代码工作区，可含多个 Git 仓
 └── himate/
     └── himate-knowledge-wifi-mp/        领域知识根
+        ├── AGENTS.md                  知识根规则
+        ├── AGENTS-code-root.md / config.yml  项目入口源模板
+        ├── deploy.ps1 / deploy.sh      Windows / Linux 部署入口
+        ├── skills/                    Skill 分发源码
+        ├── workflows/                 Workflow 模板
+        ├── tools/
+        │   ├── deploy/                共用部署实现与说明
+        │   └── knowledge/             开发工具
         ├── knowledge.py / knowledge.cmd / knowledge.sh
         ├── runtime/                   CLI、运行包和运行依赖锁
         ├── governance/
@@ -148,7 +157,8 @@ repo/
 |---|---|
 | `knowledge/`、`docs-raw/` | 保留正式卡、导航、原件及本机来源映射；由业务变更和入库流程维护 |
 | `governance/sources.lock.yaml` | 保留来源身份与成功处理事实，不能用发行包中的空登记覆盖 |
-| 项目 `AGENTS.md`、`config.yml` | 保留已有项目约定和实际路径，新增配置按需合并 |
+| 项目 `AGENTS.md`、`config.yml` | 部署时分别询问覆盖，默认 `y`；输入 `n` 保留现有文件，内容按实际项目维护 |
+| 知识根的 `AGENTS-code-root.md`、`config.yml` | 项目入口源模板，部署后仍保留在知识根 |
 | `runtime/`、仓内启动器与检查入口 | 按同一发行版本替换程序文件，运行环境独立维护 |
 | `governance/` 中算法、Schema、模板、规则及 `framework.lock.yaml` | 按同一版本更新并保持摘要一致；项目定制规则按需合并，不能整目录删除 |
 | `docs-llm-wiki/`、`evals/` | 更新随版本发布的文件，保留本地 SDD、任务和历史工件 |

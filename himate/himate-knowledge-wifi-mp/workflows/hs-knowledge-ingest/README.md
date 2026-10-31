@@ -12,4 +12,4 @@
 
 P4 是独立 reviewer，其余为 coder。普通更新保留原生命周期，局部过时不整卡退役。暂缓不推进文件成功版本。P5 使用已审结果，不复检；失败保留暂存直接重试，重新执行 P1 会清理本轮暂存，因此重试时不回 P1。Git 提交和推送另行授权。
 
-实际节点和转移由 workflow.yaml 维护；layouts.yaml 只维护画布。操作细节由各 Skill 提供，设计见领域[详细设计](../../../../himate/himate-knowledge-wifi-mp/docs-llm-wiki/知识库详细设计.md)。
+实际节点和转移由 workflow.yaml 维护；layouts.yaml 只维护画布。操作细节由各 Skill 提供，设计见领域[详细设计](../../docs-llm-wiki/知识库详细设计.md)。

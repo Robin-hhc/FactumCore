@@ -22,6 +22,8 @@ knowledge read CARD_ID --json
 
 需要解析 PDF/Office/图片时，用 `source extract --input FILE.json --json` 生成独立阅读材料，大 PDF 优先指定所需页范围；实际打开相关图片并结合 OCR/结构判断。结果的 `read_id` 仅属于本次阅读，较长阅读可 `source renew`，消费结束必须 `source release`；不要用 ingest scan 回源或清理整个 artifacts。外部图片链接、缺模型及未解析范围保留为缺口。
 
+PDF 矢量图可能没有独立图片文件。显式指定物理页范围可得到 `role: page_preview` 的页面视图，单次最多 8 页，并受像素和字节预算约束；按缺口缩小范围继续读。预览不是原内嵌图、OCR 结果或已理解证明，必须实际打开。
+
 空命中时检查关键词、显式标签、退役状态、截断和诊断，再有依据地调整检索。旧 draft 可按 ID 阅读，不自动升为正式可搜状态。运行失败不能当作有效空结果。
 
 使用本次命令返回值及 `report_ref`；每次搜索报告独立保存在 `artifacts/query/`。查询不读写入库 `.build`，不入库、不初始化代码图谱。显式保存输出也使用 `artifacts/query/`。

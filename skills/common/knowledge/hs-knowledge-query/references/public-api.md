@@ -33,6 +33,8 @@
 
 当前已登记文档可用 `knowledge source extract --input FILE.json --json`。请求示例为 `{"source_id":"doc-example","page_start":10,"page_end":15}`，页范围在实际转换时生效；不需要范围时省略两项。`parser` 可提供明确的本地解析选项，native 不做 OCR，standard 需要预置模型。返回 `read_id`、`expires_at`、原件副本及 `parsed` 阅读稿/JSON/图片入口，目录独立于入库 `.build` 和搜索报告；解析不推进入库成功标记。
 
+PDF 显式页范围同时生成页面预览，从 `parsed.images` 中的 `role: page_preview` 及 Markdown 获取入口。固定 1.5 倍，每次最多 8 页、累计 1600 万像素和 16 MiB PNG，超限或失败报告实际未生成页；页面预览也计入总产物配额。原图缺口不会因生成预览而被抹掉。未指定范围不默认渲染整页；页段 `element` 绑定范围，不能作为全量解析元素重用，正式 PDF 引用采用物理页定位。
+
 消费后以 `{"read_id":"本次返回的ID"}` 调用 `knowledge source release --input FILE.json --json`，只释放该阅读目录；仍需继续时用 `source renew`。ready 租约默认 1800 秒，到期入口失效；`source cleanup --json` 只回收过期且没有活跃转换的来源阅读产物。不要猜 ID、不批量删除 artifacts，也不要把临时图像路径写成正式卡唯一依据。图片需通过宿主实际图片工具读取，Markdown 链接本身不证明 Agent 已看图。
 
 空命中先核关键词、显式标签、退役状态、截断和诊断。运行错误保持错误，不能当零命中。需重新入库或索引维护时使用相应入口。

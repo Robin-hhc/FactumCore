@@ -30,6 +30,23 @@ def two_frame_tiff_bytes():
     return stream.getvalue()
 
 
+def vector_pdf_bytes(pages=2, size=None):
+    from pypdf import PdfReader, PdfWriter
+    from pypdf.generic import DecodedStreamObject, NameObject, RectangleObject
+    original = PdfReader(BytesIO(document_bytes(".pdf")))
+    writer = PdfWriter()
+    for index in range(pages):
+        page = writer.add_page(original.pages[index % 2])
+        if size is not None:
+            page.mediabox = RectangleObject([0, 0, *size])
+        content = DecodedStreamObject()
+        content.set_data(page.get_contents().get_data() + b"\n0 0 1 RG 3 w 20 20 m 70 130 180 30 260 140 c S\n")
+        page[NameObject("/Contents")] = writer._add_object(content)
+    stream = BytesIO()
+    writer.write(stream)
+    return stream.getvalue()
+
+
 def document_bytes(suffix, *, pictures=False):
     stream = BytesIO()
     if suffix in {".md", ".txt"}:
@@ -166,6 +183,103 @@ def test_page_range_and_element_locations_use_original_identity(tmp_path):
     with pytest.raises(ContractError, match="INVALID_SOURCE_LOCATOR"):
         parser.select(loaded, {**element, "profile_sha256": "0" * 64})
     assert descriptor["source_sha256"] == element["source_sha256"]
+
+
+def test_scoped_vector_pdf_has_a_bounded_physical_page_preview(tmp_path):
+    descriptor, loaded = parse_bytes(tmp_path, ".pdf", data=vector_pdf_bytes(), page_range=(2, 2))
+    previews = [image for image in descriptor["images"] if image["role"] == "page_preview"]
+    assert len(previews) == 1
+    assert previews[0]["locator"] == {"kind": "page", "page": 2}
+    assert previews[0]["element_ref"] is None
+    from PIL import Image
+    with Image.open(tmp_path / previews[0]["ref"]) as image:
+        assert image.size == (450, 270)
+        pixels = image.convert("RGB").tobytes()
+        assert any(pixels[n] < 50 and pixels[n + 1] < 50 and pixels[n + 2] > 200
+                   for n in range(0, len(pixels), 3)), "The source's blue vector curve is missing"
+    preview = loaded["manifest"]["page_preview"]
+    assert preview["rendered_pages"] == [2]
+    assert preview["source_sha256"] == descriptor["source_sha256"]
+    assert "images/page_preview_000002.png" in loaded["markdown"]
+    assert "Second page requirement" in parser.select(loaded, {"kind": "page", "page": 2})[0]["text"]
+    from docling_core.types.doc import DoclingDocument
+    DoclingDocument.model_validate(loaded["document"])
+
+
+def test_full_vector_pdf_does_not_automatically_render_pages(tmp_path, monkeypatch):
+    import pypdfium2 as pdfium
+    monkeypatch.setattr(pdfium.PdfPage, "render", lambda *a, **k: pytest.fail("Full ingestion rendered a page"))
+    descriptor, loaded = parse_bytes(tmp_path, ".pdf", data=vector_pdf_bytes())
+    assert "three" in loaded["text"]
+    assert loaded["manifest"]["page_preview"] is None
+    assert not any(image["role"] == "page_preview" for image in descriptor["images"])
+
+
+def test_failed_page_preview_keeps_text_and_native_locations(tmp_path, monkeypatch):
+    import pypdfium2 as pdfium
+    def fail(*args, **kwargs):
+        raise RuntimeError("Synthetic renderer failure")
+    monkeypatch.setattr(pdfium.PdfPage, "render", fail)
+    descriptor, loaded = parse_bytes(tmp_path, ".pdf", data=vector_pdf_bytes(), page_range=(2, 2))
+    assert descriptor["parse_status"] == "partial"
+    assert any(g["code"] == "PAGE_PREVIEW_UNAVAILABLE" for g in descriptor["gaps"])
+    assert "Second page requirement" in parser.select(loaded, {"kind": "page", "page": 2})[0]["text"]
+    assert loaded["manifest"]["page_preview"]["rendered_pages"] == []
+
+
+@pytest.mark.parametrize("pages,size,expected", [(9, None, "PAGE_PREVIEW_PAGE_LIMIT"), (1, (50000, 50000), "PAGE_PREVIEW_PIXEL_LIMIT")])
+def test_page_preview_page_and_pixel_budgets_reject_before_render(tmp_path, monkeypatch, pages, size, expected):
+    import pypdfium2 as pdfium
+    monkeypatch.setattr(pdfium.PdfPage, "render", lambda *a, **k: pytest.fail("An over-budget page was rendered"))
+    descriptor, loaded = parse_bytes(tmp_path, ".pdf", data=vector_pdf_bytes(pages, size), page_range=(1, pages))
+    assert any(g["code"] == expected for g in descriptor["gaps"])
+    assert loaded["manifest"]["page_preview"]["rendered_pages"] == []
+
+
+def test_page_preview_png_budget_does_not_save_the_oversized_image(tmp_path, monkeypatch):
+    monkeypatch.setattr(parser, "_PREVIEW_LIMITS", {**parser._PREVIEW_LIMITS, "max_png_bytes": 1})
+    descriptor, loaded = parse_bytes(tmp_path, ".pdf", data=vector_pdf_bytes(), page_range=(2, 2))
+    assert any(g["code"] == "PAGE_PREVIEW_BYTE_LIMIT" for g in descriptor["gaps"])
+    assert loaded["manifest"]["page_preview"]["png_bytes"] == 0
+    assert not any(image["role"] == "page_preview" for image in descriptor["images"])
+
+
+def test_unavailable_picture_bytes_remain_explicit_beside_a_page_preview(tmp_path, monkeypatch):
+    original = parser._docling
+    def unavailable_picture(*args):
+        text, segments, images, gaps, pages = original(*args)
+        gaps.append({"code": "IMAGE_UNAVAILABLE", "message": "Synthetic upstream bitmap bytes unavailable", "severity": "review"})
+        images.append({"ref": None, "element_ref": "#/pictures/unavailable", "role": "document_picture"})
+        return text, segments, images, gaps, pages
+    monkeypatch.setattr(parser, "_docling", unavailable_picture)
+    descriptor, _ = parse_bytes(tmp_path, ".pdf", data=vector_pdf_bytes(), page_range=(2, 2))
+    assert descriptor["parse_status"] == "partial"
+    assert any(g["code"] == "IMAGE_UNAVAILABLE" for g in descriptor["gaps"])
+    assert any(image["ref"] and image["role"] == "page_preview" for image in descriptor["images"])
+
+
+def test_page_preview_asset_damage_is_rejected_without_rerender(tmp_path, monkeypatch):
+    descriptor, _ = parse_bytes(tmp_path, ".pdf", data=vector_pdf_bytes(), page_range=(2, 2))
+    preview = next(image for image in descriptor["images"] if image["role"] == "page_preview")
+    path = tmp_path / preview["ref"]
+    path.write_bytes(path.read_bytes() + b"changed")
+    monkeypatch.setattr(parser, "_pdf_page_previews", lambda *a, **k: pytest.fail("load rendered a new preview"))
+    with pytest.raises(ContractError, match="PARSE_MATERIAL_CHANGED"):
+        parser.load(tmp_path, descriptor, expected_source_id=descriptor["source_id"], expected_sha256=descriptor["source_sha256"])
+
+
+def test_scoped_elements_cannot_alias_a_different_full_document_element(tmp_path):
+    data = vector_pdf_bytes()
+    _, full = parse_bytes(tmp_path, ".pdf", data=data, output=".build/materials/references/full")
+    _, scoped = parse_bytes(tmp_path, ".pdf", data=data, output=".build/materials/references/scoped", page_range=(2, 2))
+    full_profile = full["manifest"]["profile"]
+    assert "page_range" not in full_profile
+    assert full_profile == parser._profile(parser._options(tmp_path, None), ".pdf", tmp_path)
+    assert scoped["manifest"]["profile"]["page_range"] == [2, 2]
+    element = next(row["locator"] for row in scoped["locators"]["segments"] if row["locator"]["kind"] == "element")
+    assert parser.select(scoped, element)
+    with pytest.raises(ContractError, match="INVALID_SOURCE_LOCATOR"):
+        parser.select(full, element)
 
 
 def test_native_sheet_range_and_slide_have_distinct_addresses(tmp_path):

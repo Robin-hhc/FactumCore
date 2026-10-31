@@ -9,6 +9,7 @@ from collections import defaultdict
 from importlib import metadata
 from io import BytesIO
 import hashlib
+import math
 from pathlib import Path, PurePosixPath
 import re
 import sys
@@ -30,6 +31,7 @@ _DEFAULTS = {
 }
 _HASH = re.compile(r"[0-9a-f]{64}")
 _CELL = re.compile(r"\$?([A-Za-z]{1,3})\$?([1-9][0-9]{0,6})")
+_PREVIEW_LIMITS = {"max_pages": 8, "max_pixels": 16_000_000, "max_png_bytes": 16 * 1024 * 1024, "scale": 1.5}
 
 
 def safe_path(root, reference, allowed_prefixes=None):
@@ -259,6 +261,149 @@ def _multiframe_gap(data, suffix, pages):
     return gap
 
 
+def _pdf_page_previews(root, data, output, options, page_range, pages, source_hash):
+    """Render only an explicit, small physical-page request, separately from extraction."""
+    if page_range is None:
+        return [], [], None
+    metadata_record = {**_PREVIEW_LIMITS, "requested_range": list(page_range), "rendered_pages": [],
+                       "pixels": 0, "png_bytes": 0, "assets": [], "source_sha256": source_hash}
+    images, gaps = [], []
+    started = time.perf_counter()
+    first, last = page_range
+    if last - first + 1 > _PREVIEW_LIMITS["max_pages"]:
+        return [], [_gap("PAGE_PREVIEW_PAGE_LIMIT", "Page previews support at most eight explicitly selected pages", severity="review")], metadata_record
+    selected = list(range(first, last + 1))
+    if not set(selected).issubset(pages):
+        return [], [_gap("PAGE_PREVIEW_RANGE_UNAVAILABLE", "Not all requested physical pages were extracted", severity="review")], metadata_record
+    pdf = None
+    try:
+        import pypdfium2 as pdfium
+        metadata_record["renderer"] = "pypdfium2:" + metadata.version("pypdfium2")
+        pdf = pdfium.PdfDocument(data)
+        if last > len(pdf):
+            raise ValueError("Preview page range is outside the original PDF")
+        dimensions = []
+        for number in selected:
+            page = pdf[number - 1]
+            try:
+                width, height = page.get_size()
+            finally:
+                page.close()
+            if (not math.isfinite(width) or not math.isfinite(height) or min(width, height) <= 0
+                    or max(width, height) > _PREVIEW_LIMITS["max_pixels"]):
+                raise ValueError("PDF page geometry is outside the preview budget")
+            dimensions.append((math.ceil(width * _PREVIEW_LIMITS["scale"]), math.ceil(height * _PREVIEW_LIMITS["scale"])))
+        if sum(width * height for width, height in dimensions) > _PREVIEW_LIMITS["max_pixels"]:
+            gaps.append(_gap("PAGE_PREVIEW_PIXEL_LIMIT", "Selected pages exceed the total preview pixel budget; no pages were rendered", severity="review"))
+        else:
+            existing = sum(path.stat().st_size for path in output.rglob("*") if path.is_file())
+            byte_budget = min(_PREVIEW_LIMITS["max_png_bytes"], max(0, options["max_output_bytes"] - existing))
+            for number, (width, height) in zip(selected, dimensions):
+                page, bitmap = pdf[number - 1], None
+                try:
+                    bitmap = page.render(scale=_PREVIEW_LIMITS["scale"])
+                    image = bitmap.to_pil()
+                    try:
+                        buffer = BytesIO()
+                        image.save(buffer, format="PNG")
+                        raw = buffer.getvalue()
+                    finally:
+                        image.close()
+                finally:
+                    if bitmap is not None:
+                        bitmap.close()
+                    page.close()
+                if metadata_record["png_bytes"] + len(raw) > byte_budget:
+                    gaps.append(_gap("PAGE_PREVIEW_BYTE_LIMIT", "PNG previews exceed the preview or remaining operation byte budget; later pages were not saved", locator={"kind": "page", "page": number}, severity="review"))
+                    break
+                local_ref = f"images/page_preview_{number:06}.png"
+                target = safe_path(output, local_ref, ["images"])
+                target.parent.mkdir(exist_ok=True)
+                _workspace_no_links(target.parent)
+                target.write_bytes(raw)
+                ref = target.relative_to(root).as_posix()
+                asset = {"ref": ref, "local_ref": local_ref, "page": number, "width": width, "height": height, "bytes": len(raw)}
+                metadata_record["assets"].append(asset)
+                metadata_record["rendered_pages"].append(number)
+                metadata_record["pixels"] += width * height
+                metadata_record["png_bytes"] += len(raw)
+                images.append({"ref": ref, "element_ref": None, "locator": {"kind": "page", "page": number},
+                               "role": "page_preview", "source_sha256": source_hash,
+                               "provenance": [{"page_no": number}], "ocr_status": "not_requested", "description_status": "agent_required"})
+    except Exception as error:
+        gaps.append(_gap("PAGE_PREVIEW_UNAVAILABLE", "Physical-page rendering failed without replacing extracted text: " + str(error), severity="review"))
+    finally:
+        if pdf is not None:
+            pdf.close()
+    metadata_record["seconds"] = time.perf_counter() - started
+    return images, gaps, metadata_record
+
+
+def _attach_previews(output, preview):
+    document = read_json(output / "document.json")
+    body = document.setdefault("body", {})
+    body["meta"] = body.get("meta") or {}
+    body["meta"]["himate__page_previews"] = preview
+    _write_json(output / "document.json", document)
+    additions = "".join(f"\n\nPhysical page {asset['page']} preview (rendered, not an extracted source bitmap):\n\n![Page {asset['page']}]({asset['local_ref']})" for asset in preview["assets"])
+    if additions:
+        with (output / "document.md").open("ab") as stream:
+            stream.write(additions.encode("utf-8"))
+
+
+def _validate_previews(root, output, manifest, document, registered):
+    preview = manifest.get("page_preview")
+    image_rows = [row for row in manifest.get("images", []) if row.get("role") == "page_preview"]
+    document_preview = ((document.get("body") or {}).get("meta") or {}).get("himate__page_previews")
+    if preview is None:
+        if image_rows or document_preview is not None:
+            raise ContractError("PARSE_DESCRIPTOR_INVALID", "Unregistered page-preview metadata")
+        return
+    if not isinstance(preview, dict) or document_preview != preview:
+        raise ContractError("PARSE_DESCRIPTOR_INVALID", "JSON and manifest page previews differ")
+    bounds = _page_range(manifest.get("page_range"))
+    if (bounds is None or preview.get("requested_range") != bounds
+            or preview.get("source_sha256") != manifest["source_sha256"]):
+        raise ContractError("PARSE_DESCRIPTOR_INVALID", "Preview source/page scope differs")
+    for field, maximum in _PREVIEW_LIMITS.items():
+        value = preview.get(field)
+        if type(value) not in (int, float) or not 0 < value <= maximum:
+            raise ContractError("PARSE_DESCRIPTOR_INVALID", "Invalid preview resource budget")
+    assets = preview.get("assets")
+    if not isinstance(assets, list) or len(assets) > preview["max_pages"] or len(image_rows) != len(assets):
+        raise ContractError("PARSE_DESCRIPTOR_INVALID", "Invalid page-preview asset set")
+    rendered, pixels, byte_count, refs = [], 0, 0, set()
+    for asset in assets:
+        page = asset.get("page")
+        if (type(page) is not int or not bounds[0] <= page <= bounds[1]
+                or page not in manifest.get("pages", []) or page in rendered):
+            raise ContractError("PARSE_DESCRIPTOR_INVALID", "Preview is not an extracted physical page")
+        ref, local_ref = asset.get("ref"), asset.get("local_ref")
+        path = safe_path(output, local_ref, ["images"])
+        if path.relative_to(root).as_posix() != ref or ref not in registered or ref in refs:
+            raise ContractError("PARSE_DESCRIPTOR_INVALID", "Preview asset is not registered inside images")
+        matches = [row for row in image_rows if row.get("ref") == ref]
+        if (len(matches) != 1 or matches[0].get("locator") != {"kind": "page", "page": page}
+                or matches[0].get("element_ref") is not None
+                or matches[0].get("source_sha256") != manifest["source_sha256"]):
+            raise ContractError("PARSE_DESCRIPTOR_INVALID", "Preview image identity differs")
+        from PIL import Image
+        with Image.open(path) as image:
+            if image.format != "PNG" or image.size != (asset.get("width"), asset.get("height")):
+                raise ContractError("PARSE_DESCRIPTOR_INVALID", "Preview PNG geometry differs")
+            image.verify()
+        if path.stat().st_size != asset.get("bytes"):
+            raise ContractError("PARSE_DESCRIPTOR_INVALID", "Preview byte count differs")
+        rendered.append(page)
+        refs.add(ref)
+        pixels += asset["width"] * asset["height"]
+        byte_count += asset["bytes"]
+    if (rendered != preview.get("rendered_pages") or pixels != preview.get("pixels")
+            or byte_count != preview.get("png_bytes") or pixels > preview["max_pixels"]
+            or byte_count > preview["max_png_bytes"]):
+        raise ContractError("PARSE_DESCRIPTOR_INVALID", "Preview coverage or resource accounting differs")
+
+
 def _item_text(item):
     if hasattr(item, "text"):
         return item.text
@@ -428,6 +573,8 @@ def parse(root, source, data, output_ref, options=None, page_range=None):
     if output.exists():
         raise ContractError("PARSE_OUTPUT_EXISTS", "Every parse requires a fresh operation directory", output_ref)
     profile = _profile(options, suffix, root)
+    if page_range is not None:
+        profile["page_range"] = list(page_range)
     source_hash, profile_hash = sha256_bytes(data), sha256_bytes(canonical_bytes(profile))
     output.mkdir(parents=True)
     _workspace_no_links(output)
@@ -457,9 +604,15 @@ def parse(root, source, data, output_ref, options=None, page_range=None):
     multiframe = _multiframe_gap(data, suffix, pages)
     if multiframe is not None:
         gaps.append(multiframe)
-    converted = time.perf_counter()
     (output / "text.txt").write_bytes(text.encode("utf-8"))
     _write_json(output / "locators.json", {"schema_version": "1.0", "source_sha256": source_hash, "profile_sha256": profile_hash, "segments": segments})
+    preview = None
+    if suffix == ".pdf" and page_range is not None:
+        preview_images, preview_gaps, preview = _pdf_page_previews(root, data, output, options, page_range, pages, source_hash)
+        images.extend(preview_images)
+        gaps.extend(preview_gaps)
+        _attach_previews(output, preview)
+    converted = time.perf_counter()
     files = []
     for path in sorted(output.rglob("*")):
         if path.is_file():
@@ -477,7 +630,7 @@ def parse(root, source, data, output_ref, options=None, page_range=None):
                 "output_ref": output_ref, "page_range": page_range, "pages": pages,
                 "text_ref": output_ref + "/text.txt", "markdown_ref": output_ref + "/document.md",
                 "document_ref": output_ref + "/document.json", "locators_ref": output_ref + "/locators.json",
-                "files": files, "images": images, "gaps": gaps,
+                "files": files, "images": images, "gaps": gaps, "page_preview": preview,
                 "statistics": {"conversion_seconds": converted - conversion_started, "wall_seconds": time.perf_counter() - started,
                                "input_bytes": len(data), "output_bytes": output_bytes, "page_count": len(pages), "image_count": len(images)}}
     _write_json(output / "manifest.json", manifest)
@@ -544,6 +697,7 @@ def load(root, descriptor, *, expected_source_id, expected_sha256):
         image_path = safe_path(output, unquote(uri), ["images"])
         if image_path.relative_to(root).as_posix() not in registered:
             raise ContractError("PARSE_DESCRIPTOR_INVALID", "Markdown image is not a registered local asset")
+    _validate_previews(root, output, manifest, document, registered)
     locators = read_json(safe_path(root, manifest["locators_ref"], [output_ref]))
     if locators.get("source_sha256") != expected_sha256 or locators.get("profile_sha256") != manifest["profile_sha256"]:
         raise ContractError("PARSE_SOURCE_MISMATCH", "Locator identity differs")

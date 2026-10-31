@@ -64,6 +64,64 @@ def test_ingest_scan_returns_one_document_without_legacy_operation_request(knowl
     assert not list((knowledge / "knowledge").rglob("*.md"))
 
 
+def test_no_card_commit_keeps_receipt_under_artifacts_without_creating_logs(knowledge):
+    original = knowledge / "docs-raw/specs/a.md"
+    original.write_text("# A\n\nAn already covered conclusion.\n", encoding="utf-8")
+    status, scanned = invoke(knowledge, "ingest", "scan")
+    assert status == 0, scanned
+    (knowledge / ".build/plan.md").write_text(
+        "---\ncards: []\n---\nThe source adds no new knowledge after full review.\n", encoding="utf-8")
+    status, checked = invoke(knowledge, "ingest", "check")
+    assert status == 0, checked
+    request = knowledge / "artifacts/commit-request.json"
+    request.write_text(json.dumps({"reason": "Fully reviewed; existing knowledge covers this source."}), encoding="utf-8")
+
+    status, committed = invoke(knowledge, "ingest", "commit", "--input", str(request))
+
+    assert status == 0 and committed["phase"] == "completed", committed
+    receipt = knowledge / "artifacts/ingest/latest.json"
+    assert receipt.is_file()
+    assert json.loads(receipt.read_bytes()) == committed["data"]
+    assert not (knowledge / "logs").exists()
+    assert not (knowledge / ".build").exists()
+    registry = yaml.safe_load((knowledge / "governance/sources.lock.yaml").read_bytes())
+    resource = next(row for row in registry["resources"] if row["source_id"] == scanned["data"]["source"]["doc_id"])
+    assert resource["processed_hash"] == hashlib.sha256(original.read_bytes()).hexdigest()
+    status, report = invoke(knowledge, "status")
+    assert status == 0 and report["phase"] == "completed", report
+    assert report["data"] == committed["data"]
+
+
+def test_status_reads_legacy_receipt_without_migration_and_prefers_current_work(knowledge):
+    status, report = invoke(knowledge, "status")
+    assert status == 0 and report["phase"] == "idle", report
+    assert not (knowledge / "logs").exists()
+    assert not (knowledge / "artifacts/ingest").exists()
+
+    old = knowledge / "logs/ingest/latest.json"
+    old.parent.mkdir(parents=True)
+    legacy_bytes = b'{"source_id":"legacy-source","card_ids":[]}\n'
+    old.write_bytes(legacy_bytes)
+    status, report = invoke(knowledge, "status")
+    assert status == 0 and report["phase"] == "completed", report
+    assert report["data"]["source_id"] == "legacy-source"
+    assert old.read_bytes() == legacy_bytes
+    assert not (knowledge / "artifacts/ingest").exists()
+
+    latest = knowledge / "artifacts/ingest/latest.json"
+    latest.parent.mkdir(parents=True)
+    latest.write_text('{"source_id":"new-source","card_ids":[]}', encoding="utf-8")
+    status, report = invoke(knowledge, "status")
+    assert status == 0 and report["data"]["source_id"] == "new-source", report
+    task = knowledge / ".build/task.json"
+    task.parent.mkdir()
+    task.write_text('{"source":{"source_id":"pending-source"}}', encoding="utf-8")
+    status, report = invoke(knowledge, "status")
+    assert status == 0 and report["phase"] == "prepared", report
+    assert report["data"]["source"]["source_id"] == "pending-source"
+    assert old.read_bytes() == legacy_bytes
+
+
 def test_formal_check_needs_no_private_ingest_or_review_ticket(knowledge):
     status, report = invoke(knowledge, "lint")
     assert status == 0, report

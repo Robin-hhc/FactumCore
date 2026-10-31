@@ -8,7 +8,7 @@
 
 在数据所在端原生知识根运行knowledge.py或sh ./knowledge.sh；Windows可用.\knowledge.cmd。实际执行端先取得仓库代码，选用已有Python3.10—3.12；需要诊断时运行doctor。部署脚本先向选定Python执行一次锁定依赖的pip安装，再删除本次同名Skill和Workflow包的完整目录，最后复制新包。pip失败不动旧包；源码与目标根其他包保留，宿主加载运行。远端由宿主已有SSH工具执行同一命令，不逐次传Skill脚本。
 
-.build只保存本轮暂存，P1会清空。P5失败直接重试，不能先回P1。数据库在artifacts/knowledge.sqlite，独立搜索报告在artifacts/query，巡检汇总在artifacts/patrol。query可与写流程共存；lint与ingest串行运行，运行环境和正式记录在.build以外。
+.build只保存本轮暂存，P1会清空。P5失败直接重试，不能先回P1。数据库在artifacts/knowledge.sqlite，入库回执在artifacts/ingest/latest.json，独立搜索报告在artifacts/query，巡检汇总在artifacts/patrol。query可与写流程共存；lint与ingest串行运行，运行环境和正式记录在.build以外。artifacts含独立模型与本机材料，不整目录清空。
 
 来源与卡头使用真实ID和定位；新卡字段见governance/specs/cards.md，条件、依据和缺口放正文，旧知识正常更新时完整保留。搜索返回整卡相关候选，精读后核对适用性；代码引用不证明已实现。日常scan直接比较SHA-256，Git按需回看旧版。未知构建、宏和适用条件不补造。配置只描述真实工作区与模块。
 

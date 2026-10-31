@@ -644,7 +644,7 @@ def commit(root, request):
         result = {"source_id": source["source_id"], "processed_hash": source["hash"],
                   "card_ids": [card["id"] for card in drafts], "deleted": deletes,
                   "reason": request.get("reason", "Reviewed card changes published")}
-        write_json(safe_path(root, "logs/ingest/latest.json"), result)
+        write_json(safe_path(root, "artifacts/ingest/latest.json"), result)
         catalog.mark_processed(source["source_id"], source["hash"], source["exists"],
                                source_commit=source.get("source_commit"))
     # Cleanup is last. A failed copy or database operation leaves all drafts.

@@ -21,4 +21,4 @@ knowledge ingest commit --json
 
 无需产卡但已完整处理时，将 `{"reason":"实际不改卡理由"}` 写入 `.build/commit.json`，再运行 `knowledge ingest commit --input .build/commit.json --json`。暂缓／失败不能标成完成。
 
-成功后依据命令回执交付；需要复核时读 `logs/ingest/latest.json`，不再用 `scan` 验证，它会开启下一轮。Git 提交、推送与合入由用户另行授权。
+成功后依据命令回执交付；需要复核时读 `artifacts/ingest/latest.json`，不再用 `scan` 验证，它会开启下一轮。Git 提交、推送与合入由用户另行授权。

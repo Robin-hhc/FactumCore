@@ -31,8 +31,9 @@ config.local.yml
 /himate/himate-knowledge-wifi-mp/artifacts/*
 !/himate/himate-knowledge-wifi-mp/artifacts/.gitkeep
 
-# Keep ingest records, applicability events and explicit verification materials
-# versionable; copied source caches and machine transaction state stay local.
+# Retain historical evidence paths; new receipts live under artifacts/.
+# Historical source caches and local operation records stay private.
+/himate/himate-knowledge-wifi-mp/logs/ingest/
 /himate/himate-knowledge-wifi-mp/logs/evidence/objects/
 /himate/himate-knowledge-wifi-mp/logs/evidence/checked-code/
 /himate/himate-knowledge-wifi-mp/logs/evidence/extractions/

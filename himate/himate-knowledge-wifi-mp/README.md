@@ -12,4 +12,4 @@ HiMate 将设计文档、规格和代码分析蒸馏为可追溯知识卡，通�
 
 [使用说明](docs-llm-wiki/使用说明.md)介绍配置、安装和日常命令；[详细设计](docs-llm-wiki/知识库详细设计.md)说明入库、巡检及检索；[架构设计](docs-llm-wiki/HiMate知识库架构设计.md#53-himate-knowledge目录架构)说明组件与目录分工。维护者从[开发指南](CONTRIBUTING.md)进入。
 
-原件在 `docs-raw/`，正式卡在 `knowledge/`，来源身份和处理版本保存在 `governance/sources.lock.yaml`。`.build/` 保存当前任务的材料与候选，`artifacts/` 保存可重建的数据库和检索产物。
+原件在 `docs-raw/`，正式卡在 `knowledge/`，来源身份和处理版本保存在 `governance/sources.lock.yaml`。`.build/` 保存当前任务的材料与候选；`artifacts/` 保存派生数据库、运行回执和阅读产物，也可存放独立维护的本地模型，不能整目录清空。更新与清理边界见[架构设计 §5.5](docs-llm-wiki/HiMate知识库架构设计.md#55-框架更新与目录清理)。

@@ -15,7 +15,7 @@
       "sha256": "e4ae118eb0ebc99af582721a0ea74d1acaf24ac25b49f381c70911ac0708bb13"
     },
     "himate_knowledge/cli.py": {
-      "sha256": "e3da57087630cee32c55f161b854dbf5bd01731109a7d5b3270fcb569ba925e5"
+      "sha256": "96bfe037a3fa2279a2fc7b12381100b0231a4229a88c0a862590ef11ca231988"
     },
     "himate_knowledge/command_install.py": {
       "sha256": "1405b6eabf3adf0e8ba8da131add28e5d269404a520107a46858e46497ceb5f0"
@@ -34,5 +34,5 @@
     }
   },
   "schema_version": "1.0",
-  "version": "0.15.1"
+  "version": "0.15.2"
 }

@@ -142,7 +142,10 @@ def execute(args, root):
         data, phase = ingest.commit(root, request)
     elif command == "status":
         task = root / ".build/task.json"
-        latest = root / "logs/ingest/latest.json"
+        latest = root / "artifacts/ingest/latest.json"
+        if not latest.is_file():
+            # Existing roots can retain their last receipt without migration.
+            latest = root / "logs/ingest/latest.json"
         data = ingest.read_json(task if task.is_file() else latest) if task.is_file() or latest.is_file() else {}
         phase = "prepared" if task.is_file() else "completed" if latest.is_file() else "idle"
     else:

@@ -1,24 +1,24 @@
 template_id: hs-knowledge-ingest
 canvas:
   nodes:
+    __start__:
+      x: -237.2366849444774
+      y: 19.14497258328391
     prepare_sources:
       x: 0
       y: 0
     plan_change:
-      x: 300
-      y: 0
+      x: 282
+      y: -117.422498510808
     materialize_view:
-      x: 600
-      y: 0
+      x: 282
+      y: 85.5142108720014
     lint_view:
-      x: 900
-      y: 0
+      x: 282
+      y: 293.2051850020095
     apply_view:
-      x: 1200
-      y: 0
-    __start__:
-      x: -250
-      y: 0
+      x: 597.5715293793328
+      y: 285.8982572437064
     __end__:
-      x: 1500
-      y: 0
+      x: 934.5851430403483
+      y: 31.908287638806524

@@ -8,7 +8,7 @@ This page contains models that power the PDF document converion package [docling
 
 ## Layout Model
 
-The layout model will take an image from a page and apply RT-DETR model in order to find different layout components. It currently detects the labels: Caption, Footnote, Formula, List-item, Page-footer, Page-header, Picture, Section-header, Table, Text, Title. As a reference (from the DocLayNet-paper), this is the performance of standard object detection methods on the DocLayNet dataset compared to human evaluation, 
+The layout model will take an image from a page and apply RT-DETR model in order to find different layout components. It currently detects the labels: Caption, Footnote, Formula, List-item, Page-footer, Page-header, Picture, Section-header, Table, Text, Title. As a reference (from the DocLayNet-paper), this is the performance of standard object detection methods on the DocLayNet dataset compared to human evaluation,
 
 |                | human   | MRCNN   | MRCNN   | FRCNN   | YOLO   |
 |----------------|---------|---------|---------|---------|--------|
@@ -54,7 +54,7 @@ The tableformer model will identify the structure of the table, starting from an
 }
 
 @article{doclaynet2022,
-  title = {DocLayNet: A Large Human-Annotated Dataset for Document-Layout Analysis},  
+  title = {DocLayNet: A Large Human-Annotated Dataset for Document-Layout Analysis},
   doi = {10.1145/3534678.353904},
   url = {https://arxiv.org/abs/2206.01062},
   author = {Pfitzmann, Birgit and Auer, Christoph and Dolfi, Michele and Nassar, Ahmed S and Staar, Peter W J},

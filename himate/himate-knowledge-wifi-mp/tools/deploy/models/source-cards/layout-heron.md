@@ -8,7 +8,7 @@ license: apache-2.0
 
 🚀 **`heron`** is the **default layout analysis model** of the [Docling project](https://github.com/docling-project/docling), designed for robust and high-quality document layout understanding.
 
-📄 For an in-depth description of the model architecture, training datasets, and evaluation methodology, please refer to our technical report: **"Advanced Layout Analysis Models for Docling"**, Nikolaos Livathinos *et al.*, 
+📄 For an in-depth description of the model architecture, training datasets, and evaluation methodology, please refer to our technical report: **"Advanced Layout Analysis Models for Docling"**, Nikolaos Livathinos *et al.*,
 [🔗 https://arxiv.org/abs/2509.11720](https://arxiv.org/abs/2509.11720)
 
 

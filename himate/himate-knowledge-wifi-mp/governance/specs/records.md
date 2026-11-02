@@ -22,6 +22,8 @@ reviewed_pages 仅记录范围内全部材料经评估、P4 审阅并完成本�
 
 P1自动保存task和选中原件副本；PDF 同时交接 pdf_review 的起点、宽候选边界、字量及页索引，不默认限制页数。P2自主截断实际范围并写短plan.md，PDF 必须显式 source_pages；P3写完整cards及必要changes.json；P4写简短review.md，明确实际评估范围；P5只登记该范围，不把候选未读页或补读前文计入。当前批次暂存只在.build，下一轮P1可清空其内容并保留根README；可重建PDF解析缓存留在artifacts，正式进度留在来源登记。
 
+PDF task 通过 manifest-reference 描述符交接固定材料入口、身份与摘要，不内嵌全书图片和缺口明细。task.gaps 保留缺口次数及完整 manifest 入口，页索引也保留聚合缺口和 gap_details_ref；摘要不改变 parse_status，不证明图形提取或内容审阅完成。这些均为派生交接信息，不新增正式处理字段。
+
 P5先核对本轮 PDF 输入与范围的机械约束，再复制覆盖卡片、更新全部引用关系与检索索引，成功后保存本批覆盖或全文成功标记；不重复 P4 语义审阅。失败保留材料供当前session重试同一P5，不先回P1；重复登记按区间并集处理，不累计两遍。结果记录具体错误，不把失败当完成。
 
 本批成功仍返回 phase completed，回执 source_complete 区分本批与全文完成。PDF partial 时 source_complete=false，包含 processing/remaining_pages；processed_hash 只反映实际最后全文成功值。入库 Workflow 可以结束本批并交付剩余范围，下次普通 scan 继续；巡检返回 L2 后仍将未完成 PDF 视为待办。

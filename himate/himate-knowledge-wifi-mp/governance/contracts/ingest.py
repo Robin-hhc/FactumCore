@@ -288,7 +288,9 @@ def _pdf_packet(loaded, start, end, *, text_budget=None):
     pages, text = [], ["# PDF review packet", "", "Evaluate all material within the planned physical pages.", ""]
     units = _text_units("\n".join(text))
     for number in range(start, end + 1):
-        images = images_by_page.get(number, [])
+        images = [{**item, "provenance": [prov for prov in item.get("provenance", [])
+                                          if prov.get("page_no") == number]}
+                  for item in images_by_page.get(number, [])]
         structures = structures_by_page.get(number, [])
         available = number in by_page
         block = [f"## Physical page {number}", "", by_page.get(number, "[Physical page material unavailable]"), ""]
@@ -305,11 +307,14 @@ def _pdf_packet(loaded, start, end, *, text_budget=None):
         # Keep the whole crossing page available; P2 chooses what it can assess.
         if text_budget is not None and units >= text_budget:
             break
+    manifest_ref = loaded["output_ref"] + "/manifest.json"
     index = {"source_id": loaded["manifest"]["source_id"],
              "source_sha256": loaded["manifest"]["source_sha256"],
-             "manifest_ref": loaded["output_ref"] + "/manifest.json",
+             "manifest_ref": manifest_ref,
              "document_ref": loaded["manifest"]["document_ref"],
-             "pages": pages, "text_units": units, "gaps": loaded["manifest"]["gaps"]}
+             "pages": pages, "text_units": units,
+             "gaps": document_parser.summarize_gaps(loaded["manifest"]["gaps"], manifest_ref),
+             "gap_details_ref": manifest_ref}
     return "\n".join(text).encode("utf-8"), index
 
 
@@ -454,8 +459,11 @@ def scan(root, request):
                 # manifest-owned files or its text/locator semantics.
                 if suffix not in {".txt", ".pdf"}:
                     (materials / "current.txt").write_bytes(safe_path(root, parsed["text_ref"]).read_bytes())
-                gaps.extend(item.get("message", str(item)) if isinstance(item, dict) else str(item)
-                            for item in parsed.get("gaps", []))
+                for item in parsed.get("gaps", []):
+                    message = item.get("message", str(item)) if isinstance(item, dict) else str(item)
+                    if isinstance(item, dict) and "count" in item:
+                        message += f" ({item['count']} occurrences; details: {item['details_ref']})"
+                    gaps.append(message)
                 if _pdf_source(source):
                     pdf_review = _prepare_pdf_review(root, source, selected["content"], page_budget, text_budget)
         except (ValueError, UnicodeError, ImportError, ContractError) as error:

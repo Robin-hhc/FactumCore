@@ -376,6 +376,59 @@ def test_text_units_weight_all_non_ascii_characters_and_include_structure_entrie
     assert page["image_count"] == 1 and page["table_count"] == 1
 
 
+def test_pdf_handoff_summarizes_repeated_whole_book_diagnostics(library, monkeypatch):
+    parser = module("document_parser")
+    convert = parser._docling
+
+    def noisy(*args):
+        text, segments, images, gaps, pages = convert(*args)
+        for number in range(3000):
+            reference = f"#/pictures/{number}"
+            images.append({"ref": None, "element_ref": reference, "provenance": []})
+            gaps.append({"code": "IMAGE_UNAVAILABLE", "severity": "review",
+                         "message": "An extracted picture has no saved local image",
+                         "locator": {"kind": "element", "ref": reference}})
+        return text, segments, images, gaps, pages
+
+    monkeypatch.setattr(parser, "_docling", noisy)
+    task = prepare(library)
+    assert (library / ".build/task.json").stat().st_size < 12000
+    assert task["source"]["parsed"]["parse_status"] == "partial"
+    assert len(task["gaps"]) == 1 and "3000" in task["gaps"][0]
+    index_path = library / task["pdf_review"]["page_index_ref"]
+    assert index_path.stat().st_size < 12000
+    index = json.loads(index_path.read_bytes())
+    assert len(index["gaps"]) == 1 and index["gaps"][0]["count"] == 3000
+    assert index["gap_details_ref"] == task["source"]["parsed"]["manifest_ref"]
+    manifest = json.loads((library / index["gap_details_ref"]).read_bytes())
+    assert len(manifest["gaps"]) == len(manifest["images"]) == 3000
+    assert index["gaps"][0]["details_ref"] == index["gap_details_ref"]
+
+
+def test_page_index_keeps_shared_image_provenance_local_without_changing_manifest(library, monkeypatch):
+    text_pages(library, monkeypatch, ["First physical page", "Second physical page"], illustrated=True)
+    parser = module("document_parser")
+    convert = parser._docling
+
+    def shared(*args):
+        result = convert(*args)
+        result[2][0]["provenance"].append({"page_no": 2})
+        return result
+
+    monkeypatch.setattr(parser, "_docling", shared)
+    task = prepare(library)
+    index = json.loads((library / task["pdf_review"]["page_index_ref"]).read_bytes())
+    for page in index["pages"]:
+        assert page["image_count"] == 1
+        assert page["images"][0]["provenance"] == [{"page_no": page["page"]}]
+    manifest_path = library / task["source"]["parsed"]["manifest_ref"]
+    original = manifest_path.read_bytes()
+    assert json.loads(original)["images"][0]["provenance"] == [{"page_no": 1}, {"page_no": 2}]
+    plan(library, [[1, 2]])
+    assert module("ingest").check(library, {})[1] == "passed"
+    assert manifest_path.read_bytes() == original
+
+
 @pytest.mark.parametrize(("body", "expected_end"), [("sparse", 5), ("d" * 2000, 1)])
 def test_same_text_budget_adapts_to_page_density(library, monkeypatch, body, expected_end):
     text_pages(library, monkeypatch, [body] * 5)

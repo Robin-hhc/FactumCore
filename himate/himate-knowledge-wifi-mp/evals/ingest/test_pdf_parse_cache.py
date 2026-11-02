@@ -85,6 +85,132 @@ def test_matching_pdf_cache_is_verified_and_reused_without_conversion(tmp_path, 
     assert loaded["manifest"]["pages"] == [1, 2, 3]
 
 
+def test_pdf_cache_handoff_is_compact_without_losing_fixed_diagnostics(tmp_path, conversion, monkeypatch):
+    parser, _ = conversion
+    convert = parser._docling
+
+    def many_images(*args, **kwargs):
+        text, segments, _, _, pages = convert(*args, **kwargs)
+        images = [{"ref": None, "provenance": [{"page_no": 1}]} for _ in range(3000)]
+        gaps = [{"code": "IMAGE_UNAVAILABLE", "severity": "review",
+                 "message": "An extracted picture has no saved local image",
+                 "locator": {"kind": "element", "ref": f"#/pictures/{number}"}}
+                for number in range(3000)]
+        return text, segments, images, gaps, pages
+
+    monkeypatch.setattr(parser, "_docling", many_images)
+    data = pdf_bytes()
+
+    descriptor = parser.prepare_pdf(tmp_path, source(), data)
+
+    assert descriptor["descriptor_kind"] == "manifest-reference"
+    assert "images" not in descriptor
+    assert len(parser.canonical_bytes(descriptor)) < 12000
+    assert descriptor["statistics"]["image_count"] == 3000
+    assert descriptor["parse_status"] == "partial"
+    assert descriptor["gaps"] == [{
+        "code": "IMAGE_UNAVAILABLE", "severity": "review",
+        "message": "An extracted picture has no saved local image", "count": 3000,
+        "example_locators": [{"kind": "element", "ref": f"#/pictures/{number}"}
+                             for number in range(3)],
+        "details_ref": descriptor["manifest_ref"],
+    }]
+    bundle = tmp_path / Path(descriptor["manifest_ref"]).parent
+    pointer = bundle.parent / (bundle.name[:64] + ".json")
+    assert parser.read_json(pointer) == descriptor
+    loaded = parser.load(tmp_path, descriptor, expected_source_id="doc-pdf",
+                         expected_sha256=parser.sha256_bytes(data))
+    assert len(loaded["manifest"]["images"]) == 3000
+    assert len(loaded["manifest"]["gaps"]) == 3000
+
+
+def test_legacy_full_cache_pointer_upgrades_without_conversion_or_bundle_changes(tmp_path, conversion):
+    parser, calls = conversion
+    data = pdf_bytes()
+    compact = parser.prepare_pdf(tmp_path, source(), data)
+    manifest = parser.read_json(tmp_path / compact["manifest_ref"])
+    legacy = {key: value for key, value in compact.items() if key != "descriptor_kind"}
+    legacy.update(images=manifest["images"], gaps=manifest["gaps"])
+    bundle = tmp_path / Path(compact["manifest_ref"]).parent
+    before = {path.name: path.read_bytes() for path in bundle.iterdir()}
+    pointer = bundle.parent / (bundle.name[:64] + ".json")
+    parser._write_json(pointer, legacy)
+    parser.load(tmp_path, legacy, expected_source_id="doc-pdf", expected_sha256=parser.sha256_bytes(data))
+
+    upgraded = parser.prepare_pdf(tmp_path, source(), data)
+
+    assert upgraded == compact
+    assert parser.read_json(pointer) == compact
+    assert len(calls) == 1
+    assert {path.name: path.read_bytes() for path in bundle.iterdir()} == before
+
+
+def test_direct_parse_keeps_the_full_descriptor_contract(tmp_path, conversion):
+    parser, _ = conversion
+    data = pdf_bytes()
+
+    full = parser.parse(tmp_path, source(), data, ".build/materials/parsed")
+
+    assert "descriptor_kind" not in full
+    assert full["images"] == []
+    assert full["gaps"] == []
+    parser.load(tmp_path, full, expected_source_id="doc-pdf", expected_sha256=parser.sha256_bytes(data))
+    full["images"] = [{"ref": None}]
+    with pytest.raises(module("validation").ContractError, match="PARSE_DESCRIPTOR_INVALID"):
+        parser.load(tmp_path, full, expected_source_id="doc-pdf", expected_sha256=parser.sha256_bytes(data))
+
+
+@pytest.mark.parametrize("field,value", [
+    ("source_id", "doc-other"), ("source_sha256", "0" * 64), ("profile_sha256", "0" * 64),
+    ("extractor", "unverified"), ("parse_status", "partial"), ("statistics", {}),
+    ("text_ref", "docs-raw/other.txt"), ("markdown_ref", "docs-raw/other.md"),
+    ("document_ref", "docs-raw/other.json"), ("locators_ref", "docs-raw/other.json"),
+    ("gaps", [{"count": 1}]), ("descriptor_kind", "unrecognized"), ("images", []),
+])
+def test_compact_descriptor_cannot_bypass_fixed_manifest_fields(tmp_path, conversion, field, value):
+    parser, _ = conversion
+    data = pdf_bytes()
+    descriptor = parser.prepare_pdf(tmp_path, source(), data)
+    descriptor[field] = value
+
+    with pytest.raises(module("validation").ContractError, match="PARSE_DESCRIPTOR_INVALID"):
+        parser.load(tmp_path, descriptor, expected_source_id="doc-pdf", expected_sha256=parser.sha256_bytes(data))
+
+
+@pytest.mark.parametrize("damage", ["manifest", "asset", "extra-file", "missing-file"])
+def test_compact_load_still_checks_manifest_and_all_fixed_materials(tmp_path, conversion, damage):
+    parser, _ = conversion
+    data = pdf_bytes()
+    descriptor = parser.prepare_pdf(tmp_path, source(), data)
+    if damage == "manifest":
+        (tmp_path / descriptor["manifest_ref"]).write_bytes(b"Changed manifest.")
+    elif damage == "asset":
+        (tmp_path / descriptor["text_ref"]).write_bytes(b"Changed parsed output.")
+    elif damage == "extra-file":
+        (tmp_path / descriptor["text_ref"]).with_name("unregistered.txt").write_bytes(b"Unexpected output.")
+    else:
+        (tmp_path / descriptor["locators_ref"]).unlink()
+
+    with pytest.raises((module("validation").ContractError, FileNotFoundError)):
+        parser.load(tmp_path, descriptor, expected_source_id="doc-pdf", expected_sha256=parser.sha256_bytes(data))
+
+
+def test_gap_summary_is_bounded_for_unique_messages_and_large_locators():
+    parser = module("document_parser")
+    gaps = [{"code": "UNAVAILABLE", "severity": "review", "message": f"Issue {number}:" + "x" * 2000,
+             "locator": {"ref": "x" * 2000}} for number in range(1000)]
+
+    summary = parser.summarize_gaps(gaps, "artifacts/ingest/parsed/fixed/manifest.json")
+
+    assert len(summary) == 65
+    assert sum(row["count"] for row in summary) == 1000
+    assert all(len(row["message"]) <= 240 for row in summary)
+    assert all(row["example_locators"] == [] for row in summary)
+    assert summary[-1]["count"] == 936
+    assert summary[-1]["severity"] == "review"
+    assert len(parser.canonical_bytes(summary)) < 35000
+
+
 @pytest.mark.parametrize("damage", ["markdown", "manifest", "extra-file", "missing-file"])
 def test_damaged_cache_rebuilds_a_fresh_bundle_without_rewriting_the_old_one(tmp_path, conversion, damage):
     parser, calls = conversion

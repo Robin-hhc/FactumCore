@@ -33,6 +33,8 @@ _DEFAULTS = {
 _HASH = re.compile(r"[0-9a-f]{64}")
 _CELL = re.compile(r"\$?([A-Za-z]{1,3})\$?([1-9][0-9]{0,6})")
 _PREVIEW_LIMITS = {"max_pages": 8, "max_pixels": 16_000_000, "max_png_bytes": 16 * 1024 * 1024, "scale": 1.5}
+_DESCRIPTOR_FIELDS = ("source_id", "source_sha256", "profile_sha256", "extractor", "parse_status",
+                      "text_ref", "markdown_ref", "document_ref", "locators_ref", "statistics")
 OCR_MODEL_FILES = (
     "docling-project--docling-layout-heron/config.json",
     "docling-project--docling-layout-heron/preprocessor_config.json",
@@ -143,6 +145,40 @@ def _gap(code, message, *, locator=None, severity="warning"):
     return value
 
 
+def summarize_gaps(gaps, details_ref):
+    """Bound handoff diagnostics while retaining counts and the fixed evidence."""
+    groups = {}
+    overflow, overflow_review = 0, False
+    for gap in gaps:
+        key = (str(gap.get("code", ""))[:80], str(gap.get("severity", "warning"))[:32],
+               str(gap.get("message", ""))[:240])
+        if key not in groups:
+            if len(groups) >= 64:
+                overflow += 1
+                overflow_review = overflow_review or key[1] == "review"
+                continue
+            groups[key] = {"code": key[0], "severity": key[1], "message": key[2],
+                           "count": 0, "example_locators": [], "details_ref": details_ref}
+        row = groups[key]
+        row["count"] += 1
+        locator = gap.get("locator")
+        if (locator is not None and len(row["example_locators"]) < 3
+                and len(canonical_bytes(locator)) <= 1024 and locator not in row["example_locators"]):
+            row["example_locators"].append(locator)
+    result = list(groups.values())
+    if overflow:
+        result.append({"code": "OTHER_PARSE_GAPS", "severity": "review" if overflow_review else "warning",
+                       "message": "Additional diagnostic groups are retained in the fixed manifest",
+                       "count": overflow, "example_locators": [], "details_ref": details_ref})
+    return result
+
+
+def _cache_descriptor(descriptor, manifest):
+    return {"descriptor_kind": "manifest-reference", **{key: manifest[key] for key in _DESCRIPTOR_FIELDS},
+            "manifest_ref": descriptor["manifest_ref"], "manifest_sha256": descriptor["manifest_sha256"],
+            "gaps": summarize_gaps(manifest["gaps"], descriptor["manifest_ref"])}
+
+
 def _write_json(path, value):
     path.write_bytes(canonical_bytes(value))
 
@@ -195,7 +231,10 @@ def prepare_pdf(root, source, data, options=None):
             if (descriptor["profile_sha256"] == profile_hash
                     and re.fullmatch(key + r"-[0-9a-f]{32}", PurePosixPath(loaded["output_ref"]).name)
                     and loaded["manifest"].get("page_range") is None):
-                return descriptor
+                compact = _cache_descriptor(descriptor, loaded["manifest"])
+                if compact != descriptor:
+                    _write_json(index, compact)
+                return compact
         except (ContractError, OSError, ValueError):
             # Damaged disposable material is rebuilt without changing any
             # previously handed-off bundle or formal source progress.
@@ -204,11 +243,12 @@ def prepare_pdf(root, source, data, options=None):
     _workspace_no_links(index.parent)
     output_ref = cache_ref + key + "-" + secrets.token_hex(16)
     descriptor = parse(root, source, data, output_ref, options=options)
-    load(root, descriptor, expected_source_id=source_id, expected_sha256=source_hash)
+    loaded = load(root, descriptor, expected_source_id=source_id, expected_sha256=source_hash)
     if descriptor["profile_sha256"] != profile_hash:
         raise ContractError("PARSE_PROFILE_CHANGED", "Parser profile changed while preparing PDF materials")
-    _write_json(safe_path(root, index_ref), descriptor)
-    return descriptor
+    compact = _cache_descriptor(descriptor, loaded["manifest"])
+    _write_json(safe_path(root, index_ref), compact)
+    return compact
 
 
 def _external_images(data, suffix):
@@ -730,9 +770,15 @@ def load(root, descriptor, *, expected_source_id, expected_sha256):
             or not _HASH.fullmatch(str(expected_sha256))
             or sha256_bytes(canonical_bytes(manifest.get("profile"))) != manifest.get("profile_sha256")):
         raise ContractError("PARSE_SOURCE_MISMATCH", "Parser bundle identity does not match this source")
-    for key in ("source_id", "source_sha256", "profile_sha256", "extractor", "parse_status", "text_ref", "markdown_ref", "document_ref", "locators_ref", "images", "gaps", "statistics"):
+    compact = "descriptor_kind" in descriptor
+    if compact and (descriptor["descriptor_kind"] != "manifest-reference"
+                    or set(descriptor) != set(_DESCRIPTOR_FIELDS) | {"descriptor_kind", "manifest_ref", "manifest_sha256", "gaps"}):
+        raise ContractError("PARSE_DESCRIPTOR_INVALID", "Unknown manifest-reference descriptor fields or kind")
+    for key in _DESCRIPTOR_FIELDS + (() if compact else ("images", "gaps")):
         if descriptor.get(key) != manifest.get(key):
             raise ContractError("PARSE_DESCRIPTOR_INVALID", "Descriptor differs from fixed manifest: " + key)
+    if compact and descriptor["gaps"] != summarize_gaps(manifest.get("gaps", []), manifest_ref):
+        raise ContractError("PARSE_DESCRIPTOR_INVALID", "Descriptor differs from fixed manifest: gaps")
     files = manifest.get("files")
     if not isinstance(files, list) or not 4 <= len(files) <= 100000:
         raise ContractError("PARSE_DESCRIPTOR_INVALID", "Expected bounded parser output list")

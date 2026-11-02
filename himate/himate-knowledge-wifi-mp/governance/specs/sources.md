@@ -26,7 +26,11 @@ P5 成功发布后合并本批范围，部分完成仅写 processing，全文覆
 
 新文档使用 Docling 生成阅读稿、结构 JSON、定位及独立图片；MD/TXT 仍直接读取。PDF 使用 `artifacts/ingest/parsed/<cache-key>-<generation>/` 的可重建缓存，cache-key 绑定来源身份、原件 hash 与当前实际解析 profile。P1 命中时校验版本、配置和产物摘要，缺失、损坏或配置改变时生成新的 bundle，不覆盖已交接的 manifest；旧 generation 不在本轮递归清理。非 PDF 解析仍位于 `.build/materials/parsed`，P5 成功后随暂存清理。
 
-task 固定本轮解析描述符供 P2—P4 复用；PDF 先看 `.build/materials/pdf-review.json` 页索引，再分段读取 pdf-review.md 中选定页段，完整 source.parsed 供图表和必要补读，不默认将整本或整个候选包放入上下文。本轮依据丢失或摘要变化时停止并重新备料、审阅，不能重转后冒充已读材料。解析缓存可删除重建，累计覆盖仍由正式来源登记保存；缓存不是另一份 raw 来源。默认 native 不做 OCR，standard 只使用提前准备的本地模型；外部资源不自动抓取，图片语义由 Agent 实际看图后判断。
+`prepare_pdf` 交接 `descriptor_kind: manifest-reference` 的紧凑描述符：固定 manifest 入口及摘要、来源和解析配置身份、阅读稿/结构/定位入口、统计和缺口摘要，不重复复制全书 images/gaps。`parse` 与 `source extract` 的原完整描述符接口不变；`load` 仍完整核对 manifest 摘要、来源与 profile 身份及产物文件 hash，并可加载完整元数据。
+
+缺口按 code、severity、message 聚合，保留 count、最多 3 个 example_locators 和指向完整 manifest 的 details_ref；最多 64 类，其余以 OTHER_PARSE_GAPS 项累计。P1 task.gaps 交接次数及明细入口；pdf-review.json.gaps 使用同样摘要，gap_details_ref 指向固定 manifest，每页 images.provenance 仅保留本页。原始缺口明细仍在 manifest，原 parse_status 为 partial 时保持 partial；摘要不表示提取缺口已修复。
+
+task 固定本轮解析描述符供 P2—P4 复用；PDF 先看 `.build/materials/pdf-review.json` 页索引，再分段读取 pdf-review.md 中选定页段，按需沿入口补读完整结构和原件，不默认加载整本或整个候选包。实际 source_pages 内的图示仍须打开原 PDF 或页预览，缺口摘要或 image_count=0 不证明图示已被提取、理解；候选外未审图元留待续办。本轮依据丢失或摘要变化时停止并重新备料、审阅，不能重转后冒充已读材料。解析缓存可删除重建，累计覆盖仍由正式来源登记保存；缓存不是另一份 raw 来源。默认 native 不做 OCR，standard 只使用提前准备的本地模型；外部资源不自动抓取，图片语义由 Agent 实际看图后判断。
 
 `source extract` 为已登记来源生成独立阅读目录 `artifacts/source-read/<read_id>/`，可限制 PDF page_start/page_end；原件副本与解析材料都属于本次读取。它不清理入库 `.build`，不推进处理 hash。消费后 `source release` 精确释放该 ID，`source renew` 为未到期 ready 入口续期，默认 1800 秒；`source cleanup` 及新读取开始时有界回收已过期且非活跃转换的产物，不清理查询报告、模型或其他目录。没有后台清理进程，工作流应主动释放；损坏/未知租约保留诊断且受任务数上限约束。
 

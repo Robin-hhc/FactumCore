@@ -43,7 +43,7 @@ Git 用于按需读取已有历史版本。来源提交可以辅助定位原文�
 
 CLI 执行文件、结构解析、定位与固定检查，可调用预先准备的本地 Docling/OCR 模型；知识判断、图意理解与内容审阅由 Agent 完成，不自动调用远程视觉服务。Skill 包由 `SKILL.md` 和按需阅读的 references 组成；执行代码、依赖和测试集中在对应工程目录。运行包与治理规则分别由 `runtime/manifest.json`、`governance/framework.lock.yaml` 记录版本和文件摘要。
 
-文档解析由统一模块交付 Markdown 阅读稿、结构 JSON、定位、图片及缺口。PDF 全量解析位于现有 `artifacts/ingest/parsed/` 命名空间，按来源身份、原件 hash 和实际解析配置校验复用；缺失或损坏时生成新材料，不覆盖已经交接的固定 manifest。缓存可删除重建，不保存唯一进度。P1 在 `.build` 准备有限页材料包，P2—P4 先读取本批材料，必要时回到完整结构和原图；非 PDF 解析仍位于 `.build/materials/parsed/` 并随批次清理。转换稿不重新登记为另一份 raw 来源，OCR 和转换成功不等于图意已经审阅。
+文档解析由统一模块交付 Markdown 阅读稿、结构 JSON、定位、图片及缺口。PDF 全量解析位于现有 `artifacts/ingest/parsed/` 命名空间，按来源身份、原件 hash 和实际解析配置校验复用；缺失或损坏时生成新材料，不覆盖已经交接的固定 manifest。缓存可删除重建，不保存唯一进度。P1 在 `.build` 准备页材料包，通过固定 manifest 引用和带次数、明细入口的缺口摘要交接，不重复全书图片与缺口元数据。P2—P4 先读取实际范围，图示仍回到原 PDF 或页预览核对；摘要不改变 partial 状态，也不表示图形提取已修复。非 PDF 解析仍位于 `.build/materials/parsed/` 并随批次清理。转换稿不重新登记为另一份 raw 来源，OCR 和转换成功不等于图意已经审阅。
 
 ## 4. 核心业务协作
 

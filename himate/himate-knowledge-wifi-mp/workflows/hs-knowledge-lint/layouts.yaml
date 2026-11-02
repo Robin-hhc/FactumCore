@@ -1,36 +1,36 @@
 template_id: hs-knowledge-lint
 canvas:
   nodes:
-    sync_workspace:
-      x: 0
-      y: 0
-    plan_patrol:
-      x: 300
-      y: 0
-    prepare_sources:
-      x: 600
-      y: 0
-    plan_change:
-      x: 900
-      y: 0
-    materialize_view:
-      x: 1200
-      y: 0
-    lint_view:
-      x: 1500
-      y: 0
-    apply_view:
-      x: 1800
-      y: 0
-    refresh_index:
-      x: 2100
-      y: 0
-    complete_patrol:
-      x: 2400
-      y: 0
     __start__:
       x: -250
       y: 0
+    sync_workspace:
+      x: -27.85627811631666
+      y: -17.59343881030525
+    plan_patrol:
+      x: 288.2710407931298
+      y: -17.59343881030525
+    prepare_sources:
+      x: 616.1273189094464
+      y: 117.28959206870171
+    plan_change:
+      x: 864
+      y: 215.51962542623937
+    materialize_view:
+      x: 864
+      y: 385.5895339258568
+    lint_view:
+      x: 864
+      y: 542.4643633177454
+    apply_view:
+      x: 864
+      y: 697.8362386044178
+    refresh_index:
+      x: 861.1286837743385
+      y: -132.42752165418304
+    complete_patrol:
+      x: 1228.5701992138418
+      y: 29.32239801717543
     __end__:
-      x: 2700
-      y: 0
+      x: 1607.7406738602153
+      y: 43.983597025763146

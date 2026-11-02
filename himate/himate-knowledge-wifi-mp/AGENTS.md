@@ -6,7 +6,7 @@
 
 入库P1选一个变化文件、P2决策、P3写卡、P4独立审阅、P5入库。11个Skill按单步职责提供指引，CLI负责机械步骤及预先配置的本地文档/OCR解析，不自主调用生成式模型；看图与知识判断由宿主Agent完成。详细规则见[文档入口](docs-llm-wiki/README.md)。
 
-在数据所在端原生知识根运行knowledge.py或sh ./knowledge.sh；Windows可用.\knowledge.cmd。部署也从本知识根运行deploy.ps1或sh ./deploy.sh，选用已有Python3.10—3.12。脚本先展示OpenFlow Skill、CAC Skill和OpenFlow Workflow的默认目录，回车采用或输入自定义地址，并收集项目入口的覆盖选择：默认y、输入n保留。确认选择后安装依赖，删除本次同名包并复制新包，再把config.yml和AGENTS-code-root.md按选择复制到../../的config.yml和AGENTS.md。pip失败不动旧包或入口，源码模板与其他包保留。远端由宿主已有SSH工具执行同一CLI，不逐次传Skill脚本。
+在数据所在端原生知识根运行knowledge.py或sh ./knowledge.sh；Windows可用.\knowledge.cmd。部署也从本知识根运行deploy.ps1或sh ./deploy.sh，选用已有Python3.10—3.12。脚本先展示OpenFlow Skill、CAC Skill和OpenFlow Workflow的默认目录，回车采用或输入自定义地址，并收集项目入口的覆盖选择：默认y、输入n保留。确认后默认沿用执行端pip配置安装Docling多格式解析与OCR完整依赖并准备artifacts/models/docling-cpu本地模型；完整模型复用，否则优先校验tools/deploy/models内附权重并离线复制；未携带权重时才预置或显式--download-models/-DownloadModels下载，随包权重损坏则停止。准备均成功后才删除本次同名包并复制新包，再把config.yml和AGENTS-code-root.md按选择复制到../../的config.yml和AGENTS.md。依赖或模型准备失败不动旧包或入口，源码模板与其他包保留。解析默认仍为native，扫描件显式选择standard与本地模型。远端由宿主已有SSH工具执行同一CLI，不逐次传Skill脚本。
 
 .build只保存本轮暂存，P1会清空。P5失败直接重试，不能先回P1。数据库在artifacts/knowledge.sqlite，入库回执在artifacts/ingest/latest.json，独立搜索报告在artifacts/query，巡检汇总在artifacts/patrol。query可与写流程共存；lint与ingest串行运行，运行环境和正式记录在.build以外。artifacts含独立模型与本机材料，不整目录清空。
 

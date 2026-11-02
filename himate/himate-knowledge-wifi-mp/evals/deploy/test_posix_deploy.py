@@ -24,7 +24,8 @@ def recorder(path):
 
 
 @pytest.mark.parametrize("selection", ["default", "environment", "flag", "equals"])
-def test_posix_selects_python_and_forwards_paths_from_another_directory(tmp_path, selection):
+@pytest.mark.parametrize("download_models", [False, True])
+def test_posix_selects_python_and_forwards_paths_from_another_directory(tmp_path, selection, download_models):
     distribution = tmp_path / "distribution with spaces"
     distribution.mkdir()
     wrapper = distribution / "deploy.sh"
@@ -50,6 +51,8 @@ def test_posix_selects_python_and_forwards_paths_from_another_directory(tmp_path
         arguments += ["--python=" + str(selected)]
     else:
         selected = default
+    if download_models:
+        arguments.append("--download-models")
 
     result = subprocess.run(["sh", str(wrapper), *arguments], cwd=working, env=environment,
                             capture_output=True, timeout=30)
@@ -94,4 +97,15 @@ def test_posix_help_reaches_shared_backend_without_deployment(tmp_path):
                             cwd=tmp_path, capture_output=True, timeout=30)
     assert result.returncode == 0, result.stderr.decode("utf-8", "replace")
     assert b"--skills-root" in result.stdout and b"--workflows-root" in result.stdout
+    assert b"--skip-ocr" not in result.stdout
+    assert b"--download-models" in result.stdout
     assert not (tmp_path / ".openflow").exists()
+
+
+def test_posix_rejects_removed_skip_option_before_deployment(tmp_path):
+    result = subprocess.run(
+        ["sh", str(WRAPPER), "--python", sys.executable, "--skip-ocr", "--source-root", str(tmp_path)],
+        cwd=tmp_path, capture_output=True, timeout=30)
+    assert result.returncode == 2
+    assert b"unrecognized arguments: --skip-ocr" in result.stderr
+    assert not (tmp_path / "artifacts").exists()

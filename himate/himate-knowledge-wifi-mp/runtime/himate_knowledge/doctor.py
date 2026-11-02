@@ -204,6 +204,22 @@ def _doctor_configuration(root, yaml_available, gaps, rules):
     return data
 
 
+def _matches_pin(actual, expected):
+    if actual is None:
+        return False
+    if actual == expected:
+        return True
+    try:
+        from packaging.specifiers import InvalidSpecifier, SpecifierSet
+        from packaging.version import InvalidVersion
+    except ImportError:
+        return False
+    try:
+        return SpecifierSet("==" + expected).contains(actual, prereleases=True)
+    except (InvalidSpecifier, InvalidVersion):
+        return False
+
+
 def doctor(root, manifest):
     gaps, dependencies = [], []
     for line in (root / "runtime/requirements.lock.txt").read_text(encoding="utf-8").splitlines():
@@ -230,9 +246,9 @@ def doctor(root, manifest):
         except importlib.metadata.PackageNotFoundError:
             actual = None
         dependencies.append({"name": name, "expected": expected, "actual": actual})
-        if actual != expected:
+        if not _matches_pin(actual, expected):
             gaps.append({"code": "DEPENDENCY_UNAVAILABLE", "message": name + " requires " + expected})
-    yaml_available = any(row["name"].casefold() == "pyyaml" and row["actual"] == row["expected"]
+    yaml_available = any(row["name"].casefold() == "pyyaml" and _matches_pin(row["actual"], row["expected"])
                          for row in dependencies)
     if not yaml_available:
         _doctor_gap(gaps, "YAML_PARSER_UNAVAILABLE", "Pinned PyYAML is required to inspect rule/configuration data",

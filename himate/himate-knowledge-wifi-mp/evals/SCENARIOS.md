@@ -31,7 +31,7 @@
 | 来源稍后再变 | P5 保存 P1 记录的 hash，后续扫描仍能发现新的版本 | `ingest/` |
 | 数据库重建 | 由正式卡和来源登记恢复双向关系及无卡成功事实 | `catalog/` |
 | 工作区和诊断 | doctor 选择确切配置，拒绝无效或歧义映射；错误不创建目标仓 | `cli/`、`contracts/test_workspace_mapping.py` |
-| Skill 与 Workflow 模板安装 | 先向选定 Python 执行一次锁定依赖的 pip 安装，再删除本次全部同名包目录，最后复制全部新包；pip 失败不动旧包，同名包完整替换，源码和目标根其他包保留 | [deploy/test_install_skills.py](deploy/test_install_skills.py)（模拟 pip） |
+| Skill 与 Workflow 模板安装 | 默认沿用 pip 配置安装锁定的 Docling 多格式解析与 OCR 完整依赖，复用运行模型或校验内附清单后离线安装，损坏集合不联网；准备均成功后才替换本次全部同名包，依赖或模型准备失败保留旧包与入口；源码和目标根其他包保留 | [deploy/test_install_skills.py](deploy/test_install_skills.py)（模拟依赖安装与模型准备） |
 | Linux / PowerShell 部署入口 | Linux/PowerShell 入口选择解释器并保留含空格参数；Linux 入口传递失败退出码，并在空解释器参数时拒绝调用后端 | [deploy/test_posix_deploy.py](deploy/test_posix_deploy.py)、[deploy/test_install_skills.py](deploy/test_install_skills.py) |
 
 六决策的语义效果需要作者和独立 reviewer 在实际材料上核验；仅通过脚本不能证明自动知识蒸馏质量。Workflow 静态测试也不代表实际宿主执行过。

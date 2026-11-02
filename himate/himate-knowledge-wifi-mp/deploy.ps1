@@ -12,7 +12,8 @@ param(
     [string]$WorkflowsRoot,
     [string]$Python = 'python',
     [string]$SourceRoot = $PSScriptRoot,
-    [switch]$NonInteractive
+    [switch]$NonInteractive,
+    [switch]$DownloadModels
 )
 
 Set-StrictMode -Version Latest
@@ -30,6 +31,7 @@ if (-not [string]::IsNullOrWhiteSpace($WorkflowsRoot)) {
     $deployArguments += @('--workflows-root', $WorkflowsRoot)
 }
 if ($NonInteractive) { $deployArguments += '--non-interactive' }
+if ($DownloadModels) { $deployArguments += '--download-models' }
 
 & $Python @deployArguments
 exit $LASTEXITCODE

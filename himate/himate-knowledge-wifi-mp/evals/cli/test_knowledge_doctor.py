@@ -33,12 +33,17 @@ def knowledge(tmp_path):
     return root
 
 
-def observe(root, *, no_site=False):
+def observe(root, *, no_site=False, site_packages=None):
     before = {p.relative_to(root).as_posix(): p.read_bytes() for p in root.rglob("*") if p.is_file()}
     command = [sys.executable, "-B"] + (["-S"] if no_site else [])
     environment = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8")
     environment.pop("PYTHONPATH", None)
-    result = subprocess.run([*command, str(root / "knowledge.py"), "doctor", "--json"],
+    arguments = [str(root / "knowledge.py"), "doctor", "--json"]
+    if site_packages is not None:
+        launcher = ("import runpy, sys; sys.path.append(sys.argv[1]); "
+                    "sys.argv = sys.argv[2:]; runpy.run_path(sys.argv[0], run_name='__main__')")
+        arguments = ["-c", launcher, str(site_packages), *arguments]
+    result = subprocess.run([*command, *arguments],
                             cwd=root, capture_output=True, encoding="utf-8", env=environment, timeout=60)
     assert "Traceback" not in result.stderr, result.stderr
     report = json.loads(result.stdout)
@@ -278,3 +283,34 @@ def test_doctor_checks_only_dependencies_for_the_current_python_and_platform(kno
     status, report = observe(knowledge)
     assert status == 0, report
     assert all(row["name"] != "nonexistent-other-platform-dependency" for row in report["data"]["dependencies"])
+
+
+@pytest.mark.parametrize("version,ready", [
+    ("1.2.3+cpu", True), ("1.2.3+vendor.7", True),
+    ("1.2.4", False), ("not-a-version", False),
+])
+def test_doctor_matches_installed_distribution_versions_like_pip(knowledge, version, ready):
+    # A real distribution metadata record is sufficient; no package code is
+    # imported or installed to test the execution host's version matching.
+    site = knowledge.parent / "synthetic-site-packages"
+    distribution = site / "sample_library-0.dist-info"
+    distribution.mkdir(parents=True)
+    (distribution / "METADATA").write_text(
+        "Metadata-Version: 2.1\nName: sample-library\nVersion: " + version + "\n",
+        encoding="utf-8",
+    )
+    lock = knowledge / "runtime/requirements.lock.txt"
+    with lock.open("a", encoding="utf-8") as stream:
+        stream.write("\nsample-library==1.2.3\n")
+    manifest_path = knowledge / "runtime/manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["files"]["requirements.lock.txt"]["sha256"] = hashlib.sha256(lock.read_bytes()).hexdigest()
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    status, report = observe(knowledge, site_packages=site)
+    dependency = next(row for row in report["data"]["dependencies"] if row["name"] == "sample-library")
+    assert dependency == {"name": "sample-library", "expected": "1.2.3", "actual": version}
+    assert status == (0 if ready else 3), report
+    assert report["status"] == ("ok" if ready else "blocked"), report
+    if not ready:
+        assert {"code": "DEPENDENCY_UNAVAILABLE", "message": "sample-library requires 1.2.3"} in report["diagnostics"]

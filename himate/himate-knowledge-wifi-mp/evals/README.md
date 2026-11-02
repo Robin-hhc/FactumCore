@@ -13,7 +13,7 @@
 | `cli/` | doctor、命令错误与目标目录边界 |
 | `workflows/` | 五节点顺序、作者与独立审阅职责、返工目标、能力包归属 |
 | `integration/` | 仓内启动器的单文件调用和跨功能闭环 |
-| `deploy/` | 部署后端的依赖安装顺序、包替换与目录保护，以及 Linux/PowerShell 入口的参数与退出码传递 |
+| `deploy/` | 部署后端的依赖与模型准备顺序、失败保护、包替换与目录保护，以及 Linux/PowerShell 入口的参数与退出码传递 |
 | `tooling/` | 测试发现、超时及 JUnit/汇总报告 |
 | `support/` | 公共开发夹具和规则装载助手，不含业务测试 |
 
@@ -36,13 +36,13 @@ python himate/himate-knowledge-wifi-mp/evals/run_acceptance.py --profile quick -
 python -m pytest himate/himate-knowledge-wifi-mp/evals/ingest -q
 ```
 
-quick 仅选每个职责目录排序后的首个测试文件，是明确的局部冒烟。`--groups` 同样是局部范围；验证按实际修改范围选择，不把每次局部工作都扩成全量测试。真实部署依次执行一次锁定依赖的 pip 安装、删除本次全部同名 Skill 和 Workflow 包目录、复制全部新包，宿主加载运行，不在安装后追加测试。
+quick 仅选每个职责目录排序后的首个测试文件，是明确的局部冒烟。`--groups` 同样是局部范围；验证按实际修改范围选择，不把每次局部工作都扩成全量测试。真实部署默认沿用 pip 配置安装锁定的 Docling 多格式解析与 OCR 完整依赖，复用完整运行模型或校验内附集合后离线安装。准备成功后才替换本次同名 Skill 和 Workflow 包目录，由宿主加载运行，不在安装后追加测试。
 
 输出目录必须全新。运行器保留每组 JUnit、stdout/stderr、实际选择和 `summary.json`；超时、收集失败、空测试组和无效报告不能算通过。`--jobs` 控制测试组并行，不表示生产 ingest/lint 支持并发写入。性能统计只作观察，不设速度门禁；`--baseline` 仅在环境和选择一致时比较。
 
 ## 验证边界
 
-独立算法检查、隔离 CLI 测试和公司实际环境分别记录。[deploy/test_install_skills.py](deploy/test_install_skills.py) 与 [deploy/test_posix_deploy.py](deploy/test_posix_deploy.py) 使用临时目录、模拟 pip 和解释器记录器，验证三步顺序、pip 失败时旧包保留、同名包完整替换、其他包与源码保留，以及 Linux/PowerShell 入口的解释器选择、参数与退出码传递；部署不分发知识仓或 ZIP。该冒烟不代表真实安装环境、OpenFlow 宿主触发或业务知识验收。
+独立算法检查、隔离 CLI 测试和公司实际环境分别记录。[deploy/test_install_skills.py](deploy/test_install_skills.py) 与 [deploy/test_posix_deploy.py](deploy/test_posix_deploy.py) 使用临时目录、模拟依赖安装、模型准备和解释器记录器，验证准备与替换顺序、内附清单与小型合成模型的大小及摘要核对和离线复制、损坏或缺件时不联网、依赖或模型准备失败时旧包和入口保留、同名包完整替换、其他包与源码保留，以及 Linux/PowerShell 入口的解释器选择、参数与退出码传递；部署不分发知识仓或 ZIP。该冒烟不代表真实安装环境、OpenFlow 宿主触发或业务知识验收。Python 3.10—3.12 的依赖兼容与真实 OCR 结果按实际执行端分别记录，未测平台不据此视为通过。
 
 P2、P3 由作者执行，P4 由独立 reviewer 读计划、旧卡、新稿和依据。合成脚本测试可以验证角色与返工配置，不能替代真实内容审阅质量。真实 Linux、公司文档、代码实现和权限效果由实际试用单列验收。
 

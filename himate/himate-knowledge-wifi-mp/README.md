@@ -1,15 +1,15 @@
 # HiMate WiFi Knowledge
 
-HiMate 将设计文档、规格和代码分析蒸馏为可追溯知识卡，通过来源 ID 和具体定位关联原文与实现，供 Agent 在开发和问题定位时检索使用。
+HiMate 将设计文档、规格和代码分析蒸馏为可追溯知识卡，供 Agent 在开发和问题定位时检索使用。
+
+从[使用说明](docs-llm-wiki/使用说明.md)开始：一次安装完整的 Docling 多格式解析与 OCR 环境，将文档放入 `docs-raw/`，在 OpenFlow 入库和提问。
 
 | 任务 | 入口 |
 |---|---|
 | 处理新增、修改或删除的文档 | `hs-knowledge-ingest` Workflow |
 | 巡检原件和已引用代码的变化 | `hs-knowledge-lint` Workflow |
-| 精确检索、精读卡片及追溯来源 | `hs-knowledge-query` Skill |
+| 检索、精读卡片及追溯来源 | `hs-knowledge-query` Skill |
 
-知识根由项目 `config.yml` 选择，默认位于 `repo/himate/himate-knowledge-wifi-mp/`；`repo/` 是可包含多个代码仓的 manifest 工作区根，不要求自身为 Git 仓。部署入口、Skill、Workflow 和工具均在知识根内。首次从本目录运行部署脚本，安装依赖和能力包，并确认项目入口文件的覆盖选择；日常将文档放入 `docs-raw/`，在 OpenFlow 运行入库工作流，再使用 Query Skill 提问。
+知识根由项目 `config.yml` 选择，默认位于 `repo/himate/himate-knowledge-wifi-mp/`；`repo/` 是可包含多个代码仓的工作区根，不要求自身为 Git 仓。
 
-[使用说明](docs-llm-wiki/使用说明.md)介绍部署和 OpenFlow 日常操作；[运维与命令参考](docs-llm-wiki/运维与命令参考.md)提供环境准备及手动命令；[详细设计](docs-llm-wiki/知识库详细设计.md)说明入库、巡检及检索；[架构设计](docs-llm-wiki/HiMate知识库架构设计.md#53-himate-knowledge目录架构)说明组件与目录分工。开发者从[开发指南](CONTRIBUTING.md)进入。
-
-原件在 `docs-raw/`，正式卡在 `knowledge/`，来源身份和处理版本保存在 `governance/sources.lock.yaml`。`.build/` 保存当前任务的材料与候选；`artifacts/` 保存派生数据库、运行回执和阅读产物，也可存放独立维护的本地模型，不能整目录清空。更新与清理边界见[架构设计 §5.5](docs-llm-wiki/HiMate知识库架构设计.md#55-框架更新与目录清理)。
+开发者从[开发指南](CONTRIBUTING.md)进入；组件与数据归属见[架构设计](docs-llm-wiki/HiMate知识库架构设计.md#53-himate-knowledge目录架构)，流程机制见[详细设计](docs-llm-wiki/知识库详细设计.md)。

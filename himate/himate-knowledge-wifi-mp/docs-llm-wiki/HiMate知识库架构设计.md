@@ -78,7 +78,7 @@ flowchart LR
 
 部署入口、分发源码与工具均位于知识根：`deploy.ps1`、`deploy.sh`、`skills/`、`workflows/` 和 `tools/`。Windows 与 Linux 入口共用 Python 后端，交互展示两个 Skill 安装目录和一个 Workflow 模板目录，回车采用默认值，也可输入自定义路径。
 
-默认将 Skill 同时安装到 `~/.openflow/config/skills` 和 `~/.cac/skills`，将 Workflow 安装到 `~/.openflow/config/workflow-templates`。执行前还收集已有项目入口的覆盖选择，默认 `y`，输入 `n` 保留。确认后依次安装锁定依赖、删除全部本次同名包目录、复制全部新包，再按选择将两个源模板复制到 manifest 根；pip 失败不动旧包或入口，其他包与源文件保留。脚本不下载 Python、不创建虚拟环境、不配置远端 SSH 或注册宿主。
+默认将 Skill 同时安装到 `~/.openflow/config/skills` 和 `~/.cac/skills`，将 Workflow 安装到 `~/.openflow/config/workflow-templates`。执行前还收集已有项目入口的覆盖选择，默认 `y`，输入 `n` 保留。确认后，沿用执行端 pip 镜像安装面向 Python 3.10—3.12 的锁定 OCR 依赖，并校验知识根的 `artifacts/models/docling-cpu/`。依赖采用普通 PyTorch 发行包，CPU 表示解析器的推理设备选择；Linux 普通包还会安装 CUDA 相关运行依赖，体积按平台和版本核对。完整模型直接复用；否则优先校验 `tools/deploy/models/` 中的清单与内附权重，离线复制到运行目录。内附集合损坏则停止，未携带集合时才预置文件或显式 `--download-models` / `-DownloadModels` 下载，默认不访问模型站点。脚本和锁不追加外网包源，内部镜像需提供锁定发行包及其平台依赖。准备均成功后才删除全部本次同名包目录、复制全部新包，再按选择将两个源模板复制到 manifest 根；依赖或模型准备失败不动旧包或入口，其他包与源文件保留。脚本不下载 Python、不创建虚拟环境、不配置远端 SSH 或注册宿主。
 
 ### 5.3 HiMate Knowledge目录架构
 
@@ -94,7 +94,8 @@ repo/
         ├── skills/                    Skill 分发源码
         ├── workflows/                 Workflow 模板
         ├── tools/
-        │   ├── deploy/                共用部署实现与说明
+        │   ├── deploy/                共用部署实现、说明与离线模型包
+        │   │   └── models/            摘要清单、来源说明及 docling-cpu 权重
         │   └── knowledge/             开发工具
         ├── knowledge.py / knowledge.cmd / knowledge.sh
         ├── runtime/                   CLI、运行包和运行依赖锁
@@ -123,7 +124,7 @@ repo/
         │   ├── sources/               按需恢复的来源版本
         │   ├── source-read/           隔离的临时原件阅读任务与到期租约
         │   ├── patrol/                巡检统计
-        │   └── models/                独立准备和维护的本地解析模型
+        │   └── models/                部署准备并独立维护的本地解析模型
         ├── evals/                     全部开发测试与公共夹具
         │   └── deploy/                部署工具测试
         └── docs-llm-wiki/              设计与使用说明
@@ -140,7 +141,8 @@ repo/
 | `artifacts/knowledge.sqlite` | 可从来源登记和正式卡重建的派生索引 |
 | `artifacts/ingest/`、`query/`、`patrol/`、`sources/` | 运行回执、检索和巡检报告、按需恢复副本；按实际使用情况清理 |
 | `artifacts/source-read/` | 临时文档阅读使用独立 ID，消费后释放并有界回收过期产物 |
-| `artifacts/models/` | 独立准备和维护的解析模型，入库和阅读清理均保留 |
+| `tools/deploy/models/` | 离线分发的模型清单和权重；8 个必需模型约 416.18 MB，二进制另行随包携带，Git 克隆不含权重 |
+| `artifacts/models/` | 部署从内附模型安装、复用或显式下载后独立维护的运行模型，入库和阅读清理均保留 |
 | Python 环境 | 在 `.build` 之外独立准备和维护 |
 
 执行端保留来源登记和正式卡即可重建查询数据库。原件是否能回到某个旧版本，还取决于对应 Git 历史或已保留材料是否可用。
@@ -162,6 +164,7 @@ repo/
 | `runtime/`、仓内启动器与检查入口 | 按同一发行版本替换程序文件，运行环境独立维护 |
 | `governance/` 中算法、Schema、模板、规则及 `framework.lock.yaml` | 按同一版本更新并保持摘要一致；项目定制规则按需合并，不能整目录删除 |
 | `docs-llm-wiki/`、`evals/` | 更新随版本发布的文件，保留本地 SDD、任务和历史工件 |
+| `tools/deploy/models/` | 清单与匹配权重一同更新和交付，不以新清单搭配旧权重；二进制按离线分发方式补齐 |
 | 已安装的同名 Skill、Workflow 包 | 由部署脚本完整替换，其他包保留 |
 
 空闲时可清理已消费报告、可重建数据库和 Python/测试工具缓存。`artifacts/` 可能同时存放模型、环境和本机材料，不整目录删除；临时原件阅读使用专用释放与过期回收命令。已有备份和历史证据按项目保留规则单独管理。
@@ -182,4 +185,4 @@ repo/
 
 不同群组分别管理知识根、可引用代码范围及执行环境，并通过实际存储权限和运行账户控制访问。原件、卡片、数据库、缓存和记录应处于一致的访问边界；标签与检索条件用于选择内容范围。
 
-日常部署与 OpenFlow 操作见[使用说明](使用说明.md)，环境配置和手动命令见[运维与命令参考](运维与命令参考.md)，来源格式及适用条件原则见[知识库关键点](知识库关键点.md)。
+日常部署与 OpenFlow 操作见[使用说明](使用说明.md)，来源格式及适用条件原则见[知识库关键点](知识库关键点.md)。

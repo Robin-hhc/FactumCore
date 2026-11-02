@@ -32,6 +32,16 @@ _DEFAULTS = {
 _HASH = re.compile(r"[0-9a-f]{64}")
 _CELL = re.compile(r"\$?([A-Za-z]{1,3})\$?([1-9][0-9]{0,6})")
 _PREVIEW_LIMITS = {"max_pages": 8, "max_pixels": 16_000_000, "max_png_bytes": 16 * 1024 * 1024, "scale": 1.5}
+OCR_MODEL_FILES = (
+    "docling-project--docling-layout-heron/config.json",
+    "docling-project--docling-layout-heron/preprocessor_config.json",
+    "docling-project--docling-layout-heron/model.safetensors",
+    "docling-project--docling-models/model_artifacts/tableformer/accurate/tm_config.json",
+    "docling-project--docling-models/model_artifacts/tableformer/accurate/tableformer_accurate.safetensors",
+    "RapidOcr/PP-OCRv6_det_small.onnx",
+    "RapidOcr/PP-OCRv6_rec_small.onnx",
+    "RapidOcr/ch_ppocr_mobile_v2.0_cls_mobile.onnx",
+)
 
 
 def safe_path(root, reference, allowed_prefixes=None):
@@ -178,14 +188,7 @@ def _models(root, options):
     directory = safe_path(root, options["models_path"], ["artifacts/models"])
     if not directory.is_dir():
         raise ContractError("PARSER_MODELS_REQUIRED", "The configured local model directory is unavailable")
-    required = ["docling-project--docling-layout-heron/config.json",
-                "docling-project--docling-layout-heron/preprocessor_config.json",
-                "docling-project--docling-layout-heron/model.safetensors",
-                "docling-project--docling-models/model_artifacts/tableformer/accurate/tm_config.json",
-                "docling-project--docling-models/model_artifacts/tableformer/accurate/tableformer_accurate.safetensors",
-                "RapidOcr/PP-OCRv6_det_small.onnx", "RapidOcr/PP-OCRv6_rec_small.onnx",
-                "RapidOcr/ch_ppocr_mobile_v2.0_cls_mobile.onnx"]
-    for reference in required:
+    for reference in OCR_MODEL_FILES:
         path = safe_path(directory, reference)
         if not path.is_file() or not path.stat().st_size:
             raise ContractError("PARSER_MODELS_REQUIRED", "Preinstalled standard model set is incomplete: " + reference)

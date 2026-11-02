@@ -1,5 +1,5 @@
 #!/bin/sh
-# Install with the same Python that runs the shared deployment backend.
+# Install the complete document runtime; model downloads require explicit --download-models.
 set -eu
 
 python=${HIMATE_KNOWLEDGE_PYTHON:-python3}

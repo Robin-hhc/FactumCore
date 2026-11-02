@@ -30,9 +30,9 @@ Windows 入口默认使用 `python`，通过 `-Python` 选择解释器。两个�
 
 脚本收集知识根 `skills/` 中含 `SKILL.md` 的能力包，以及 `workflows/` 中含 `workflow.yaml` 的模板包。两个 Skill 目标安装同一组包，Workflow 只安装到 OpenFlow 模板目录。先收集目录与项目入口覆盖选择、校验路径，再依次执行：
 
-1. 向选定的 Python 执行一次锁定运行依赖的 pip 安装。
-2. 删除三个目标内本次全部同名包的完整目录及旧内容。
-3. 将新包复制到各自目标目录。
+1. 向选定的 Python 安装 `runtime/requirements.lock.txt` 的完整 Docling 多格式解析与 OCR 依赖。
+2. 优先复用源知识根 `artifacts/models/docling-cpu/` 中的完整模型；否则验证 `tools/deploy/models/manifest.json` 和内附 `docling-cpu/` 的文件大小、SHA-256 及路径，离线安装到运行目录。内附集合损坏则失败；未携带集合时才按显式下载选项获取模型。
+3. 依赖和模型准备均成功后，删除三个目标内本次全部同名包的完整目录及旧内容，再将新包复制到各自目标目录。
 
 第一步使用的命令为：
 
@@ -40,7 +40,12 @@ Windows 入口默认使用 `python`，通过 `-Python` 选择解释器。两个�
 python -m pip install -r runtime/requirements.lock.txt
 ```
 
-使用执行端已有的 Python 3.10–3.12；Linux 的 `--python`、Windows 的 `-Python` 指定运行部署后端和安装依赖的同一解释器。脚本不下载 Python、不创建虚拟环境。pip 失败时停止，保留全部旧包。
+唯一运行锁面向 Python 3.10–3.12，使用普通 `torch==2.14.1`、`torchvision==0.29.2` 发行包；解析器使用 CPU 推理。Linux 的 `--python`、Windows 的 `-Python` 指定运行部署后端、安装依赖和准备模型的同一解释器。包安装沿用已有 pip 配置，不指定或追加外网索引；内部镜像须提供锁定版本及其平台依赖，缺包时明确失败，不自动切换源。Linux 普通 PyTorch 会引入 CUDA 运行库等 Python 依赖，安装体积通常更大，OCR 仍按 CPU 运行。本地模型完整时复用；否则优先校验内附集合并离线安装，损坏集合明确失败。未携带模型且本地也缺失时，只有显式 `--download-models` / `-DownloadModels` 才访问模型来源。脚本不下载 Python、不创建虚拟环境。依赖安装或模型准备失败时停止，保留全部旧包和项目入口。
+
+内附模型位于 `models/docling-cpu/`，由同级 `models/manifest.json` 固定大小与摘要，共 8 个必需文件、416,177,665 字节，约 416.18 MB（396.90 MiB）。离线交付时随知识包携带这整个目录及匹配清单；权重二进制由 Git 忽略，单独克隆仓库不会取得它。
+
+`--download-models` / `-DownloadModels` 显式允许未携带模型且本地缺失时下载。默认不访问模型站点，存在但损坏的内附集合不会触发下载回退。
+
 
 ```powershell
 .\deploy.ps1 -SkillsRoot 'OPENFLOW_SKILLS_ROOT' -CacSkillsRoot 'CAC_SKILLS_ROOT' -WorkflowsRoot 'WORKFLOWS_ROOT' -Python 'PATH_TO_PYTHON'
@@ -67,4 +72,4 @@ python tools/deploy/deploy.py --skills-root SKILLS_ROOT --workflows-root WORKFLO
 
 自动化执行可加 `--non-interactive` 或 `-NonInteractive`，未指定目录采用默认值，已有项目入口按默认 `y` 覆盖。安装器不搬运知识根、不配置远端 SSH、不下载 Python、不创建虚拟环境、不注册宿主，也不追加部署后验证。宿主从实际安装目录加载能力；远端数据执行端仍需具备代码、配置、解释器与依赖。
 
-开发测试统一位于 [evals/deploy/](../../evals/deploy/)，从 manifest 根通过 [evals 运行器](../../evals/README.md#执行) 的 `--groups deploy` 执行。测试使用临时目录、模拟 pip 和解释器记录器，验证包安装顺序、三路包替换、入口覆盖选择及跨平台参数传递；不会向用户安装目录实际部署。日常操作见[使用说明](../../docs-llm-wiki/使用说明.md)。
+开发测试统一位于 [evals/deploy/](../../evals/deploy/)，从 manifest 根通过 [evals 运行器](../../evals/README.md#执行) 的 `--groups deploy` 执行。测试使用临时目录、模拟依赖安装、模型准备和解释器记录器，验证准备顺序、内附清单与小型合成模型的完整性和离线复制、损坏集合不联网、失败保留旧包、三路包替换、入口覆盖选择及平台入口参数传递；不会向用户安装目录实际部署。模拟测试不代替执行端真实安装和 OCR 验证。日常操作见[使用说明](../../docs-llm-wiki/使用说明.md)。

@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "model_set": "docling-cpu",
   "files": [
     {
@@ -15,7 +15,29 @@
     {
       "path": "docling-project--docling-layout-heron/model.safetensors",
       "bytes": 171658996,
-      "sha256": "00333a43451945aaf89db8ca9c0a17e75d1537c17db60fdb91aa95f4c7929e0c"
+      "sha256": "00333a43451945aaf89db8ca9c0a17e75d1537c17db60fdb91aa95f4c7929e0c",
+      "parts": [
+        {
+          "path": "docling-project--docling-layout-heron/model.safetensors.part001",
+          "bytes": 50331648,
+          "sha256": "69379f1850d43b57430ce95ba1ac964ed56b2c8039e0cd3900e1d3cf573683c2"
+        },
+        {
+          "path": "docling-project--docling-layout-heron/model.safetensors.part002",
+          "bytes": 50331648,
+          "sha256": "b76e66e27e57c00db0e1d389b3e55a63d8f218ebdc8eff4bb4aa5b79e05ddbd0"
+        },
+        {
+          "path": "docling-project--docling-layout-heron/model.safetensors.part003",
+          "bytes": 50331648,
+          "sha256": "f21bdf9ddac4a308889e279845107ae1bc2a1d8662678e2ce149a6cc96052bc6"
+        },
+        {
+          "path": "docling-project--docling-layout-heron/model.safetensors.part004",
+          "bytes": 20664052,
+          "sha256": "a45b63b31eff0a88d0e2f2018a91f2c569cf0b7d9723e7a33ec720f8f4382d25"
+        }
+      ]
     },
     {
       "path": "docling-project--docling-models/model_artifacts/tableformer/accurate/tm_config.json",
@@ -25,7 +47,34 @@
     {
       "path": "docling-project--docling-models/model_artifacts/tableformer/accurate/tableformer_accurate.safetensors",
       "bytes": 212758388,
-      "sha256": "2a7d6c924b3cd12fb99a09280ca9c33a89c5d60b93253617d2e088c1a40374d9"
+      "sha256": "2a7d6c924b3cd12fb99a09280ca9c33a89c5d60b93253617d2e088c1a40374d9",
+      "parts": [
+        {
+          "path": "docling-project--docling-models/model_artifacts/tableformer/accurate/tableformer_accurate.safetensors.part001",
+          "bytes": 50331648,
+          "sha256": "f4d55c067761cfa4f7b8f956f73ca76e519530b0ce4482de914a02f8b74b2522"
+        },
+        {
+          "path": "docling-project--docling-models/model_artifacts/tableformer/accurate/tableformer_accurate.safetensors.part002",
+          "bytes": 50331648,
+          "sha256": "9a4aac969a23305eddb0cba1dfe5b511fc2f449e9e5d68b99ec59752a7321fad"
+        },
+        {
+          "path": "docling-project--docling-models/model_artifacts/tableformer/accurate/tableformer_accurate.safetensors.part003",
+          "bytes": 50331648,
+          "sha256": "c93368b883f700329342088275ffb87eaf1f20583b89436ff2aa36a2d3910518"
+        },
+        {
+          "path": "docling-project--docling-models/model_artifacts/tableformer/accurate/tableformer_accurate.safetensors.part004",
+          "bytes": 50331648,
+          "sha256": "086c514f26b37c18b66ee20e0ca7e65c21a77285a3964b06c862b0282279acdb"
+        },
+        {
+          "path": "docling-project--docling-models/model_artifacts/tableformer/accurate/tableformer_accurate.safetensors.part005",
+          "bytes": 11431796,
+          "sha256": "10b54a10f33448bc14b0e8eeb9e7065938cd2dce66970db19e8cbc40f93597c8"
+        }
+      ]
     },
     {
       "path": "RapidOcr/PP-OCRv6_det_small.onnx",

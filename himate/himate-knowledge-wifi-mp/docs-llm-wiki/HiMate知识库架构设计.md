@@ -141,7 +141,7 @@ repo/
 | `artifacts/knowledge.sqlite` | 可从来源登记和正式卡重建的派生索引 |
 | `artifacts/ingest/`、`query/`、`patrol/`、`sources/` | 运行回执、检索和巡检报告、按需恢复副本；按实际使用情况清理 |
 | `artifacts/source-read/` | 临时文档阅读使用独立 ID，消费后释放并有界回收过期产物 |
-| `tools/deploy/models/` | 离线分发的模型清单和权重；8 个必需模型约 416.18 MB，二进制另行随包携带，Git 克隆不含权重 |
+| `tools/deploy/models/` | 随 Git 提交的模型清单和权重；8 个必需模型约 416.18 MB，大权重分片保存，部署自动校验并合并 |
 | `artifacts/models/` | 部署从内附模型安装、复用或显式下载后独立维护的运行模型，入库和阅读清理均保留 |
 | Python 环境 | 在 `.build` 之外独立准备和维护 |
 

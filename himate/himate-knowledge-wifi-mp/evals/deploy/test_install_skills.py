@@ -358,6 +358,107 @@ def write_model_bundle(model_preparation):
     return bundle, manifest, value
 
 
+def write_split_model_bundle(model_preparation):
+    bundle, manifest, value = write_model_bundle(model_preparation)
+    originals = {}
+    for row in value["files"]:
+        if not row["path"].endswith(".safetensors"):
+            continue
+        source = bundle / row["path"]
+        data = source.read_bytes()
+        originals[row["path"]] = data
+        midpoint = len(data) // 2
+        row["parts"] = []
+        for index, part in enumerate((data[:midpoint], data[midpoint:]), start=1):
+            reference = row["path"] + f".part{index:03d}"
+            (bundle / reference).write_bytes(part)
+            row["parts"].append({"path": reference, "bytes": len(part),
+                                 "sha256": hashlib.sha256(part).hexdigest()})
+        source.unlink()
+    value["schema_version"] = "1.1"
+    manifest.write_text(json.dumps(value), encoding="utf-8")
+    return bundle, manifest, value, originals
+
+
+def test_default_model_preparation_reassembles_split_weights_without_downloader(model_preparation):
+    directory, required, downloader, capture, command, environment = model_preparation
+    bundle, _, _, originals = write_split_model_bundle(model_preparation)
+    downloader.write_text("raise AssertionError('Split models must not import downloader')\n", encoding="utf-8")
+    result = subprocess.run([*command[:-1], "local"], env=environment,
+                            text=True, capture_output=True, timeout=30)
+    assert result.returncode == 0, result.stderr
+    assert "Installed bundled CPU OCR models" in result.stdout
+    assert not capture.exists()
+    for reference in required:
+        expected = originals[reference] if reference in originals else (bundle / reference).read_bytes()
+        assert (directory / reference).read_bytes() == expected
+    assert not list(directory.rglob("*.part*"))
+    assert not list(directory.rglob("*.tmp"))
+    assert all(not (bundle / reference).exists() for reference in originals)
+
+
+@pytest.mark.parametrize("damage", ["missing-part", "part-digest", "order", "duplicate", "escape",
+                                    "parts-total", "whole-digest", "empty-parts"])
+def test_invalid_split_bundle_fails_before_writing_or_downloading(model_preparation, damage):
+    directory, _, downloader, capture, command, environment = model_preparation
+    bundle, manifest, value, _ = write_split_model_bundle(model_preparation)
+    row = next(row for row in value["files"] if "parts" in row)
+    if damage == "missing-part":
+        (bundle / row["parts"][-1]["path"]).unlink()
+    elif damage == "part-digest":
+        path = bundle / row["parts"][-1]["path"]
+        path.write_bytes(b"x" * path.stat().st_size)
+    elif damage == "order":
+        row["parts"].reverse()
+    elif damage == "duplicate":
+        row["parts"][-1] = dict(row["parts"][0])
+    elif damage == "escape":
+        row["parts"][-1]["path"] = "../outside.part002"
+    elif damage == "parts-total":
+        row["parts"][-1]["bytes"] += 1
+    elif damage == "whole-digest":
+        row["sha256"] = "0" * 64
+    elif damage == "empty-parts":
+        row["parts"] = []
+    manifest.write_text(json.dumps(value), encoding="utf-8")
+    downloader.write_text("raise AssertionError('Invalid split bundle must not import downloader')\n", encoding="utf-8")
+    directory.mkdir(parents=True)
+    (directory / "keep.txt").write_bytes(b"unrelated local file")
+    result = subprocess.run(command, env=environment, text=True, capture_output=True, timeout=30)
+    assert result.returncode != 0
+    assert "AssertionError" not in result.stderr
+    assert not capture.exists()
+    assert {p.relative_to(directory).as_posix(): p.read_bytes()
+            for p in directory.rglob("*") if p.is_file()} == {"keep.txt": b"unrelated local file"}
+
+
+def test_interrupted_split_copy_preserves_old_model_and_removes_temporary(model_preparation):
+    directory, _, downloader, capture, command, environment = model_preparation
+    _, manifest, value, _ = write_split_model_bundle(model_preparation)
+    split = next(row for row in value["files"] if "parts" in row)
+    value["files"].remove(split)
+    value["files"].insert(0, split)
+    manifest.write_text(json.dumps(value), encoding="utf-8")
+    existing = directory / split["path"]
+    existing.parent.mkdir(parents=True)
+    existing.write_bytes(b"existing local model")
+    (downloader.parents[2] / "sitecustomize.py").write_text(
+        "import shutil\n"
+        "original_copy = shutil.copyfileobj\n"
+        "def interrupted_copy(source, destination, length):\n"
+        "    if str(source.name).endswith('.part002'):\n"
+        "        destination.write(b'partial second part')\n"
+        "        raise OSError('Synthetic interrupted split copy')\n"
+        "    return original_copy(source, destination, length)\n"
+        "shutil.copyfileobj = interrupted_copy\n", encoding="utf-8")
+    result = subprocess.run([*command[:-1], "local"], env=environment,
+                            text=True, capture_output=True, timeout=30)
+    assert result.returncode != 0 and "Synthetic interrupted split copy" in result.stderr
+    assert not capture.exists()
+    assert {p.relative_to(directory).as_posix(): p.read_bytes()
+            for p in directory.rglob("*") if p.is_file()} == {split["path"]: b"existing local model"}
+
+
 def test_default_model_preparation_installs_verified_bundle_without_downloader(model_preparation):
     directory, required, downloader, capture, command, environment = model_preparation
     bundle, manifest, _ = write_model_bundle(model_preparation)

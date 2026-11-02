@@ -31,9 +31,6 @@ config.local.yml
 /himate/himate-knowledge-wifi-mp/artifacts/*
 !/himate/himate-knowledge-wifi-mp/artifacts/.gitkeep
 
-# Carry offline OCR weights with deployment copies; keep only their small manifest and source notes in Git.
-/himate/himate-knowledge-wifi-mp/tools/deploy/models/docling-cpu/
-
 # Retain historical evidence paths; new receipts live under artifacts/.
 # Historical source caches and local operation records stay private.
 /himate/himate-knowledge-wifi-mp/logs/ingest/

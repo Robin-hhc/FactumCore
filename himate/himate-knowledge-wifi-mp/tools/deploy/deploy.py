@@ -42,15 +42,29 @@ def unique_object(pairs):
     return value
 
 
-def verify_file(path, row):
+def verify_file(path, row, combined=None):
     if not path.is_file() or path.stat().st_size != row["bytes"]:
         raise RuntimeError(f"Bundled model size mismatch or file missing: {path}")
     digest = hashlib.sha256()
     with path.open("rb") as stream:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
+            if combined is not None:
+                combined.update(chunk)
     if digest.hexdigest() != row["sha256"]:
         raise RuntimeError(f"Bundled model digest mismatch: {path}")
+
+
+def validate_entry(bundle, row):
+    if not isinstance(row, dict):
+        raise RuntimeError("Invalid bundled model entry")
+    reference = row.get("path")
+    path = safe_path(bundle, reference)
+    if (type(row.get("bytes")) is not int or row["bytes"] <= 0
+            or not isinstance(row.get("sha256"), str)
+            or not re.fullmatch("[0-9a-f]{64}", row["sha256"])):
+        raise RuntimeError(f"Invalid bundled model size or digest: {reference}")
+    return path
 
 
 def install_bundle(options):
@@ -65,22 +79,16 @@ def install_bundle(options):
         raise RuntimeError(f"Expected bundled model directory: {bundle}")
     manifest = json.loads(safe_path(base, "manifest.json").read_text(encoding="utf-8"),
                           object_pairs_hook=unique_object)
-    if (not isinstance(manifest, dict) or manifest.get("schema_version") != "1.0"
+    if (not isinstance(manifest, dict) or manifest.get("schema_version") not in ("1.0", "1.1")
             or manifest.get("model_set") != "docling-cpu"
             or not isinstance(manifest.get("files"), list) or not manifest["files"]):
         raise RuntimeError("Invalid bundled model manifest")
     rows, identities = {}, set()
     for row in manifest["files"]:
-        if not isinstance(row, dict):
-            raise RuntimeError("Invalid bundled model entry")
-        reference = row.get("path")
-        safe_path(bundle, reference)
+        validate_entry(bundle, row)
+        reference = row["path"]
         if reference.casefold() in identities:
             raise RuntimeError(f"Duplicate bundled model path: {reference}")
-        if (type(row.get("bytes")) is not int or row["bytes"] <= 0
-                or not isinstance(row.get("sha256"), str)
-                or not re.fullmatch("[0-9a-f]{64}", row["sha256"])):
-            raise RuntimeError(f"Invalid bundled model size or digest: {reference}")
         identities.add(reference.casefold())
         rows[reference] = row
     if set(rows) != set(OCR_MODEL_FILES):
@@ -92,21 +100,40 @@ def install_bundle(options):
     inspect_tree(directory)
     targets = []
     for reference, row in rows.items():
-        source = safe_path(bundle, reference)
+        if "parts" in row:
+            parts = row["parts"]
+            if not isinstance(parts, list) or len(parts) < 2:
+                raise RuntimeError(f"Invalid bundled model parts: {reference}")
+            sources = []
+            for index, part in enumerate(parts, 1):
+                source = validate_entry(bundle, part)
+                if part["path"] != f"{reference}.part{index:03d}" or part["bytes"] > 48 * 1024 * 1024:
+                    raise RuntimeError(f"Invalid bundled model part order or size: {reference}")
+                sources.append((source, part))
+            if sum(part["bytes"] for _, part in sources) != row["bytes"]:
+                raise RuntimeError(f"Bundled model parts total size mismatch: {reference}")
+        else:
+            sources = [(safe_path(bundle, reference), row)]
         target = safe_path(root, options["models_path"] + "/" + reference, [options["models_path"]])
-        verify_file(source, row)
-        targets.append((source, target, row))
-    for source, target, row in targets:
+        combined = hashlib.sha256()
+        for source, part in sources:
+            verify_file(source, part, combined)
+        if combined.hexdigest() != row["sha256"]:
+            raise RuntimeError(f"Bundled model combined digest mismatch: {reference}")
+        targets.append((sources, target, row))
+    for sources, target, row in targets:
         target.parent.mkdir(parents=True, exist_ok=True)
         safe_path(root, target.relative_to(root).as_posix(), [options["models_path"]])
         descriptor, name = tempfile.mkstemp(prefix=".model-", suffix=".tmp", dir=target.parent)
         temporary = Path(name)
         try:
-            with os.fdopen(descriptor, "wb") as destination, source.open("rb") as stream:
-                shutil.copyfileobj(stream, destination, length=1024 * 1024)
+            with os.fdopen(descriptor, "wb") as destination:
+                for source, _ in sources:
+                    with source.open("rb") as stream:
+                        shutil.copyfileobj(stream, destination, length=1024 * 1024)
                 destination.flush()
                 os.fsync(destination.fileno())
-            shutil.copymode(source, temporary)
+            shutil.copymode(sources[0][0], temporary)
             verify_file(temporary, row)
             safe_path(root, target.relative_to(root).as_posix(), [options["models_path"]])
             os.replace(temporary, target)

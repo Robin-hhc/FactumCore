@@ -31,7 +31,7 @@ Windows 入口默认使用 `python`，通过 `-Python` 选择解释器。两个�
 脚本收集知识根 `skills/` 中含 `SKILL.md` 的能力包，以及 `workflows/` 中含 `workflow.yaml` 的模板包。两个 Skill 目标安装同一组包，Workflow 只安装到 OpenFlow 模板目录。先收集目录与项目入口覆盖选择、校验路径，再依次执行：
 
 1. 向选定的 Python 安装 `runtime/requirements.lock.txt` 的完整 Docling 多格式解析与 OCR 依赖。
-2. 优先复用源知识根 `artifacts/models/docling-cpu/` 中的完整模型；否则验证 `tools/deploy/models/manifest.json` 和内附 `docling-cpu/` 的文件大小、SHA-256 及路径，离线安装到运行目录。内附集合损坏则失败；未携带集合时才按显式下载选项获取模型。
+2. 优先复用源知识根 `artifacts/models/docling-cpu/` 中的完整模型；否则验证 `tools/deploy/models/manifest.json` 和内附 `docling-cpu/` 的文件及分片大小、SHA-256 和路径，自动合并分片并离线安装到运行目录。内附集合损坏则失败；未携带集合时才按显式下载选项获取模型。
 3. 依赖和模型准备均成功后，删除三个目标内本次全部同名包的完整目录及旧内容，再将新包复制到各自目标目录。
 
 第一步使用的命令为：
@@ -42,7 +42,7 @@ python -m pip install -r runtime/requirements.lock.txt
 
 唯一运行锁面向 Python 3.10–3.12，使用普通 `torch==2.14.1`、`torchvision==0.29.2` 发行包；解析器使用 CPU 推理。Linux 的 `--python`、Windows 的 `-Python` 指定运行部署后端、安装依赖和准备模型的同一解释器。包安装沿用已有 pip 配置，不指定或追加外网索引；内部镜像须提供锁定版本及其平台依赖，缺包时明确失败，不自动切换源。Linux 普通 PyTorch 会引入 CUDA 运行库等 Python 依赖，安装体积通常更大，OCR 仍按 CPU 运行。本地模型完整时复用；否则优先校验内附集合并离线安装，损坏集合明确失败。未携带模型且本地也缺失时，只有显式 `--download-models` / `-DownloadModels` 才访问模型来源。脚本不下载 Python、不创建虚拟环境。依赖安装或模型准备失败时停止，保留全部旧包和项目入口。
 
-内附模型位于 `models/docling-cpu/`，由同级 `models/manifest.json` 固定大小与摘要，共 8 个必需文件、416,177,665 字节，约 416.18 MB（396.90 MiB）。离线交付时随知识包携带这整个目录及匹配清单；权重二进制由 Git 忽略，单独克隆仓库不会取得它。
+内附模型位于 `models/docling-cpu/`，由同级 `models/manifest.json` 固定大小与摘要，安装后为 8 个必需文件、416,177,665 字节，约 416.18 MB（396.90 MiB）。模型通过普通 Git 提交，不依赖 Git LFS；两个超过 100 MiB 的权重拆为不超过 48 MiB 的 `.part001` 等分片，部署自动校验并合并，无需手工处理。克隆或同步完整仓库即可取得权重；离线拷贝时保留这整个目录及匹配清单。
 
 `--download-models` / `-DownloadModels` 显式允许未携带模型且本地缺失时下载。默认不访问模型站点，存在但损坏的内附集合不会触发下载回退。
 

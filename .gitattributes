@@ -2,6 +2,8 @@
 # Line-ending normalization would invalidate the byte-pinned framework and snapshots.
 /himate/himate-knowledge-wifi-mp/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
 /himate/himate-knowledge-wifi-mp/deploy.sh text eol=lf
+/himate/himate-knowledge-wifi-mp/tools/deploy/models/docling-cpu/**/*.onnx binary
+/himate/himate-knowledge-wifi-mp/tools/deploy/models/docling-cpu/**/*.part[0-9][0-9][0-9] binary
 /config.yml -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
 
 # Preserve approved design bytes.

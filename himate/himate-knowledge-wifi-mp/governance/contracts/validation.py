@@ -12,8 +12,9 @@ from . import workspace_config
 
 
 class ContractError(ValueError):
-    def __init__(self, code, message, path=""):
+    def __init__(self, code, message, path="", *, field="", actual=None):
         self.code, self.message, self.path = code, str(message), str(path)
+        self.field, self.actual = field, actual
         super().__init__(f"{code}: {message}" + (f" ({path})" if path else ""))
 
 

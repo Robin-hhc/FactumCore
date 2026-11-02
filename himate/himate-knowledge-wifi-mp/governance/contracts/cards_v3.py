@@ -196,7 +196,14 @@ def parse_card(data, path, rules=None, source_lookup=None, *, concise_only=False
         tags = metadata["tags"]
         if (not isinstance(tags, list) or any(not isinstance(tag, str) or not tag for tag in tags)
                 or (not legacy and (any(not tag.strip() for tag in tags) or len(set(tags)) != len(tags)))):
-            raise ContractError("INVALID_CARD_TAGS", "Use distinct nonempty string tags", path)
+            actual = (", ".join(f"tags[{index}]={tag!r} ({type(tag).__name__})"
+                                for index, tag in enumerate(tags)) if isinstance(tags, list)
+                      else f"tags={tags!r} ({type(tags).__name__})")
+            raise ContractError(
+                "INVALID_CARD_TAGS", "Use distinct nonempty string tags; " + actual
+                + ". Quote numeric or boolean identifiers to keep them strings.",
+                path, field="tags", actual=tags,
+            )
     if "lifecycle" in metadata and metadata["lifecycle"] not in (
             ("draft", "stable", "deprecated") if legacy else ("stable", "deprecated")):
         raise ContractError("INVALID_CARD_LIFECYCLE", "Use stable or deprecated for new cards", path)

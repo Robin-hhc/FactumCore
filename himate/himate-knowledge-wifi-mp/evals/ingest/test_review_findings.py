@@ -113,3 +113,72 @@ def test_check_resolves_navigation_links_without_indexing_navigation(library, ta
         assert result["findings"] == []
     with module("catalog").Catalog(library) as catalog:
         assert [card["id"] for card in catalog.all_cards()] == ["b"]
+
+
+def test_check_reports_all_invalid_draft_tags_without_partial_plan_findings(library):
+    retained = put_card(library, "retained", "doc-b", "Retained documented requirement.")
+    retained_bytes = retained.read_bytes()
+    bad_tags = {
+        "frame-flow": ["wifi", 80211, 1108],
+        "rx-path": ["wifi", 8023],
+        "tx-path": ["wifi", 1108],
+        "duplicate": ["wifi", "wifi"],
+        "blank": ["wifi", "  "],
+        "not-list": "wifi",
+    }
+    drafts = {
+        identity: put_card(library, identity, "doc-a", "A documented requirement.",
+                           stage=True, tags=tags)
+        for identity, tags in bad_tags.items()
+    }
+    drafts["command"] = put_card(library, "command", "doc-a", "A documented requirement.",
+                                 stage=True, tags=["wifi", "command"])
+    write_plan(library, [(identity, f"knowledge/{identity}.md") for identity in drafts])
+    before = {identity: path.read_bytes() for identity, path in drafts.items()}
+
+    result, status = module("ingest").check(library, {})
+
+    assert status == "failed", result
+    assert len(result["findings"]) == len(bad_tags), result
+    assert {finding["code"] for finding in result["findings"]} == {"INVALID_CARD_TAGS"}
+    by_path = {finding["path"]: finding for finding in result["findings"]}
+    assert set(by_path) == {f"knowledge/{identity}.md" for identity in bad_tags}
+    for identity, tags in bad_tags.items():
+        finding = by_path[f"knowledge/{identity}.md"]
+        assert finding["field"] == "tags"
+        assert finding["actual"] == tags
+        if identity in ("frame-flow", "rx-path", "tx-path"):
+            assert f"{tags[1]} (int)" in finding["message"]
+            assert "quot" in finding["message"].lower()
+    assert {identity: path.read_bytes() for identity, path in drafts.items()} == before
+    assert retained.read_bytes() == retained_bytes
+    assert sorted(path.name for path in (library / "knowledge").glob("*.md")) == ["retained.md"]
+
+    for identity, tags in bad_tags.items():
+        corrected = ([str(tag) for tag in tags] if identity in ("frame-flow", "rx-path", "tx-path")
+                     else ["wifi"])
+        put_card(library, identity, "doc-a", "A documented requirement.", stage=True, tags=corrected)
+    corrected_bytes = {identity: path.read_bytes() for identity, path in drafts.items()}
+
+    result, status = module("ingest").check(library, {})
+
+    assert status == "passed", result
+    assert result["findings"] == []
+    assert {identity: path.read_bytes() for identity, path in drafts.items()} == corrected_bytes
+    assert retained.read_bytes() == retained_bytes
+    assert sorted(path.name for path in (library / "knowledge").glob("*.md")) == ["retained.md"]
+
+
+@pytest.mark.parametrize("tags", [[], ["wifi", "rx"], ["80211", "1108", "8023"]],
+                         ids=["empty", "text", "quoted-numbers"])
+def test_check_accepts_string_tags_and_empty_tag_arrays(library, tags):
+    candidate = put_card(library, "a", "doc-a", "A documented requirement.", stage=True, tags=tags)
+    original = candidate.read_bytes()
+    write_plan(library, [("a", "knowledge/a.md")])
+
+    result, status = module("ingest").check(library, {})
+
+    assert status == "passed", result
+    assert result["findings"] == []
+    assert candidate.read_bytes() == original
+    assert not (library / "knowledge/a.md").exists()

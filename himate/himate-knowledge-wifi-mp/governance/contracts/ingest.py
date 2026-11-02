@@ -288,12 +288,28 @@ def scan(root, request):
     return {**task, "task_ref": ".build/task.json", "pending_at_least": len(pending)}, "prepared"
 
 
-def _drafts(root, catalog, rules=None, *, concise_only=False):
+def _finding(error, path=""):
+    result = {"code": getattr(error, "code", "INVALID_CARD"),
+              "path": path or str(getattr(error, "path", "")), "message": str(error)}
+    if getattr(error, "field", ""):
+        result.update(field=error.field, actual=error.actual)
+    return result
+
+
+def _drafts(root, catalog, rules=None, *, concise_only=False, findings=None):
     directory = safe_path(root, ".build/cards")
     lookup = {row["id"]: row for row in catalog.list_files()}
-    return [parse_card(path.read_bytes(), "knowledge/" + path.relative_to(directory).as_posix(), rules,
-                       source_lookup=lookup, concise_only=concise_only)
-            for path in sorted(directory.rglob("*.md"))] if directory.exists() else []
+    drafts = []
+    for path in sorted(directory.rglob("*.md")) if directory.exists() else []:
+        reference = "knowledge/" + path.relative_to(directory).as_posix()
+        try:
+            drafts.append(parse_card(path.read_bytes(), reference, rules,
+                                     source_lookup=lookup, concise_only=concise_only))
+        except (ValueError, OSError, ContractError, yaml.YAMLError) as error:
+            if findings is None:
+                raise
+            findings.append(_finding(error, reference))
+    return drafts
 
 
 def _planned_cards(root):
@@ -501,12 +517,14 @@ def check(root, request, rules=None):
         planned = None if request.get("formal") else _planned_cards(root)
         catalog = Catalog(root)
     except (ValueError, ContractError, yaml.YAMLError) as error:
-        return {"findings": [{"code": getattr(error, "code", "INVALID_CARD"),
-                              "path": str(getattr(error, "path", "")), "message": str(error)}]}, "failed"
+        return {"findings": [_finding(error)]}, "failed"
     with catalog:
         try:
             drafts = (catalog.all_cards() if request.get("formal")
-                      else _drafts(root, catalog, rules, concise_only=True))
+                      else _drafts(root, catalog, rules, concise_only=True, findings=findings))
+            # A partial parsed set cannot establish plan membership or links.
+            if findings:
+                return {"findings": findings}, "failed"
             deletes = set() if request.get("formal") else set(_deletes(root))
             overlap = deletes & {card["path"] for card in drafts}
             if overlap:
@@ -529,7 +547,7 @@ def check(root, request, rules=None):
                                                   expected_sha256=source["hash"])
                     context["loaded"][(source["source_id"], source["hash"])] = loaded
         except (ValueError, OSError, ContractError, yaml.YAMLError) as error:
-            return {"findings": [{"code": getattr(error, "code", "INVALID_CARD"), "message": str(error)}]}, "failed"
+            return {"findings": [_finding(error)]}, "failed"
         if planned is not None:
             actual = {card["id"]: card["path"] for card in drafts}
             for identity in sorted(planned.keys() | actual.keys()):

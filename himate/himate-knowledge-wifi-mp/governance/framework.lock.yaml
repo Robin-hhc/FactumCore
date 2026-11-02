@@ -1,13 +1,13 @@
 schema_version: '2.0'
 contract_family: aiot-wifi
-tool_version: 0.15.4
+tool_version: 0.15.5
 files:
   contracts/__init__.py:
     path: governance/contracts/__init__.py
     sha256: ccc90c8e3b38e19264e3c6843099880b6f293779fc7222051ea5a47c3316c8db
   contracts/cards_v3.py:
     path: governance/contracts/cards_v3.py
-    sha256: 66cb7ece0411c071e9c275feddb26149c4a6848beb2af55f457dbc399e8c63b4
+    sha256: 7123d7cca30ad21f306b0b24d80b252631b884a165b64fc4f18d88c197dd5b76
   contracts/catalog.py:
     path: governance/contracts/catalog.py
     sha256: b1c4f2141fb54636cec83306258dea27693c16fec81fe13df036eead4029cb12
@@ -19,7 +19,7 @@ files:
     sha256: a4c76455e14dcd0265c26f221f01a18890afda781a112e58facc53ced5bdd83e
   contracts/ingest.py:
     path: governance/contracts/ingest.py
-    sha256: 8c261ff936f507d7dab58598de835c908a7f6d90793d9b0df205a3858fbd1e5c
+    sha256: 2c47abe8d34780c2f0ebdb33a65ada3b0ce2354a3a7ac2dd5b7f76640d440d40
   contracts/knowledge.py:
     path: governance/contracts/knowledge.py
     sha256: 2b165355fa1548c9c5e58bc9fe3e0c0802d0e02bdbc61c498b37424785faebe9
@@ -37,7 +37,7 @@ files:
     sha256: 2acff75155c6ceaf69c17334b5b0b248fb7e205c6d3abef840d87b9393cbb54f
   contracts/validation.py:
     path: governance/contracts/validation.py
-    sha256: d79568f64f2ebb07ee47830941587bc23f78882ea75807331e649d03f2fc67dc
+    sha256: 7b117885c54d1ba99540bcc7cffad5e04054e488f39ebdd3f59e31e00704e289
   contracts/workspace_config.py:
     path: governance/contracts/workspace_config.py
     sha256: 6a4341a05243b24ba37c91691a2900b34673f7dd02dc747df7745a8c1118daec

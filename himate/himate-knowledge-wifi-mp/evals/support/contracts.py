@@ -6,6 +6,7 @@ still independently verify the copied rule lock and exact source bytes.
 
 import importlib
 import importlib.util
+import json
 from pathlib import Path
 import shutil
 import sys
@@ -21,9 +22,17 @@ def write_plan(root, cards, body="Keep the documented knowledge and its chosen l
     """Write explicit author intent; callers supply expected IDs and final paths."""
     path = Path(root) / ".build/plan.md"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("---\n" + yaml.safe_dump({"cards": [
+    metadata = {"cards": [
         {"id": identity, "path": relative} for identity, relative in cards
-    ]}, sort_keys=False) + "---\n" + body + "\n", encoding="utf-8")
+    ]}
+    task_path = Path(root) / ".build/task.json"
+    if task_path.is_file():
+        task = json.loads(task_path.read_bytes())
+        if "pdf_review" in task:
+            batch = task["pdf_review"]
+            metadata["source_pages"] = [[batch["start_page"], batch["end_page"]]]
+    path.write_text("---\n" + yaml.safe_dump(metadata, sort_keys=False)
+                    + "---\n" + body + "\n", encoding="utf-8")
     return path
 
 

@@ -53,8 +53,50 @@
               "null"
             ],
             "pattern": "^[0-9a-f]{40,64}$"
+          },
+          "processing": {
+            "type": "object",
+            "required": ["source_sha256", "reviewed_pages"],
+            "properties": {
+              "source_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "reviewed_pages": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "prefixItems": [
+                    {"type": "integer", "minimum": 1},
+                    {"type": "integer", "minimum": 1}
+                  ],
+                  "minItems": 2,
+                  "maxItems": 2
+                }
+              }
+            },
+            "additionalProperties": false
           }
         },
+        "allOf": [
+          {
+            "if": {"required": ["processing"]},
+            "then": {
+              "properties": {"kind": {"const": "raw"}},
+              "anyOf": [
+                {
+                  "required": ["path"],
+                  "properties": {"path": {"type": "string", "pattern": "\\.[pP][dD][fF]$"}}
+                },
+                {
+                  "required": ["source_path"],
+                  "not": {"required": ["path"]},
+                  "properties": {"source_path": {"type": "string", "pattern": "\\.[pP][dD][fF]$"}}
+                }
+              ]
+            }
+          }
+        ],
         "additionalProperties": true
       }
     },

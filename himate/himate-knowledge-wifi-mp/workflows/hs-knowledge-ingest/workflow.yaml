@@ -1,7 +1,7 @@
 version: 1
 id: hs-knowledge-ingest
 name: WiFi 知识入库
-description: 一次处理一个变化来源；P2先决策、P3写卡、P4独立审阅，P5入库并更新文件hash。
+description: 一次处理一个来源或PDF页批；P2先决策、P3写卡、P4独立审阅，P5入库并登记本批或全文完成。
 kind: custom
 source: user_created
 entry:
@@ -15,7 +15,7 @@ nodes:
   skill: hs-knowledge-source
   prompt: '复用已知项目与执行端；否则读当前工作区 AGENTS.md、config.yml，确定知识根，位置不明确才询问用户。在数据所在端的原生知识根调用仓内 CLI，交接实际项目、知识根、执行端及已验证的 CLI 命令前缀（含指定解释器），后续节点沿用。
 
-    使用 hs-knowledge-source 扫描一个变化来源；巡检指定 source_id 时完整采用该 ID。prepared 交 P2，unchanged 结束本轮。'
+    使用 hs-knowledge-source 扫描一个变化或待续办来源；巡检指定 source_id 时完整采用该 ID。有 task.pdf_review 时交接起点、宽候选及页索引，不默认读完整本或整个候选包。prepared 交 P2，unchanged 结束本轮。'
   exits:
   - id: prepared
     label: 本轮材料已准备
@@ -30,7 +30,7 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-change-plan
-  prompt: '使用 hs-knowledge-change-plan 以本轮 task 的来源为范围阅读全文和关联卡，完成六决策、新增主题查重及简短计划；不沿用前次问答主题作筛选。plan.md 开头的 YAML frontmatter 用 cards 列出本轮完整候选的 id/path；更新保留原路径和原生命周期，标签或状态变化由 P2 明确决定；新卡按现有类型导航选目录，无候选写 cards: []。
+  prompt: '使用 hs-knowledge-change-plan，读取 task、页索引和完整关联卡，完成六决策、新增主题查重及简短计划；不沿用前次问答主题作筛选。存在的 raw PDF 按需分段读宽候选，按自身上下文、图表、条款和产卡量自由选实际 end；80k token 仅作软目标，不要求读完候选。计划必填 source_pages 的单连续物理页区间，从 task 起点开始且不超过候选上限，完整评估选定范围。非 PDF 仍阅读全文，来源删除沿用原有判断。plan.md 的 YAML frontmatter 用 cards 固定完整候选 id/path；更新保留原路径和生命周期，标签或状态变化由 P2 决定；新卡按现有类型导航选目录，无候选写 cards: []。
 
     content_planned 交 P3；必要依据不足则 deferred，说明缺口并保留未完成文件，不推进成功 hash。'
   exits:
@@ -64,7 +64,7 @@ nodes:
   type: skill
   owner: reviewer
   skill: hs-knowledge-review
-  prompt: '由独立 reviewer 使用 hs-knowledge-review，沿用已交接的 CLI 先运行 ingest check，由机器一一核对计划 cards 与候选 id/path，不另行推断路径类型；再独立阅读来源，对照计划、旧卡与新稿，核对旧知识保留、整卡退役及状态决定，空候选也检查全文新主题。
+  prompt: '由独立 reviewer 使用 hs-knowledge-review，沿用已交接的 CLI 先运行 ingest check，核对计划 cards 与候选 id/path，以及存在的 raw PDF 版本、source_pages 和候选边界。再独立阅读计划实际范围，对照旧卡与新稿核对事实、遗漏、旧知识保留、整卡退役及状态决定。PDF 完整评估实际页段，无须读完宽候选；非 PDF 检查全文，空候选也检查范围内新主题。补读前文、跨章和卡引用不自动计为覆盖。
 
     通过后交 P5；计划决定需改变回 P2、成稿或落位拼写问题回 P3，新稿重新审阅。不替作者改稿。'
   exits:
@@ -85,13 +85,13 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-apply
-  prompt: '使用 hs-knowledge-apply 调用 ingest commit，复制候选并刷新关系和检索索引，最后保存本文件成功 hash；不重复质量检查。
+  prompt: '使用 hs-knowledge-apply 调用 ingest commit，机械核对本轮 PDF 页段后复制候选并刷新关系和检索索引，成功后合并本批已评估范围，仅全文覆盖时保存本文件成功 hash；不重复 P4 内容质量审阅。
 
-    失败保留本轮暂存并直接重试 P5，不回 P1 清理。需要改稿时回 P3 再审。成功以 commit 回执交付，不用 scan 验证；本节点不提交或推送 Git。'
+    失败保留本轮暂存并直接重试 P5，不回 P1 清理。需要改稿时回 P3 再审。成功以 commit 回执交付，source_complete 为 false 时明确 PDF 尚有待办；本批 completed 不代表全文完成。不用 scan 验证上一批；主动续办才开始下一轮。本节点不提交或推送 Git。'
   exits:
   - id: completed
-    label: 本文件已入库
-    condition: 本轮卡片和索引更新成功，触发文件处理标记已保存。
+    label: 本批已入库
+    condition: 本轮卡片和索引更新成功，已保存本批处理事实，并按 source_complete 区分部分或全文完成。
     target: __end__
 artifacts:
   primary: []

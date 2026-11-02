@@ -8,7 +8,7 @@
 
 在数据所在端原生知识根运行knowledge.py或sh ./knowledge.sh；Windows可用.\knowledge.cmd。部署也从本知识根运行deploy.ps1或sh ./deploy.sh，选用已有Python3.10—3.12。脚本先展示OpenFlow Skill、CAC Skill和OpenFlow Workflow的默认目录，回车采用或输入自定义地址，并收集项目入口的覆盖选择：默认y、输入n保留。确认后默认沿用执行端pip配置安装Docling多格式解析与OCR完整依赖并准备artifacts/models/docling-cpu本地模型；完整模型复用，否则优先校验tools/deploy/models内附权重并离线复制；未携带权重时才预置或显式--download-models/-DownloadModels下载，随包权重损坏则停止。准备均成功后才删除本次同名包并复制新包，再把config.yml和AGENTS-code-root.md按选择复制到../../的config.yml和AGENTS.md。依赖或模型准备失败不动旧包或入口，源码模板与其他包保留。解析默认仍为native，扫描件显式选择standard与本地模型。远端由宿主已有SSH工具执行同一CLI，不逐次传Skill脚本。
 
-.build只保存本轮暂存，P1会清空。P5失败直接重试，不能先回P1。数据库在artifacts/knowledge.sqlite，入库回执在artifacts/ingest/latest.json，独立搜索报告在artifacts/query，巡检汇总在artifacts/patrol。query可与写流程共存；lint与ingest串行运行，运行环境和正式记录在.build以外。artifacts含独立模型与本机材料，不整目录清空。
+.build只保存本批暂存，P1/P5清理保留根README。PDF从最早未评估页按字量准备宽候选，默认不设页数帽；P2按自身上下文和材料复杂度选实际source_pages，无须一次读完候选，P4评估该范围全部内容，P5成功后才登记覆盖。本批完成不等于全文完成，按回执source_complete交付剩余范围。累计进度在正式sources.lock.yaml的processing中，PDF解析缓存位于artifacts/ingest/parsed，可删重建；非PDF仍按整文件处理。P5失败直接重试，不能先回P1。数据库在artifacts/knowledge.sqlite，入库回执在artifacts/ingest/latest.json，独立搜索报告在artifacts/query，巡检汇总在artifacts/patrol。query可与写流程共存；lint与ingest串行运行，运行环境和正式记录在.build以外。artifacts含独立模型与本机材料，不整目录清空。
 
 来源与卡头使用真实ID和定位；新卡字段见governance/specs/cards.md，条件、依据和缺口放正文，旧知识正常更新时完整保留。搜索返回整卡相关候选，精读后核对适用性；代码引用不证明已实现。日常scan直接比较SHA-256，Git按需回看旧版。未知构建、宏和适用条件不补造。配置只描述真实工作区与模块。
 

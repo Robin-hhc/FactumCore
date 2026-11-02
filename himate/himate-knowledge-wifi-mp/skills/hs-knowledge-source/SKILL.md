@@ -1,6 +1,6 @@
 ---
 name: hs-knowledge-source
-description: 扫描一个变化文档或巡检指定代码文件，获取来源ID、关联卡和本轮材料；用于P1。
+description: 扫描一个变化或待续办文档、巡检指定代码文件，获取来源ID、关联卡和本轮材料；用于P1。
 ---
 
 # 单文件来源准备
@@ -9,14 +9,16 @@ description: 扫描一个变化文档或巡检指定代码文件，获取来源I
 
 ## 执行
 
-运行 `knowledge ingest scan --json`；指定来源时加 `--source` 和实际路径或来源 ID。该命令初始化本轮 `.build`，以内容 hash 找一份新增、修改或删除来源，并通过数据库反查关联卡。
+运行 `knowledge ingest scan --json`；指定来源时加 `--source` 和实际路径或来源 ID。该命令初始化本轮 `.build`，以内容 hash 和正式处理进度找一份新增、修改、删除或尚未评估完的来源，并通过数据库反查关联卡。
 
-- `prepared`：交接返回的 task、文件副本、来源 ID 和关联卡列表；`source.parsed` 存在时同时交接阅读稿、结构 JSON、图片及缺口。解析材料位于本轮 `.build/materials/parsed`，后续复用，不逐节点重转。连同实际执行端、知识根及已验证的 CLI 命令前缀进入 P2；后续节点沿用该解释器。
+- `prepared`：交接 task、文件副本、来源 ID 和关联卡。有 `task.pdf_review` 时交接起点、候选结束页、`packet_ref` 和 `page_index_ref`；P2 按需分段读取候选包，自选实际结束页，不要求一次读完。完整 `source.parsed` 用于核对结构、图表及必要补读。非 PDF 继续交接阅读稿、结构 JSON、图片及缺口；来源删除沿用原有交接。连同实际执行端、知识根及已验证的 CLI 命令前缀进入 P2。
 - `unchanged`：本次范围无待办，结束。
 - 读取或运行失败：说明具体错误，不能当作无变化或删除。
 
 巡检已选文件时完整采用其 `source_id`，不改成另一个来源。P5 失败后留在 P5 重试，不重新扫描或清暂存。原件只读。
 
-大文档按页段阅读，不默认导出所有整页图片。native 解析不做 OCR；扫描件需要已准备本地模型和显式 standard 配置，业务步骤不安装或下载模型。转换状态和 OCR 文本不证明图片已被理解。用户要求重处理未改来源时，用具体已登记 ID 和 `reprocess: true` 的 JSON 请求，不清空成功 hash。
+PDF 默认按 400000 等效字符准备宽候选，无默认页数帽；需要时可显式设字量或页数预算，计量和字段见[来源操作](references/materials.md)。候选量不是本轮必读量，P2 按上下文与材料复杂度截断；起点固定为最早未评估页。PDF 解析缓存位于 `artifacts/ingest/parsed/`，可删重建；累计进度在正式来源登记，清 `.build` 不清进度。非 PDF 解析仍随本轮 `.build/materials/parsed` 清理。
+
+不默认导出所有整页图片。native 解析不做 OCR；扫描件需要已准备本地模型和显式 standard 配置，业务步骤不安装或下载模型。转换状态和 OCR 文本不证明图片已被理解。用户要求重新评估未改来源时，用具体已登记 ID 和 `reprocess: true` 的 JSON 请求；PDF 将从第 1 页开始新一轮评估，P5 首批成功前保留旧成功事实。普通续办不反复使用 reprocess，也不手工清空成功 hash。
 
 新增主题由 P2 判断；脚本反查只提供已有引用候选。需要来源登记、关系查询或旧版时，读[来源操作](references/materials.md)。

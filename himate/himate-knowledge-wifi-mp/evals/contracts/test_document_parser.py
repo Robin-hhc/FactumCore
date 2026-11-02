@@ -324,7 +324,7 @@ def test_each_read_gets_an_independent_directory_and_existing_outputs_are_not_re
     assert one["manifest_ref"] != two["manifest_ref"]
     assert one["source_sha256"] == two["source_sha256"]
     with pytest.raises(ContractError, match="PARSE_OUTPUT_EXISTS"):
-        parse_bytes(tmp_path, output=str(Path(one["manifest_ref"]).parent))
+        parse_bytes(tmp_path, output=Path(one["manifest_ref"]).parent.as_posix())
 
 
 @pytest.mark.parametrize("options", [{"unexpected": True}, {"threads": True}, {"threads": 33}, {"threads": 10 ** 1000}, {"pipeline": []}, {"timeout_seconds": float("nan")}, {"timeout_seconds": 10 ** 1000}, {"timeout_seconds": 3601}, {"images_scale": 10 ** 1000}, {"images_scale": 4.01}, {"max_input_bytes": 256 * 1024 * 1024 + 1}, {"max_output_bytes": 256 * 1024 * 1024 + 1}, {"models_path": "/tmp/models"}, {"models_path": "artifacts/other/models"}])

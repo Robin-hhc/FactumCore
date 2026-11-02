@@ -2,7 +2,7 @@
 
 本目录保存仓内原件，按 conventions、chips、storys、specs、protocols、troubleshooting 组织；外部资料由 `sources/dbox.local.yml` 映射执行端实际目录。原件只读。`index.md`、`README.md`、`AGENTS.md`、模板及本机配置不作为来源正文；目录不可读不能当作无变化或删除，不跟随原生链接或 junction。
 
-日常使用 `hs-knowledge-ingest` Workflow。P1 的 `knowledge ingest scan` 清理本轮 `.build`，以内容 SHA-256 找一个新增、修改或删除文件，并交接同次读取的副本、来源 ID 和关联卡。P2 读材料并作六决策，P3 写完整候选，P4 先脚本检查再独立内容审阅，P5 入库、刷新引用及检索索引，最后保存触发文件的成功 hash。P5 失败保留材料，直接重试，不先回 P1。
+日常使用 `hs-knowledge-ingest` Workflow。P1 的 `knowledge ingest scan` 清理本批 `.build` 并保留根 README，以内容 SHA-256 和正式进度找一个新增、修改、删除或待续办文件，交接同次读取的副本、来源 ID 和关联卡；PDF 另交接最早未评估页、宽候选和页索引，默认不设页数帽。P2 按上下文及材料复杂度自主选实际本批范围，无须读完候选，再作六决策；P3 写完整候选，P4 先脚本检查再独立审阅实际范围内全部内容，P5 入库、刷新引用及检索索引后登记本批覆盖；仅全文完成才保存触发文件的成功 hash。P5 失败保留材料，直接重试，不先回 P1。
 
 来源操作使用 `knowledge source register/list/resolve/configure`：分别登记实际文件、查询文件与卡的双向关系、按可用 Git 历史恢复原文、配置本机 dbox 目录。命令位于实际知识根的仓内 CLI；Skill 只提供操作指引，不携带执行脚本。旧原文未提交且没有留副本时，不能凭 hash 恢复；必要依据不足则说明缺口。
 

@@ -1,7 +1,7 @@
-"""Per-operation document materials; legacy extraction remains independently readable.
+"""Fixed document materials and disposable PDF parse caches.
 
 This module never starts installation, downloads models, or interprets knowledge.
-Descriptors bind an operation's fixed inputs and files, not a persistent cache.
+Descriptors bind fixed inputs and files; cached materials never own review progress.
 """
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ import hashlib
 import math
 from pathlib import Path, PurePosixPath
 import re
+import secrets
 import sys
 import time
 from urllib.parse import unquote
@@ -59,7 +60,10 @@ def _output(root, reference):
     if (len(parts) == 4 and parts[:2] == ("artifacts", "source-read")
             and parts[3] == "parsed" and re.fullmatch(r"[0-9a-f]{32}", parts[2])):
         return path
-    raise ContractError("PARSE_OUTPUT_UNSAFE", "Use this operation's materials or source-read directory", reference)
+    if (len(parts) == 4 and parts[:3] == ("artifacts", "ingest", "parsed")
+            and re.fullmatch(r"[0-9a-f]{64}-[0-9a-f]{32}", parts[3])):
+        return path
+    raise ContractError("PARSE_OUTPUT_UNSAFE", "Use fixed materials, a PDF cache bundle or a source-read directory", reference)
 
 
 def _options(root, value):
@@ -141,6 +145,70 @@ def _gap(code, message, *, locator=None, severity="warning"):
 
 def _write_json(path, value):
     path.write_bytes(canonical_bytes(value))
+
+
+def pdf_page_count(data):
+    """Read the original PDF's physical extent independently of conversion."""
+    if not isinstance(data, bytes) or not data:
+        raise ContractError("PDF_PAGE_COUNT_UNAVAILABLE", "Expected nonempty original PDF bytes")
+    document = None
+    try:
+        import pypdfium2 as pdfium
+
+        document = pdfium.PdfDocument(data)
+        count = len(document)
+        if count < 1:
+            raise ValueError("The original PDF has no physical pages")
+        return count
+    except (ImportError, OSError, ValueError, RuntimeError) as error:
+        raise ContractError("PDF_PAGE_COUNT_UNAVAILABLE", "Cannot read the original PDF page count: " + str(error)) from error
+    finally:
+        if document is not None:
+            document.close()
+
+
+def prepare_pdf(root, source, data, options=None):
+    """Reuse verified PDF materials or build a fresh, separately fixed bundle."""
+    root = Path(root).absolute()
+    _workspace_no_links(root)
+    root = root.resolve(strict=True)
+    if (not isinstance(source, dict) or not isinstance(source.get("path"), str)
+            or PurePosixPath(source["path"]).suffix.lower() != ".pdf"):
+        raise ContractError("PARSE_SOURCE_INVALID", "PDF cache preparation requires a PDF source")
+    source_id = validate_id(source.get("id") or source.get("source_id"))
+    options = _options(root, options)
+    if not isinstance(data, bytes) or not data:
+        raise ContractError("UNREADABLE_DOCUMENT", "Expected nonempty original bytes")
+    if len(data) > options["max_input_bytes"]:
+        raise ContractError("PARSE_INPUT_LIMIT", "Original exceeds max_input_bytes")
+    source_hash = sha256_bytes(data)
+    profile_hash = sha256_bytes(canonical_bytes(_profile(options, ".pdf", root)))
+    key = sha256_bytes(canonical_bytes({"source_id": source_id, "source_sha256": source_hash,
+                                      "profile_sha256": profile_hash}))
+    cache_ref = "artifacts/ingest/parsed/"
+    index_ref = cache_ref + key + ".json"
+    index = safe_path(root, index_ref)
+    if index.is_file():
+        try:
+            descriptor = read_json(index)
+            loaded = load(root, descriptor, expected_source_id=source_id, expected_sha256=source_hash)
+            if (descriptor["profile_sha256"] == profile_hash
+                    and re.fullmatch(key + r"-[0-9a-f]{32}", PurePosixPath(loaded["output_ref"]).name)
+                    and loaded["manifest"].get("page_range") is None):
+                return descriptor
+        except (ContractError, OSError, ValueError):
+            # Damaged disposable material is rebuilt without changing any
+            # previously handed-off bundle or formal source progress.
+            pass
+    index.parent.mkdir(parents=True, exist_ok=True)
+    _workspace_no_links(index.parent)
+    output_ref = cache_ref + key + "-" + secrets.token_hex(16)
+    descriptor = parse(root, source, data, output_ref, options=options)
+    load(root, descriptor, expected_source_id=source_id, expected_sha256=source_hash)
+    if descriptor["profile_sha256"] != profile_hash:
+        raise ContractError("PARSE_PROFILE_CHANGED", "Parser profile changed while preparing PDF materials")
+    _write_json(safe_path(root, index_ref), descriptor)
+    return descriptor
 
 
 def _external_images(data, suffix):

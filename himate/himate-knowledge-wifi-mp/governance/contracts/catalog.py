@@ -1,7 +1,7 @@
 """SQLite file/card lookups, rebuilt from cards and the source registry.
 
-The source registry stores only persistent source identity and latest complete
-processing facts. SQLite contains derived relationships and local scheduling
+The source registry stores persistent identity, partial PDF review coverage and
+latest complete processing facts. SQLite contains derived relationships and local scheduling
 metadata; it does not introduce workflow phases or recovery journals.
 """
 
@@ -34,6 +34,88 @@ def _relative(value):
             or value.startswith("/") or any(part in {"", ".", ".."} for part in value.split("/"))):
         raise ContractError("INVALID_SOURCE_PATH", "Use a relative POSIX path", value)
     return PurePosixPath(value).as_posix()
+
+
+def normalize_page_ranges(ranges, total_pages=None):
+    """Validate physical-page intervals and return their sorted, merged union."""
+    if total_pages is not None and (type(total_pages) is not int or total_pages < 1):
+        raise ContractError("INVALID_REVIEWED_PAGES", "total_pages must be a positive integer")
+    if not isinstance(ranges, list):
+        raise ContractError("INVALID_REVIEWED_PAGES", "Use an array of [start, end] page intervals")
+    values = []
+    for interval in ranges:
+        if (not isinstance(interval, list) or len(interval) != 2
+                or any(type(page) is not int for page in interval)
+                or not 1 <= interval[0] <= interval[1]
+                or (total_pages is not None and interval[1] > total_pages)):
+            raise ContractError("INVALID_REVIEWED_PAGES", "Use positive integer page intervals within the PDF")
+        values.append(list(interval))
+    merged = []
+    for first, last in sorted(values):
+        if merged and first <= merged[-1][1] + 1:
+            merged[-1][1] = max(last, merged[-1][1])
+        else:
+            merged.append([first, last])
+    return merged
+
+
+def remaining_page_ranges(total_pages, reviewed):
+    """Return the physical-page complement of confirmed review coverage."""
+    if type(total_pages) is not int or total_pages < 1:
+        raise ContractError("INVALID_REVIEWED_PAGES", "total_pages must be a positive integer")
+    remaining, first = [], 1
+    for start, end in normalize_page_ranges(reviewed, total_pages):
+        if first < start:
+            remaining.append([first, start - 1])
+        first = end + 1
+    if first <= total_pages:
+        remaining.append([first, total_pages])
+    return remaining
+
+
+def _raw_pdf(source):
+    path = source.get("path", source.get("source_path"))
+    return (source.get("kind") == "raw" and isinstance(path, str)
+            and PurePosixPath(path).suffix.lower() == ".pdf")
+
+
+def _processing(source):
+    if "processing" not in source:
+        return None
+    value = source["processing"]
+    if (not _raw_pdf(source) or not isinstance(value, dict)
+            or set(value) != {"source_sha256", "reviewed_pages"}
+            or not isinstance(value.get("source_sha256"), str)
+            or not re.fullmatch(r"[0-9a-f]{64}", value["source_sha256"])):
+        raise ContractError("INVALID_PDF_PROCESSING", "Use source_sha256 and reviewed_pages for a raw PDF", source.get("source_id", ""))
+    try:
+        reviewed = normalize_page_ranges(value["reviewed_pages"])
+    except ContractError as error:
+        raise ContractError("INVALID_PDF_PROCESSING", error.message, source.get("source_id", "")) from error
+    return {"source_sha256": value["source_sha256"], "reviewed_pages": reviewed}
+
+
+def pdf_review_result(source, source_hash, pages, total_pages, *, restart=False):
+    """Project confirmed coverage without writing; None means complete coverage."""
+    identity = source.get("source_id", source.get("id", "")) if isinstance(source, dict) else ""
+    if not isinstance(source_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", source_hash):
+        raise ContractError("INVALID_SOURCE_HASH", "Use the original PDF SHA-256", identity)
+    if type(restart) is not bool:
+        raise ContractError("INVALID_PDF_PROCESSING", "restart must be a boolean", identity)
+    if type(total_pages) is not int or total_pages < 1:
+        raise ContractError("INVALID_REVIEWED_PAGES", "total_pages must be a positive integer", identity)
+    reviewed = normalize_page_ranges(pages, total_pages)
+    if not isinstance(source, dict) or not _raw_pdf(source):
+        raise ContractError("PDF_SOURCE_REQUIRED", "Review coverage applies only to raw PDF sources", identity)
+    previous = _processing(source)
+    if (not restart and previous is None and source.get("processed_hash") == source_hash
+            and source.get("processed_exists") is True):
+        return None
+    if not restart and previous is not None and previous["source_sha256"] == source_hash:
+        reviewed = normalize_page_ranges(previous["reviewed_pages"] + reviewed, total_pages)
+    if not remaining_page_ranges(total_pages, reviewed):
+        return None
+    return {"source_sha256": source_hash, "reviewed_pages": reviewed}
 
 
 def atomic_write(path, data):
@@ -156,15 +238,23 @@ class Catalog:
                          else {"schema_version": "2.0", "resources": [], "snapshots": []})
         if not isinstance(self.registry, dict) or not isinstance(self.registry.get("resources"), list):
             raise ContractError("INVALID_SOURCE_REGISTRY", "Expected resources", self.registry_path)
+        self._validate_processing()
+
+    def _validate_processing(self):
+        for source in self.registry["resources"]:
+            if isinstance(source, dict):
+                _processing(source)
 
     def _sync_resources(self):
         identities = set()
+        resources = {}
         with self.transaction():
             for source in self.registry["resources"]:
                 identity = validate_id(source.get("source_id"))
                 if identity in identities:
                     raise ContractError("DUPLICATE_SOURCE_ID", identity)
                 identities.add(identity)
+                resources[identity] = source
                 path = source.get("path", source.get("source_path"))
                 if path is None:
                     continue  # Historical version-only resources remain untouched.
@@ -182,8 +272,10 @@ class Catalog:
             for row in self.connection.execute("SELECT id FROM files").fetchall():
                 if row["id"] not in identities:
                     self.connection.execute("DELETE FROM files WHERE id=?", (row["id"],))
+        self._resources_by_id = resources
 
     def _save_registry(self):
+        self._validate_processing()
         atomic_write(self.registry_path, yaml.safe_dump(
             self.registry, allow_unicode=True, sort_keys=False).encode("utf-8"))
 
@@ -238,8 +330,7 @@ class Catalog:
             self._sync_resources()
         return [self.get_file(identity) for identity in identities]
 
-    @staticmethod
-    def _file(row):
+    def _file(self, row):
         if row is None:
             return None
         value = dict(row)
@@ -247,6 +338,9 @@ class Catalog:
         if value["processed_exists"] is not None:
             value["processed_exists"] = bool(value["processed_exists"])
         value["processed"] = value["processed_exists"] is not None
+        processing = _processing(self._resources_by_id[value["id"]])
+        if processing is not None:
+            value["processing"] = processing
         return value
 
     def get_file(self, file_id):
@@ -380,10 +474,30 @@ class Catalog:
             raise ContractError("UNKNOWN_SOURCE_ID", file_id)
         value = {"processed_hash": hash_or_none, "processed_exists": bool(exists),
                  "processed_at": datetime.now(timezone.utc).isoformat(), "source_commit": source_commit}
+        if not exists:
+            resource.pop("processing", None)
         resource.update(value)
         self._sync_resources()
         self._save_registry()
         return self.get_file(file_id)
+
+    def record_pdf_review(self, file_id, source_hash, pages, total_pages, *, source_commit=None, restart=False):
+        """Record a successfully published batch without prematurely completing its PDF."""
+        with self.transaction():
+            resource = next((item for item in self.registry["resources"] if item["source_id"] == file_id), None)
+            if resource is None:
+                raise ContractError("UNKNOWN_SOURCE_ID", file_id)
+            processing = pdf_review_result(resource, source_hash, pages, total_pages, restart=restart)
+            if (not restart and "processing" not in resource and resource.get("processed_hash") == source_hash
+                    and resource.get("processed_exists") is True):
+                return self.get_file(file_id)
+            if processing is None:
+                resource.pop("processing", None)
+                return self.mark_processed(file_id, source_hash, source_commit=source_commit)
+            resource["processing"] = processing
+            self._sync_resources()
+            self._save_registry()
+            return self.get_file(file_id)
 
     def touch_attempt(self, file_id):
         with self.transaction():

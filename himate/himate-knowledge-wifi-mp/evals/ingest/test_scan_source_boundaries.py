@@ -14,8 +14,10 @@ def raw_root(tmp_path):
     root = tmp_path / "library"
     for name in ("docs-raw", "knowledge", "governance", "artifacts"):
         (root / name).mkdir(parents=True)
-    for name in ("index.md", "README.md", "AGENTS.md"):
-        (root / "docs-raw" / name).write_text("# Directory guidance\n", encoding="utf-8")
+    for name in ("index.md", "README.md", "AGENTS.md", "chips/README.md", "sources/wiki/README.md"):
+        path = root / "docs-raw" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# Directory guidance\n", encoding="utf-8")
     return root
 
 

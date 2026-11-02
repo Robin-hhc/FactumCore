@@ -160,12 +160,19 @@ def test_p5_does_not_repeat_the_p4_check(tmp_path, monkeypatch):
     assert status == "completed", result
 
 
-def test_failed_p5_keeps_drafts_and_same_task_can_be_retried(tmp_path, monkeypatch):
+@pytest.mark.parametrize("keep_readme", [False, True], ids=["without-readme", "with-readme"])
+def test_failed_p5_keeps_drafts_and_same_task_can_be_retried(tmp_path, monkeypatch, keep_readme):
     root = library_root(tmp_path)
     put_doc(root)
     task = scan(root)
+    readme = root / ".build/README.md"
+    readme_bytes = b"Temporary ingest staging lives here.\r\n"
+    if keep_readme:
+        readme.write_bytes(readme_bytes)
     candidate = draft(root, "waiting", [task["source"]["doc_id"]])
     expected = candidate.read_bytes()
+    staged_bytes = {path.relative_to(root): path.read_bytes()
+                    for path in (root / ".build").rglob("*") if path.is_file()}
     catalog_type = module("catalog").Catalog
     original_rebuild, calls = catalog_type.rebuild, []
 
@@ -178,6 +185,8 @@ def test_failed_p5_keeps_drafts_and_same_task_can_be_retried(tmp_path, monkeypat
     monkeypatch.setattr(catalog_type, "rebuild", fail_once)
     with pytest.raises(OSError, match="indexing failure"):
         module("ingest").commit(root, {})
+    assert {path.relative_to(root): path.read_bytes()
+            for path in (root / ".build").rglob("*") if path.is_file()} == staged_bytes
     assert candidate.read_bytes() == expected
     assert (root / ".build/task.json").is_file()
     assert (root / "knowledge/waiting.md").read_bytes() == expected
@@ -187,6 +196,11 @@ def test_failed_p5_keeps_drafts_and_same_task_can_be_retried(tmp_path, monkeypat
     result, status = module("ingest").commit(root, {})
     assert status == "completed", result
     assert not candidate.exists()
+    if keep_readme:
+        assert list((root / ".build").iterdir()) == [readme]
+        assert readme.read_bytes() == readme_bytes
+    else:
+        assert not (root / ".build").exists()
     with catalog_type(root) as catalog:
         assert [card["id"] for card in catalog.cards_for(task["source"]["doc_id"])] == ["waiting"]
 

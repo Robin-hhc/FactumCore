@@ -107,6 +107,67 @@ def test_no_card_commit_keeps_receipt_under_artifacts_without_creating_logs(know
     assert report["data"] == committed["data"]
 
 
+@pytest.mark.parametrize("keep_readme", [False, True], ids=["without-readme", "with-readme"])
+def test_public_ingest_cleans_staging_but_preserves_only_its_root_readme(knowledge, keep_readme):
+    (knowledge / "docs-raw/specs/a.md").write_text(
+        "# A\n\nAn already covered conclusion.\n", encoding="utf-8")
+    staging = knowledge / ".build"
+    staging.mkdir()
+    readme = staging / "README.md"
+    readme_bytes = b"\xef\xbb\xbfTemporary ingest staging lives here.\r\n"
+    if keep_readme:
+        readme.write_bytes(readme_bytes)
+    stale_files = ["stale.txt", ".hidden", "nested/README.md", ".cache/deep/stale.txt"]
+
+    def add_stale_files():
+        for relative in stale_files:
+            path = staging / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("Previous operation data.\n", encoding="utf-8")
+
+    add_stale_files()
+    (staging / "task.json").write_text("Old task must be discarded.", encoding="utf-8")
+
+    status, scanned = invoke(knowledge, "ingest", "scan", "--source", "docs-raw/specs/a.md")
+
+    assert status == 0 and scanned["phase"] == "prepared", scanned
+    assert all(not (staging / relative).exists() for relative in stale_files)
+    assert not (staging / "nested").exists()
+    assert not (staging / ".cache").exists()
+    assert list((staging / "cards").iterdir()) == []
+    assert json.loads((staging / "task.json").read_bytes())["source"] == scanned["data"]["source"]
+    if keep_readme:
+        assert readme.read_bytes() == readme_bytes
+    else:
+        assert not readme.exists()
+    (staging / "plan.md").write_text(
+        "---\ncards: []\n---\nThe source adds no new knowledge after full review.\n", encoding="utf-8")
+    status, checked = invoke(knowledge, "ingest", "check")
+    assert status == 0 and checked["phase"] == "passed", checked
+    add_stale_files()
+    request = knowledge / "artifacts/commit-request.json"
+    request.write_text(json.dumps({"reason": "Fully reviewed; no new card is needed."}), encoding="utf-8")
+
+    status, committed = invoke(knowledge, "ingest", "commit", "--input", str(request))
+
+    assert status == 0 and committed["phase"] == "completed", committed
+    if keep_readme:
+        assert list(staging.iterdir()) == [readme]
+        assert readme.read_bytes() == readme_bytes
+    else:
+        assert not staging.exists()
+
+    add_stale_files()
+    (staging / "task.json").write_text("An obsolete completed task.", encoding="utf-8")
+
+    status, unchanged = invoke(knowledge, "ingest", "scan", "--source", "docs-raw/specs/a.md")
+
+    assert status == 0 and unchanged["phase"] == "unchanged", unchanged
+    assert list(staging.iterdir()) == ([readme] if keep_readme else [])
+    if keep_readme:
+        assert readme.read_bytes() == readme_bytes
+
+
 def test_status_reads_legacy_receipt_without_migration_and_prefers_current_work(knowledge):
     status, report = invoke(knowledge, "status")
     assert status == 0 and report["phase"] == "idle", report

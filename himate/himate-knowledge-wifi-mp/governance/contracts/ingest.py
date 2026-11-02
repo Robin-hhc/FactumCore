@@ -219,11 +219,26 @@ def observe(root, catalog, selected=None, *, include_code=False, first=False, ke
     return pending
 
 
-def _clear_build(root):
+def _clear_build(root, *, remove_empty=False):
     path = safe_path(root, ".build")
     if path.exists():
-        shutil.rmtree(path)
-    path.mkdir()
+        if path.is_symlink() or getattr(path.lstat(), "st_file_attributes", 0) & 0x400:
+            raise OSError("Cannot clean a linked .build directory")
+        for child in path.iterdir():
+            linked = child.is_symlink() or getattr(child.lstat(), "st_file_attributes", 0) & 0x400
+            if child.name == "README.md" and child.is_file() and not linked:
+                continue
+            if child.is_dir() and not child.is_symlink():
+                if linked:
+                    child.rmdir()
+                else:
+                    shutil.rmtree(child)
+            else:
+                child.unlink()
+        if remove_empty and not any(path.iterdir()):
+            path.rmdir()
+    elif not remove_empty:
+        path.mkdir()
 
 
 def scan(root, request):
@@ -667,7 +682,7 @@ def commit(root, request):
                                source_commit=source.get("source_commit"))
     # Cleanup is last. A failed copy or database operation leaves all drafts.
     try:
-        shutil.rmtree(safe_path(root, ".build"))
+        _clear_build(root, remove_empty=True)
     except OSError as error:
         result["cleanup_error"] = str(error)
     return result, "completed"

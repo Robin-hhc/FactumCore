@@ -32,7 +32,7 @@ def test_workspace_metadata_preserves_flat_nested_and_custom_fixture_roots(tmp_p
     source.mkdir()
     workspace.mkdir()
     prefix = "/himate/himate-knowledge-wifi-mp/"
-    original = (prefix + ".build/*\n!" + prefix + ".build/.gitkeep\n/main/*\n").encode()
+    original = (prefix + ".build/*\n!" + prefix + ".build/README.md\n/main/*\n").encode()
     (source / ".gitignore").write_bytes(original)
     (source / ".gitattributes").write_bytes((prefix + "** -text\n/config.yml -text\n").encode())
     copy_workspace_metadata(workspace, workspace / relative, source_root=source,

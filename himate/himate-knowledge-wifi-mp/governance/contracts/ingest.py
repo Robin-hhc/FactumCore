@@ -296,8 +296,13 @@ def _pdf_packet(loaded, start, end, *, text_budget=None):
         block = [f"## Physical page {number}", "", by_page.get(number, "[Physical page material unavailable]"), ""]
         if available and not by_page[number].strip():
             block.extend(["No text was extracted. Verify the original page before treating it as blank.", ""])
+        image_refs = {}
         for item in images:
-            block.extend(["Image: " + str(item.get("ref") or "[unavailable]"), ""])
+            reference = str(item.get("ref") or "[unavailable]")
+            image_refs[reference] = image_refs.get(reference, 0) + 1
+        for reference, count in image_refs.items():
+            occurrences = f" ({count} drawing occurrences; see page index for every location)" if count > 1 else ""
+            block.extend(["Image: " + reference + occurrences, ""])
         page_units = 1 + _text_units("\n".join(block))
         pages.append({"page": number, "available": available, "images": images, "structures": structures,
                       "text_units": page_units, "image_count": len(images),

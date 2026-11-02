@@ -429,6 +429,32 @@ def test_page_index_keeps_shared_image_provenance_local_without_changing_manifes
     assert manifest_path.read_bytes() == original
 
 
+def test_repeated_bitmap_draws_do_not_fill_the_reading_packet_with_identical_paths(library, monkeypatch):
+    parser = module("document_parser")
+    text_pages(library, monkeypatch, ["A physical page requirement."] * 5, illustrated=True)
+    convert = parser._docling
+
+    def repeated_draws(*args):
+        text, segments, images, gaps, pages = convert(*args)
+        repeated = [{**images[0], "element_ref": f"#/pictures/{number}"} for number in range(2000)]
+        return text, segments, repeated, gaps, pages
+
+    monkeypatch.setattr(parser, "_docling", repeated_draws)
+    task = prepare(library, review_text_budget=5000)
+    packet = (library / task["pdf_review"]["packet_ref"]).read_text(encoding="utf-8")
+    index = json.loads((library / task["pdf_review"]["page_index_ref"]).read_bytes())
+    manifest = json.loads((library / task["source"]["parsed"]["manifest_ref"]).read_bytes())
+    reference = manifest["images"][0]["ref"]
+
+    assert task["pdf_review"]["end_page"] == 2
+    assert task["pdf_review"]["text_units"] < 5000
+    assert packet.count("Image: " + reference) == 1
+    assert "2000 drawing occurrences" in packet
+    assert index["pages"][0]["image_count"] == len(index["pages"][0]["images"]) == 2000
+    assert len({row["element_ref"] for row in index["pages"][0]["images"]}) == 2000
+    assert len(manifest["images"]) == 2000
+
+
 @pytest.mark.parametrize(("body", "expected_end"), [("sparse", 5), ("d" * 2000, 1)])
 def test_same_text_budget_adapts_to_page_density(library, monkeypatch, body, expected_end):
     text_pages(library, monkeypatch, [body] * 5)

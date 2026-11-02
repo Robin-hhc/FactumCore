@@ -47,8 +47,8 @@ OCR_MODEL_FILES = (
 )
 
 
-def safe_path(root, reference, allowed_prefixes=None):
-    path = _relative_path(root, reference, allowed_prefixes)
+def safe_path(root, reference, allowed_prefixes=None, *, directory_entries=None):
+    path = _relative_path(root, reference, allowed_prefixes, _directory_entries=directory_entries)
     _workspace_no_links(path)
     return path
 
@@ -112,7 +112,7 @@ def _page_range(value):
 def _profile(options, suffix, root):
     versions = {}
     packages = [] if suffix in {".md", ".txt"} else ["docling-slim", "docling", "docling-core"]
-    packages += {".pdf": ["docling-parse"], ".docx": ["python-docx"], ".xlsx": ["openpyxl"], ".pptx": ["python-pptx"]}.get(suffix, [])
+    packages += {".pdf": ["docling-parse", "pypdfium2"], ".docx": ["python-docx"], ".xlsx": ["openpyxl"], ".pptx": ["python-pptx"]}.get(suffix, [])
     if options["pipeline"] == "standard" and suffix in ({".pdf"} | IMAGE_FORMATS):
         packages += ["rapidocr", "onnxruntime", "torch", "transformers", "docling-ibm-models"]
     for name in packages:
@@ -131,11 +131,14 @@ def _profile(options, suffix, root):
                     for chunk in iter(lambda: stream.read(1024 * 1024), b""):
                         digest.update(chunk)
                 models.append({"ref": path.relative_to(directory).as_posix(), "bytes": path.stat().st_size, "sha256": digest.hexdigest()})
-    return {"adapter": "himate-document:1", "format": suffix, "versions": versions, "model_files": models,
+    profile = {"adapter": "himate-document:1", "format": suffix, "versions": versions, "model_files": models,
             "options": options, "remote_services": False, "external_plugins": False,
             "remote_resource_fetch": False, "local_resource_fetch": False,
             "picture_description": "host_agent", "generate_page_images": False,
             "generate_picture_images": True}
+    if suffix == ".pdf":
+        profile["picture_export"] = "pdfium-rgba-dedup:1"
+    return profile
 
 
 def _gap(code, message, *, locator=None, severity="warning"):
@@ -596,6 +599,12 @@ def _document_segments(document, suffix, source_hash, profile_hash):
     return segments
 
 
+def _pdf_picture_recovery(document, data, output, options):
+    from .pdf_pictures import recover_and_export
+
+    recover_and_export(document, data, output, options)
+
+
 def _docling(root, source, data, output, options, page_range, source_hash, profile_hash):
     from docling_core.types.doc import ImageRefMode
     from docling.datamodel.base_models import DocumentStream
@@ -629,12 +638,25 @@ def _docling(root, source, data, output, options, page_range, source_hash, profi
                     kept = document.add_picture(image=ImageRef.from_pil(image=image, dpi=72),
                                                 prov=picture.prov[0] if picture.prov else None)
                     original_images.add(kept.self_ref)
-    document.save_as_markdown(output / "document.md", artifacts_dir=Path("images"), image_mode=ImageRefMode.REFERENCED, traverse_pictures=True, mark_meta=True)
-    document.save_as_json(output / "document.json", artifacts_dir=Path("images"), image_mode=ImageRefMode.REFERENCED, ensure_ascii=False)
+    if suffix == ".pdf":
+        _pdf_picture_recovery(document, data, output, options)
+        # Assets already have content-addressed local references. The save_as_*
+        # helpers would write a new PNG for every repeated drawing occurrence.
+        (output / "document.md").write_text(document.export_to_markdown(
+            image_mode=ImageRefMode.REFERENCED, traverse_pictures=True, mark_meta=True), encoding="utf-8")
+        exported = document.export_to_dict()
+        for picture in exported.get("pictures", []):
+            image = picture.get("image")
+            if image is not None and isinstance(image.get("uri"), str):
+                image["uri"] = image["uri"].replace("\\", "/")
+        _write_json(output / "document.json", exported)
+    else:
+        document.save_as_markdown(output / "document.md", artifacts_dir=Path("images"), image_mode=ImageRefMode.REFERENCED, traverse_pictures=True, mark_meta=True)
+        document.save_as_json(output / "document.json", artifacts_dir=Path("images"), image_mode=ImageRefMode.REFERENCED, ensure_ascii=False)
     segments = _document_segments(document, suffix, source_hash, profile_hash)
     text = "\n\n".join(segment["text"] for segment in segments if segment["locator"]["kind"] == "element" and segment["text"])
     exported = read_json(output / "document.json")
-    images = []
+    images, image_refs, image_directories = [], {}, {}
     image_pages = set()
     for picture in exported.get("pictures", []):
         provenance = picture.get("prov", [])
@@ -642,9 +664,10 @@ def _docling(root, source, data, output, options, page_range, source_hash, profi
         uri = (picture.get("image") or {}).get("uri")
         image_ref = None
         if isinstance(uri, str) and uri.startswith("images/"):
-            asset = safe_path(output, uri, ["images"])
-            if asset.is_file():
-                image_ref = asset.relative_to(Path(root).resolve()).as_posix()
+            if uri not in image_refs:
+                asset = safe_path(output, uri, ["images"], directory_entries=image_directories)
+                image_refs[uri] = asset.relative_to(root).as_posix() if asset.is_file() else None
+            image_ref = image_refs[uri]
         if image_ref is None:
             gaps.append(_gap("IMAGE_UNAVAILABLE", "An extracted picture has no saved local image", locator=locator, severity="review"))
         images.append({"ref": image_ref, "element_ref": picture["self_ref"], "locator": locator,
@@ -724,11 +747,11 @@ def parse(root, source, data, output_ref, options=None, page_range=None):
         gaps.extend(preview_gaps)
         _attach_previews(output, preview)
     converted = time.perf_counter()
-    files = []
+    files, directories = [], {}
     for path in sorted(output.rglob("*")):
         if path.is_file():
             relative = path.relative_to(root).as_posix()
-            safe_path(root, relative, [output_ref])
+            safe_path(root, relative, [output_ref], directory_entries=directories)
             raw = path.read_bytes()
             files.append({"ref": relative, "bytes": len(raw), "sha256": sha256_bytes(raw)})
     output_bytes = sum(row["bytes"] for row in files)
@@ -782,13 +805,13 @@ def load(root, descriptor, *, expected_source_id, expected_sha256):
     files = manifest.get("files")
     if not isinstance(files, list) or not 4 <= len(files) <= 100000:
         raise ContractError("PARSE_DESCRIPTOR_INVALID", "Expected bounded parser output list")
-    registered = set()
+    registered, directories = set(), {}
     for row in files:
         ref = row.get("ref")
         if ref in registered:
             raise ContractError("PARSE_DESCRIPTOR_INVALID", "Duplicate parser output")
         registered.add(ref)
-        asset = safe_path(root, ref, [output_ref])
+        asset = safe_path(root, ref, [output_ref], directory_entries=directories)
         raw = asset.read_bytes()
         if len(raw) != row.get("bytes") or sha256_bytes(raw) != row.get("sha256"):
             raise ContractError("PARSE_MATERIAL_CHANGED", "Parser output bytes differ", ref)
@@ -803,15 +826,21 @@ def load(root, descriptor, *, expected_source_id, expected_sha256):
         if image.get("ref") is not None and image["ref"] not in registered:
             raise ContractError("PARSE_DESCRIPTOR_INVALID", "Image is not a registered parser asset")
     document = read_json(safe_path(root, manifest["document_ref"], [output_ref]))
+    checked_image_uris = set()
     for image in document.get("pictures", []):
         uri = (image.get("image") or {}).get("uri")
         if uri is not None:
-            image_path = safe_path(output, uri, ["images"])
+            if not isinstance(uri, str):
+                raise ContractError("PARSE_DESCRIPTOR_INVALID", "Document image URI must be a local path")
+            if uri in checked_image_uris:
+                continue
+            image_path = safe_path(output, uri, ["images"], directory_entries=directories)
             if image_path.relative_to(root).as_posix() not in registered:
                 raise ContractError("PARSE_DESCRIPTOR_INVALID", "Document image is not a registered local asset")
+            checked_image_uris.add(uri)
     markdown = safe_path(root, manifest["markdown_ref"]).read_text(encoding="utf-8")
-    for uri in _markdown_image_uris(markdown):
-        image_path = safe_path(output, unquote(uri), ["images"])
+    for uri in dict.fromkeys(_markdown_image_uris(markdown)):
+        image_path = safe_path(output, unquote(uri), ["images"], directory_entries=directories)
         if image_path.relative_to(root).as_posix() not in registered:
             raise ContractError("PARSE_DESCRIPTOR_INVALID", "Markdown image is not a registered local asset")
     _validate_previews(root, output, manifest, document, registered)

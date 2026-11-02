@@ -112,7 +112,7 @@ def validate_id(value):
     return value
 
 
-def safe_path(root, relative, allowed_prefixes=None):
+def safe_path(root, relative, allowed_prefixes=None, *, _directory_entries=None):
     root = Path(root).resolve(strict=True)
     if (
         not isinstance(relative, str)
@@ -148,9 +148,17 @@ def safe_path(root, relative, allowed_prefixes=None):
     cursor = root
     for part in parts:
         if cursor.is_dir():
-            aliases = [
-                p.name for p in cursor.iterdir() if p.name.casefold() == part.casefold()
-            ]
+            if _directory_entries is None:
+                aliases = [p.name for p in cursor.iterdir() if p.name.casefold() == part.casefold()]
+            else:
+                # Only fixed-material readers opt in. Share this snapshot for
+                # one read operation, never across writes or separate loads.
+                if cursor not in _directory_entries:
+                    names = {}
+                    for child in cursor.iterdir():
+                        names.setdefault(child.name.casefold(), set()).add(child.name)
+                    _directory_entries[cursor] = names
+                aliases = _directory_entries[cursor].get(part.casefold(), ())
             if aliases and part not in aliases:
                 raise ContractError(
                     "PATH_CASE_ALIAS",

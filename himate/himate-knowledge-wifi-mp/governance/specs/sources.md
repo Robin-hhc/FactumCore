@@ -28,6 +28,8 @@ P5 成功发布后合并本批范围，部分完成仅写 processing，全文覆
 
 PDF 原生位图使用本地 PDFium 按原件物理页与图片边框提取，含 Form 变换、裁剪、旋转与透明遮罩处理；规范像素全透明时回看原位采样，避免吞掉极薄裁剪边缘。匹配有歧义或解码失败仍登记 IMAGE_UNAVAILABLE，不擅选图片。导出的 PNG 按实际像素与尺寸去重，重复绘制保留所有 element/provenance 但共用图片文件，Markdown 与结构 JSON 指向相同本地资产。本批阅读包每页对相同图片路径只列一次并标明出现次数，逐次定位仍在页索引与固定清单，避免重复路径耗尽候选字量。图片策略版本及 PDFium 版本进入解析 profile，升级后建新缓存，累计评估进度不变。位图恢复不等同于完整矢量图、文字叠加关系或图意理解；完整图示仍回看原页。
 
+PDF 页侧独立、连续且等距排列的长数字列，在具有明确正文间隔且无结构或同列文字歧义时归为行号装饰。Markdown、text.txt、物理页文本和入库阅读包统一省略这些行号；结构 JSON 保留原文、self_ref 和 provenance，原元素仍可按绑定来源与解析配置的 locator 读取。正文编号、表格、代码、图示与不满足识别条件的数字保留，不使用纯数字行的全局删除规则。文字处理策略版本纳入 PDF profile，升级创建新缓存且不改累计评估进度。
+
 `prepare_pdf` 交接 `descriptor_kind: manifest-reference` 的紧凑描述符：固定 manifest 入口及摘要、来源和解析配置身份、阅读稿/结构/定位入口、统计和缺口摘要，不重复复制全书 images/gaps。`parse` 与 `source extract` 的原完整描述符接口不变；`load` 仍完整核对 manifest 摘要、来源与 profile 身份及产物文件 hash，并可加载完整元数据。
 
 缺口按 code、severity、message 聚合，保留 count、最多 3 个 example_locators 和指向完整 manifest 的 details_ref；最多 64 类，其余以 OTHER_PARSE_GAPS 项累计。P1 task.gaps 交接次数及明细入口；pdf-review.json.gaps 使用同样摘要，gap_details_ref 指向固定 manifest，每页 images.provenance 仅保留本页。原始缺口明细仍在 manifest，原 parse_status 为 partial 时保持 partial；摘要不表示提取缺口已修复。

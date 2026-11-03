@@ -138,6 +138,7 @@ def _profile(options, suffix, root):
             "generate_picture_images": True}
     if suffix == ".pdf":
         profile["picture_export"] = "pdfium-rgba-dedup:1"
+        profile["text_export"] = "margin-line-numbers:1"
     return profile
 
 
@@ -558,7 +559,7 @@ def _range_box(reference):
     return first[0], first[1], last[0] + 1, last[1] + 1
 
 
-def _document_segments(document, suffix, source_hash, profile_hash):
+def _document_segments(document, suffix, source_hash, profile_hash, *, hidden_text_refs=None):
     segments, pages = [], defaultdict(list)
     groups = {group.self_ref: group for group in document.groups}
     for item, _ in document.iterate_items(traverse_pictures=True):
@@ -592,6 +593,13 @@ def _document_segments(document, suffix, source_hash, profile_hash):
                     end_row = start_row + cell.row_span
                     cell_range = f"{_column(start_col + 1)}{start_row + 1}:{_column(end_col)}{end_row}"
                     segments.append({"locator": {"kind": "cell_range", "sheet": sheet, "range": cell_range}, "text": cell.text})
+    # Reading decoration remains addressable as an original, identity-bound
+    # element, while the page aggregates continue to contain body text only.
+    for item in document.texts if hidden_text_refs else ():
+        if item.self_ref in hidden_text_refs:
+            locator = {"kind": "element", "ref": item.self_ref,
+                       "source_sha256": source_hash, "profile_sha256": profile_hash}
+            segments.append({"locator": locator, "text": _item_text(item)})
     for page in sorted(document.pages):
         kind = "slide" if suffix == ".pptx" else "page"
         if suffix in {".pdf", ".pptx"} | IMAGE_FORMATS:
@@ -638,7 +646,11 @@ def _docling(root, source, data, output, options, page_range, source_hash, profi
                     kept = document.add_picture(image=ImageRef.from_pil(image=image, dpi=72),
                                                 prov=picture.prov[0] if picture.prov else None)
                     original_images.add(kept.self_ref)
+    hidden_text_refs = set()
     if suffix == ".pdf":
+        from .pdf_text import mark_margin_line_numbers
+
+        hidden_text_refs = mark_margin_line_numbers(document)
         _pdf_picture_recovery(document, data, output, options)
         # Assets already have content-addressed local references. The save_as_*
         # helpers would write a new PNG for every repeated drawing occurrence.
@@ -653,8 +665,11 @@ def _docling(root, source, data, output, options, page_range, source_hash, profi
     else:
         document.save_as_markdown(output / "document.md", artifacts_dir=Path("images"), image_mode=ImageRefMode.REFERENCED, traverse_pictures=True, mark_meta=True)
         document.save_as_json(output / "document.json", artifacts_dir=Path("images"), image_mode=ImageRefMode.REFERENCED, ensure_ascii=False)
-    segments = _document_segments(document, suffix, source_hash, profile_hash)
-    text = "\n\n".join(segment["text"] for segment in segments if segment["locator"]["kind"] == "element" and segment["text"])
+    segments = _document_segments(document, suffix, source_hash, profile_hash,
+                                  hidden_text_refs=hidden_text_refs)
+    text = "\n\n".join(segment["text"] for segment in segments
+                       if segment["locator"]["kind"] == "element" and segment["text"]
+                       and segment["locator"]["ref"] not in hidden_text_refs)
     exported = read_json(output / "document.json")
     images, image_refs, image_directories = [], {}, {}
     image_pages = set()

@@ -123,6 +123,8 @@ def run_group(item, output, environment):
         "-q",
         "--basetemp",
         str(output / "t" / f"{number:02d}"),
+        "-o",
+        "cache_dir=" + str(output / "pytest-cache" / label),
         "--junitxml",
         str(xml),
     ]

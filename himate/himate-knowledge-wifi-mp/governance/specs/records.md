@@ -26,7 +26,7 @@ PDF task 通过 manifest-reference 描述符交接固定材料入口、身份与
 
 P5先核对本轮 PDF 输入与范围的机械约束，再复制覆盖卡片、更新全部引用关系与检索索引，成功后保存本批覆盖或全文成功标记；不重复 P4 语义审阅。失败保留材料供当前session重试同一P5，不先回P1；重复登记按区间并集处理，不累计两遍。结果记录具体错误，不把失败当完成。
 
-本批成功仍返回 phase completed，回执 source_complete 区分本批与全文完成。PDF partial 时 source_complete=false，包含 processing/remaining_pages；processed_hash 只反映实际最后全文成功值。入库 Workflow 可以结束本批并交付剩余范围，下次普通 scan 继续；巡检返回 L2 后仍将未完成 PDF 视为待办。
+本批成功仍返回 phase completed，回执 source_complete 区分本批与全文完成。PDF partial 时 source_complete=false，包含 processing/remaining_pages；processed_hash 只反映实际最后全文成功值。独立入库 Workflow 成功后回 P1，在原始任务范围内继续普通 scan，范围无待办才正常结束；巡检成功后返回 L2，仍将未完成 PDF 视为待办。P1 发现巡检选中的单一来源无待办时也回 L2，不据此宣称巡检完成。暂缓保留阻塞出口并交代剩余，不推进处理事实或反复重扫；P5失败保留本批材料直接重试。
 
 不增加前序通过票据、不可变视图链、CAS、应用层journal或备份链。数据库可用常规事务完成自身更新，不宣称外部文件与数据库在所有故障下原子完成。串行运行、Agent重试及必要时人工恢复是初期选择。
 

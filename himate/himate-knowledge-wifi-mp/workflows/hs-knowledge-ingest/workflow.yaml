@@ -1,7 +1,7 @@
 version: 1
 id: hs-knowledge-ingest
 name: WiFi 知识入库
-description: 一次处理一个来源或PDF页批；P2先决策、P3写卡、P4独立审阅，P5入库并登记本批或全文完成。
+description: 在本次选定范围内逐批处理来源或PDF页段；P5成功回P1继续扫描，P1确认无待办才正常结束。
 kind: custom
 source: user_created
 entry:
@@ -15,7 +15,9 @@ nodes:
   skill: hs-knowledge-source
   prompt: '复用已知项目与执行端；否则读当前工作区 AGENTS.md、config.yml，确定知识根，位置不明确才询问用户。在数据所在端的原生知识根调用仓内 CLI，交接实际项目、知识根、执行端及已验证的 CLI 命令前缀（含指定解释器），后续节点沿用。
 
-    使用 hs-knowledge-source 扫描一个变化或待续办来源；巡检指定 source_id 时完整采用该 ID。有 task.pdf_review 时交接起点、宽候选及页索引，不默认读完整本或整个候选包。prepared 交 P2，unchanged 结束本轮。'
+    首次进入交接本次任务的原始范围，后续各批保持：未指定来源时运行普通 scan，不把上一批 source_id 作为后续扫描范围；指定文件、目录或来源 ID 时每批采用该范围。沿用已验证的 CLI 命令前缀、parser 选项、review_text_budget 和 review_page_budget。用户明确要求重评时，reprocess: true 仅首次 P1 使用，后续普通续办。
+
+    使用 hs-knowledge-source 扫描一个变化或待续办来源。有 task.pdf_review 时交接起点、宽候选及页索引，不默认读完整本或整个候选包。prepared 交 P2；unchanged 表示本次原始范围无待办，汇总各批实际处理的来源、页段和卡片变动后结束。'
   exits:
   - id: prepared
     label: 本轮材料已准备
@@ -23,7 +25,7 @@ nodes:
     target: plan_change
   - id: unchanged
     label: 没有待办
-    condition: 本次所选范围扫描成功且没有待办。
+    condition: 本次任务原始范围扫描成功且没有待办，已汇总各批实际结果。
     target: __end__
 - id: plan_change
   title: P2 阅读并制定编辑计划
@@ -32,7 +34,7 @@ nodes:
   skill: hs-knowledge-change-plan
   prompt: '使用 hs-knowledge-change-plan，读取 task、页索引和完整关联卡，完成六决策、新增主题查重及简短计划；不沿用前次问答主题作筛选。存在的 raw PDF 按需分段读宽候选，按自身上下文、图表、条款和产卡量自由选实际 end；80k token 仅作软目标，不要求读完候选。计划必填 source_pages 的单连续物理页区间，从 task 起点开始且不超过候选上限，完整评估选定范围。非 PDF 仍阅读全文，来源删除沿用原有判断。plan.md 的 YAML frontmatter 用 cards 固定完整候选 id/path；更新保留原路径和生命周期，标签或状态变化由 P2 决定；新卡按现有类型导航选目录，无候选写 cards: []。
 
-    content_planned 交 P3；必要依据不足则 deferred，说明缺口并保留未完成文件，不推进成功 hash。'
+    content_planned 交 P3；必要依据不足则 deferred，说明缺口并保留未完成文件，不推进成功 hash。本次任务因阻塞结束，交付已完成批次及当前来源仍未完成的事实，不宣称范围内待办已清空，也不回 P1 反复选中该来源。'
   exits:
   - id: content_planned
     label: 编辑计划已明确
@@ -40,7 +42,7 @@ nodes:
     target: materialize_view
   - id: deferred
     label: 本文件暂缓
-    condition: 必要依据不足，已说明缺口；本文件不标为处理完成。
+    condition: 必要依据不足，已说明阻塞及实际已完成范围；本文件仍未完成，本次范围不宣称全部完成。
     target: __end__
 - id: materialize_view
   title: P3 按计划写完整卡
@@ -87,12 +89,14 @@ nodes:
   skill: hs-knowledge-apply
   prompt: '使用 hs-knowledge-apply 调用 ingest commit，机械核对本轮 PDF 页段后复制候选并刷新关系和检索索引，成功后合并本批已评估范围，仅全文覆盖时保存本文件成功 hash；不重复 P4 内容质量审阅。
 
-    失败保留本轮暂存并直接重试 P5，不回 P1 清理。需要改稿时回 P3 再审。成功以 commit 回执交付，source_complete 为 false 时明确 PDF 尚有待办；本批 completed 不代表全文完成。不用 scan 验证上一批；主动续办才开始下一轮。本节点不提交或推送 Git。'
+    失败保留本轮暂存并直接重试 P5，不回 P1 清理。需要改稿时回 P3 再审。成功后简要交接 commit 回执中的来源、实际页段、卡片变动及剩余范围，source_complete 为 false 时明确 PDF 尚未完成；本批 completed 不代表本次任务或全文完成。
+
+    本批成功后必须回 P1，按任务原始范围及已交接的解析和预算配置选择下一批，直到 P1 确认该范围无待办。上一批结果以 commit 回执为准，回 P1 后的 scan 用于选择下一批；不重复使用 reprocess: true。本节点不提交或推送 Git。'
   exits:
   - id: completed
     label: 本批已入库
     condition: 本轮卡片和索引更新成功，已保存本批处理事实，并按 source_complete 区分部分或全文完成。
-    target: __end__
+    target: prepare_sources
 artifacts:
   primary: []
   optional: []

@@ -145,6 +145,24 @@ def test_incomplete_group_retains_output_and_fails(runner, monkeypatch, tmp_path
         assert (tmp_path / "00.stdout.txt").read_bytes() == b"partial stdout"
 
 
+def test_group_keeps_pytest_cache_under_its_external_results(runner, monkeypatch, tmp_path):
+    source = tmp_path / "source"
+    tests = source / "himate/himate-knowledge-wifi-mp/evals/fixture"
+    tests.mkdir(parents=True)
+    test_file = tests / "test_cache.py"
+    test_file.write_text("def test_value():\n    assert 1 + 1 == 2\n", encoding="utf-8")
+    output = tmp_path / "external-results"
+    output.mkdir()
+    monkeypatch.setattr(runner, "ROOT", source)
+
+    result = runner.run_group((0, "fixture", (tests,)), output,
+                              dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
+
+    assert result["exit_code"] == 0 and result["tests"] == 1, result
+    assert not list(source.rglob(".pytest_cache"))
+    assert (output / "pytest-cache/fixture/v/cache/nodeids").is_file()
+
+
 def test_timeout_stops_process_tree_and_collects_partial_output(runner, monkeypatch):
     class Process:
         returncode = 124

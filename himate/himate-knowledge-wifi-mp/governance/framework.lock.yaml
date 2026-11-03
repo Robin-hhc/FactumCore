@@ -1,6 +1,6 @@
 schema_version: '2.0'
 contract_family: aiot-wifi
-tool_version: 0.16.3
+tool_version: 0.16.4
 files:
   contracts/__init__.py:
     path: governance/contracts/__init__.py
@@ -19,7 +19,7 @@ files:
     sha256: a4c76455e14dcd0265c26f221f01a18890afda781a112e58facc53ced5bdd83e
   contracts/ingest.py:
     path: governance/contracts/ingest.py
-    sha256: 9e317686297527bf698d898ef8e70a01a6e2aa91af00a2f98dbf29e326d105a8
+    sha256: ca3fee577b0957d59fa16a864e21f3fe43ac008ef6a3ef55d33ee655ba37095a
   contracts/knowledge.py:
     path: governance/contracts/knowledge.py
     sha256: 2b165355fa1548c9c5e58bc9fe3e0c0802d0e02bdbc61c498b37424785faebe9
@@ -91,10 +91,10 @@ files:
     sha256: 915b655066514ee1c66122e9735e6da89c010ff6c476c54727d8b746e9de42ab
   specs/records.md:
     path: governance/specs/records.md
-    sha256: 34bdcb99ae046513811050cadf4d3805f1eaff7cc923eacd35787afaacd89365
+    sha256: 16d1d8d411257486e0f0b4f17d9a0cfb96897e99b93b7e79fb6b4e1fc6235975
   specs/sources.md:
     path: governance/specs/sources.md
-    sha256: 188c1f8a88e8fa9d6da305338643be49f29126dd0d12842e61c84b1d35845281
+    sha256: 74c804c7ae55859f696c6dcde88213b4ebbe7f609b01b52de91e942f5fdbf774
   specs/ci-runner.md:
     path: governance/specs/ci-runner.md
     sha256: afbe4024ce2203b508604e84a2c092b7a6af7fa315fd4a6fcb4803d2c04ee308

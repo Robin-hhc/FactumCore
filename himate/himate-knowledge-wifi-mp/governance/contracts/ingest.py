@@ -173,10 +173,13 @@ def observe(root, catalog, selected=None, *, include_code=False, first=False, ke
     target = catalog.get_file(selected) if selected else None
     selected_path = target["path"] if target else selected
     paths = _raw_files(root, selected_path)
+    selected_directory = False
     if selected_path and not target:
-        if not selected_path.startswith("docs-raw/"):
+        if selected_path != "docs-raw" and not selected_path.startswith("docs-raw/"):
             selected_path = "docs-raw/" + selected_path
-        if selected_path not in paths and safe_path(root, selected_path, ["docs-raw"]).exists():
+        selected_location = safe_path(root, selected_path, ["docs-raw"])
+        selected_directory = selected_location.is_dir()
+        if selected_path not in paths and selected_location.exists() and not selected_directory:
             raise ContractError("UNSUPPORTED_DOCUMENT_FORMAT", selected_path)
     catalog.register_many([
         {"kind": "raw", "path": path} for path in paths
@@ -188,7 +191,7 @@ def observe(root, catalog, selected=None, *, include_code=False, first=False, ke
     elif selected_path:
         candidates = [row for row in candidates if row["kind"] != "code" and
                       (row["path"] == selected_path or row["path"].startswith(selected_path.rstrip("/") + "/"))]
-        if not candidates:
+        if not candidates and not selected_directory:
             raise ContractError("SOURCE_MISSING", selected_path)
     elif not include_code:
         candidates = [row for row in candidates if row["kind"] != "code"]

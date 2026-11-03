@@ -50,6 +50,44 @@ def test_five_steps_keep_decision_writing_and_independent_review_separate():
     }
 
 
+def test_ingest_completed_batch_returns_to_scan_before_normal_completion():
+    graph = yaml.safe_load((KNOWLEDGE_ROOT / "workflows/hs-knowledge-ingest/workflow.yaml").read_bytes())
+    edges = {row["id"]: {edge["id"]: edge["target"] for edge in row["exits"]}
+             for row in graph["nodes"]}
+    assert edges["apply_view"] == {"completed": "prepare_sources"}
+    assert edges["prepare_sources"] == {"prepared": "plan_change", "unchanged": "__end__"}
+    assert edges["plan_change"]["deferred"] == "__end__"
+
+
+def test_patrol_reselects_after_completed_or_already_completed_selected_source():
+    graph = yaml.safe_load((KNOWLEDGE_ROOT / "workflows/hs-knowledge-lint/workflow.yaml").read_bytes())
+    edges = {row["id"]: {edge["id"]: edge["target"] for edge in row["exits"]}
+             for row in graph["nodes"]}
+    assert edges["apply_view"] == {"completed": "plan_patrol"}
+    assert edges["prepare_sources"]["unchanged"] == "plan_patrol"
+    assert edges["plan_patrol"]["needs_ingest"] == "prepare_sources"
+    assert edges["plan_patrol"]["unchanged"] == "complete_patrol"
+    assert edges["plan_change"]["deferred"] == "complete_patrol"
+
+
+@pytest.mark.parametrize("workflow,node_id,exit_id,wrong_target", [
+    ("hs-knowledge-ingest", "apply_view", "completed", "__end__"),
+    ("hs-knowledge-ingest", "plan_change", "deferred", "prepare_sources"),
+    ("hs-knowledge-lint", "apply_view", "completed", "prepare_sources"),
+    ("hs-knowledge-lint", "prepare_sources", "unchanged", "complete_patrol"),
+    ("hs-knowledge-lint", "plan_change", "deferred", "plan_patrol"),
+])
+def test_loop_boundaries_cannot_terminate_early_or_repeat_blocked_sources(
+        distribution, workflow, node_id, exit_id, wrong_target):
+    path = distribution / "workflows" / workflow / "workflow.yaml"
+    value = yaml.safe_load(path.read_bytes())
+    node = next(row for row in value["nodes"] if row["id"] == node_id)
+    next(edge for edge in node["exits"] if edge["id"] == exit_id)["target"] = wrong_target
+    path.write_text(yaml.safe_dump(value), encoding="utf-8")
+    assert any(node_id + ": unsafe or missing transition" in error
+               for error in validator_module().validate(distribution))
+
+
 @pytest.mark.parametrize("skill", ["record", "explore", "lint"])
 def test_retired_skills_cannot_reappear_as_active_packages(distribution, skill):
     package = distribution / "skills" / ("hs-knowledge-" + skill)

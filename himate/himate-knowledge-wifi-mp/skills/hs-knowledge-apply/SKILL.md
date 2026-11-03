@@ -21,4 +21,8 @@ knowledge ingest commit --json
 
 本批范围无需产卡但已完整评估时，将 `{"reason":"实际不改卡理由"}` 写入 `.build/commit.json`，再运行 `knowledge ingest commit --input .build/commit.json --json`；PDF 计划仍须有 source_pages。经核实无增量的页也可登记，暂缓／失败不推进覆盖或成功 hash。
 
-成功后依据命令回执交付。`phase: completed` 表示本批发布完成；`source_complete: false` 表示该 PDF 仍有剩余页，说明本批范围和待办，下次普通入库继续，不宣称整文完成。需要复核时读 `artifacts/ingest/latest.json`，不以新 scan 验证上一批；主动开始下一批才重新扫描。P1/P5 清理保留 .build 根 README，PDF 派生缓存及正式进度不随本批清理。Git 提交、推送与合入由用户另行授权。
+成功后简要交接命令回执中的来源、实际页段、卡片变动及剩余范围，供最终汇总。`phase: completed` 表示本批发布完成；`source_complete: false` 表示该 PDF 仍有剩余页，不宣称整文或本次任务完成。
+
+按所属 Workflow 继续：独立 ingest 成功后回 P1，按任务原始范围扫描下一批，直到该范围返回 `unchanged` 才正常结束；未限定来源时不把上一批 `source_id` 变为后续范围。巡检成功后回 L2，由 L2 选择下一来源再交 P1，采用其最新 `source_id`。两者沿用已交接的 CLI 命令前缀、`parser` 和页段预算配置；`reprocess: true` 仅首次重评使用，后续普通续办。
+
+上一批结果以 commit 回执为准，需要复核时读 `artifacts/ingest/latest.json`；下一次 scan 用于选择下一批。P1/P5 清理保留 .build 根 README，PDF 派生缓存及正式进度不随本批清理。暂缓／失败报告实际阻塞和未完成范围，不通过回 P1 反复重扫解决。Git 提交、推送与合入由用户另行授权。

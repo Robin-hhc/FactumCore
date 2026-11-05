@@ -32,6 +32,7 @@ config.local.yml
 !/himate/himate-knowledge-wifi-mp/docs-raw/conventions/README.md
 /himate/himate-knowledge-wifi-mp/docs-raw/protocols/*
 !/himate/himate-knowledge-wifi-mp/docs-raw/protocols/README.md
+/himate/himate-knowledge-wifi-mp/docs-raw/sources/dbox.local.yml
 /himate/himate-knowledge-wifi-mp/docs-raw/sources/3ms/*
 !/himate/himate-knowledge-wifi-mp/docs-raw/sources/3ms/README.md
 /himate/himate-knowledge-wifi-mp/docs-raw/sources/dbox/*
@@ -63,3 +64,11 @@ config.local.yml
 
 # Retired independent checkout, if still present locally.
 /aiot-knowledge/
+
+# Selected real fixtures are versioned on the OpenFlow adaptation branch.
+!/main/.gitattributes
+!/main/.gitignore
+!/main/hi1102_device/
+!/main/hi1105_host/
+!/himate/himate-knowledge-wifi-mp/docs-raw/protocols/ieee80211/
+!/himate/himate-knowledge-wifi-mp/docs-raw/specs/hi1105-wme-snap-static-analysis.md

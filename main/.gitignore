@@ -1,0 +1,4 @@
+**/.codegraph/
+**/.codegraph-cache/
+.codex/
+*.log

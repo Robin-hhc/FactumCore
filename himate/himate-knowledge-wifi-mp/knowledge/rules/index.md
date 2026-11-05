@@ -6,5 +6,7 @@
 
 | 稳定 Card ID | 标题 | 用途与边界 | 相对链接 |
 |---|---|---|---|
+| wifi-snap-encapsulation-static | mac_set_snap 的组织码选择、字节序与偏移接口 | guidance；产品条件见卡头 | [正文](wifi-snap-encapsulation-static.md) |
+| wifi-wme-tid-ac-mapping-static | 两份源码的 WME TID/AC 映射与不可逆边界 | guidance；产品条件见卡头 | [正文](wifi-wme-tid-ac-mapping-static.md) |
 
 [返回知识入口](../index.md)。使用时精读固定版本正文并按需回到实际来源，说明 local/shared 身份、范围和真实确认/验证情况。

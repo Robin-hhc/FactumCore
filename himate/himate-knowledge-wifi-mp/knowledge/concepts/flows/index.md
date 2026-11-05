@@ -6,5 +6,6 @@
 
 | 稳定 Card ID | 标题 | 用途与边界 | 相对链接 |
 |---|---|---|---|
+| ieee1996-scanning-roaming-history | 1996草案教程中的扫描、关联与重关联（历史背景） | historical；产品条件见卡头 | [正文](ieee1996-scanning-roaming-history.md) |
 
 [返回知识入口](../../index.md)。使用时精读固定版本正文并按需回到实际来源，说明 local/shared 身份、范围和真实确认/验证情况。

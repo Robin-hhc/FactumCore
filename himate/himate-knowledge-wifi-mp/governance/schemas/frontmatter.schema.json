@@ -384,12 +384,8 @@
             "string",
             "null"
           ],
-          "enum": [
-            "chip12",
-            "chip08",
-            "chip07c",
-            null
-          ]
+          "minLength": 1,
+          "pattern": "\\S"
         },
         "side": {
           "type": [

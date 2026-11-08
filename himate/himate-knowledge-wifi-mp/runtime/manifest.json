@@ -21,7 +21,7 @@
       "sha256": "1405b6eabf3adf0e8ba8da131add28e5d269404a520107a46858e46497ceb5f0"
     },
     "himate_knowledge/doctor.py": {
-      "sha256": "9a72e7fd275bc7e141f87ee9eafc061bc60631b4daa8601af1b57a01f17253bd"
+      "sha256": "01c973e2f9670cbd50f0a4d9c5a16d60f099738fb95a0f2b7dc3db7203cc9f66"
     },
     "himate_knowledge/protocol.py": {
       "sha256": "47bfb4189c9dd570b44cd5993557d950c48b471dfd55360b540d9c2be7918867"
@@ -31,5 +31,5 @@
     }
   },
   "schema_version": "1.0",
-  "version": "0.16.4"
+  "version": "0.16.6"
 }

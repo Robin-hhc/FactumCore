@@ -91,6 +91,55 @@ def test_doctor_ready_includes_verified_rule_version_and_exact_workspace(knowled
     assert not (knowledge.parent / "main").exists()
 
 
+@pytest.mark.parametrize("domain", ["bluetooth", "embedded-audio"])
+def test_doctor_discovers_a_non_wifi_domain_without_an_extra_selector(knowledge, domain):
+    config = knowledge.parent / "config.yml"
+    value = yaml.safe_load(config.read_bytes())
+    value["knowledge_roots"] = {domain: knowledge.name}
+    config.write_text(yaml.safe_dump(value), encoding="utf-8")
+
+    status, report = observe(knowledge)
+
+    assert status == 0, report
+    assert report["data"]["config_path"] == str(config)
+    assert report["data"]["configuration"]["knowledge_root"] == str(knowledge.resolve())
+
+
+def test_doctor_selects_the_current_root_from_multiple_domain_mappings(knowledge):
+    config = knowledge.parent / "config.yml"
+    value = yaml.safe_load(config.read_bytes())
+    value["knowledge_roots"] = {
+        "audio": "himate/himate-knowledge-audio",
+        "bluetooth": knowledge.name,
+        "wifi": "himate/himate-knowledge-wifi",
+    }
+    config.write_text(yaml.safe_dump(value, sort_keys=False), encoding="utf-8")
+
+    status, report = observe(knowledge)
+
+    assert status == 0, report
+    assert report["data"]["config_path"] == str(config)
+    assert report["data"]["configuration"]["knowledge_root"] == str(knowledge.resolve())
+
+
+def test_doctor_blocks_two_domain_aliases_for_the_same_current_root(knowledge):
+    config = knowledge.parent / "config.yml"
+    value = yaml.safe_load(config.read_bytes())
+    value["knowledge_roots"] = {"bluetooth": knowledge.name, "audio": knowledge.name}
+    config.write_text(yaml.safe_dump(value), encoding="utf-8")
+
+    blocked(knowledge, "CONFIG_AMBIGUOUS")
+
+
+def test_doctor_does_not_ignore_an_unsafe_other_domain_mapping(knowledge):
+    config = knowledge.parent / "config.yml"
+    value = yaml.safe_load(config.read_bytes())
+    value["knowledge_roots"] = {"bluetooth": knowledge.name, "audio": "../other-workspace"}
+    config.write_text(yaml.safe_dump(value), encoding="utf-8")
+
+    blocked(knowledge, "CONFIG_KNOWLEDGE_ROOT_MISMATCH")
+
+
 def test_doctor_blocks_missing_governance_lock(knowledge):
     (knowledge / "governance/framework.lock.yaml").unlink()
     blocked(knowledge, "RULE_LOCK_UNAVAILABLE")

@@ -419,7 +419,6 @@ def workspace_layout(config, workspace_root):
     _workspace_declaration(config)
     code_root = _workspace_path(root, config["code_root"])
     gaps, modules, repos, architecture = [], [], {}, []
-    known_chips = ("chip12", "chip08", "chip07c")
     if not code_root.exists():
         gaps.append({"code": "code_root_missing", "path": config["code_root"]})
     elif not code_root.is_dir():
@@ -429,9 +428,6 @@ def workspace_layout(config, workspace_root):
         workspace_path = path.relative_to(root).as_posix()
         module = {**copy.deepcopy(declared), "workspace_path": workspace_path, "binding_ids": []}
         modules.append(module)
-        unknown_chips = sorted(set(declared.get("chips", [])) - set(known_chips))
-        if unknown_chips:
-            gaps.append({"code": "non_domain_chip_labels", "path": workspace_path, "chips": unknown_chips})
         if not path.exists():
             gaps.append({"code": "module_missing", "path": workspace_path})
             continue
@@ -457,21 +453,26 @@ def workspace_layout(config, workspace_root):
         binding["excluded_roots"] = sorted(
             repo["workspace_path"][len(prefix):] for repo in repos.values()
             if repo["workspace_path"] != own and repo["workspace_path"].startswith(prefix))
+    # Only a module's own labels establish a chip/side combination. A side
+    # declared by another module must not invent a Target for this chip.
+    target_labels = {(chip, side) for module in modules
+                     for chip in module.get("chips", []) for side in module.get("sides", [])}
     targets = []
-    for chip in known_chips:
-        for side in ("host", "device"):
-            matches = [item for item in architecture if chip in item["chips"] and side in item["sides"]]
-            targets.append({"target_id": f"{chip}-{side}", "chip": chip, "side": side,
-                            "source_bindings": sorted(item["binding_id"] for item in matches),
-                            "module_roots": sorted({item["module_root"] for item in matches}),
-                            "build_profile": None, "required_features": [], "protocol_versions": []})
+    for chip, side in sorted(target_labels):
+        matches = [item for item in architecture if chip in item["chips"] and side in item["sides"]]
+        targets.append({"target_id": f"{chip}-{side}", "chip": chip, "side": side,
+                        "source_bindings": sorted(item["binding_id"] for item in matches),
+                        "module_roots": sorted({item["module_root"] for item in matches}),
+                        "build_profile": None, "required_features": [], "protocol_versions": []})
+    paired_chips = sorted({chip for chip, _ in target_labels
+                           if (chip, "host") in target_labels and (chip, "device") in target_labels})
     return {"mapping_kind": "modules", "workspace_root": str(root), "code_root": config["code_root"],
             "code_root_path": str(code_root), "modules": modules,
             "repos": sorted(repos.values(), key=lambda item: item["workspace_path"]),
             "architecture": sorted(architecture, key=lambda item: item["binding_id"]),
             "targets": targets,
             "pairs": [{"pairing_id": chip + "-host-device", "host_target": chip + "-host",
-                       "device_target": chip + "-device", "compatibility_policy": "unknown"} for chip in known_chips],
+                       "device_target": chip + "-device", "compatibility_policy": "unknown"} for chip in paired_chips],
             "layout_gaps": gaps}
 
 

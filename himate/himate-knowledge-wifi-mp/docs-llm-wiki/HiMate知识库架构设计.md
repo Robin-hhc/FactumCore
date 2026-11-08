@@ -70,6 +70,10 @@ flowchart LR
 
 `repo/` 表示 manifest 工作区根，项目入口为 `AGENTS.md` 和 `config.yml`；该根不要求自身是 Git 仓，代码工作区可包含多个实际仓。`knowledge_roots` 和 `code_root` 相对项目配置目录，分别选择知识根和代码根；`modules[].path` 相对 `code_root`，描述允许引用的实际模块。`himate/` 是多个领域知识根的容器。
 
+`knowledge_roots` 的键名仅作标识，不限定为 `wifi`；运行时按当前知识根的实际路径自动选择唯一匹配项，无须额外指定领域。既有 `wifi` 配置保持兼容；同一目录有多个匹配项时拒绝歧义配置。
+
+模块映射按每个模块自身的 `chips`、`sides` 组合自动派生 Target，不维护固定芯片列表，也不跨模块补造组合。同一芯片同时登记 Host 和 Device 时派生配对，兼容策略仍为未知；缺少标签时只登记代码范围。缺失模块仍保留已声明的 Target，但没有可引用的实际代码绑定。修改 `modules` 后重新读取配置即更新这些映射，无须另行登记 Target；配置标签不证明实际构建、宏或协议条件。
+
 知识根内的 `config.yml` 和 `AGENTS-code-root.md` 是部署源模板，分别复制为 `repo/config.yml` 和 `repo/AGENTS.md`。部署目标由知识包根的 `../..` 确定，不通过 Git 查找；运行时按项目配置的准确映射选择知识根。
 
 登记代码时，未填写 `repo_id` 的 `path` 相对项目配置目录；填写 `repo_id` 时，相对对应的已配置代码仓。文档路径相对知识根，位于 `docs-raw/`。路径参数详见[来源规范](../governance/specs/sources.md)。

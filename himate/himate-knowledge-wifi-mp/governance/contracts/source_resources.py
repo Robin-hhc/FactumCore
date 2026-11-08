@@ -1,6 +1,7 @@
 """Exact logical-resource/snapshot resolution; source objects are always read-only."""
 
 from .validation import ContractError, canonical_bytes, load_yaml, safe_path, sha256_bytes, workspace_config_path
+from . import workspace_config
 
 
 DBOX_PREFIX = "docs-raw/sources/dbox"
@@ -484,8 +485,7 @@ def _recover_git(knowledge_root, recovery):
     config = load_yaml(config_path)
     if not isinstance(config, dict):
         raise ContractError("RECOVERY_CONFIG_MISMATCH", "Configured workspace mapping is unavailable")
-    mapped = config.get("knowledge_roots", {}).get("wifi")
-    if not isinstance(mapped, str) or (workspace / mapped).resolve() != root:
+    if workspace_config.mapped_root(config, config_path, root) is None:
         raise ContractError("RECOVERY_CONFIG_MISMATCH", "Configured domain does not match this knowledge root")
     if any(key in recovery for key in ("repo_root", "repository_root", "workspace_root")):
         raise ContractError("UNTRUSTED_RECOVERY_ROOT", "Repository roots come only from config")

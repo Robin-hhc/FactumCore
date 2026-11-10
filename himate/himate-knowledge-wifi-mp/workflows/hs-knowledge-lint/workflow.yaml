@@ -68,7 +68,9 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-change-plan
-  prompt: '使用 hs-knowledge-change-plan，读取 task、页索引和完整关联卡，完成六决策、新增主题查重及简短计划；不沿用前次问答主题作筛选。存在的 raw PDF 按需分段读宽候选，按自身上下文、图表、条款和产卡量自由选实际 end；80k token 仅作软目标，不要求读完候选。计划必填 source_pages 的单连续物理页区间，从 task 起点开始且不超过候选上限，完整评估选定范围。非 PDF 仍阅读全文，来源删除沿用原有判断。plan.md 的 YAML frontmatter 用 cards 固定完整候选 id/path；更新保留原路径和生命周期，标签或状态变化由 P2 决定；新卡按现有类型导航选目录，无候选写 cards: []。
+  prompt: '使用 hs-knowledge-change-plan，读取 task 和完整关联卡，完成六决策及简短计划。文档评估按本轮来源范围识别新主题并查重，不沿用前次问答主题作筛选。存在的 raw PDF 按需分段读宽候选，按自身上下文、图表、条款和产卡量自由选实际 end；80k token 仅作软目标，不要求读完候选。计划必填 source_pages 的单连续物理页区间，从 task 起点开始且不超过候选上限，完整评估选定范围。非 PDF 文档阅读全文；涉及实现时区分稿件记录的版本与本轮核对的版本。
+
+    代码来源按所有关联卡中引用该文件的段落评估，按需读关键函数和必要上下文。区分仅定位变化、结论或条件变化、证据缺失；把已核实的定位与范围交 P3。来源删除沿用原有判断。plan.md 的 YAML frontmatter 用 cards 固定完整候选 id/path；更新保留原路径和生命周期，标签或状态变化由 P2 决定；新卡按现有类型导航选目录，无候选写 cards: []。
 
     content_planned 交 P3；必要依据不足则 deferred，说明缺口并保留未完成文件，不推进成功 hash。交 L4 汇总已完成批次和阻塞来源，不回 L2 反复选中同一来源，不宣称巡检待办已清空。'
   exits:
@@ -102,7 +104,9 @@ nodes:
   type: skill
   owner: reviewer
   skill: hs-knowledge-review
-  prompt: '由独立 reviewer 使用 hs-knowledge-review，沿用已交接的 CLI 先运行 ingest check，核对计划 cards 与候选 id/path，以及存在的 raw PDF 版本、source_pages 和候选边界。再独立阅读计划实际范围，对照旧卡与新稿核对事实、遗漏、旧知识保留、整卡退役及状态决定。PDF 完整评估实际页段，无须读完宽候选；非 PDF 检查全文，空候选也检查范围内新主题。补读前文、跨章和卡引用不自动计为覆盖。
+  prompt: '由独立 reviewer 使用 hs-knowledge-review，沿用已交接的 CLI 先运行 ingest check，核对计划 cards 与候选 id/path，以及存在的 raw PDF 版本、source_pages 和候选边界。再独立阅读计划实际范围，对照旧卡与新稿核对事实、遗漏、旧知识保留、整卡退役及状态决定。PDF 完整评估实际页段，无须读完宽候选；非 PDF 文档检查全文，空候选也检查范围内新主题。补读前文、跨章和卡引用不自动计为覆盖。
+
+    代码来源按所有关联卡中引用该文件的段落独立回源核对，空候选也核对原结论、适用条件和定位是否仍有效。优先用已核实的符号或行段，必要时扩读。文档中的实现结论按实际版本与段旁代码依据核对。
 
     通过后交 P5；计划决定需改变回 P2、成稿或落位拼写问题回 P3，新稿重新审阅。不替作者改稿。'
   exits:

@@ -225,9 +225,11 @@ def test_failed_apply_retries_same_materials_and_defer_keeps_remaining_work(know
     assert_processed(knowledge, [path])
 
 
-def test_lint_reselects_when_its_selected_source_was_completed_before_p1(knowledge):
-    first, second = "docs-raw/specs/a.md", "docs-raw/specs/b.md"
-    write_text(knowledge, first, "# A\n\nSynthetic source A.\n")
+@pytest.mark.parametrize("first", ["docs-raw/specs/a.md", "docs-raw/agent-notes/a.md"])
+def test_lint_reselects_when_its_selected_source_was_completed_before_p1(knowledge, first):
+    second = "docs-raw/specs/b.md"
+    write_text(knowledge, "docs-raw/agent-notes/README.md", "# Directory guidance\n")
+    original = write_text(knowledge, first, "# A\n\nSynthetic source A.\n").read_bytes()
     write_text(knowledge, second, "# B\n\nSynthetic source B.\n")
     graph = edges("hs-knowledge-lint")
     status, selection = invoke(knowledge, "patrol", "plan")
@@ -238,7 +240,8 @@ def test_lint_reselects_when_its_selected_source_was_completed_before_p1(knowled
 
     # A completed separate operation makes L2's selection stale before its P1.
     prepared = scan(knowledge, {"source": selected["source_id"]})
-    publish_selected(knowledge, prepared["data"])
+    assert publish_selected(knowledge, prepared["data"])["card_ids"] == []
+    assert (knowledge / first).read_bytes() == original
     unchanged = scan(knowledge, {"source": selected["source_id"]})
     assert unchanged["phase"] == "unchanged"
     assert graph["prepare_sources"][unchanged["phase"]] == "plan_patrol"

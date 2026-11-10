@@ -18,7 +18,7 @@
 | 知识根下的 `skills/`、`workflows/`、`tools/` | 知识能力分发源码、工作流定义及工具，均相对上行的知识根 |
 | `himate/himate-knowledge-wifi-mp/docs-llm-wiki/` | 共享架构、概要与详细设计、使用说明；本项目 `sdd/` 与 `task.md` 仅本地维护，不在仓根另建文档目录 |
 
-文档入库使用 `hs-knowledge-ingest` Workflow，巡检使用 `hs-knowledge-lint` Workflow，检索使用 `hs-knowledge-query` Skill，实际命令由知识根内的 `knowledge.py`／`knowledge.cmd`／`knowledge.sh` 执行；用法见该根的共享使用说明。
+文档入库使用 `hs-knowledge-ingest` Workflow，巡检使用 `hs-knowledge-lint` Workflow，检索使用 `hs-knowledge-query` Skill。用户要求沉淀聊天或从函数入口生成分析稿时，使用 `hs-knowledge-capture` Skill。实际 CLI 命令由知识根内的 `knowledge.py`／`knowledge.cmd`／`knowledge.sh` 执行，用法见该根的共享使用说明。
 
 本项目根是 manifest 工作区根，不要求自身为 Git 仓。Git 历史与提交在文件所属的实际仓操作，多仓同步按配置的 manifest 根执行；日常知识操作通过上述能力执行。
 

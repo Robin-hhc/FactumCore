@@ -16,7 +16,7 @@ import yaml
 
 
 SKILLS = tuple("hs-knowledge-" + name for name in (
-    "source", "change-plan", "view-materialize", "review", "apply", "query", "maintain",
+    "source", "change-plan", "view-materialize", "review", "apply", "query", "maintain", "capture",
     "patrol-sync", "patrol-plan", "patrol-reindex", "patrol-complete",
 ))
 OWNERS = {"lint_view": "reviewer"}

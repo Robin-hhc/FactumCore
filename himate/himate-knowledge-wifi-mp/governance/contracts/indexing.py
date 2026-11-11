@@ -22,8 +22,8 @@ def lexical(text):
     return sorted(set().union(*term_groups(text))) if text else []
 
 
-def sqlite_readonly_uri(path):
-    """Open an absolute, immutable generation without a SQLite URI authority.
+def sqlite_readonly_uri(path, *, immutable=True):
+    """Open an absolute read-only path without a SQLite URI authority.
 
     SQLite normally rejects file://server/share; a UNC name belongs in the
     URI path (file:////server/share). Extended Windows namespaces also stay
@@ -49,4 +49,4 @@ def sqlite_readonly_uri(path):
     else:
         normalized = path if isinstance(path, PurePosixPath) else Path(path)
         uri = normalized.as_uri()
-    return uri + "?mode=ro&immutable=1"
+    return uri + ("?mode=ro&immutable=1" if immutable else "?mode=ro")

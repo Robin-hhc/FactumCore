@@ -12,7 +12,7 @@ import sys
 from .protocol import NodeError as CommandError, domain, envelope, sha
 
 
-COMMANDS = ("ingest", "source", "query", "search", "read", "patrol", "maintain",
+COMMANDS = ("ingest", "source", "query", "search", "read", "patrol", "maintain", "panel",
             "review", "lint", "apply", "status", "doctor", "install-command")
 
 
@@ -110,6 +110,10 @@ def execute(args, root):
         if words:
             raise CommandError("INVALID_ARGUMENT", "Source parameters belong in --input")
         data, phase = library.sources(root, action or "list", request)
+    elif command == "panel":
+        if words:
+            raise CommandError("INVALID_ARGUMENT", "Panel parameters belong in --input")
+        data, phase = modules["panel"].run(root, action, request)
     elif command in {"query", "search", "read"}:
         if command == "query" and words and words[0] in {"search", "read"}:
             action = words.pop(0)

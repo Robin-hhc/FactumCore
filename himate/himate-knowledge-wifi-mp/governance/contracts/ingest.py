@@ -873,7 +873,6 @@ def commit(root, request):
         catalog.rebuild()
         from .library import build_search
 
-        build_search(catalog)
         current = catalog.get_file(source["source_id"])
         processing = (pdf_review_result(current, source["hash"], pdf_batch["pages"], pdf_batch["total_pages"],
                                         restart=source["change"] == "reprocess") if pdf_batch is not None else None)
@@ -886,6 +885,13 @@ def commit(root, request):
             result["processing"] = processing
             result["remaining_pages"] = remaining_page_ranges(
                 pdf_batch["total_pages"], processing["reviewed_pages"])
+        # Publish the matching read view before updating the authoritative lock.
+        # A failure rolls back the entire SQLite transaction and leaves P5 retryable.
+        projected_source = {"processing": processing}
+        if processing is None:
+            projected_source.update(processed=True, processed_exists=source["exists"],
+                                    processed_hash=source["hash"], source_commit=source.get("source_commit"))
+        build_search(catalog, panel_sources={source["source_id"]: projected_source})
         write_json(safe_path(root, "artifacts/ingest/latest.json"), result)
         if pdf_batch is not None:
             catalog.record_pdf_review(

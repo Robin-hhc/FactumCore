@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 import json
 import hashlib
 import os
@@ -40,15 +41,168 @@ def knowledge(tmp_path):
     return root
 
 
-def invoke(root, *arguments):
+def invoke(root, *arguments, request=None):
     env = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8", PYTHONDONTWRITEBYTECODE="1")
     env.pop("PYTHONPATH", None)
+    stdin = None if request is None else json.dumps(request)
+    if stdin is not None:
+        arguments = (*arguments, "--input", "-")
     result = subprocess.run(
         [sys.executable, "-B", str(root / "knowledge.py"), *arguments, "--json"],
+        input=stdin,
         cwd=root, env=env, capture_output=True, encoding="utf-8", timeout=60,
     )
     assert "Traceback" not in result.stderr, result.stderr
     return result.returncode, json.loads(result.stdout)
+
+
+def _panel(root, action, request=None):
+    status, report = invoke(root, "panel", action, request=request)
+    assert status == 0, report
+    return report["data"]
+
+
+def _panel_card(root, identity, references, body):
+    directory = root / "knowledge/rules"
+    directory.mkdir(exist_ok=True)
+    target = directory / (identity + ".md")
+    header = {"id": identity, "doc_ref": references, "code_ref": [], "tags": ["wifi"]}
+    target.write_text("---\n" + yaml.safe_dump(header) + "---\n" + body, encoding="utf-8")
+    return target
+
+
+def test_panel_reads_published_cards_and_rejects_stale_revisions(knowledge):
+    status, report = invoke(knowledge, "panel", "overview")
+    assert status == 2 and report["diagnostics"][0]["code"] == "PANEL_VIEW_UNAVAILABLE"
+    assert not (knowledge / "artifacts/knowledge.sqlite").exists()
+    status, report = invoke(knowledge, "maintain", "reindex")
+    assert status == 0 and _panel(knowledge, "overview")["card_count"] == 0, report
+
+    raw = knowledge / "docs-raw/specs/original.md"
+    raw.write_text("# Original\n", encoding="utf-8")
+    status, report = invoke(knowledge, "source", "register",
+                            request={"path": "docs-raw/specs/original.md", "source_id": "doc-a"})
+    assert status == 0, report
+    references = [{"doc_id": "doc-a", "line_start": 1, "line_end": 1}]
+    card = _panel_card(knowledge, "a", references, "# First\n\nThe Alpha proof.\n")
+    _panel_card(knowledge, "b", references, "# Second\n\nThe Alpha variant.\n")
+    assert invoke(knowledge, "maintain", "reindex")[0] == 0
+
+    overview = _panel(knowledge, "overview")
+    revision = overview["view_revision"]
+    assert overview["card_count"] == 2 and overview["document_count"] == 1 and overview["code_count"] == 0
+    assert overview["types"] == [{"type": "rule", "count": 2}]
+    args = {"view_revision": revision, "limit": 1, "query": "alpha", "type": "rule", "tag": "wifi"}
+    first = _panel(knowledge, "cards", args)
+    assert [item["id"] for item in first["items"]] == ["a"] and first["next_cursor"]
+    second = _panel(knowledge, "cards", {**args, "cursor": first["next_cursor"]})
+    assert [item["id"] for item in second["items"]] == ["b"] and second["next_cursor"] is None
+    search = {"query": "alpha", "tags": ["wifi"], "top_k": 1}
+    legacy = invoke(knowledge, "search", request=search)[1]["data"]
+    published = _panel(knowledge, "search", {**search, "view_revision": revision})
+    assert published["matches"] == legacy["matches"] and published["truncated"] is True
+
+    _panel_card(knowledge, "a", references, "# Changed\n\nA different fact.\n")
+    assert invoke(knowledge, "read", "a")[1]["data"]["title"] == "Changed"
+    status, report = invoke(knowledge, "read", request={"card_id": "a", "view_revision": revision})
+    assert status == 0 and report["data"]["title"] == "First", report
+    assert _panel(knowledge, "read", {"card_id": "a"})["view_revision"] == revision
+    assert _panel(knowledge, "search", search) == published
+    assert _panel(knowledge, "overview") == overview
+
+    card.write_text("Unparseable card", encoding="utf-8")
+    assert invoke(knowledge, "maintain", "reindex")[0] == 2
+    assert _panel(knowledge, "overview") == overview
+    _panel_card(knowledge, "a", references, "# Changed\n\nA different fact.\n")
+    assert invoke(knowledge, "maintain", "reindex")[0] == 0
+    status, report = invoke(knowledge, "panel", "cards", request=args)
+    assert status == 2 and report["diagnostics"][0]["code"] == "PANEL_REVISION_MISMATCH"
+    status, report = invoke(knowledge, "panel", "read", request={"card_id": "a", "view_revision": revision})
+    assert status == 2 and report["diagnostics"][0]["code"] == "PANEL_REVISION_MISMATCH"
+
+
+def test_panel_graph_pages_high_degree_neighbors_and_filters_kinds(knowledge):
+    resources = [{"source_id": f"doc-{index:03}", "kind": "raw",
+                  "path": f"docs-raw/specs/item-{index:03}.md"} for index in range(80)]
+    (knowledge / "governance/sources.lock.yaml").write_text(
+        yaml.safe_dump({"schema_version": "2.0", "resources": resources, "snapshots": []}), encoding="utf-8")
+    references = [{"doc_id": source["source_id"], "line_start": 1, "line_end": 1} for source in resources]
+    references.append({"doc_id": "doc-000", "line_start": 2, "line_end": 2})
+    _panel_card(knowledge, "hub", references, "# Hub\n\nMany references.\n")
+    assert invoke(knowledge, "maintain", "reindex")[0] == 0
+    request = {"card_id": "hub", "limit": 50, "kinds": ["document"]}
+    first = _panel(knowledge, "graph", request)
+    second = _panel(knowledge, "graph", {**request, "cursor": first["next_cursor"],
+                                        "view_revision": first["view_revision"]})
+    assert (len(first["nodes"]), len(first["edges"]), len(second["nodes"]), len(second["edges"])) == (51, 50, 31, 30)
+    assert not second["next_cursor"]
+    assert [edge["target"] for edge in first["edges"] + second["edges"]] == [source["source_id"] for source in resources]
+    for page in (first, second):
+        ids = {node["id"] for node in page["nodes"]}
+        assert all(edge["kind"] == "doc_ref" and edge["source"] in ids and edge["target"] in ids for edge in page["edges"])
+    assert not _panel(knowledge, "graph", {**request, "kinds": ["code"]})["edges"]
+    status, report = invoke(knowledge, "panel", "graph",
+                            request={**request, "kinds": ["code"], "cursor": first["next_cursor"]})
+    assert status == 2 and report["diagnostics"][0]["code"] == "PANEL_CURSOR_INVALID"
+
+
+def test_panel_raw_saves_once_and_lists_without_registering(knowledge, tmp_path):
+    original = b"# Uploaded\n\nComplete document.\n"
+    staged = tmp_path / "staged"
+    staged.write_bytes(original)
+    digest = hashlib.sha256(original).hexdigest()
+    request = {"path": "specs/uploaded.md", "staged_path": str(staged),
+               "expected_size": len(original), "expected_sha256": digest}
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda path: invoke(knowledge, "panel", "raw-save", request={**request, "path": path}),
+                                [request["path"], "specs/Uploaded.md"]))
+    successful = [report for code, report in results if code == 0]
+    failed = [report for code, report in results if code != 0]
+    assert len(successful) == len(failed) == 1
+    assert successful[0]["data"]["sha256"] == digest
+    assert failed[0]["diagnostics"][0]["code"] == "RAW_TARGET_EXISTS"
+    item = _panel(knowledge, "raw-list", {"path": "specs"})["items"][0]
+    assert item == {key: successful[0]["data"][key] for key in ("name", "path", "kind", "size")}
+    resolved = _panel(knowledge, "raw-path", {"path": item["path"]})
+    assert Path(resolved["absolute_path"]).read_bytes() == staged.read_bytes() == original
+    assert not (knowledge / ".build").exists()
+    assert not list((knowledge / "docs-raw/specs").glob(".upload-*"))
+    assert not invoke(knowledge, "source", "list")[1]["data"]["files"]
+
+    for path, expected_code in (("../formal.md", "RAW_UNSAFE_PATH"),
+                                ("specs/README.md", "RAW_UNSUPPORTED_TARGET"),
+                                ("specs/mismatch.md", "RAW_STAGE_MISMATCH")):
+        status, report = invoke(knowledge, "panel", "raw-save",
+                                request={**request, "path": path, "expected_sha256": "0" * 64})
+        assert status == 2 and report["diagnostics"][0]["code"] == expected_code
+    assert not (knowledge / "docs-raw/specs/mismatch.md").exists()
+
+
+def test_source_resolve_binds_snapshot_to_source_and_hash(knowledge):
+    original = b"# Original\n\nHistorical evidence.\n"
+    frozen = knowledge / "logs/evidence/objects/retained.bin"
+    frozen.parent.mkdir(parents=True)
+    frozen.write_bytes(original)
+    digest = hashlib.sha256(original).hexdigest()
+    resource = {"source_id": "doc-a", "kind": "raw", "path": "docs-raw/specs/a.md"}
+    snapshot = {"snapshot_id": "snap-a", "source_id": "doc-a", "sha256": digest, "bytes": len(original),
+                "recovery": {"method": "evidence_object", "path": frozen.relative_to(knowledge).as_posix()}}
+    (knowledge / "governance/sources.lock.yaml").write_text(
+        yaml.safe_dump({"schema_version": "2.0", "resources": [resource], "snapshots": [snapshot]}),
+        encoding="utf-8")
+    (knowledge / resource["path"]).write_text("# Changed\n", encoding="utf-8")
+    _panel_card(knowledge, "a", [{"doc_id": "doc-a", "snapshot_id": "snap-a", "line_start": 1, "line_end": 2}],
+                "# A\n\nA fixed citation.\n")
+    assert invoke(knowledge, "maintain", "reindex")[0] == 0
+    revision = _panel(knowledge, "overview")["view_revision"]
+    status, report = invoke(knowledge, "read", request={"card_id": "a", "view_revision": revision})
+    assert status == 0 and report["data"]["doc_ref"][0]["source_sha256"] == digest
+    args = {"source_id": "doc-a", "snapshot_id": "snap-a", "hash": digest}
+    status, report = invoke(knowledge, "source", "resolve", request=args)
+    assert status == 0 and report["data"]["hash"] == digest, report
+    assert (knowledge / report["data"]["original_ref"]).read_bytes() == original
+    status, report = invoke(knowledge, "source", "resolve", request={**args, "hash": "0" * 64})
+    assert status == 2 and report["diagnostics"][0]["code"] == "SOURCE_HASH_MISMATCH"
 
 
 def test_ingest_scan_returns_one_document_without_legacy_operation_request(knowledge):
@@ -94,6 +248,7 @@ def test_no_card_commit_keeps_receipt_under_artifacts_without_creating_logs(know
     status, committed = invoke(knowledge, "ingest", "commit", "--input", str(request))
 
     assert status == 0 and committed["phase"] == "completed", committed
+    assert _panel(knowledge, "overview")["card_count"] == 0
     receipt = knowledge / "artifacts/ingest/latest.json"
     assert receipt.is_file()
     assert json.loads(receipt.read_bytes()) == committed["data"]

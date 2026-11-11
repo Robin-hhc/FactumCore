@@ -9,9 +9,6 @@ from collections import defaultdict
 import math
 from statistics import median
 
-from docling_core.types.doc import ContentLayer, DocItemLabel
-
-
 _PROTECTED = frozenset({
     "table", "picture", "chart", "code", "list_item", "list", "ordered_list",
     "document_index", "picture_area",
@@ -107,7 +104,7 @@ def _sequence(rows, height):
     return boxes[0].t, boxes[-1].b, pitch, max(12, letter_height * 1.5)
 
 
-def _separate_from_body(rows, records, side, sequence):
+def _separate_from_body(rows, records, side, sequence, body_layer):
     top, bottom, pitch, clearance = sequence
     selected = {item.self_ref for item, _ in rows}
     left = min(box.l for _, box in rows)
@@ -127,7 +124,7 @@ def _separate_from_body(rows, records, side, sequence):
         if gap < clearance:
             return False
         text = getattr(item, "text", "").strip()
-        if item.content_layer == ContentLayer.BODY and len(text) >= 8 and not text.isdigit():
+        if item.content_layer == body_layer and len(text) >= 8 and not text.isdigit():
             body_lines += 1
     return body_lines >= max(10, len(rows) // 3)
 
@@ -139,6 +136,8 @@ def mark_margin_line_numbers(document) -> set[str]:
     alone.  A semantic list with exactly the same unlabelled geometry remains
     inherently ambiguous; no claim of general layout understanding is made.
     """
+    from docling_core.types.doc import ContentLayer, DocItemLabel
+
     sizes, pages = _page_boxes(document)
     protected = _protected_nodes(document)
     changed = set()
@@ -158,7 +157,7 @@ def mark_margin_line_numbers(document) -> set[str]:
                 sides[side].append((item, box))
         for side, rows in sides.items():
             sequence = _sequence(rows, height)
-            if sequence is None or not _separate_from_body(rows, records, side, sequence):
+            if sequence is None or not _separate_from_body(rows, records, side, sequence, ContentLayer.BODY):
                 continue
             for item, _ in rows:
                 item.content_layer = ContentLayer.FURNITURE

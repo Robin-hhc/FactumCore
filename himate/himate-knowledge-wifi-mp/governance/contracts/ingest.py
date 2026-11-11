@@ -280,12 +280,16 @@ def _pdf_packet(loaded, start, end, *, text_budget=None):
     by_page = {item["locator"]["page"]: item["text"] for item in loaded["locators"]["segments"]
                if item["locator"].get("kind") == "page"}
     images_by_page, structures_by_page = {}, {}
+    pattern_elements = set()
     for item in loaded["manifest"]["images"]:
+        if item.get("role") == "pattern_texture":
+            pattern_elements.add(item["element_ref"])
+            continue
         for number in {prov.get("page_no") for prov in item.get("provenance", [])}:
             images_by_page.setdefault(number, []).append(item)
     for kind in ("texts", "tables", "pictures"):
         for item in loaded["document"].get(kind, []):
-            if item.get("self_ref"):
+            if item.get("self_ref") and item["self_ref"] not in pattern_elements:
                 for number in {prov.get("page_no") for prov in item.get("prov", [])}:
                     structures_by_page.setdefault(number, []).append({"kind": kind, "ref": item["self_ref"]})
     pages, text = [], ["# PDF review packet", "", "Evaluate all material within the planned physical pages.", ""]

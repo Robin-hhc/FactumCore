@@ -20,6 +20,7 @@ _TOLERANCE = 0.1
 _NEIGHBOURS = tuple(product((-1, 0, 1), repeat=4))
 _MAX_PAGE_OBJECTS = 100_000
 _MAX_FILES = 99_996  # Leave room for the four fixed document-material files.
+_MAX_PATTERN_PIXELS = 65_536
 _MISSING = object()
 
 
@@ -240,11 +241,13 @@ def _occurrence_ref(reference, picture, original_dpis):
 def _recover_page(page, pictures, document, assets, image_type, original_dpis):
     geometry = _page_geometry(page, document.pages[pictures[0][0].prov[0].page_no].size)
     if geometry is None:
-        return
+        return False
     groups, index = {}, defaultdict(list)
+    has_image_objects = False
     for number, obj in enumerate(page.get_objects(filter=[image_type], max_depth=15)):
+        has_image_objects = True
         if number >= _MAX_PAGE_OBJECTS or not assets.ready():
-            return
+            return False
         try:
             bounds = _object_bounds(obj, geometry)
         except Exception:
@@ -257,11 +260,13 @@ def _recover_page(page, pictures, document, assets, image_type, original_dpis):
                 groups[key] = []
                 index[_bucket(bounds)].append((bounds, groups[key]))
             groups[key].append(obj)
+    if not has_image_objects:
+        return True
 
     recovered, fingerprints = {}, {}
     for picture, bounds in pictures:
         if not assets.ready():
-            return
+            return False
         key = tuple(round(value, 6) for value in bounds)
         if key in recovered:
             picture.image = _occurrence_ref(recovered[key], picture, original_dpis)
@@ -303,18 +308,120 @@ def _recover_page(page, pictures, document, assets, image_type, original_dpis):
                 reference = assets.save(selected, selected_digest)
         recovered[key] = reference
         picture.image = _occurrence_ref(reference, picture, original_dpis)
+    return False
 
 
-def recover_and_export(document, data, output: Path, options: dict) -> None:
+def _binary_pixels(image):
+    """Compare the pattern of two colors independently of paint and polarity."""
+    if image.width * image.height > _MAX_PATTERN_PIXELS:
+        return None
+    rgba = image.convert("RGBA")
+    colors = rgba.getcolors(maxcolors=2)
+    if colors is None or len(colors) != 2:
+        return None
+    pixels = rgba.tobytes()
+    first = pixels[:4]
+    return bytes(pixels[offset:offset + 4] == first for offset in range(0, len(pixels), 4))
+
+
+def _page_pattern_masks(page, sizes):
+    """Collect exact pixels from one-bit masks painted through page patterns."""
+    from PIL import Image
+    from pypdf.generic import ContentStream
+
+    resources = page.get("/Resources")
+    patterns = resources.get_object().get("/Pattern") if resources is not None else None
+    if patterns is None:
+        return {}
+    content = page.get_contents()
+    if content is None:
+        return {}
+    used = {operands[-1] for operands, operation in content.operations
+            if operation in {b"scn", b"SCN"} and operands and isinstance(operands[-1], str)}
+    signatures = defaultdict(set)
+    for name, reference in patterns.get_object().items():
+        if name not in used:
+            continue
+        pattern = reference.get_object()
+        if pattern.get("/PatternType") != 1:
+            continue
+        resources = pattern.get("/Resources")
+        objects = resources.get_object().get("/XObject") if resources is not None else None
+        if objects is None:
+            continue
+        used_objects = {operands[0] for operands, operation in ContentStream(pattern, page.pdf).operations
+                        if operation == b"Do" and len(operands) == 1 and isinstance(operands[0], str)}
+        for name, reference in objects.get_object().items():
+            if name not in used_objects:
+                continue
+            mask = reference.get_object()
+            size = (mask.get("/Width"), mask.get("/Height"))
+            if (mask.get("/Subtype") != "/Image" or getattr(mask.get("/ImageMask"), "value", None) is not True
+                    or mask.get("/BitsPerComponent", 1) != 1 or size not in sizes):
+                continue
+            width, height = size
+            raw = mask.get_data()
+            if len(raw) != ((width + 7) // 8) * height:
+                continue
+            signature = _binary_pixels(Image.frombytes("1", size, raw))
+            if signature is not None:
+                signatures[size].add(signature)
+    return signatures
+
+
+def _verified_pattern_tiles(data, pages, assets):
+    if not pages or not assets.ready():
+        return set()
+    try:
+        from pypdf import PdfReader
+
+        reader = PdfReader(BytesIO(data))
+    except Exception:
+        return set()
+    verified = set()
+    try:
+        for number, images in pages.items():
+            if not assets.ready():
+                break
+            sizes = {(int(image.size.width), int(image.size.height)) for _, image in images}
+            sizes = {size for size in sizes if assets.image_fits(*size)}
+            try:
+                signatures = _page_pattern_masks(reader.pages[number - 1], sizes)
+            except Exception:
+                # An unsupported pattern is still a visible missing-image diagnostic.
+                continue
+            if not signatures:
+                continue
+            by_uri = {}
+            for reference, image in images:
+                size = (image.size.width, image.size.height)
+                if size not in signatures or not assets.ready():
+                    continue
+                key = (image.uri, size)
+                if key not in by_uri:
+                    try:
+                        native = image.pil_image
+                        by_uri[key] = (native is not None and native.size == size
+                                       and _binary_pixels(native) in signatures[size])
+                    except Exception:
+                        by_uri[key] = False
+                if by_uri[key]:
+                    verified.add(reference)
+    finally:
+        reader.close()
+    return verified
+
+
+def recover_and_export(document, data, output: Path, options: dict) -> set[str]:
     """Recover bitmaps, retaining every occurrence's native provenance.
 
     Successful pictures share local assets by canonical RGBA content and size.
-    Failures, ambiguity and exhausted budgets stay explicit missing pictures;
-    the caller records its existing IMAGE_UNAVAILABLE diagnostics for them.
+    Return the unresolved references verified as tiling masks in the original.
+    Other failures, ambiguity and exhausted budgets stay explicit missing pictures.
     """
     assets = _Assets(Path(output), options)
     missing = defaultdict(list)
-    original_dpis = {}
+    original_dpis, native_images = {}, {}
     native = options.get("pipeline", "native") == "native"
     for picture in document.pictures:
         if picture.image is not None and picture.image.dpi > 0:
@@ -323,6 +430,11 @@ def recover_and_export(document, data, output: Path, options: dict) -> None:
             # Even a decoded native RGB image can lack its separate alpha
             # mask.  Use the original PDF object for every native occurrence;
             # an unverified old bitmap is not a safe recovery fallback.
+            image = picture.image
+            if image is not None and getattr(image.uri, "scheme", None) == "data":
+                width, height = image.size.width, image.size.height
+                if min(width, height) >= 1 and width * height <= _MAX_PATTERN_PIXELS:
+                    native_images[picture.self_ref] = image
             picture.image = None
         elif picture.image is not None:
             try:
@@ -337,8 +449,9 @@ def recover_and_export(document, data, output: Path, options: dict) -> None:
                 number, bounds = location
                 missing[number].append((picture, bounds))
     if not missing or not assets.ready():
-        return
+        return set()
     pdf = None
+    pattern_pages = {}
     try:
         import pypdfium2 as pdfium
 
@@ -350,7 +463,12 @@ def recover_and_export(document, data, output: Path, options: dict) -> None:
                 continue
             page = pdf[number - 1]
             try:
-                _recover_page(page, pictures, document, assets, pdfium.raw.FPDF_PAGEOBJ_IMAGE, original_dpis)
+                no_image_objects = _recover_page(page, pictures, document, assets, pdfium.raw.FPDF_PAGEOBJ_IMAGE, original_dpis)
+                if no_image_objects and native_images:
+                    images = [(picture.self_ref, native_images[picture.self_ref]) for picture, _ in pictures
+                              if picture.self_ref in native_images]
+                    if images:
+                        pattern_pages[number] = images
             except Exception:
                 # One unsupported page geometry must not hide another page's
                 # usable text or prevent recovery of later pages.
@@ -362,3 +480,4 @@ def recover_and_export(document, data, output: Path, options: dict) -> None:
     finally:
         if pdf is not None:
             pdf.close()
+    return _verified_pattern_tiles(data, pattern_pages, assets)

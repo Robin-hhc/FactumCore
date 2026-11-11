@@ -327,11 +327,18 @@ def test_each_read_gets_an_independent_directory_and_existing_outputs_are_not_re
         parse_bytes(tmp_path, output=Path(one["manifest_ref"]).parent.as_posix())
 
 
-@pytest.mark.parametrize("options", [{"unexpected": True}, {"threads": True}, {"threads": 33}, {"threads": 10 ** 1000}, {"pipeline": []}, {"timeout_seconds": float("nan")}, {"timeout_seconds": 10 ** 1000}, {"timeout_seconds": 3601}, {"images_scale": 10 ** 1000}, {"images_scale": 4.01}, {"max_input_bytes": 256 * 1024 * 1024 + 1}, {"max_output_bytes": 256 * 1024 * 1024 + 1}, {"models_path": "/tmp/models"}, {"models_path": "artifacts/other/models"}])
+@pytest.mark.parametrize("options", [{"unexpected": True}, {"threads": True}, {"threads": 33}, {"threads": 10 ** 1000}, {"pipeline": []}, {"timeout_seconds": float("nan")}, {"timeout_seconds": 10 ** 1000}, {"timeout_seconds": 3601}, {"images_scale": 10 ** 1000}, {"images_scale": 4.01}, {"max_input_bytes": 256 * 1024 * 1024 + 1}, {"max_output_bytes": 0}, {"models_path": "/tmp/models"}, {"models_path": "artifacts/other/models"}])
 def test_options_are_explicit_and_model_paths_are_scoped(tmp_path, options):
     with pytest.raises(ContractError):
         parse_bytes(tmp_path, options=options)
     assert not (tmp_path / ".build").exists()
+
+
+def test_large_document_budgets_are_explicit_parser_options(tmp_path):
+    options = {"max_pages": 6000, "max_output_bytes": 1024 * 1024 * 1024}
+    descriptor, loaded = parse_bytes(tmp_path, options=options)
+    assert descriptor["parse_status"] == "parsed"
+    assert loaded["manifest"]["profile"]["options"].items() >= options.items()
 
 
 def test_missing_preinstalled_models_report_gap_without_network(tmp_path, monkeypatch):

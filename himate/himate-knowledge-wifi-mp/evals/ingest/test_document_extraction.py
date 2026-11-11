@@ -433,7 +433,7 @@ def test_conversion_does_not_hold_the_catalog_transaction_against_queries(tmp_pa
     {"kind": "element", "ref": "#/texts/0", "source_sha256": "a" * 64,
      "profile_sha256": "b" * 64, "parser": {"max_input_bytes": 256 * 1024 * 1024 + 1}},
     {"kind": "element", "ref": "#/texts/0", "source_sha256": "a" * 64,
-     "profile_sha256": "b" * 64, "parser": {"max_output_bytes": 256 * 1024 * 1024 + 1}},
+     "profile_sha256": "b" * 64, "parser": {"max_output_bytes": 0}},
 ])
 def test_new_locator_shapes_reject_ambiguous_or_unbound_addresses(locator):
     with pytest.raises(module("validation").ContractError):
@@ -451,3 +451,13 @@ def test_element_resource_limits_are_enforced_by_schema_and_candidate_validation
     schema = json.loads((Path(__file__).resolve().parents[2] / "governance/schemas/frontmatter.schema.json").read_bytes())
     with pytest.raises(ValidationError):
         validate(locator, schema["$defs"]["document_locator"])
+
+
+def test_large_output_budget_is_portable_in_element_references():
+    from jsonschema import validate
+
+    locator = {"kind": "element", "ref": "#/texts/0", "source_sha256": "a" * 64,
+               "profile_sha256": "b" * 64, "parser": {"max_output_bytes": 1024 * 1024 * 1024}}
+    module("cards_v3")._document_locator(locator, "knowledge/example.md")
+    schema = json.loads((Path(__file__).resolve().parents[2] / "governance/schemas/frontmatter.schema.json").read_bytes())
+    validate(locator, schema["$defs"]["document_locator"])

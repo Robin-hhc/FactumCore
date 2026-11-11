@@ -240,10 +240,11 @@ def create(root, source, data, *, options=None, page_range=None):
     if (isinstance(timeout, bool) or not isinstance(timeout, (int, float))
             or not math.isfinite(timeout) or timeout <= 0):
         raise ContractError("INVALID_PARSER_OPTIONS", "Timeout must be positive and finite")
-    for field, value, maximum in (("max_input_bytes", input_limit, MAX_SOURCE_BYTES),
-                                  ("max_output_bytes", limit, MAX_OUTPUT_BYTES)):
-        if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= maximum:
-            raise ContractError("INVALID_PARSER_OPTIONS", field + " must be an integer from 1 to 268435456")
+    for field, value in (("max_input_bytes", input_limit), ("max_output_bytes", limit)):
+        if type(value) is not int or value < 1:
+            raise ContractError("INVALID_PARSER_OPTIONS", field + " must be a positive integer")
+    if input_limit > MAX_SOURCE_BYTES:
+        raise ContractError("INVALID_PARSER_OPTIONS", "max_input_bytes must not exceed 256 MiB")
     read_id = uuid4().hex
     reference = READ_ROOT + "/" + read_id
     busy_path = None

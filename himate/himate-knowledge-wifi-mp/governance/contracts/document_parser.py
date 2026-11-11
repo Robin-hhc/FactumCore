@@ -5,7 +5,7 @@ Descriptors bind fixed inputs and files; cached materials never own review progr
 """
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 from importlib import metadata
 from io import BytesIO
 import hashlib
@@ -33,6 +33,9 @@ _DEFAULTS = {
 _HASH = re.compile(r"[0-9a-f]{64}")
 _CELL = re.compile(r"\$?([A-Za-z]{1,3})\$?([1-9][0-9]{0,6})")
 _PREVIEW_LIMITS = {"max_pages": 8, "max_pixels": 16_000_000, "max_png_bytes": 16 * 1024 * 1024, "scale": 1.5}
+_PATTERN_PREVIEW_PAGES = 32
+_MAX_PARSE_FILES = 100_000
+_PDF_CONVERSION_PAGES = 200
 _DESCRIPTOR_FIELDS = ("source_id", "source_sha256", "profile_sha256", "extractor", "parse_status",
                       "text_ref", "markdown_ref", "document_ref", "locators_ref", "statistics")
 OCR_MODEL_FILES = (
@@ -79,8 +82,7 @@ def _options(root, value):
     for field in ("threads", "max_input_bytes", "max_pages", "max_output_bytes"):
         if type(result[field]) is not int or result[field] < 1:
             raise ContractError("PARSE_OPTIONS_INVALID", field + " must be a positive integer")
-        maximum = {"threads": 32, "max_input_bytes": 256 * 1024 * 1024,
-                   "max_output_bytes": 256 * 1024 * 1024}.get(field)
+        maximum = {"threads": 32, "max_input_bytes": 256 * 1024 * 1024}.get(field)
         if maximum is not None and result[field] > maximum:
             raise ContractError("PARSE_OPTIONS_INVALID", field + " exceeds the supported operation limit")
     for field in ("timeout_seconds", "images_scale"):
@@ -113,6 +115,8 @@ def _profile(options, suffix, root):
     versions = {}
     packages = [] if suffix in {".md", ".txt"} else ["docling-slim", "docling", "docling-core"]
     packages += {".pdf": ["docling-parse", "pypdfium2"], ".docx": ["python-docx"], ".xlsx": ["openpyxl"], ".pptx": ["python-pptx"]}.get(suffix, [])
+    if suffix == ".pdf" and options["pipeline"] == "native":
+        packages += ["pypdf", "Pillow"]
     if options["pipeline"] == "standard" and suffix in ({".pdf"} | IMAGE_FORMATS):
         packages += ["rapidocr", "onnxruntime", "torch", "transformers", "docling-ibm-models"]
     for name in packages:
@@ -139,6 +143,9 @@ def _profile(options, suffix, root):
     if suffix == ".pdf":
         profile["picture_export"] = "pdfium-rgba-dedup:1"
         profile["text_export"] = "margin-line-numbers:1"
+        if options["pipeline"] == "native":
+            profile["conversion"] = "bounded-native-pages:1"
+            profile["pattern_preview"] = "fill-mask:1"
     return profile
 
 
@@ -376,18 +383,22 @@ def _multiframe_gap(data, suffix, pages):
     return gap
 
 
-def _pdf_page_previews(root, data, output, options, page_range, pages, source_hash):
-    """Render only an explicit, small physical-page request, separately from extraction."""
-    if page_range is None:
-        return [], [], None
-    metadata_record = {**_PREVIEW_LIMITS, "requested_range": list(page_range), "rendered_pages": [],
+def _pdf_page_previews(root, data, output, options, page_range, pages, source_hash, *, pattern_pages=()):
+    """Render requested pages or a bounded set of pages containing pattern masks."""
+    automatic = page_range is None
+    limits = {**_PREVIEW_LIMITS, "max_pages": _PATTERN_PREVIEW_PAGES} if automatic else _PREVIEW_LIMITS
+    request = {"requested_pages": list(pattern_pages)} if automatic else {"requested_range": list(page_range)}
+    metadata_record = {**limits, **request, "rendered_pages": [],
                        "pixels": 0, "png_bytes": 0, "assets": [], "source_sha256": source_hash}
     images, gaps = [], []
     started = time.perf_counter()
-    first, last = page_range
-    if last - first + 1 > _PREVIEW_LIMITS["max_pages"]:
-        return [], [_gap("PAGE_PREVIEW_PAGE_LIMIT", "Page previews support at most eight explicitly selected pages", severity="review")], metadata_record
-    selected = list(range(first, last + 1))
+    if automatic:
+        selected = list(pattern_pages[:limits["max_pages"]])
+    else:
+        first, last = page_range
+        if last - first + 1 > limits["max_pages"]:
+            return [], [_gap("PAGE_PREVIEW_PAGE_LIMIT", "Page previews support at most eight explicitly selected pages", severity="review")], metadata_record
+        selected = list(range(first, last + 1))
     if not set(selected).issubset(pages):
         return [], [_gap("PAGE_PREVIEW_RANGE_UNAVAILABLE", "Not all requested physical pages were extracted", severity="review")], metadata_record
     pdf = None
@@ -395,9 +406,10 @@ def _pdf_page_previews(root, data, output, options, page_range, pages, source_ha
         import pypdfium2 as pdfium
         metadata_record["renderer"] = "pypdfium2:" + metadata.version("pypdfium2")
         pdf = pdfium.PdfDocument(data)
-        if last > len(pdf):
+        if selected[-1] > len(pdf):
             raise ValueError("Preview page range is outside the original PDF")
         dimensions = []
+        pixels = 0
         for number in selected:
             page = pdf[number - 1]
             try:
@@ -405,18 +417,22 @@ def _pdf_page_previews(root, data, output, options, page_range, pages, source_ha
             finally:
                 page.close()
             if (not math.isfinite(width) or not math.isfinite(height) or min(width, height) <= 0
-                    or max(width, height) > _PREVIEW_LIMITS["max_pixels"]):
+                    or max(width, height) > limits["max_pixels"]):
                 raise ValueError("PDF page geometry is outside the preview budget")
-            dimensions.append((math.ceil(width * _PREVIEW_LIMITS["scale"]), math.ceil(height * _PREVIEW_LIMITS["scale"])))
-        if sum(width * height for width, height in dimensions) > _PREVIEW_LIMITS["max_pixels"]:
+            width, height = math.ceil(width * limits["scale"]), math.ceil(height * limits["scale"])
+            if automatic and pixels + width * height > limits["max_pixels"]:
+                break
+            dimensions.append((width, height))
+            pixels += width * height
+        if pixels > limits["max_pixels"]:
             gaps.append(_gap("PAGE_PREVIEW_PIXEL_LIMIT", "Selected pages exceed the total preview pixel budget; no pages were rendered", severity="review"))
         else:
             existing = sum(path.stat().st_size for path in output.rglob("*") if path.is_file())
-            byte_budget = min(_PREVIEW_LIMITS["max_png_bytes"], max(0, options["max_output_bytes"] - existing))
+            byte_budget = min(limits["max_png_bytes"], max(0, options["max_output_bytes"] - existing))
             for number, (width, height) in zip(selected, dimensions):
                 page, bitmap = pdf[number - 1], None
                 try:
-                    bitmap = page.render(scale=_PREVIEW_LIMITS["scale"])
+                    bitmap = page.render(scale=limits["scale"])
                     image = bitmap.to_pil()
                     try:
                         buffer = BytesIO()
@@ -454,16 +470,36 @@ def _pdf_page_previews(root, data, output, options, page_range, pages, source_ha
     return images, gaps, metadata_record
 
 
-def _attach_previews(output, preview):
-    document = read_json(output / "document.json")
+def _attach_previews(output, preview, max_output_bytes):
+    document_path = output / "document.json"
+    document = read_json(document_path)
     body = document.setdefault("body", {})
     body["meta"] = body.get("meta") or {}
     body["meta"]["himate__page_previews"] = preview
-    _write_json(output / "document.json", document)
-    additions = "".join(f"\n\nPhysical page {asset['page']} preview (rendered, not an extracted source bitmap):\n\n![Page {asset['page']}]({asset['local_ref']})" for asset in preview["assets"])
+    encoded = canonical_bytes(document)
+    additions = "".join(f"\n\nPhysical page {asset['page']} preview (rendered, not an extracted source bitmap):\n\n![Page {asset['page']}]({asset['local_ref']})" for asset in preview["assets"]).encode("utf-8")
+    sizes = [path.stat().st_size for path in output.rglob("*") if path.is_file()]
+    output_bytes = sum(sizes) - document_path.stat().st_size + len(encoded) + len(additions)
+    if len(sizes) > _MAX_PARSE_FILES:
+        return _gap("PAGE_PREVIEW_FILE_LIMIT", "Page previews exceed the remaining output file budget", severity="review")
+    if output_bytes > max_output_bytes:
+        return _gap("PAGE_PREVIEW_BYTE_LIMIT", "Page previews and their metadata exceed the remaining output byte budget", severity="review")
+    document_path.write_bytes(encoded)
     if additions:
         with (output / "document.md").open("ab") as stream:
-            stream.write(additions.encode("utf-8"))
+            stream.write(additions)
+    return None
+
+
+def _pattern_tiles_by_page(images):
+    counts = Counter()
+    for image in images:
+        if image.get("role") == "pattern_texture":
+            provenance = image.get("provenance", [])
+            if len(provenance) != 1 or type(provenance[0].get("page_no")) is not int:
+                raise ContractError("PARSE_DESCRIPTOR_INVALID", "Pattern texture requires one physical page")
+            counts[provenance[0]["page_no"]] += 1
+    return counts
 
 
 def _validate_previews(root, output, manifest, document, registered):
@@ -477,10 +513,21 @@ def _validate_previews(root, output, manifest, document, registered):
     if not isinstance(preview, dict) or document_preview != preview:
         raise ContractError("PARSE_DESCRIPTOR_INVALID", "JSON and manifest page previews differ")
     bounds = _page_range(manifest.get("page_range"))
-    if (bounds is None or preview.get("requested_range") != bounds
-            or preview.get("source_sha256") != manifest["source_sha256"]):
+    limits = _PREVIEW_LIMITS
+    pages = set(manifest.get("pages", []))
+    if bounds is None:
+        selected = sorted(_pattern_tiles_by_page(manifest["images"]))
+        if not selected or preview.get("requested_pages") != selected or not set(selected).issubset(pages):
+            raise ContractError("PARSE_DESCRIPTOR_INVALID", "Pattern preview page scope differs")
+        allowed = set(selected[:_PATTERN_PREVIEW_PAGES])
+        limits = {**_PREVIEW_LIMITS, "max_pages": _PATTERN_PREVIEW_PAGES}
+    else:
+        if preview.get("requested_range") != bounds:
+            raise ContractError("PARSE_DESCRIPTOR_INVALID", "Preview page range differs")
+        allowed = {number for number in pages if bounds[0] <= number <= bounds[1]}
+    if preview.get("source_sha256") != manifest["source_sha256"]:
         raise ContractError("PARSE_DESCRIPTOR_INVALID", "Preview source/page scope differs")
-    for field, maximum in _PREVIEW_LIMITS.items():
+    for field, maximum in limits.items():
         value = preview.get(field)
         if type(value) not in (int, float) or not 0 < value <= maximum:
             raise ContractError("PARSE_DESCRIPTOR_INVALID", "Invalid preview resource budget")
@@ -490,8 +537,7 @@ def _validate_previews(root, output, manifest, document, registered):
     rendered, pixels, byte_count, refs = [], 0, 0, set()
     for asset in assets:
         page = asset.get("page")
-        if (type(page) is not int or not bounds[0] <= page <= bounds[1]
-                or page not in manifest.get("pages", []) or page in rendered):
+        if type(page) is not int or page not in allowed or page in rendered:
             raise ContractError("PARSE_DESCRIPTOR_INVALID", "Preview is not an extracted physical page")
         ref, local_ref = asset.get("ref"), asset.get("local_ref")
         path = safe_path(output, local_ref, ["images"])
@@ -499,6 +545,7 @@ def _validate_previews(root, output, manifest, document, registered):
             raise ContractError("PARSE_DESCRIPTOR_INVALID", "Preview asset is not registered inside images")
         matches = [row for row in image_rows if row.get("ref") == ref]
         if (len(matches) != 1 or matches[0].get("locator") != {"kind": "page", "page": page}
+                or matches[0].get("provenance") != [{"page_no": page}]
                 or matches[0].get("element_ref") is not None
                 or matches[0].get("source_sha256") != manifest["source_sha256"]):
             raise ContractError("PARSE_DESCRIPTOR_INVALID", "Preview image identity differs")
@@ -610,7 +657,74 @@ def _document_segments(document, suffix, source_hash, profile_hash, *, hidden_te
 def _pdf_picture_recovery(document, data, output, options):
     from .pdf_pictures import recover_and_export
 
-    recover_and_export(document, data, output, options)
+    return recover_and_export(document, data, output, options)
+
+
+def _native_pdf_document(root, source, data, options, page_range):
+    """Release native page cells between conversions, preserving physical pages."""
+    from docling_core.types.doc import ContentLayer, DoclingDocument
+    from docling.datamodel.base_models import DocumentStream
+
+    deadline = time.monotonic() + options["timeout_seconds"]
+    total = pdf_page_count(data)
+    if total > options["max_pages"]:
+        raise ContractError("PARSE_PAGE_LIMIT", f"Original has {total} pages, exceeding max_pages={options['max_pages']}")
+    first, last = page_range if page_range is not None else (1, total)
+    if first > total:
+        raise ContractError("PARSE_RANGE_INVALID", "Requested range starts beyond the original PDF")
+    last = min(last, total)
+    documents, gaps, page_map = [], [], {}
+    combined_last = 0
+    for start in range(first, last + 1, _PDF_CONVERSION_PAGES):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            gaps.append(_gap("DOCUMENT_CONVERSION_ERROR", "PDF conversion exceeded timeout_seconds", severity="review"))
+            break
+        converter = _converter(root, ".pdf", {**options, "timeout_seconds": remaining})
+        end = min(start + _PDF_CONVERSION_PAGES - 1, last)
+        arguments = {"max_file_size": options["max_input_bytes"],
+                     "max_num_pages": options["max_pages"],
+                     "page_range": (start, end),
+                     "raises_on_error": False}
+        result = converter.convert(DocumentStream(name=PurePosixPath(source["path"]).name,
+                                                   stream=BytesIO(data)), **arguments)
+        document = result.document
+        if getattr(result.status, "value", str(result.status)) != "success":
+            gaps.append(_gap("DOCUMENT_PARTIAL", "Docling did not report a clean conversion", severity="review"))
+        if set(document.pages) != set(range(start, end + 1)):
+            gaps.append(_gap("DOCUMENT_PARTIAL", "PDF conversion did not return all requested physical pages",
+                             locator={"kind": "pages", "start": start, "end": end}, severity="review"))
+        gaps.extend(_gap("DOCUMENT_CONVERSION_ERROR", getattr(error, "error_message", str(error)), severity="review")
+                    for error in result.errors)
+        # The result retains all parsed native page cells alongside its document.
+        # Keep only the document before starting another bounded conversion.
+        del result, converter
+        if document.pages:
+            offset = combined_last - min(document.pages) + 1
+            page_map.update({number + offset: number for number in document.pages})
+            combined_last = max(document.pages) + offset
+            documents.append(document)
+        del document
+    if not documents:
+        return DoclingDocument(name=PurePosixPath(source["path"]).stem), gaps
+    if len(documents) == 1:
+        return documents[0], gaps
+    origin = documents[0].origin
+    document = DoclingDocument.concatenate(documents)
+    documents.clear()
+    document.origin = origin
+    # concatenate normalizes each fragment to contiguous page numbers. Restore
+    # original physical numbers, including missing pages and non-one starts.
+    for item, _ in document.iterate_items(traverse_pictures=True,
+                                          included_content_layers=set(ContentLayer)):
+        for provenance in getattr(item, "prov", []):
+            provenance.page_no = page_map[provenance.page_no]
+    pages = {}
+    for number, page in document.pages.items():
+        page.page_no = page_map[number]
+        pages[page.page_no] = page
+    document.pages = pages
+    return document, gaps
 
 
 def _docling(root, source, data, output, options, page_range, source_hash, profile_hash):
@@ -620,6 +734,8 @@ def _docling(root, source, data, output, options, page_range, source_hash, profi
     gaps, original_images = [], set()
     if suffix in IMAGE_FORMATS and options["pipeline"] == "native":
         document = _raster_document(data, PurePosixPath(source["path"]).stem)
+    elif suffix == ".pdf" and options["pipeline"] == "native":
+        document, gaps = _native_pdf_document(root, source, data, options, page_range)
     else:
         converter = _converter(root, suffix, options)
         arguments = {"max_num_pages": options["max_pages"], "max_file_size": options["max_input_bytes"]}
@@ -646,12 +762,12 @@ def _docling(root, source, data, output, options, page_range, source_hash, profi
                     kept = document.add_picture(image=ImageRef.from_pil(image=image, dpi=72),
                                                 prov=picture.prov[0] if picture.prov else None)
                     original_images.add(kept.self_ref)
-    hidden_text_refs = set()
+    hidden_text_refs, pattern_textures = set(), set()
     if suffix == ".pdf":
         from .pdf_text import mark_margin_line_numbers
 
         hidden_text_refs = mark_margin_line_numbers(document)
-        _pdf_picture_recovery(document, data, output, options)
+        pattern_textures = _pdf_picture_recovery(document, data, output, options) or set()
         # Assets already have content-addressed local references. The save_as_*
         # helpers would write a new PNG for every repeated drawing occurrence.
         (output / "document.md").write_text(document.export_to_markdown(
@@ -670,7 +786,8 @@ def _docling(root, source, data, output, options, page_range, source_hash, profi
     text = "\n\n".join(segment["text"] for segment in segments
                        if segment["locator"]["kind"] == "element" and segment["text"]
                        and segment["locator"]["ref"] not in hidden_text_refs)
-    exported = read_json(output / "document.json")
+    if suffix != ".pdf":
+        exported = read_json(output / "document.json")
     images, image_refs, image_directories = [], {}, {}
     image_pages = set()
     for picture in exported.get("pictures", []):
@@ -683,10 +800,14 @@ def _docling(root, source, data, output, options, page_range, source_hash, profi
                 asset = safe_path(output, uri, ["images"], directory_entries=image_directories)
                 image_refs[uri] = asset.relative_to(root).as_posix() if asset.is_file() else None
             image_ref = image_refs[uri]
-        if image_ref is None:
+        pattern_texture = picture["self_ref"] in pattern_textures
+        if image_ref is None and not pattern_texture:
             gaps.append(_gap("IMAGE_UNAVAILABLE", "An extracted picture has no saved local image", locator=locator, severity="review"))
+        role = "source_bitmap" if picture["self_ref"] in original_images else "document_picture"
+        if pattern_texture:
+            role = "pattern_texture"
         images.append({"ref": image_ref, "element_ref": picture["self_ref"], "locator": locator,
-                       "role": "source_bitmap" if picture["self_ref"] in original_images else "document_picture",
+                       "role": role,
                        "provenance": provenance, "ocr_status": "unverified" if options["pipeline"] == "standard" and suffix in ({".pdf"} | IMAGE_FORMATS) else "not_requested",
                        "description_status": "agent_required"})
         image_pages.update(p["page_no"] for p in provenance)
@@ -756,11 +877,29 @@ def parse(root, source, data, output_ref, options=None, page_range=None):
     (output / "text.txt").write_bytes(text.encode("utf-8"))
     _write_json(output / "locators.json", {"schema_version": "1.0", "source_sha256": source_hash, "profile_sha256": profile_hash, "segments": segments})
     preview = None
-    if suffix == ".pdf" and page_range is not None:
-        preview_images, preview_gaps, preview = _pdf_page_previews(root, data, output, options, page_range, pages, source_hash)
-        images.extend(preview_images)
+    pattern_counts = _pattern_tiles_by_page(images)
+    if suffix == ".pdf" and (page_range is not None or pattern_counts):
+        preview_images, preview_gaps, preview = _pdf_page_previews(
+            root, data, output, options, page_range, pages, source_hash, pattern_pages=sorted(pattern_counts))
         gaps.extend(preview_gaps)
-        _attach_previews(output, preview)
+        budget_gap = _attach_previews(output, preview, options["max_output_bytes"])
+        if budget_gap is None:
+            images.extend(preview_images)
+        else:
+            for asset in preview["assets"]:
+                safe_path(output, asset["local_ref"], ["images"]).unlink()
+            gaps.append(budget_gap)
+            preview = None
+        previews = {asset["page"]: asset["ref"] for asset in (preview or {}).get("assets", [])}
+        for number, count in sorted(pattern_counts.items()):
+            locator = {"kind": "page", "page": number}
+            if number in previews:
+                gap = _gap("PDF_PATTERN_PAGE_PREVIEW", "PDF fill masks are available in the rendered page preview", locator=locator)
+                gap["preview_ref"] = previews[number]
+            else:
+                gap = _gap("PDF_PATTERN_PREVIEW_UNAVAILABLE", "Open the original page to review PDF fill masks", locator=locator, severity="review")
+            gap["pattern_tiles"] = count
+            gaps.append(gap)
     converted = time.perf_counter()
     files, directories = [], {}
     for path in sorted(output.rglob("*")):
@@ -818,7 +957,7 @@ def load(root, descriptor, *, expected_source_id, expected_sha256):
     if compact and descriptor["gaps"] != summarize_gaps(manifest.get("gaps", []), manifest_ref):
         raise ContractError("PARSE_DESCRIPTOR_INVALID", "Descriptor differs from fixed manifest: gaps")
     files = manifest.get("files")
-    if not isinstance(files, list) or not 4 <= len(files) <= 100000:
+    if not isinstance(files, list) or not 4 <= len(files) <= _MAX_PARSE_FILES:
         raise ContractError("PARSE_DESCRIPTOR_INVALID", "Expected bounded parser output list")
     registered, directories = set(), {}
     for row in files:

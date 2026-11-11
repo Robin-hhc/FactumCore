@@ -5,11 +5,13 @@ from collections import Counter
 from contextlib import closing, contextmanager
 import json
 from pathlib import PurePosixPath
+import posixpath
 import sqlite3
+from urllib.parse import unquote, urlsplit
 from uuid import uuid4
 
-from . import indexing, raw_materials
-from .validation import ContractError, canonical_bytes, safe_path, sha256_bytes, validate_id
+from . import citation_versions, indexing, raw_materials
+from .validation import ContractError, canonical_bytes, markdown_structure, safe_path, sha256_bytes, validate_id
 
 
 CARD_TYPES = {
@@ -44,6 +46,32 @@ def _references(card):
     yield from ((item["code_id"], "code", "code_ref") for item in card["code_ref"])
 
 
+def _card_links(path, structures, card_ids):
+    results = {}
+    for link in structures[path]["links"]:
+        target = link["target"]
+        if not target or link.get("image"):
+            continue
+        try:
+            parsed = urlsplit(target)
+        except ValueError:
+            continue
+        relative = unquote(parsed.path)
+        if parsed.scheme or parsed.netloc or parsed.query or relative.startswith("/") or "\\" in relative:
+            continue
+        resolved = posixpath.normpath(posixpath.join(posixpath.dirname(path), relative)) if relative else path
+        if resolved not in card_ids:
+            continue
+        anchor = unquote(parsed.fragment)
+        if anchor and anchor not in structures[resolved]["anchors"]:
+            continue
+        result = {"target": target, "card_id": card_ids[resolved]}
+        if anchor:
+            result["anchor"] = anchor
+        results[target] = result
+    return list(results.values())
+
+
 def publish(catalog, cards, source_changes, search_weights):
     """Replace the read model inside the existing catalog write transaction."""
     db = catalog.connection
@@ -52,7 +80,9 @@ def publish(catalog, cards, source_changes, search_weights):
     files = {item["id"]: item for item in catalog.list_files()}
     for identity, changes in source_changes.items():
         files[identity].update(changes)
-    snapshots = {row["snapshot_id"]: row for row in catalog.registry["snapshots"]}
+    versions = citation_versions.project_index(catalog.registry)
+    structures = {card["path"]: markdown_structure(card["body"], strip_frontmatter=False) for card in cards}
+    card_ids = {card["path"]: card["id"] for card in cards}
     mtimes = dict(db.execute("SELECT id,mtime_ns FROM cards"))
     edges = set()
     referenced = {"document": set(), "code": set()}
@@ -73,14 +103,14 @@ def publish(catalog, cards, source_changes, search_weights):
                 edges.add((identity, "card", peer, summaries[peer]["title"], identity, peer, "related_to"))
                 edges.add((peer, "card", identity, summary["title"], identity, peer, "related_to"))
         detail = card_detail(card, [files[source_id] for source_id in sorted(sources)])
+        detail["card_links"] = _card_links(card["path"], structures, card_ids)
+        detail["heading_anchors"] = structures[card["path"]]["headings"]
+        for peer in {link["card_id"] for link in detail["card_links"]} - {identity}:
+            edges.add((identity, "card", peer, summaries[peer]["title"], identity, peer, "card_link"))
+            edges.add((peer, "card", identity, summary["title"], identity, peer, "card_link"))
         for kind in ("doc", "code"):
-            refs = []
-            for item in detail[kind + "_ref"]:
-                snapshot = snapshots.get(item.get("snapshot_id"))
-                if snapshot and snapshot.get("source_id") == item[kind + "_id"]:
-                    item = {**item, "source_sha256": snapshot["sha256"]}
-                refs.append(item)
-            detail[kind + "_ref"] = refs
+            detail[kind + "_ref"] = [citation_versions.project_reference(card, kind, item, versions)
+                                    for item in detail[kind + "_ref"]]
         card_rows.append((identity, summary["title"], summary["type"], summary["summary"],
                           json.dumps(summary["tags"], ensure_ascii=False),
                           card["path"], detail["lifecycle"], json.dumps(detail, ensure_ascii=False)))

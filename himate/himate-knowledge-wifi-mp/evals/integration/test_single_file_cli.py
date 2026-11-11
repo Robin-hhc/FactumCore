@@ -146,6 +146,105 @@ def test_panel_graph_pages_high_degree_neighbors_and_filters_kinds(knowledge):
     assert status == 2 and report["diagnostics"][0]["code"] == "PANEL_CURSOR_INVALID"
 
 
+def test_panel_publishes_only_actual_markdown_card_links(knowledge):
+    (knowledge / "docs-raw/specs/a.md").write_text("# Source\n", encoding="utf-8")
+    assert invoke(knowledge, "source", "register",
+                  request={"path": "docs-raw/specs/a.md", "source_id": "doc-a"})[0] == 0
+    references = [{"doc_id": "doc-a", "line_start": 1, "line_end": 1}]
+    _panel_card(knowledge, "a", references,
+                "# A\n\n[Target](./b.md#detail), [Duplicate](b.md#启用-1) and [Via definition][target].\n\n"
+                "![Image](b.md) [Missing anchor](b.md#missing) [Raw](../../docs-raw/specs/a.md)\n"
+                "[External](https://example.test/b.md) [Navigation](README.md)\n\n"
+                "\x60[Code](b.md)\x60\n\n[target]: b.md#%E4%B8%AD\n")
+    _panel_card(knowledge, "b", references,
+                "# B\n\n## Detail\n\n<a id=\"中\"></a>\n\n## 启用 \x60foo\x60\n\n## 启用 \x60bar\x60\n")
+    assert invoke(knowledge, "maintain", "reindex")[0] == 0
+    read = _panel(knowledge, "read", {"card_id": "a"})
+    assert read["card_links"] == [{"target": "./b.md#detail", "card_id": "b", "anchor": "detail"},
+                                  {"target": "b.md#启用-1", "card_id": "b", "anchor": "启用-1"},
+                                  {"target": "b.md#%E4%B8%AD", "card_id": "b", "anchor": "中"}]
+    other = _panel(knowledge, "read", {"card_id": "b"})
+    assert other["heading_anchors"] == [
+        {"anchor": "b", "line": 1}, {"anchor": "detail", "line": 3},
+        {"anchor": "启用", "line": 7}, {"anchor": "启用-1", "line": 9},
+    ]
+    expected = [{"source": "a", "target": "b", "kind": "card_link"}]
+    for identity in ("a", "b"):
+        graph = _panel(knowledge, "graph", {"card_id": identity, "kinds": ["card"], "limit": 1,
+                                            "view_revision": read["view_revision"]})
+        assert graph["edges"] == expected and graph["next_cursor"] is None
+
+
+def test_checked_source_binding_survives_reindex_clone_and_recheck(knowledge, tmp_path):
+    if not shutil.which("git"):
+        pytest.skip("Git is required to exercise clean-checkout recovery")
+    project = knowledge.parents[1]
+    relative_root = knowledge.relative_to(project)
+    raw = knowledge / "docs-raw/specs/a.md"
+    older = b"# Original\nExact evidence from the first review.\n"
+    newer = b"# Updated\nEvidence checked during the second review.\n"
+    raw.write_bytes(older)
+
+    def git(*args):
+        return subprocess.run(["git", "-C", str(project), "-c", "user.name=Synthetic Test",
+                               "-c", "user.email=test@example.invalid", *args],
+                              capture_output=True, text=True, check=True, timeout=30)
+
+    git("init", "-q")
+    git("add", "config.yml", raw.relative_to(project).as_posix())
+    git("commit", "-qm", "Track original")
+    status, scanned = invoke(knowledge, "ingest", "scan", "--source", "docs-raw/specs/a.md")
+    assert status == 0, scanned
+    source_id = scanned["data"]["source"]["doc_id"]
+    header = {"id": "fixed", "doc_ref": [{"doc_id": source_id, "line_start": 1, "line_end": 2}], "code_ref": []}
+    markdown = ("---\n" + yaml.safe_dump(header) + "---\n# Fixed\n\nA checked citation.\n").encode()
+
+    def check_and_publish():
+        (knowledge / ".build/cards/fixed.md").write_bytes(markdown)
+        (knowledge / ".build/plan.md").write_text(
+            "---\ncards:\n- id: fixed\n  path: knowledge/fixed.md\n---\nReview the fixed reference.\n",
+            encoding="utf-8")
+        status, checked = invoke(knowledge, "ingest", "check")
+        assert status == 0, checked
+        status, published = invoke(knowledge, "ingest", "commit")
+        assert status == 0, published
+
+    raw.write_bytes(newer)
+    check_and_publish()
+    formal = knowledge / "knowledge/fixed.md"
+    assert formal.read_bytes() == markdown
+    original_ref = _panel(knowledge, "read", {"card_id": "fixed"})["doc_ref"][0]
+    old_hash = hashlib.sha256(older).hexdigest()
+    assert original_ref["source_version"] == "bound" and original_ref["source_sha256"] == old_hash
+    registry = knowledge / "governance/sources.lock.yaml"
+    git("add", raw.relative_to(project).as_posix(), formal.relative_to(project).as_posix(),
+        registry.relative_to(project).as_posix())
+    git("commit", "-qm", "Publish reference and advance live source")
+
+    clone = tmp_path / "fresh"
+    git("clone", "--no-local", str(project), str(clone))
+    fresh = clone / relative_root
+    for directory in ("runtime", "governance"):
+        shutil.copytree(knowledge / directory, fresh / directory, dirs_exist_ok=True,
+                        ignore=shutil.ignore_patterns("sources.lock.yaml", "__pycache__"))
+    for name in ("knowledge.py", "knowledge.cmd", "knowledge.sh"):
+        shutil.copyfile(knowledge / name, fresh / name)
+    (fresh / "knowledge/fixed.md").write_bytes(markdown.replace(b"\n", b"\r\n"))
+    assert invoke(fresh, "maintain", "reindex")[0] == 0
+    cloned_ref = _panel(fresh, "read", {"card_id": "fixed"})["doc_ref"][0]
+    assert cloned_ref == original_ref
+    status, resolved = invoke(fresh, "source", "resolve",
+                              request={"source_id": source_id, "snapshot_id": cloned_ref["snapshot_id"], "hash": old_hash})
+    assert status == 0, resolved
+    assert (fresh / resolved["data"]["original_ref"]).read_bytes() == older
+
+    assert invoke(knowledge, "ingest", "scan", "--source", "docs-raw/specs/a.md")[0] == 0
+    check_and_publish()
+    rebound = _panel(knowledge, "read", {"card_id": "fixed"})["doc_ref"][0]
+    assert rebound["source_version"] == "bound" and rebound["source_sha256"] == hashlib.sha256(newer).hexdigest()
+    assert rebound["snapshot_id"] != original_ref["snapshot_id"]
+
+
 def test_panel_raw_saves_once_and_lists_without_registering(knowledge, tmp_path):
     original = b"# Uploaded\n\nComplete document.\n"
     staged = tmp_path / "staged"

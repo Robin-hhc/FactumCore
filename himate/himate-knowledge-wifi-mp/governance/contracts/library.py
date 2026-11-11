@@ -10,9 +10,9 @@ from uuid import uuid4
 
 import yaml
 
-from .catalog import Catalog
-from . import indexing, ingest, panel, source_resources
-from .validation import ContractError, safe_path, validate_id
+from .catalog import Catalog, atomic_write
+from . import citation_versions, indexing, ingest, panel, source_resources
+from .validation import ContractError, _workspace_no_links, safe_path, validate_id
 
 
 SEARCH_VERSION = "card-v1"
@@ -139,9 +139,40 @@ def query(root, request, *, read=False):
         return result, "searched"
 
 
+def _recover_bound_snapshot(root, source, snapshot):
+    try:
+        data, recovered_from = source_resources.recover_snapshot_source(root, snapshot)
+        commit = recovered_from.split(":", 2)[1] if recovered_from.startswith("git:") else None
+        return data, commit
+    except ContractError as error:
+        if "card_references" not in snapshot or error.code not in citation_versions.MISSING_VERSION:
+            raise
+    retained = citation_versions.retained_bytes(root, snapshot)
+    if retained is not None:
+        return retained, None
+    expected = snapshot["sha256"]
+    try:
+        path = ingest.source_path(root, source)
+        _workspace_no_links(path)
+        data = path.read_bytes()
+    except (OSError, ContractError):
+        data = None
+    if data is not None and len(data) == snapshot["bytes"] and ingest.sha(data) == expected:
+        return data, None
+    try:
+        data, commit = ingest.old_source(root, source, expected_hash=expected)
+        if len(data) == snapshot["bytes"] and ingest.sha(data) == expected:
+            return data, commit
+    except (OSError, ContractError, subprocess.TimeoutExpired):
+        pass
+    raise ContractError("SOURCE_INPUT_UNAVAILABLE", "The exact checked source version is unavailable",
+                        snapshot["snapshot_id"])
+
+
 def _resolve_source(root, source, request):
     identity = source["source_id"]
     snapshot_id = request.get("snapshot_id")
+    snapshot = None
     expected = request.get("hash")
     if expected is not None and (not isinstance(expected, str) or len(expected) != 64
                                  or any(character not in "0123456789abcdef" for character in expected)):
@@ -154,9 +185,7 @@ def _resolve_source(root, source, request):
                          if row["snapshot_id"] == snapshot_id and row["source_id"] == identity), None)
         if snapshot is None:
             raise ContractError("SOURCE_SNAPSHOT_MISMATCH", str(snapshot_id))
-        data, _ = source_resources.recover_snapshot_source(root, snapshot)
-        recovery = snapshot.get("recovery")
-        commit = recovery.get("commit") if isinstance(recovery, dict) else None
+        data, commit = _recover_bound_snapshot(root, source, snapshot)
     else:
         try:
             data, commit = ingest.old_source(root, source, commit=request.get("commit"), expected_hash=expected)
@@ -176,8 +205,7 @@ def _resolve_source(root, source, request):
     component = ingest.sha(identity.encode("utf-8"))[:20]
     reference = f"artifacts/sources/{component}-{observed}{suffix}"
     target = safe_path(root, reference, ["artifacts/sources"])
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_bytes(data)
+    atomic_write(target, data)
     result = {"source_id": identity, "original_ref": reference, "hash": observed, "commit": commit}
     if snapshot_id is not None:
         result["snapshot_id"] = snapshot_id
@@ -189,7 +217,8 @@ def _resolve_source(root, source, request):
             result.update({key: reading[key] for key in ("read_id", "expires_at", "parsed")})
             result["text_ref"] = reading["parsed"]["text_ref"]
         else:
-            text = (source_resources.extract_code_text(data, ingest.code_extractor(source))[0]
+            extractor = (snapshot or {}).get("extraction", {}).get("extractor")
+            text = (source_resources.extract_code_text(data, extractor or ingest.code_extractor(source))[0]
                     if source["kind"] == "code" else source_resources.extract_document(data, suffix.lower())[0])
             text_ref = reference + ".txt"
             safe_path(root, text_ref).write_text(text, encoding="utf-8")

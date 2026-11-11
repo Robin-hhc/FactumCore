@@ -7,9 +7,12 @@ the tests do not recreate the retired frozen-view pipeline.
 
 from __future__ import annotations
 
+from contextlib import closing
 import hashlib
 import json
+import os
 from pathlib import Path
+import sqlite3
 import sys
 
 import pytest
@@ -233,6 +236,95 @@ def test_failed_panel_publication_preserves_view_and_p5_retry(tmp_path, monkeypa
     assert status == "completed", result
     new_view, _ = panel.run(root, "overview", {})
     assert new_view["card_count"] == 1 and new_view["view_revision"] != previous_view["view_revision"]
+
+
+
+def test_final_sqlite_commit_failure_restores_source_lock_and_preserves_receipt(tmp_path, monkeypatch):
+    root = library_root(tmp_path)
+    put_doc(root)
+    task = scan(root)
+    ingest = module("ingest")
+    panel = module("panel")
+    catalog_type = module("catalog").Catalog
+    module("library").patrol(root, "reindex", {})
+    previous, _ = panel.run(root, "overview", {})
+    candidate = draft(root, "pending", [task["source"]["doc_id"]])
+    lock = root / "governance/sources.lock.yaml"
+    original_lock = lock.read_bytes()
+    receipt = root / "artifacts/ingest/latest.json"
+    receipt.parent.mkdir()
+    previous_receipt = b'{"source_id":"previous","source_complete":true}\n'
+    receipt.write_bytes(previous_receipt)
+    save_registry = catalog_type._save_registry
+
+    # The read transaction sees the old view and blocks only the final writer commit.
+    with closing(sqlite3.connect(root / "artifacts/knowledge.sqlite", isolation_level=None)) as reader:
+        def save_and_hold_reader(catalog):
+            save_registry(catalog)
+            assert lock.read_bytes() != original_lock
+            catalog.connection.execute("PRAGMA busy_timeout=50")
+            reader.execute("BEGIN")
+            assert reader.execute("SELECT count(*) FROM panel_cards").fetchone()[0] == 0
+
+        with monkeypatch.context() as patch:
+            patch.setattr(catalog_type, "_save_registry", save_and_hold_reader)
+            with pytest.raises(sqlite3.OperationalError, match="database is locked"):
+                ingest.commit(root, {})
+
+    assert lock.read_bytes() == original_lock
+    assert receipt.read_bytes() == previous_receipt
+    assert panel.run(root, "overview", {})[0] == previous
+    assert candidate.is_file() and (root / ".build/task.json").is_file()
+    with catalog_type(root, refresh=False) as catalog:
+        assert [row["source_id"] for row in ingest.observe(root, catalog)] == [task["source"]["source_id"]]
+
+    result, phase = ingest.commit(root, {})
+    assert phase == "completed" and result["source_complete"] is True
+    assert json.loads(receipt.read_bytes()) == result
+    new, _ = panel.run(root, "overview", {})
+    assert new["card_count"] == 1 and new["view_revision"] != previous["view_revision"]
+
+
+
+def test_failed_receipt_replacement_preserves_committed_result_and_previous_receipt(tmp_path, monkeypatch):
+    root = library_root(tmp_path)
+    put_doc(root)
+    task = scan(root)
+    ingest = module("ingest")
+    panel = module("panel")
+    catalog_type = module("catalog").Catalog
+    module("library").patrol(root, "reindex", {})
+    candidate = draft(root, "pending", [task["source"]["doc_id"]])
+    receipt = root / "artifacts/ingest/latest.json"
+    receipt.parent.mkdir()
+    previous_receipt = b'{"source_id":"previous","source_complete":true}\n'
+    receipt.write_bytes(previous_receipt)
+    replace = os.replace
+
+    def fail_receipt_replacement(source, destination):
+        if destination == receipt:
+            # A complete receipt has been staged, but the final replacement fails.
+            assert json.loads(source.read_bytes())["source_complete"] is True
+            assert panel.run(root, "overview", {})[0]["card_count"] == 1
+            raise PermissionError("Synthetic receipt replacement failure")
+        return replace(source, destination)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(os, "replace", fail_receipt_replacement)
+        result, phase = ingest.commit(root, {})
+
+    assert phase == "completed" and result["source_complete"] is True
+    assert result["receipt_warning"] == {
+        "code": "INGEST_RECEIPT_WRITE_FAILED",
+        "message": "Synthetic receipt replacement failure",
+        "path": "artifacts/ingest/latest.json",
+    }
+    assert receipt.read_bytes() == previous_receipt
+    assert list(receipt.parent.iterdir()) == [receipt]
+    assert not candidate.exists() and not (root / ".build/task.json").exists()
+    with catalog_type(root, refresh=False) as catalog:
+        assert catalog.get_file(task["source"]["doc_id"])["processed_hash"] == task["source"]["hash"]
+    assert ingest.scan(root, {}) == ({"pending": 0}, "unchanged")
 
 
 def test_failed_p5_can_retry_a_card_move_with_its_stable_id(tmp_path, monkeypatch):

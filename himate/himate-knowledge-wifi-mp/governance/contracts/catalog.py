@@ -121,7 +121,7 @@ def pdf_review_result(source, source_hash, pages, total_pages, *, restart=False)
 def atomic_write(path, data):
     """Replace one file without exposing truncated Markdown or YAML to readers."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
+    temporary = path.with_name(f".{uuid4().hex}.tmp")
     try:
         with temporary.open("xb") as stream:
             stream.write(data)
@@ -135,7 +135,7 @@ def atomic_write(path, data):
 class Catalog:
     """Public file/card relation queries and latest processed file versions."""
 
-    def __init__(self, root, *, refresh=True):
+    def __init__(self, root, *, refresh=True, rollback_registry=False):
         self.root = Path(root).resolve(strict=True)
         self.registry_path = safe_path(self.root, "governance/sources.lock.yaml")
         self.path = safe_path(self.root, "artifacts/knowledge.sqlite")
@@ -145,6 +145,8 @@ class Catalog:
         self.db = self.connection
         self._savepoint = 0
         self._refresh_on_open = refresh
+        self._rollback_registry = rollback_registry
+        self._registry_backup = None
         try:
             # executescript commits implicitly; initialize schema before taking
             # the command transaction that protects source/card/index updates.
@@ -179,7 +181,7 @@ class Catalog:
             raise
 
     def __enter__(self):
-        self._command = self.transaction()
+        self._command = self.transaction(rollback_registry=self._rollback_registry)
         try:
             self._command.__enter__()
         except BaseException:
@@ -208,7 +210,7 @@ class Catalog:
         self.connection.close()
 
     @contextmanager
-    def transaction(self):
+    def transaction(self, *, rollback_registry=False):
         """One short command transaction; nested operations cannot commit it."""
         outer = not self.connection.in_transaction
         if outer:
@@ -218,20 +220,22 @@ class Catalog:
         self.connection.execute("SAVEPOINT " + name)
         try:
             yield
-        except BaseException:
-            self.connection.execute("ROLLBACK TO " + name)
             self.connection.execute("RELEASE " + name)
             if outer:
-                self.connection.rollback()
-            raise
-        else:
-            self.connection.execute("RELEASE " + name)
+                self.connection.commit()
+        except BaseException:
             if outer:
                 try:
-                    self.connection.commit()
-                except BaseException:
+                    if rollback_registry:
+                        # SQLITE_BUSY leaves the writer transaction open after COMMIT.
+                        # Restore the file before letting the next catalog writer in.
+                        self._restore_registry()
+                finally:
                     self.connection.rollback()
-                    raise
+            elif self.connection.in_transaction:
+                self.connection.execute("ROLLBACK TO " + name)
+                self.connection.execute("RELEASE " + name)
+            raise
 
     def _load_registry(self):
         self.registry = (load_yaml(self.registry_path.read_bytes()) if self.registry_path.exists()
@@ -274,10 +278,45 @@ class Catalog:
                     self.connection.execute("DELETE FROM files WHERE id=?", (row["id"],))
         self._resources_by_id = resources
 
+    def _registry_bytes(self):
+        try:
+            return self.registry_path.read_bytes()
+        except FileNotFoundError:
+            return None
+
     def _save_registry(self):
         self._validate_processing()
-        atomic_write(self.registry_path, yaml.safe_dump(
-            self.registry, allow_unicode=True, sort_keys=False).encode("utf-8"))
+        data = yaml.safe_dump(self.registry, allow_unicode=True, sort_keys=False).encode("utf-8")
+        if self._rollback_registry:
+            if self._registry_backup is None:
+                original = previous = self._registry_bytes()
+            else:
+                original, (previous,) = self._registry_backup
+            # Account for a write error either before or after the replacement.
+            self._registry_backup = (original, (data, previous))
+        atomic_write(self.registry_path, data)
+        if self._rollback_registry:
+            self._registry_backup = (original, (data,))
+
+    def _restore_registry(self):
+        if self._registry_backup is None:
+            return
+        original, writes = self._registry_backup
+        try:
+            current = self._registry_bytes()
+            if current == original:
+                return
+            if current not in writes:
+                raise ContractError("SOURCE_REGISTRY_ROLLBACK_CONFLICT",
+                                    "Source registry changed during publication; inspect it before retrying",
+                                    self.registry_path)
+            if original is None:
+                self.registry_path.unlink(missing_ok=True)
+            else:
+                atomic_write(self.registry_path, original)
+        except OSError as error:
+            raise ContractError("SOURCE_REGISTRY_ROLLBACK_FAILED",
+                                "Could not restore the previous source registry", self.registry_path) from error
 
     def register(self, kind, path, repo=None, source_id=None, *, encoding=None):
         return self.register_many([{"kind": kind, "path": path, "repo": repo,
@@ -481,7 +520,8 @@ class Catalog:
         self._save_registry()
         return self.get_file(file_id)
 
-    def record_pdf_review(self, file_id, source_hash, pages, total_pages, *, source_commit=None, restart=False):
+    def record_pdf_review(self, file_id, source_hash, pages, total_pages, *, source_commit=None, restart=False,
+                          registry_changed=False):
         """Record a successfully published batch without prematurely completing its PDF."""
         with self.transaction():
             resource = next((item for item in self.registry["resources"] if item["source_id"] == file_id), None)
@@ -490,6 +530,8 @@ class Catalog:
             processing = pdf_review_result(resource, source_hash, pages, total_pages, restart=restart)
             if (not restart and "processing" not in resource and resource.get("processed_hash") == source_hash
                     and resource.get("processed_exists") is True):
+                if registry_changed:
+                    self._save_registry()
                 return self.get_file(file_id)
             if processing is None:
                 resource.pop("processing", None)

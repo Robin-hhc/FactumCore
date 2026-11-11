@@ -20,7 +20,7 @@ import yaml
 from .catalog import Catalog, atomic_write, normalize_page_ranges, pdf_review_result, remaining_page_ranges
 from .cards_v3 import parse_card
 from .validation import ContractError, canonical_bytes, load_yaml, markdown_structure, safe_path, validate_id
-from . import document_parser, source_resources, workspace_config
+from . import citation_versions, document_parser, source_resources, workspace_config
 
 
 FORMATS = document_parser.SUPPORTED_FORMATS
@@ -47,8 +47,8 @@ def write_json(path, value):
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def read_json(path):
-    value = json.loads(path.read_text(encoding="utf-8-sig"))
+def read_json(path, *, raw=None):
+    value = json.loads((path.read_bytes() if raw is None else raw).decode("utf-8-sig"))
     if not isinstance(value, dict):
         raise ContractError("INVALID_INPUT", "Expected a JSON object", path)
     return value
@@ -723,10 +723,13 @@ def _snapshot_reference_check(root, source, reference, snapshot, registry, conte
 def check(root, request, rules=None):
     """Fixed checks only; the independent reviewer judges actual knowledge."""
     findings = []
+    formal = bool(request.get("formal"))
     try:
-        planned = None if request.get("formal") else _planned_cards(root)
+        if not formal:
+            citation_versions.invalidate(root)
+        planned = None if formal else _planned_cards(root)
         catalog = Catalog(root)
-    except (ValueError, ContractError, yaml.YAMLError) as error:
+    except (ValueError, OSError, ContractError, yaml.YAMLError) as error:
         return {"findings": [_finding(error)]}, "failed"
     with catalog:
         try:
@@ -740,10 +743,13 @@ def check(root, request, rules=None):
             if overlap:
                 raise ContractError("WRITE_DELETE_CONFLICT", "A candidate cannot also be deleted", ", ".join(sorted(overlap)))
             staged_sources = {}
-            context = {"formal": bool(request.get("formal")), "loaded": {}, "legacy": {}, "data": {}, "descriptors": {}}
+            checked_references = []
+            task_bytes = None
+            context = {"formal": formal, "loaded": {}, "legacy": {}, "data": {}, "descriptors": {}}
             task_path = safe_path(root, ".build/task.json")
-            if not request.get("formal") and task_path.is_file():
-                task = read_json(task_path)
+            if not formal and task_path.is_file():
+                task_bytes = task_path.read_bytes()
+                task = read_json(task_path, raw=task_bytes)
                 source = _task_source(catalog, task)
                 task["source"] = source
                 _pdf_batch(root, task)
@@ -802,6 +808,9 @@ def check(root, request, rules=None):
                     extractor = (code_extractor(source, snapshot if snapshot.get("source_id") == identity else None)
                                  if kind == "code" else None)
                     _reference_check(root, source, reference, staged_sources.get(identity), extractor=extractor, context=context)
+                    if task_bytes is not None and not reference.get("snapshot_id"):
+                        data = staged_sources[identity] if identity in staged_sources else context["data"][identity]
+                        checked_references.append((card, reference, source, data, extractor))
                 except (ValueError, OSError, ContractError, subprocess.TimeoutExpired) as error:
                     findings.append({"code": getattr(error, "code", "SOURCE_UNAVAILABLE"),
                                      "path": card["path"], "message": str(error)})
@@ -836,6 +845,11 @@ def check(root, request, rules=None):
                     findings.append({"code": "BROKEN_CARD_LINK", "path": card["path"], "message": target})
                 elif parsed.fragment and unquote(parsed.fragment) not in structures[normalized]["anchors"]:
                     findings.append({"code": "BROKEN_CARD_ANCHOR", "path": card["path"], "message": target})
+    if not findings and task_bytes is not None:
+        try:
+            citation_versions.stage(root, checked_references, task_bytes)
+        except (ValueError, OSError, ContractError) as error:
+            findings.append(_finding(error))
     return {"findings": findings, "card_ids": [card["id"] for card in drafts],
             "parsed_sources": context["descriptors"],
             "review_required": True}, "failed" if findings else "passed"
@@ -850,11 +864,12 @@ def commit(root, request):
     task_path = safe_path(root, ".build/task.json")
     if not task_path.is_file():
         raise ContractError("TASK_REQUIRED", "Run ingest scan before commit")
-    task = read_json(task_path)
+    task_bytes = task_path.read_bytes()
+    task = read_json(task_path, raw=task_bytes)
     source = task["source"]
     # A previous copy may have stopped before deleting a moved card's old path.
     # Finish the reviewed overlay before reading formal cards into the catalog.
-    with Catalog(root, refresh=False) as catalog:
+    with Catalog(root, refresh=False, rollback_registry=True) as catalog:
         source = _task_source(catalog, task)
         task["source"] = source
         drafts = _drafts(root, catalog)
@@ -864,6 +879,7 @@ def commit(root, request):
         pdf_batch = _pdf_batch(root, task)
         if not drafts and not request.get("reason"):
             raise ContractError("NO_CHANGE_REASON_REQUIRED", "Explain the reviewed no-card result")
+        registry_changed = citation_versions.persist(root, catalog, drafts, task_bytes)
         for card in drafts:
             destination = safe_path(root, card["path"], ["knowledge"])
             destination.parent.mkdir(parents=True, exist_ok=True)
@@ -873,7 +889,6 @@ def commit(root, request):
         catalog.rebuild()
         from .library import build_search
 
-        build_search(catalog)
         current = catalog.get_file(source["source_id"])
         processing = (pdf_review_result(current, source["hash"], pdf_batch["pages"], pdf_batch["total_pages"],
                                         restart=source["change"] == "reprocess") if pdf_batch is not None else None)
@@ -886,15 +901,29 @@ def commit(root, request):
             result["processing"] = processing
             result["remaining_pages"] = remaining_page_ranges(
                 pdf_batch["total_pages"], processing["reviewed_pages"])
-        write_json(safe_path(root, "artifacts/ingest/latest.json"), result)
+        # Publish the matching read view before updating the authoritative lock.
+        # A failure rolls back the entire SQLite transaction and leaves P5 retryable.
+        projected_source = {"processing": processing}
+        if processing is None:
+            projected_source.update(processed=True, processed_exists=source["exists"],
+                                    processed_hash=source["hash"], source_commit=source.get("source_commit"))
+        build_search(catalog, panel_sources={source["source_id"]: projected_source})
         if pdf_batch is not None:
             catalog.record_pdf_review(
                 source["source_id"], source["hash"], pdf_batch["pages"], pdf_batch["total_pages"],
-                source_commit=source.get("source_commit"), restart=source["change"] == "reprocess")
+                source_commit=source.get("source_commit"), restart=source["change"] == "reprocess",
+                registry_changed=registry_changed)
         else:
             catalog.mark_processed(source["source_id"], source["hash"], source["exists"],
                                    source_commit=source.get("source_commit"))
-    # Cleanup is last. A failed copy or database operation leaves all drafts.
+    # The committed source ledger is authoritative. A local receipt is optional.
+    receipt_ref = "artifacts/ingest/latest.json"
+    try:
+        receipt = safe_path(root, receipt_ref)
+        atomic_write(receipt, (json.dumps(result, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
+    except OSError as error:
+        result["receipt_warning"] = {"code": "INGEST_RECEIPT_WRITE_FAILED", "message": str(error), "path": receipt_ref}
+    # Clean staging after a committed publication, even if the receipt could not be saved.
     try:
         _clear_build(root, remove_empty=True)
     except OSError as error:

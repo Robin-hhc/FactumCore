@@ -10,9 +10,9 @@ from uuid import uuid4
 
 import yaml
 
-from .catalog import Catalog
-from . import indexing, ingest, source_resources
-from .validation import ContractError, safe_path, validate_id
+from .catalog import Catalog, atomic_write
+from . import citation_versions, indexing, ingest, panel, source_resources
+from .validation import ContractError, _workspace_no_links, safe_path, validate_id
 
 
 SEARCH_VERSION = "card-v1"
@@ -46,7 +46,7 @@ def _search_fields(card):
     return {"title": card["title"], "tags": " ".join(metadata.get("tags", [])), "body": "\n".join(body)}
 
 
-def build_search(catalog):
+def build_search(catalog, *, panel_sources=None):
     """Rebuild only derived search tables, atomically, including old formats."""
     cards = catalog.all_cards()
     with catalog.transaction():
@@ -63,6 +63,8 @@ def build_search(catalog):
         catalog.connection.executemany("INSERT INTO search_terms VALUES(?,?,?)", rows)
         catalog.connection.execute("INSERT OR REPLACE INTO search_state VALUES('cards',?)", (_signature(catalog),))
         catalog.connection.execute("INSERT OR REPLACE INTO search_state VALUES('format',?)", (SEARCH_VERSION,))
+        if panel_sources is not None:
+            panel.publish(catalog, cards, panel_sources, SEARCH_WEIGHTS)
     return {"cards": len(cards), "terms": len(rows)}
 
 
@@ -70,11 +72,13 @@ def _query_options(request, *, read):
     if "purpose" in request or "context" in request:
         raise ContractError("QUERY_PARAMETERS_REMOVED",
                             "purpose/context are removed; search by query and optional tags, then read the card's conditions")
-    allowed = {"card_id"} if read else {"query", "tags", "top_k", "include_deprecated"}
+    allowed = {"card_id", "view_revision"} if read else {"query", "tags", "top_k", "include_deprecated"}
     if set(request) - allowed:
         raise ContractError("INVALID_QUERY_REQUEST", "Unsupported fields: " + ", ".join(sorted(set(request) - allowed)))
     if read:
         validate_id(request.get("card_id"))
+        if "view_revision" in request and (not isinstance(request["view_revision"], str) or not request["view_revision"]):
+            raise ContractError("INVALID_QUERY_REQUEST", "view_revision must be a nonempty string")
         return
     if not isinstance(request.get("query"), str) or not request["query"].strip():
         raise ContractError("QUERY_REQUIRED", "Pass a nonempty query")
@@ -90,17 +94,14 @@ def _query_options(request, *, read):
 
 def query(root, request, *, read=False):
     _query_options(request, read=read)
+    if read and "view_revision" in request:
+        return panel.read_card(root, request["card_id"], request["view_revision"]), "read"
     with Catalog(root) as catalog:
         if read:
             card = catalog.get_card(request.get("card_id"))
             if card is None:
                 raise ContractError("CARD_NOT_FOUND", str(request.get("card_id")))
-            return {"card_id": card["id"], "path": card["path"], "title": card["title"],
-                    "body": card["body"], "metadata": card["metadata"],
-                    "sources": catalog.files_for(card["id"]),
-                    "doc_ref": card["doc_ref"], "code_ref": card["code_ref"],
-                    "tags": card["metadata"].get("tags", []),
-                    "lifecycle": card["metadata"].get("lifecycle", "stable")}, "read"
+            return panel.card_detail(card, catalog.files_for(card["id"])), "read"
         text = request.get("query", "")
         groups = indexing.term_groups(text)
         if not groups:
@@ -138,16 +139,76 @@ def query(root, request, *, read=False):
         return result, "searched"
 
 
+def _recover_bound_snapshot(root, source, snapshot):
+    try:
+        data, recovered_from = source_resources.recover_snapshot_source(root, snapshot)
+        commit = recovered_from.split(":", 2)[1] if recovered_from.startswith("git:") else None
+        return data, commit
+    except ContractError as error:
+        if "card_references" not in snapshot or error.code not in citation_versions.MISSING_VERSION:
+            raise
+    retained = citation_versions.retained_bytes(root, snapshot)
+    if retained is not None:
+        return retained, None
+    expected = snapshot["sha256"]
+    try:
+        path = ingest.source_path(root, source)
+        _workspace_no_links(path)
+        data = path.read_bytes()
+    except (OSError, ContractError):
+        data = None
+    if data is not None and len(data) == snapshot["bytes"] and ingest.sha(data) == expected:
+        return data, None
+    try:
+        data, commit = ingest.old_source(root, source, expected_hash=expected)
+        if len(data) == snapshot["bytes"] and ingest.sha(data) == expected:
+            return data, commit
+    except (OSError, ContractError, subprocess.TimeoutExpired):
+        pass
+    raise ContractError("SOURCE_INPUT_UNAVAILABLE", "The exact checked source version is unavailable",
+                        snapshot["snapshot_id"])
+
+
 def _resolve_source(root, source, request):
     identity = source["source_id"]
-    data, commit = ingest.old_source(root, source, commit=request.get("commit"), expected_hash=request.get("hash"))
+    snapshot_id = request.get("snapshot_id")
+    snapshot = None
+    expected = request.get("hash")
+    if expected is not None and (not isinstance(expected, str) or len(expected) != 64
+                                 or any(character not in "0123456789abcdef" for character in expected)):
+        raise ContractError("INVALID_SOURCE_HASH", "Use a lowercase SHA-256")
+    if snapshot_id is not None:
+        validate_id(snapshot_id)
+        if request.get("commit") is not None:
+            raise ContractError("SOURCE_SNAPSHOT_MISMATCH", "Choose snapshot_id or commit")
+        snapshot = next((row for row in source_resources.read_source_lock(root)["snapshots"]
+                         if row["snapshot_id"] == snapshot_id and row["source_id"] == identity), None)
+        if snapshot is None:
+            raise ContractError("SOURCE_SNAPSHOT_MISMATCH", str(snapshot_id))
+        data, commit = _recover_bound_snapshot(root, source, snapshot)
+    else:
+        try:
+            data, commit = ingest.old_source(root, source, commit=request.get("commit"), expected_hash=expected)
+        except ContractError as error:
+            if expected is None or request.get("commit") is not None or error.code not in {
+                    "GIT_SOURCE_UNAVAILABLE", "OLD_SOURCE_UNAVAILABLE"}:
+                raise
+            try:
+                data = ingest.source_path(root, source).read_bytes()
+            except FileNotFoundError:
+                raise error from None
+            commit = None
+    observed = ingest.sha(data)
+    if expected is not None and expected != observed:
+        raise ContractError("SOURCE_HASH_MISMATCH", "Requested source version is unavailable", identity)
     suffix = Path(source["path"]).suffix
     component = ingest.sha(identity.encode("utf-8"))[:20]
-    reference = f"artifacts/sources/{component}-{ingest.sha(data)}{suffix}"
+    reference = f"artifacts/sources/{component}-{observed}{suffix}"
     target = safe_path(root, reference, ["artifacts/sources"])
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_bytes(data)
-    result = {"source_id": identity, "original_ref": reference, "hash": ingest.sha(data), "commit": commit}
+    atomic_write(target, data)
+    result = {"source_id": identity, "original_ref": reference, "hash": observed, "commit": commit}
+    if snapshot_id is not None:
+        result["snapshot_id"] = snapshot_id
     try:
         if source["kind"] != "code" and suffix.lower() not in {".md", ".txt", ".pdf", ".docx"}:
             from . import source_read
@@ -156,7 +217,8 @@ def _resolve_source(root, source, request):
             result.update({key: reading[key] for key in ("read_id", "expires_at", "parsed")})
             result["text_ref"] = reading["parsed"]["text_ref"]
         else:
-            text = (source_resources.extract_code_text(data, ingest.code_extractor(source))[0]
+            extractor = (snapshot or {}).get("extraction", {}).get("extractor")
+            text = (source_resources.extract_code_text(data, extractor or ingest.code_extractor(source))[0]
                     if source["kind"] == "code" else source_resources.extract_document(data, suffix.lower())[0])
             text_ref = reference + ".txt"
             safe_path(root, text_ref).write_text(text, encoding="utf-8")
@@ -264,7 +326,7 @@ def patrol(root, action, request):
             return {"pending": 0}, "unchanged"
         if action == "reindex":
             catalog.rebuild()
-            return build_search(catalog), "reindexed"
+            return build_search(catalog, panel_sources={}), "reindexed"
         if action == "complete":
             pending = ingest.observe(root, catalog, include_code=True)
             result = {"remaining": len(pending), "completed_at": datetime.now(timezone.utc).isoformat()}

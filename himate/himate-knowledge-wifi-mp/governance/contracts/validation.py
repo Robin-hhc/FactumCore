@@ -519,7 +519,7 @@ def workspace_file_allowed(normalized, repo_id, relative, target_id=None):
         return False
 
 
-def markdown_structure(data):
+def markdown_structure(data, *, strip_frontmatter=True):
     """Parse the governed Markdown subset while preserving original line numbers.
 
     Code examples never create headings or links. Heading fragments use a fixed
@@ -531,7 +531,7 @@ def markdown_structure(data):
     text = data.decode("utf-8-sig") if isinstance(data, bytes) else str(data)
     result, fence, frontmatter = [], None, False
     for number, line in enumerate(text.splitlines(keepends=True), 1):
-        if number == 1 and line.strip() == "---":
+        if strip_frontmatter and number == 1 and line.strip() == "---":
             frontmatter = True
             result.append(" " * len(line.rstrip("\r\n")) + line[len(line.rstrip("\r\n")):])
             continue
@@ -554,7 +554,7 @@ def markdown_structure(data):
             line = re.sub(r"(`+)(?!`)(.*?)\1(?!`)", lambda m: " " * len(m.group()), line)
         result.append(line)
     visible = "".join(result)
-    anchors, counts, duplicate_anchors, links, conflicts = set(), {}, [], [], []
+    anchors, counts, duplicate_anchors, links, conflicts, headings = set(), {}, [], [], [], []
     definitions = {}
     for line in visible.splitlines():
         match = re.match(r"^ {0,3}\[([^]]+)\]:\s*<?([^\s>]+)>?", line)
@@ -580,11 +580,19 @@ def markdown_structure(data):
             if anchor in anchors:
                 duplicate_anchors.append({"anchor": anchor, "line": number})
             anchors.add(anchor)
+            headings.append({"anchor": anchor, "line": number})
         if re.match(r"^ {0,3}\[[^]]+\]:", line):
             continue
         for match in re.finditer(r"!?\[[^]\n]*\]\(\s*(?:<([^>]+)>|([^\s)]+))(?:\s+[^)]*)?\)", line):
-            links.append({"target": html.unescape(match.group(1) or match.group(2)), "line": number})
+            link = {"target": html.unescape(match.group(1) or match.group(2)), "line": number}
+            if match[0].startswith("!"):
+                link["image"] = True
+            links.append(link)
         for match in re.finditer(r"!?\[([^]\n]+)\]\[([^]\n]*)\]", line):
             key = (match.group(2) or match.group(1)).casefold()
-            links.append({"target": definitions.get(key), "label": key, "line": number})
-    return {"visible": visible, "anchors": anchors, "duplicate_anchors": duplicate_anchors, "links": links, "conflicts": conflicts}
+            link = {"target": definitions.get(key), "label": key, "line": number}
+            if match[0].startswith("!"):
+                link["image"] = True
+            links.append(link)
+    return {"visible": visible, "anchors": anchors, "duplicate_anchors": duplicate_anchors, "links": links,
+            "conflicts": conflicts, "headings": headings}

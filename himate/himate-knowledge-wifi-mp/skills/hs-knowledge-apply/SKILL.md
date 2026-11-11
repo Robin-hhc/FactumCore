@@ -25,4 +25,4 @@ knowledge ingest commit --json
 
 按所属 Workflow 继续：独立 ingest 成功后回 P1，按任务原始范围扫描下一批，直到该范围返回 `unchanged` 才正常结束；未限定来源时不把上一批 `source_id` 变为后续范围。巡检成功后回 L2，由 L2 选择下一来源再交 P1，采用其最新 `source_id`。两者沿用已交接的 CLI 命令前缀、`parser` 和页段预算配置；`reprocess: true` 仅首次重评使用，后续普通续办。
 
-上一批结果以 commit 回执为准，需要复核时读 `artifacts/ingest/latest.json`；下一次 scan 用于选择下一批。P1/P5 清理保留 .build 根 README，PDF 派生缓存及正式进度不随本批清理。暂缓／失败报告实际阻塞和未完成范围，不通过回 P1 反复重扫解决。Git 提交、推送与合入由用户另行授权。
+本批以 commit 命令返回的结果为准。若返回 `data.receipt_warning`，`artifacts/ingest/latest.json` 可能仍是上一批的回执。下一次 scan 用于选择下一批。P1/P5 清理保留 .build 根 README，PDF 派生缓存及正式进度不随本批清理。暂缓／失败报告实际阻塞和未完成范围，不通过回 P1 反复重扫解决。Git 提交、推送与合入由用户另行授权。

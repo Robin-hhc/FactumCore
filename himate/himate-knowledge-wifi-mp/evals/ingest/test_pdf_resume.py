@@ -217,24 +217,41 @@ def test_same_hash_reprocess_partial_stays_pending_for_scan_and_patrol(library):
 
 
 @pytest.mark.parametrize("complete", [False, True], ids=["partial", "full"])
-def test_receipt_write_failure_does_not_advance_formal_coverage(library, monkeypatch, complete):
-    prepare(library, review_page_budget=20 if complete else 2)
+def test_receipt_write_failure_preserves_exact_committed_coverage(library, monkeypatch, complete):
+    task = prepare(library, review_page_budget=20 if complete else 2)
     plan(library, [[1, 5 if complete else 2]])
-    registry_path = library / "governance/sources.lock.yaml"
-    before = registry_path.read_bytes()
     ingest = module("ingest")
-    original = ingest.write_json
+    receipt = library / "artifacts/ingest/latest.json"
+    original = ingest.atomic_write
 
-    def fail_receipt(path, value):
-        if path == library / "artifacts/ingest/latest.json":
+    def fail_receipt(path, data):
+        if path == receipt:
             raise OSError("synthetic receipt failure")
-        return original(path, value)
+        return original(path, data)
 
-    monkeypatch.setattr(ingest, "write_json", fail_receipt)
-    with pytest.raises(OSError, match="synthetic receipt failure"):
-        ingest.commit(library, {"reason": "Assessed; no increment."})
-    assert registry_path.read_bytes() == before
-    assert (library / ".build/task.json").exists()
+    with monkeypatch.context() as patch:
+        patch.setattr(ingest, "atomic_write", fail_receipt)
+        result, phase = ingest.commit(library, {"reason": "Assessed; no increment."})
+
+    assert phase == "completed" and result["source_complete"] is complete
+    assert result["receipt_warning"]["code"] == "INGEST_RECEIPT_WRITE_FAILED"
+    assert not receipt.exists() and not (library / ".build/task.json").exists()
+    digest = task["source"]["hash"]
+    with module("catalog").Catalog(library, refresh=False) as catalog:
+        source = catalog.get_file(task["source"]["source_id"])
+    if complete:
+        assert result["processed_hash"] == source["processed_hash"] == digest
+        assert "processing" not in source
+        assert ingest.scan(library, {}) == ({"pending": 0}, "unchanged")
+    else:
+        assert result["processed_hash"] is None and source["processed_hash"] is None
+        expected = {"source_sha256": digest, "reviewed_pages": [[1, 2]]}
+        assert result["processing"] == source["processing"] == expected
+        assert result["remaining_pages"] == [[3, 5]]
+        resumed = prepare(library)
+        assert resumed["source"]["change"] == "resume"
+        assert resumed["pdf_review"]["reviewed_pages"] == [[1, 2]]
+        assert resumed["pdf_review"]["start_page"] == 3
 
 
 @pytest.mark.parametrize("material", ["packet_ref", "page_index_ref"])

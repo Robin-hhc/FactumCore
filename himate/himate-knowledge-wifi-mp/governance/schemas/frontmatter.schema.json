@@ -384,12 +384,8 @@
             "string",
             "null"
           ],
-          "enum": [
-            "chip12",
-            "chip08",
-            "chip07c",
-            null
-          ]
+          "minLength": 1,
+          "pattern": "\\S"
         },
         "side": {
           "type": [
@@ -815,8 +811,7 @@
             },
             "max_output_bytes": {
               "type": "integer",
-              "minimum": 1,
-              "maximum": 268435456
+              "minimum": 1
             },
             "images_scale": {
               "type": "number",

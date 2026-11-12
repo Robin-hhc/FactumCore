@@ -83,6 +83,25 @@ def configuration(raw, path):
     return value
 
 
+def mapped_root(config, config_path, knowledge_root):
+    """Match the actual knowledge directory without requiring a domain name."""
+    path = Path(config_path)
+    roots = config.get("knowledge_roots")
+    if (not isinstance(roots, dict) or not roots
+            or any(not isinstance(name, str) or not name.strip() for name in roots)):
+        raise WorkspaceConfigError("WORKSPACE_CONFIG_INVALID", "Expected named knowledge_roots mappings", path)
+    matches = []
+    root = Path(knowledge_root).resolve(strict=True)
+    for relative in roots.values():
+        relative_path(relative)
+        mapped = workspace_path(path.parent, relative).resolve()
+        if relative != "." and mapped == root:
+            matches.append(relative)
+    if len(matches) > 1:
+        raise WorkspaceConfigError("WORKSPACE_CONFIG_AMBIGUOUS", "Multiple entries map to the selected knowledge root", path)
+    return matches[0] if matches else None
+
+
 def select(knowledge_root, registrations=None, expected_rules=None, *, config_path=None):
     """Select exactly one explicit safe mapping, never an arbitrary parent.
 
@@ -117,11 +136,7 @@ def select(knowledge_root, registrations=None, expected_rules=None, *, config_pa
         except OSError as error:
             raise WorkspaceConfigError("WORKSPACE_CONFIG_INVALID", str(error), candidate) from error
         value = configuration(raw, candidate)
-        roots = value.get("knowledge_roots")
-        if not isinstance(roots, dict) or set(roots) != {"wifi"}:
-            raise WorkspaceConfigError("WORKSPACE_CONFIG_INVALID", "Expected one knowledge_roots.wifi mapping", candidate)
-        relative = relative_path(roots["wifi"])
-        if relative == "." or workspace_path(candidate.parent, relative).resolve() != root:
+        if mapped_root(value, candidate, root) is None:
             continue
         if identity is not None and (value.get("workspace_id") != identity
                 or expected_rules is not None and entry.get("rules_digest") != expected_rules):
@@ -134,8 +149,8 @@ def select(knowledge_root, registrations=None, expected_rules=None, *, config_pa
             raise WorkspaceConfigError("WORKSPACE_CONFIG_CHANGED", "Workspace config changed while selecting", candidate)
         matches.append(candidate.resolve())
     if len(matches) > 1:
-        raise WorkspaceConfigError("WORKSPACE_CONFIG_AMBIGUOUS", "Multiple configs map to the selected WiFi root")
+        raise WorkspaceConfigError("WORKSPACE_CONFIG_AMBIGUOUS", "Multiple configs map to the selected knowledge root")
     if not matches:
-        raise WorkspaceConfigError("WORKSPACE_CONFIG_UNAVAILABLE", "No exact workspace config maps to the selected WiFi root",
+        raise WorkspaceConfigError("WORKSPACE_CONFIG_UNAVAILABLE", "No exact workspace config maps to the selected knowledge root",
                                    available[0] if available else "")
     return matches[0]

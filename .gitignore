@@ -26,6 +26,8 @@ config.local.yml
 **/.codegraph/
 
 # Raw business material stays local; publish each directory's README only.
+/himate/himate-knowledge-wifi-mp/docs-raw/agent-notes/*
+!/himate/himate-knowledge-wifi-mp/docs-raw/agent-notes/README.md
 /himate/himate-knowledge-wifi-mp/docs-raw/chips/*
 !/himate/himate-knowledge-wifi-mp/docs-raw/chips/README.md
 /himate/himate-knowledge-wifi-mp/docs-raw/conventions/*

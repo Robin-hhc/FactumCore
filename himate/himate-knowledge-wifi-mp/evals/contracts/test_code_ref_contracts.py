@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import subprocess
 
 from jsonschema import Draft202012Validator
 import pytest
@@ -118,6 +119,71 @@ def test_current_navigation_uses_symbol_after_insertions_not_old_line_numbers(wo
     assert resources.validate_reference(reference(), lock, lambda _: original)["locator"]["start"] == 1
 
 
+@pytest.mark.parametrize("multiple_domains", [False, True])
+def test_navigation_selects_actual_knowledge_root_without_a_wifi_domain_key(workspace, multiple_domains):
+    domain, code, _, lock, config_path, _ = workspace
+    config = yaml.safe_load(config_path.read_bytes())
+    config["knowledge_roots"] = {"bluetooth": domain.name}
+    if multiple_domains:
+        other = domain.parent / "other-knowledge-root"
+        other.mkdir()
+        config["knowledge_roots"] = {"wifi": other.name, **config["knowledge_roots"]}
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    code.write_bytes(b"/* current revision */\nint ready(void) { return 7; }\n")
+
+    observed = resources.resolve_code_navigation(domain, reference(), lock)
+
+    assert observed["status"] == "resolved", observed
+    assert observed["range"]["start_line"] == 2
+    assert observed["sha256"] == hashlib.sha256(code.read_bytes()).hexdigest()
+    assert observed["config_digest"] == hashlib.sha256(config_path.read_bytes()).hexdigest()
+
+
+@pytest.mark.parametrize("multiple_domains", [False, True])
+def test_fixed_git_recovery_selects_named_domain_and_preserves_current_original(tmp_path, multiple_domains):
+    project = tmp_path / "repository"
+    domain = project / "himate/himate-knowledge-bluetooth"
+    original = domain / "docs-raw/specs/design.md"
+    original.parent.mkdir(parents=True)
+    old_bytes = b"# Design\n\nOriginal documented requirement.\n"
+    original.write_bytes(old_bytes)
+    relative = original.relative_to(project).as_posix()
+    config = {"schema_version": "2.0", "workspace_id": "recovery-test",
+              "knowledge_roots": {"bluetooth": domain.relative_to(project).as_posix()},
+              "code_root": "main", "modules": []}
+    if multiple_domains:
+        other = project / "himate/himate-knowledge-wifi"
+        foreign_original = other / "docs-raw/specs/design.md"
+        foreign_original.parent.mkdir(parents=True)
+        foreign_original.write_bytes(b"A different domain's original.\n")
+        config["knowledge_roots"] = {"wifi": other.relative_to(project).as_posix(), **config["knowledge_roots"]}
+    (project / "config.yml").write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    def git(*args):
+        return subprocess.run(
+            ["git", "-c", "user.name=Synthetic Test", "-c", "user.email=synthetic@example.invalid",
+             "-c", "core.autocrlf=false", "-C", str(project), *args],
+            check=True, capture_output=True,
+        ).stdout.decode().strip()
+
+    git("init", "--quiet")
+    git("add", "--", relative)
+    git("commit", "--quiet", "-m", "Record synthetic original")
+    commit = git("rev-parse", "HEAD")
+    current = b"# Design\n\nUncommitted local requirement.\n"
+    original.write_bytes(current)
+
+    recovered = resources._recover_git(domain, {"commit": commit, "path": relative})
+
+    assert recovered == old_bytes
+    assert original.read_bytes() == current
+    if multiple_domains:
+        with pytest.raises(validation.ContractError, match="RECOVERY_SCOPE_REQUIRED"):
+            resources._recover_git(domain, {
+                "commit": commit, "path": foreign_original.relative_to(project).as_posix(),
+            })
+
+
 def test_deleted_current_file_is_reported_missing_without_losing_old_snapshot(workspace):
     domain, code, original, lock, _, _ = workspace
     code.unlink()
@@ -163,3 +229,70 @@ def test_navigation_rejects_configuration_bound_to_another_knowledge_root(worksp
                 "repos": {mapping["repo_id"]: {"root": str(code.parents[1])}}}
     observed = resources.resolve_code_navigation(domain, reference(), lock, checkout)
     assert observed["status"] == "unavailable"
+
+
+def target_identity(workspace, chip, side):
+    domain, code, original, _, config_path, _ = workspace
+    config = yaml.safe_load(config_path.read_bytes())
+    config["modules"][0].update(chips=[chip], sides=[side])
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    mapped = validation.normalize_workspace(config, domain.parent)
+    repo = mapped["repos"][0]
+    identity = {
+        "basis": "source", "target": {"target_id": f"{chip}-{side}", "chip": chip, "side": side},
+        "build_files": {}, "macro_digest": None,
+        "repos": {repo["repo_id"]: {
+            "kind": "export", "workspace_path": repo["workspace_path"], "evidence_basis": "filesystem",
+            "head": None, "checked_files_dirty": None, "identity": None,
+            "files": {code.relative_to(code.parents[1]).as_posix(): hashlib.sha256(original).hexdigest()},
+        }},
+    }
+    schema = json.loads((Path(__file__).parents[2] / "governance/schemas/workspace.schema.json").read_bytes())
+    rules = {"knowledge_root": str(domain), "schemas": {"workspace": schema}}
+    return identity, config, rules
+
+
+@pytest.mark.parametrize("side", ["host", "device"])
+def test_current_code_identity_accepts_target_derived_from_custom_module_chip(workspace, side):
+    _, _, _, _, config_path, _ = workspace
+    identity, _, rules = target_identity(workspace, "soc-new", side)
+
+    checked = resources.validate_current_code_identity(
+        identity, config_path, hashlib.sha256(config_path.read_bytes()).hexdigest(), rules, {},
+    )
+
+    assert checked == identity
+
+
+def test_current_code_identity_rejects_sibling_module_outside_custom_target(workspace):
+    domain, code, original, _, config_path, _ = workspace
+    identity, config, rules = target_identity(workspace, "soc-new", "host")
+    sibling = domain.parent / "main/device/src/ready.c"
+    sibling.parent.mkdir(parents=True)
+    sibling.write_bytes(original)
+    config["modules"].append({"path": "device", "chips": ["soc-new"], "sides": ["device"]})
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    mapped = validation.normalize_workspace(config, domain.parent)
+    sibling_repo = next(repo for repo in mapped["repos"] if repo["workspace_path"] == "main/device")
+    recorded = next(iter(identity["repos"].values()))
+    recorded["workspace_path"] = sibling_repo["workspace_path"]
+    identity["repos"] = {sibling_repo["repo_id"]: recorded}
+
+    with pytest.raises(validation.ContractError, match="CODE_TARGET_CHANGED"):
+        resources.validate_current_code_identity(
+            identity, config_path, hashlib.sha256(config_path.read_bytes()).hexdigest(), rules, {},
+        )
+    assert code.read_bytes() == original
+    assert sibling.read_bytes() == original
+
+
+def test_current_code_identity_rejects_target_removed_by_module_chip_change(workspace):
+    _, _, _, _, config_path, _ = workspace
+    identity, config, rules = target_identity(workspace, "soc-old", "host")
+    config["modules"][0]["chips"] = ["soc-new"]
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    with pytest.raises(validation.ContractError, match="CODE_TARGET_CHANGED"):
+        resources.validate_current_code_identity(
+            identity, config_path, hashlib.sha256(config_path.read_bytes()).hexdigest(), rules, {},
+        )

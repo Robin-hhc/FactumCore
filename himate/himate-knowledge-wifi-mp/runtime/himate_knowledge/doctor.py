@@ -149,7 +149,7 @@ def _doctor_configuration(root, yaml_available, gaps, rules):
     """Load only the verified metadata selector, never the governance package."""
     data = {"path": None, "status": "not_checked", "knowledge_root": None,
             "verification": "knowledge_root_mapping_only"}
-    guidance = "Provide the intended workspace config.yml with knowledge_roots.wifi mapped to this knowledge root"
+    guidance = "Provide the intended workspace config.yml with a knowledge_roots entry mapped to this knowledge root"
     if not yaml_available or rules["status"] != "verified":
         return data
     try:
@@ -182,7 +182,7 @@ def _doctor_configuration(root, yaml_available, gaps, rules):
         # the current workspace contract, without inspecting business assets.
         if config.get("schema_version") != "2.0":
             raise selector["WorkspaceConfigError"]("WORKSPACE_CONFIG_INVALID", "Expected workspace contract 2.0", path)
-        if selector["workspace_path"](path.parent, config["knowledge_roots"]["wifi"]).resolve() != root.resolve():
+        if selector["mapped_root"](config, path, root) is None:
             raise selector["WorkspaceConfigError"]("WORKSPACE_CONFIG_CHANGED", "Selected configuration mapping changed", path)
         if _doctor_read(path) != raw:
             raise selector["WorkspaceConfigError"]("WORKSPACE_CONFIG_CHANGED", "Workspace configuration changed during diagnosis", path)

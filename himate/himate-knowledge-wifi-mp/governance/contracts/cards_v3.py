@@ -90,8 +90,8 @@ def _parser_options(options, path):
     for field in ("threads", "max_input_bytes", "max_pages", "max_output_bytes"):
         if field in options and (type(options[field]) is not int or options[field] < 1):
             raise ContractError("INVALID_SOURCE_LOCATOR", "Element parser " + field + " must be positive", path)
-        if field in {"max_input_bytes", "max_output_bytes"} and field in options and options[field] > 256 * 1024 * 1024:
-            raise ContractError("INVALID_SOURCE_LOCATOR", "Element parser input/output limits cannot exceed 256 MiB", path)
+        if field == "max_input_bytes" and field in options and options[field] > 256 * 1024 * 1024:
+            raise ContractError("INVALID_SOURCE_LOCATOR", "Element parser input limit cannot exceed 256 MiB", path)
         if field == "threads" and field in options and options[field] > 32:
             raise ContractError("INVALID_SOURCE_LOCATOR", "Element parser threads cannot exceed 32", path)
     for field in ("timeout_seconds", "images_scale"):

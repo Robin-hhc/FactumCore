@@ -173,9 +173,9 @@ def test_read_size_limits_are_checked_without_modifying_other_jobs(tmp_path, mon
     assert reads._ids(tmp_path) == [good["read_id"]]
 
 
-@pytest.mark.parametrize("field", ["max_input_bytes", "max_output_bytes"])
-def test_oversized_parser_limits_fail_before_reserving_a_read(tmp_path, field):
+def test_oversized_parser_limits_fail_before_reserving_a_read(tmp_path):
     reads = module("source_read")
+    field = "max_input_bytes"
     options = {field: 512 * 1024 * 1024}
     with pytest.raises(reads.ContractError, match="INVALID_PARSER_OPTIONS"):
         create(tmp_path, options=options)
@@ -183,9 +183,10 @@ def test_oversized_parser_limits_fail_before_reserving_a_read(tmp_path, field):
     assert not (tmp_path / "artifacts/source-read").exists()
 
 
-def test_legal_parser_options_keep_the_same_ingest_and_read_profile(tmp_path):
+@pytest.mark.parametrize("output_limit", [1024 * 1024, 1024 * 1024 * 1024])
+def test_legal_parser_options_keep_the_same_ingest_and_read_profile(tmp_path, output_limit):
     parser = module("document_parser")
-    options = {"max_input_bytes": 8 * 1024 * 1024, "max_output_bytes": 1024 * 1024}
+    options = {"max_input_bytes": 8 * 1024 * 1024, "max_output_bytes": output_limit}
     original_options = dict(options)
     data = b"# Design\n\nA documented requirement.\n"
     ingested = parser.parse(tmp_path, source(), data, ".build/materials/parsed", options=options)

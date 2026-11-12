@@ -1,6 +1,6 @@
-# OpenFlow 适配源码样本
+# FactumCore 测试分支样本
 
-`codex/openflow-adaptation` 分支提供可检出的真实资料快照，供 OpenFlow 开发者适配检索、知识卡、来源预览与图谱。产品主线的业务资料隔离约定不随此分支改变。
+`test` 分支从产品主干 `main` 同步框架代码，并保留用于验收的源码、文档原件和正式知识卡。这里的 `main/` 是测试源码目录。
 
 ## 样本范围
 
@@ -17,13 +17,13 @@
 ## 开始适配
 
 ```sh
-git clone --single-branch --branch codex/openflow-adaptation https://github.com/Robin-hhc/FactumCore.git FactumCore-openflow
-cd FactumCore-openflow
+git clone --single-branch --branch test https://github.com/Robin-hhc/FactumCore.git FactumCore-test
+cd FactumCore-test
 ```
 
 使用已有 Python 3.10–3.12 和[项目运行依赖](../himate/himate-knowledge-wifi-mp/runtime/requirements.lock.txt)。部署操作参考[使用说明](../himate/himate-knowledge-wifi-mp/docs-llm-wiki/使用说明.md)，保留本分支的项目根 `config.yml`。
 
-从检出目录运行：
+每轮验收先把远端 `main` 合入 `test`，再在本地测试检出执行 `git pull --ff-only origin test`。从固定提交建立独立试运行副本后执行以下命令。
 
 ```sh
 python -B himate/himate-knowledge-wifi-mp/knowledge.py maintain reindex --json
@@ -32,6 +32,6 @@ python -B himate/himate-knowledge-wifi-mp/knowledge.py search "mac_set_snap" --j
 python -B himate/himate-knowledge-wifi-mp/knowledge.py read wifi-snap-encapsulation-static --json
 ```
 
-预期索引有 7 卡、10 个来源；`mac_set_snap` 能找到静态封装分析卡。命令会在本次检出目录生成可重建索引及查询报告，不提交这些产物。原件保持只读，业务修改在独立试运行副本进行。
+当前基线预期有 7 张卡和 10 个来源。`mac_set_snap` 能找到静态封装分析卡。索引和查询报告留在试运行副本。验收通过的样本新增或更新可在 `test` 单独提交，业务资料和本机产物留在本机。
 
 面板方案、现有数据与拟议接口见[OpenFlow 面板与知识图谱适配建议](../himate/himate-knowledge-wifi-mp/docs-llm-wiki/OpenFlow面板与知识图谱适配建议.md)。知识内容、代码定位、机械检查和宿主 UI 验收分别判断；本样本不将它们等同。

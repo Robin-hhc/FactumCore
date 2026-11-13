@@ -26,9 +26,9 @@ def test_public_check_resolves_a_new_gb18030_header_without_dropping_its_symbol(
                   'static int ready(int value) { /* 原值 */ return value; }\n'
                   '#ifdef __cplusplus\n#if __cplusplus\n}\n#endif\n#endif\n#endif\n').encode("gb18030")
     code.write_bytes(code_bytes)
-    (project / "config.yml").write_text(yaml.safe_dump({
+    (root / "config.yml").write_text(yaml.safe_dump({
         "schema_version": "2.0", "workspace_id": "guarded-header",
-        "knowledge_roots": {"wifi": "himate/library"}, "code_root": "main", "modules": [{"path": "wifi"}],
+        "code_root": "../../main", "modules": [{"path": "wifi"}],
     }), encoding="utf-8")
     for request in ({"kind": "doc", "path": "docs-raw/design.md", "source_id": "doc-design"},
                     {"kind": "code", "path": "main/wifi/sample.h", "source_id": "code-ready", "encoding": "gb18030"}):

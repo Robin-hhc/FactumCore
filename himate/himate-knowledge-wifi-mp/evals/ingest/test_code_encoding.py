@@ -28,10 +28,9 @@ def library(tmp_path):
     code.parent.mkdir(parents=True)
     code.write_bytes(CODE.encode("gb18030"))
     (root / "docs-raw/design.md").write_text("# Reply\n\nWait for a reply.\n", encoding="utf-8")
-    (project / "config.yml").write_text(yaml.safe_dump({
+    (root / "config.yml").write_text(yaml.safe_dump({
         "schema_version": "2.0", "workspace_id": "encoding-test",
-        "knowledge_roots": {"wifi": "himate/library"},
-        "code_root": "main", "modules": [{"path": "wifi"}],
+        "code_root": "../../main", "modules": [{"path": "wifi"}],
     }), encoding="utf-8")
     _, status = module("library").sources(root, "register", {
         "kind": "doc", "path": "docs-raw/design.md", "source_id": "doc-design",

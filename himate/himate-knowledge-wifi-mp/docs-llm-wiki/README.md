@@ -15,4 +15,4 @@
 
 开发与验证从[开发指南](../CONTRIBUTING.md)进入。手动命令契约由对应 Skill 的 references 维护，本地调试笔记保留在被忽略的开发工件中。
 
-文档用 `repo/` 示意工作区根，知识根按项目根实际 `config.yml` 解析。部署入口、Skill、Workflow 和工具均位于知识根内。
+文档用 `repo/` 示意 manifest 工作区根。进入实际知识根后，读取该目录的 `config.yml` 和 `AGENTS.md`。部署入口、Skill、Workflow 和工具也位于知识根内。

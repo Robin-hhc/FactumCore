@@ -470,9 +470,9 @@ def code_project(tmp_path):
     code = project / "code/wifi/wait.c"
     code.parent.mkdir(parents=True)
     code.write_text("int wait_reply(void) {\n    return 5;\n}\n")
-    (project / "config.yml").write_text(yaml.safe_dump({
-        "schema_version": "2.0", "workspace_id": "synthetic", "knowledge_roots": {"wifi": "himate/library"},
-        "code_root": "code", "modules": [{"path": "wifi", "chips": ["chip12"], "sides": ["host"]}],
+    (root / "config.yml").write_text(yaml.safe_dump({
+        "schema_version": "2.0", "workspace_id": "synthetic",
+        "code_root": "../../code", "modules": [{"path": "wifi", "chips": ["chip12"], "sides": ["host"]}],
     }))
     original = put_doc(root)
     with module("catalog").Catalog(root) as catalog:

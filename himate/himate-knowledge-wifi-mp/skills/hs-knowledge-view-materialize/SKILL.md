@@ -5,7 +5,7 @@ description: 按本轮编辑计划和领域模板撰写或修订完整候选卡�
 
 # 按计划写完整卡
 
-在实际知识根执行命令，Linux 使用 `sh ./knowledge.sh`，Windows 使用 `.\knowledge.cmd`；已注册入口可直接用 `knowledge`。位置由 Workflow 首节点确认，独立使用时从当前工作区 `AGENTS.md`、`config.yml` 获取。
+在实际知识根执行命令，Linux 使用 `sh ./knowledge.sh`，Windows 使用 `.\knowledge.cmd`；已注册入口可直接用 `knowledge`。复用 Workflow 首节点或宿主已确认的知识根与执行端。独立使用时先确认这两项，再读取该知识根的 `AGENTS.md` 和 `config.yml`。
 
 ## 成稿
 

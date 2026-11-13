@@ -281,9 +281,9 @@ def test_legacy_struct_reference_retains_its_symbol_kind_in_public_check(tmp_pat
     code.parent.mkdir(parents=True)
     code_bytes = "struct packet {\n    int size; /* 大小字段 */\n};\n".encode(encoding)
     code.write_bytes(code_bytes)
-    (project / "config.yml").write_text(yaml.safe_dump({
-        "schema_version": "2.0", "workspace_id": "synthetic", "knowledge_roots": {"wifi": "himate/library"},
-        "code_root": "code", "modules": [{"path": "wifi"}],
+    (root / "config.yml").write_text(yaml.safe_dump({
+        "schema_version": "2.0", "workspace_id": "synthetic",
+        "code_root": "../../code", "modules": [{"path": "wifi"}],
     }))
     source = register(root)
     registered, status = module("library").sources(root, "register", {

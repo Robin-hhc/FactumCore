@@ -98,12 +98,11 @@ def workspace(tmp_path):
     code.parent.mkdir(parents=True)
     original = b"int ready(void) { return 1; }\n"
     code.write_bytes(original)
-    config = {"schema_version": "2.0", "workspace_id": "code-ref-test",
-              "knowledge_roots": {"wifi": "knowledge-root"}, "code_root": "main",
+    config = {"schema_version": "2.0", "workspace_id": "code-ref-test", "code_root": "../main",
               "modules": [{"path": "host", "chips": ["chip12"], "sides": ["host"], "description": "test"}]}
-    config_path = root / "config.yml"
+    config_path = domain / "config.yml"
     config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
-    mapping = validation.normalize_workspace(config, root)["repos"][0]
+    mapping = validation.normalize_workspace(config, domain)["repos"][0]
     lock = source_lock(original)
     lock["resources"][0]["repo_id"] = mapping["repo_id"]
     return domain, code, original, lock, config_path, mapping
@@ -119,16 +118,13 @@ def test_current_navigation_uses_symbol_after_insertions_not_old_line_numbers(wo
     assert resources.validate_reference(reference(), lock, lambda _: original)["locator"]["start"] == 1
 
 
-@pytest.mark.parametrize("multiple_domains", [False, True])
-def test_navigation_selects_actual_knowledge_root_without_a_wifi_domain_key(workspace, multiple_domains):
+def test_navigation_ignores_other_knowledge_roots_and_ancestor_configs(workspace):
     domain, code, _, lock, config_path, _ = workspace
     config = yaml.safe_load(config_path.read_bytes())
-    config["knowledge_roots"] = {"bluetooth": domain.name}
-    if multiple_domains:
-        other = domain.parent / "other-knowledge-root"
-        other.mkdir()
-        config["knowledge_roots"] = {"wifi": other.name, **config["knowledge_roots"]}
-    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    other = domain.parent / "other-knowledge-root"
+    other.mkdir()
+    (other / "config.yml").write_text(yaml.safe_dump({**config, "modules": []}), encoding="utf-8")
+    (domain.parent / "config.yml").write_text("an invalid ancestor configuration[\n", encoding="utf-8")
     code.write_bytes(b"/* current revision */\nint ready(void) { return 7; }\n")
 
     observed = resources.resolve_code_navigation(domain, reference(), lock)
@@ -139,37 +135,36 @@ def test_navigation_selects_actual_knowledge_root_without_a_wifi_domain_key(work
     assert observed["config_digest"] == hashlib.sha256(config_path.read_bytes()).hexdigest()
 
 
-@pytest.mark.parametrize("multiple_domains", [False, True])
-def test_fixed_git_recovery_selects_named_domain_and_preserves_current_original(tmp_path, multiple_domains):
+@pytest.mark.parametrize("layout", ["outer", "standalone", "added_nested_checkout"])
+def test_fixed_git_recovery_uses_owning_repo_and_preserves_current_original(tmp_path, layout):
     project = tmp_path / "repository"
     domain = project / "himate/himate-knowledge-bluetooth"
     original = domain / "docs-raw/specs/design.md"
     original.parent.mkdir(parents=True)
     old_bytes = b"# Design\n\nOriginal documented requirement.\n"
     original.write_bytes(old_bytes)
-    relative = original.relative_to(project).as_posix()
-    config = {"schema_version": "2.0", "workspace_id": "recovery-test",
-              "knowledge_roots": {"bluetooth": domain.relative_to(project).as_posix()},
-              "code_root": "main", "modules": []}
-    if multiple_domains:
-        other = project / "himate/himate-knowledge-wifi"
-        foreign_original = other / "docs-raw/specs/design.md"
-        foreign_original.parent.mkdir(parents=True)
-        foreign_original.write_bytes(b"A different domain's original.\n")
-        config["knowledge_roots"] = {"wifi": other.relative_to(project).as_posix(), **config["knowledge_roots"]}
-    (project / "config.yml").write_text(yaml.safe_dump(config), encoding="utf-8")
+    repository = domain if layout == "standalone" else project
+    relative = original.relative_to(repository).as_posix()
+    foreign_original = repository / "foreign/docs-raw/specs/design.md"
+    foreign_original.parent.mkdir(parents=True)
+    foreign_original.write_bytes(b"A different domain's original.\n")
 
     def git(*args):
         return subprocess.run(
             ["git", "-c", "user.name=Synthetic Test", "-c", "user.email=synthetic@example.invalid",
-             "-c", "core.autocrlf=false", "-C", str(project), *args],
+             "-c", "core.autocrlf=false", "-C", str(repository), *args],
             check=True, capture_output=True,
         ).stdout.decode().strip()
 
     git("init", "--quiet")
-    git("add", "--", relative)
+    git("add", "--", relative, foreign_original.relative_to(repository).as_posix())
     git("commit", "--quiet", "-m", "Record synthetic original")
     commit = git("rev-parse", "HEAD")
+    recovery = resources.git_recovery_for_current(domain, "docs-raw/specs/design.md", old_bytes)
+    assert (recovery["commit"], recovery["path"]) == (commit, relative)
+    if layout == "added_nested_checkout":
+        subprocess.run(["git", "-C", str(domain), "init", "--quiet"], check=True, capture_output=True)
+        assert resources.git_recovery_for_current(domain, "docs-raw/specs/design.md", old_bytes) is None
     current = b"# Design\n\nUncommitted local requirement.\n"
     original.write_bytes(current)
 
@@ -177,11 +172,10 @@ def test_fixed_git_recovery_selects_named_domain_and_preserves_current_original(
 
     assert recovered == old_bytes
     assert original.read_bytes() == current
-    if multiple_domains:
-        with pytest.raises(validation.ContractError, match="RECOVERY_SCOPE_REQUIRED"):
-            resources._recover_git(domain, {
-                "commit": commit, "path": foreign_original.relative_to(project).as_posix(),
-            })
+    with pytest.raises(validation.ContractError, match="RECOVERY_SCOPE_REQUIRED"):
+        resources._recover_git(domain, {
+            "commit": commit, "path": foreign_original.relative_to(repository).as_posix(),
+        })
 
 
 def test_deleted_current_file_is_reported_missing_without_losing_old_snapshot(workspace):
@@ -220,10 +214,8 @@ def test_navigation_rejects_configuration_bound_to_another_knowledge_root(worksp
     domain, code, _, lock, config_path, mapping = workspace
     other = domain.parent / "other-knowledge-root"
     other.mkdir()
-    config = yaml.safe_load(config_path.read_bytes())
-    config["knowledge_roots"]["wifi"] = other.name
-    other_config = domain.parent / "other-config.yml"
-    other_config.write_text(yaml.safe_dump(config), encoding="utf-8")
+    other_config = other / "config.yml"
+    other_config.write_bytes(config_path.read_bytes())
     checkout = {"configuration": str(other_config),
                 "config_digest": hashlib.sha256(other_config.read_bytes()).hexdigest(),
                 "repos": {mapping["repo_id"]: {"root": str(code.parents[1])}}}
@@ -236,7 +228,7 @@ def target_identity(workspace, chip, side):
     config = yaml.safe_load(config_path.read_bytes())
     config["modules"][0].update(chips=[chip], sides=[side])
     config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
-    mapped = validation.normalize_workspace(config, domain.parent)
+    mapped = validation.normalize_workspace(config, domain)
     repo = mapped["repos"][0]
     identity = {
         "basis": "source", "target": {"target_id": f"{chip}-{side}", "chip": chip, "side": side},
@@ -272,7 +264,7 @@ def test_current_code_identity_rejects_sibling_module_outside_custom_target(work
     sibling.write_bytes(original)
     config["modules"].append({"path": "device", "chips": ["soc-new"], "sides": ["device"]})
     config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
-    mapped = validation.normalize_workspace(config, domain.parent)
+    mapped = validation.normalize_workspace(config, domain)
     sibling_repo = next(repo for repo in mapped["repos"] if repo["workspace_path"] == "main/device")
     recorded = next(iter(identity["repos"].values()))
     recorded["workspace_path"] = sibling_repo["workspace_path"]

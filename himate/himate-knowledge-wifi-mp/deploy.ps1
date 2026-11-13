@@ -1,7 +1,7 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-Install knowledge dependencies, capabilities and project entry templates.
+Install knowledge runtime dependencies, OCR models and capabilities.
 .EXAMPLE
 .\deploy.ps1 -SkillsRoot SKILLS_ROOT -WorkflowsRoot WORKFLOWS_ROOT -Python PATH_TO_PYTHON -NonInteractive
 #>

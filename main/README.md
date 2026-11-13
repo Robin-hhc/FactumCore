@@ -8,7 +8,7 @@
 - `hi1105_host/`：442 个源码及构建描述文件。
 - [正式知识](../himate/himate-knowledge-wifi-mp/knowledge/index.md)：7 张已生成卡，保留原 ID、正文、定位和旧格式字段。
 - [来源登记](../himate/himate-knowledge-wifi-mp/governance/sources.lock.yaml)：仅保留这 7 卡依赖的 10 个来源，含 6 份文档原件及 4 个代码文件；来源 ID、已处理 hash 和时间不变。
-- [架构映射](../config.yml)：使用仓内相对路径，可直接定位两套源码。
+- [架构映射](../himate/himate-knowledge-wifi-mp/config.yml)：使用仓内相对路径，可直接定位两套源码。
 
 不包含本机环境配置、派生 SQLite、入库暂存、模型运行缓存或历史测试产物。开发回归源码仍正常保留在 `evals/`。
 
@@ -21,7 +21,7 @@ git clone --single-branch --branch test https://github.com/Robin-hhc/FactumCore.
 cd FactumCore-test
 ```
 
-使用已有 Python 3.10–3.12 和[项目运行依赖](../himate/himate-knowledge-wifi-mp/runtime/requirements.lock.txt)。部署操作参考[使用说明](../himate/himate-knowledge-wifi-mp/docs-llm-wiki/使用说明.md)，保留本分支的项目根 `config.yml`。
+使用已有 Python 3.10–3.12 和[项目运行依赖](../himate/himate-knowledge-wifi-mp/runtime/requirements.lock.txt)。部署操作参考[使用说明](../himate/himate-knowledge-wifi-mp/docs-llm-wiki/使用说明.md)，使用本分支知识根的 `config.yml`，其中 `code_root: ../../main` 指向本目录。
 
 每轮验收先把远端 `main` 合入 `test`，再在本地测试检出执行 `git pull --ff-only origin test`。从固定提交建立独立试运行副本后执行以下命令。
 

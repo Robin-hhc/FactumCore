@@ -34,6 +34,29 @@ def relative_path(value):
     return value
 
 
+def code_root_parts(value, *, legacy=False):
+    """Separate leading parent hops from the normal relative code directory."""
+    parents = 0
+    if isinstance(value, str) and not legacy:
+        while value.startswith("../"):
+            parents += 1
+            value = value[3:]
+        if value == "..":
+            return parents + 1, "."
+    if parents and value == ".":
+        raise WorkspaceConfigError("UNSAFE_WORKSPACE_PATH", "Expected a directory after the parent hops", value)
+    return parents, relative_path(value)
+
+
+def code_location(config_directory, value, *, legacy=False):
+    """Resolve the code path anchor without requiring a Git or code checkout."""
+    parents, directory = code_root_parts(value, legacy=legacy)
+    base = Path(config_directory)
+    if parents > len(base.parents):
+        raise WorkspaceConfigError("UNSAFE_WORKSPACE_PATH", "Code root goes above the filesystem root", value)
+    return (base.parents[parents - 1] if parents else base), directory
+
+
 def no_links(path):
     for item in (path, *path.parents):
         if item.is_symlink() or (os.path.lexists(item)
@@ -102,16 +125,13 @@ def mapped_root(config, config_path, knowledge_root):
     return matches[0] if matches else None
 
 
-def select(knowledge_root, registrations=None, expected_rules=None, *, config_path=None):
-    """Select exactly one explicit safe mapping, never an arbitrary parent.
-
-    Well-formed declarations for other knowledge roots are unrelated. Invalid,
-    unreadable or unsafe declarations fail closed; multiple exact mappings are
-    ambiguous. Explicit registrations restrict discovery to their own paths.
-    """
+def context(knowledge_root, registrations=None, expected_rules=None, *, config_path=None):
+    """Read the local configuration, or a legacy mapping explicitly supplied by a caller."""
     root = Path(knowledge_root).absolute()
     no_links(root)
     root = root.resolve(strict=True)
+    local = root / "config.yml"
+    explicit = config_path is not None or registrations is not None
     if config_path is not None:
         candidates = [(None, {"config": str(config_path)})]
     elif registrations is not None:
@@ -119,7 +139,7 @@ def select(knowledge_root, registrations=None, expected_rules=None, *, config_pa
             raise WorkspaceConfigError("WORKSPACE_CONFIG_UNAVAILABLE", "Installed workspace registrations must be a mapping")
         candidates = list(registrations.items())
     else:
-        candidates = [(None, {"config": str(parent / "config.yml")}) for parent in (root, *root.parents)]
+        candidates = [(None, {"config": str(workspace_path(root, "config.yml"))})]
     matches, available = [], []
     for identity, entry in candidates:
         if not isinstance(entry, dict) or not isinstance(entry.get("config"), str):
@@ -132,12 +152,29 @@ def select(knowledge_root, registrations=None, expected_rules=None, *, config_pa
             continue
         available.append(candidate)
         try:
+            if not stat.S_ISREG(candidate.lstat().st_mode):
+                raise WorkspaceConfigError("WORKSPACE_CONFIG_INVALID", "Expected a regular configuration file", candidate)
             raw = candidate.read_bytes()
         except OSError as error:
             raise WorkspaceConfigError("WORKSPACE_CONFIG_INVALID", str(error), candidate) from error
         value = configuration(raw, candidate)
-        if mapped_root(value, candidate, root) is None:
-            continue
+        if "knowledge_roots" in value:
+            if not explicit:
+                raise WorkspaceConfigError("WORKSPACE_CONFIG_INVALID", "Migrate the configuration to the knowledge-root format", candidate)
+            if mapped_root(value, candidate, root) is None:
+                continue
+        else:
+            if candidate.resolve() != local:
+                continue
+            workspace_path(root, "config.yml")
+            if (value.get("schema_version") != "2.0" or not isinstance(value.get("workspace_id"), str)
+                    or not value["workspace_id"].strip() or not isinstance(value.get("modules"), list)
+                    or set(value) - {"schema_version", "workspace_id", "code_root", "modules", "query", "toolchain"}):
+                raise WorkspaceConfigError("WORKSPACE_CONFIG_INVALID", "Expected a version 2.0 knowledge-root module configuration", candidate)
+            try:
+                code_location(root, value.get("code_root"))
+            except WorkspaceConfigError as error:
+                raise WorkspaceConfigError(error.code, error.message, candidate) from error
         if identity is not None and (value.get("workspace_id") != identity
                 or expected_rules is not None and entry.get("rules_digest") != expected_rules):
             continue
@@ -147,10 +184,14 @@ def select(knowledge_root, registrations=None, expected_rules=None, *, config_pa
             unchanged = False
         if not unchanged:
             raise WorkspaceConfigError("WORKSPACE_CONFIG_CHANGED", "Workspace config changed while selecting", candidate)
-        matches.append(candidate.resolve())
+        matches.append((candidate.resolve(), raw, value))
     if len(matches) > 1:
         raise WorkspaceConfigError("WORKSPACE_CONFIG_AMBIGUOUS", "Multiple configs map to the selected knowledge root")
     if not matches:
-        raise WorkspaceConfigError("WORKSPACE_CONFIG_UNAVAILABLE", "No exact workspace config maps to the selected knowledge root",
-                                   available[0] if available else "")
+        raise WorkspaceConfigError("WORKSPACE_CONFIG_UNAVAILABLE", "No exact configuration for the selected knowledge root",
+                                   available[0] if available else local)
     return matches[0]
+
+
+def select(knowledge_root, registrations=None, expected_rules=None, *, config_path=None):
+    return context(knowledge_root, registrations, expected_rules, config_path=config_path)[0]

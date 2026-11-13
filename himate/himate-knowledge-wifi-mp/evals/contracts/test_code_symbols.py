@@ -279,6 +279,49 @@ def test_conditional_branches_remain_ambiguous_without_assuming_a_build():
     assert "range" not in result
 
 
+_SHARED_CONTROL_BODY = b"""static int before(void) { return 0; }
+static int worker(void)
+{
+#if LINUX
+    int wait = 1;
+    while (wait_for_work(wait)) {
+#else
+    for (;;) {
+#endif
+#ifdef WINDOWS
+        if (should_stop(thread)) {
+#else
+        if (should_stop()) {
+#endif
+            break;
+        }
+    }
+    return 0;
+}
+static int after(void) { return 1; }
+"""
+
+
+@pytest.mark.parametrize(("name", "line"), [("before", 1), ("after", 20)])
+def test_conditional_control_headers_with_a_shared_body_keep_other_definitions(name, line):
+    raw = _SHARED_CONTROL_BODY.replace(b"\n", b"\r\n")
+    result = symbols().resolve(raw, {"kind": "function", "name": name}, path="worker.c")
+    assert result["status"] == "resolved", result
+    assert result["range"] == {"start_line": line, "end_line": line}
+    assert result["sha256"] == hashlib.sha256(raw).hexdigest()
+
+
+@pytest.mark.parametrize(("extra", "status"), [
+    (b"#ifdef OTHER\nint after(void) { return 2; }\n#endif\n", "ambiguous"),
+    (b"int after(int value { return value; }\n", "unavailable"),
+])
+def test_shared_body_keeps_duplicate_and_uncertain_definitions_visible(extra, status):
+    result = symbols().resolve(_SHARED_CONTROL_BODY + extra,
+        {"kind": "function", "name": "after"}, path="worker.c")
+    assert result["status"] == status, result
+    assert "range" not in result
+
+
 @pytest.mark.parametrize("raw", [b"int broken( {", b"#define LOG(fmt,args...) use(fmt,args)\n", b"int x =\x00;\n"])
 def test_parse_errors_are_unavailable_instead_of_missing(raw):
     result = symbols().resolve(raw, {"kind": "function", "name": "absent"}, path="broken.c")

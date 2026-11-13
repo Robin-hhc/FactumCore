@@ -450,6 +450,51 @@ def _guarded_linkage_view(source):
     return bytes(view)
 
 
+_CONTROL_HEADER = rb"[ \t]*(?:if|for|while)[ \t]*\([^\r\n]*\)[ \t]*"
+_SHARED_CONTROL_BODY = re.compile(
+    rb"^" + _CONTROL_HEADER + rb"(?P<first>\{)[ \t]*\r?\n"
+    rb"[ \t]*(?P<otherwise>\#[ \t]*else)[ \t]*\r?\n"
+    + _CONTROL_HEADER + rb"(?P<second>\{)[ \t]*\r?\n"
+    rb"[ \t]*(?P<end>\#[ \t]*endif)[ \t]*\r?\n",
+    re.M,
+)
+
+
+def _shared_control_body_view(parser, tree, source):
+    """Recover C branch headers that open the same body before a shared closing brace."""
+    root = tree.root_node
+    matches = [match for match in _SHARED_CONTROL_BODY.finditer(source)
+               if all(root.descendant_for_byte_range(*match.span(group)).type == node_type
+                      for group, node_type in (("first", "{"), ("second", "{"),
+                                               ("otherwise", "preproc_directive"), ("end", "preproc_directive")))]
+    if not matches:
+        return tree, source
+
+    # Keep both branch headers and their condition expressions. Replace their
+    # openings with empty statements and open one block after the conditional.
+    # No lines move, and the caller still hashes and cites the original bytes.
+    view = bytearray(source)
+    for match in reversed(matches):
+        for group in ("first", "second"):
+            start, end = match.span(group)
+            view[start:end] = b";"
+        view[match.end():match.end()] = b"{"
+    recovered_source = bytes(view)
+    recovered = parser.parse(recovered_source)
+    recovered_root = recovered.root_node
+    if recovered_root.type != "translation_unit":
+        return tree, source
+    for offset, match in enumerate(matches):
+        start, end = match.span("end")
+        directive = recovered_root.descendant_for_byte_range(start + offset, end + offset)
+        block_start = match.end() + offset
+        opening = recovered_root.descendant_for_byte_range(block_start, block_start + 1)
+        if (directive.type != "#endif" or opening.type != "{" or opening.parent.type != "compound_statement"
+                or opening.parent.children[-1].type != "}" or opening.parent.children[-1].is_missing):
+            return tree, source
+    return recovered, recovered_source
+
+
 def _parse(data, language, extractor):
     codecs = {None: "utf-8-sig", "code-utf8:1": "utf-8-sig", "code-gb18030:1": "gb18030"}
     if extractor not in codecs:
@@ -465,9 +510,13 @@ def _parse(data, language, extractor):
             import tree_sitter_cpp as grammar
         else:
             import tree_sitter_c as grammar
-        tree = Parser(Language(grammar.language())).parse(source)
+        parser = Parser(Language(grammar.language()))
+        tree = parser.parse(source)
+        original_source = source
+        if language == "c" and tree.root_node.has_error:
+            tree, source = _shared_control_body_view(parser, tree, source)
         symbols, uncertain, partial = _symbols(tree, source)
-        return symbols, None, uncertain, partial
+        return symbols, None, uncertain, partial or source != original_source
     except (ImportError, OSError, ValueError, TypeError, RuntimeError, RecursionError) as exc:
         return [], "Source parser unavailable: " + str(exc), [], False
 

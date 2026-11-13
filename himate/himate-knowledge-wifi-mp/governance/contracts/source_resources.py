@@ -1,11 +1,12 @@
 """Exact logical-resource/snapshot resolution; source objects are always read-only."""
 
-from .validation import ContractError, canonical_bytes, load_yaml, safe_path, sha256_bytes, workspace_config_path
-from . import workspace_config
+from .validation import ContractError, canonical_bytes, load_yaml, safe_path, sha256_bytes, workspace_configuration
 
 
 DBOX_PREFIX = "docs-raw/sources/dbox"
 DBOX_CONFIG = "docs-raw/sources/dbox.local.yml"
+RAW_RECOVERY_ROOTS = tuple("docs-raw/" + name for name in (
+    "conventions", "chips", "storys", "specs", "protocols", "troubleshooting"))
 
 
 def is_dbox_path(reference):
@@ -407,13 +408,12 @@ def _current_registered_source(knowledge_root, snapshot):
             if observed["sha256"] == snapshot.get("sha256") and observed["bytes"] == snapshot.get("bytes"):
                 return observed["data"], str(observed["actual_path"])
             return None
-        allowed = ["docs-raw/" + name for name in ("conventions", "chips", "storys", "specs", "protocols", "troubleshooting")]
-        path = safe_path(knowledge_root, resource["path"], allowed)
+        path = safe_path(knowledge_root, resource["path"], RAW_RECOVERY_ROOTS)
         reference = resource["path"]
     elif resource.get("kind") == "code":
-        config_path = workspace_config_path(knowledge_root)
-        workspace = config_path.parent
-        configuration = normalize_workspace(load_yaml(config_path), workspace)
+        config_path, _, config = workspace_configuration(knowledge_root)
+        configuration = normalize_workspace(config, config_path.parent)
+        workspace = Path(configuration.get("workspace_root", config_path.parent))
         rows = [row for row in configuration["repos"] if row["repo_id"] == resource.get("repo_id")]
         if len(rows) != 1:
             return None
@@ -437,6 +437,40 @@ def _current_registered_source(knowledge_root, snapshot):
     return data, reference
 
 
+def _raw_git_repository(root, *, pinned_path=None):
+    """Find the owning Git checkout, using a fixed path for old checkout layouts."""
+    from pathlib import Path
+    from .validation import _workspace_no_links
+
+    scoped = pinned_path is None
+    for repository in (root, *root.parents):
+        if pinned_path is not None:
+            prefixes = [(root / prefix).relative_to(repository).as_posix() + "/" for prefix in RAW_RECOVERY_ROOTS]
+            if not any(pinned_path.startswith(prefix) for prefix in prefixes):
+                continue
+            scoped = True
+        marker = repository / ".git"
+        _workspace_no_links(marker)
+        if marker.exists():
+            top = Path(_git_read(repository, "rev-parse", "--show-toplevel").decode().strip()).resolve()
+            if top == repository:
+                return repository
+            break
+    if not scoped:
+        raise ContractError("RECOVERY_SCOPE_REQUIRED", "Git recovery requires a supported raw original from this knowledge root")
+    raise ContractError("RECOVERY_REPO_MISMATCH", "The knowledge root has no exact Git checkout")
+
+
+def _raw_recovery_file(root, relative):
+    from .validation import _workspace_no_links
+
+    path = safe_path(root, relative, RAW_RECOVERY_ROOTS)
+    if relative in RAW_RECOVERY_ROOTS:
+        raise ContractError("RECOVERY_SCOPE_REQUIRED", "Git recovery requires a raw original file", relative)
+    _workspace_no_links(path)
+    return path
+
+
 def _registered_raw_history(knowledge_root, resource, snapshot):
     """Search only this registered raw path in bounded, already local history."""
     from pathlib import Path
@@ -445,17 +479,12 @@ def _registered_raw_history(knowledge_root, resource, snapshot):
         return None
     root = Path(knowledge_root).resolve()
     try:
-        workspace = workspace_config_path(root).parent
-        if not (workspace / ".git").exists():
-            return None
-        top = Path(_git_read(workspace, "rev-parse", "--show-toplevel").decode().strip()).resolve()
-        if top != workspace:
-            return None
-        relative = root.relative_to(workspace).as_posix() + "/" + resource["path"]
-        commits = _git_read(workspace, "log", "--no-show-signature", "--format=%H", "--max-count=1001", "HEAD", "--", relative).decode("ascii").splitlines()
+        repository = _raw_git_repository(root)
+        relative = _raw_recovery_file(root, resource["path"]).relative_to(repository).as_posix()
+        commits = _git_read(repository, "log", "--no-show-signature", "--format=%H", "--max-count=1001", "HEAD", "--", relative).decode("ascii").splitlines()
         for commit in commits[:1000]:
             try:
-                data = _git_read(workspace, "cat-file", "blob", commit + ":" + relative)
+                data = _git_read(repository, "cat-file", "blob", commit + ":" + relative)
             except ContractError as exc:
                 if exc.code == "GIT_SOURCE_UNAVAILABLE":
                     continue
@@ -468,25 +497,15 @@ def _registered_raw_history(knowledge_root, resource, snapshot):
 
 
 def _recover_git(knowledge_root, recovery):
-    """Read a pinned object only from the configured workspace/repository.
+    """Read a pinned object from the knowledge or configured code checkout.
 
     A source cannot choose a repository path. Raw Git paths are relative to the
-    co-located workspace; code Git paths need an explicit configured repo_id.
+    knowledge repository; code Git paths need an explicit configured repo_id.
     """
     from pathlib import Path, PurePosixPath
     import re
 
     root = Path(knowledge_root).resolve()
-    try:
-        config_path = workspace_config_path(root)
-    except ContractError as exc:
-        raise ContractError("RECOVERY_CONFIG_REQUIRED", "Git recovery requires one exact workspace config") from exc
-    workspace = config_path.parent
-    config = load_yaml(config_path)
-    if not isinstance(config, dict):
-        raise ContractError("RECOVERY_CONFIG_MISMATCH", "Configured workspace mapping is unavailable")
-    if workspace_config.mapped_root(config, config_path, root) is None:
-        raise ContractError("RECOVERY_CONFIG_MISMATCH", "Configured domain does not match this knowledge root")
     if any(key in recovery for key in ("repo_root", "repository_root", "workspace_root")):
         raise ContractError("UNTRUSTED_RECOVERY_ROOT", "Repository roots come only from config")
     commit = recovery.get("commit", recovery.get("revision"))
@@ -494,13 +513,17 @@ def _recover_git(knowledge_root, recovery):
     parts = PurePosixPath(relative).parts if isinstance(relative, str) else ()
     if not isinstance(commit, str) or not re.fullmatch(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", commit):
         raise ContractError("EXACT_GIT_REVISION_REQUIRED", "A full immutable commit object ID is required")
-    if not parts or any(part in {".", "..", ".git"} for part in parts) or relative.startswith("/") or "\\" in relative or ":" in relative:
+    if not parts or any(part.casefold() in {"", ".", "..", ".git"} for part in relative.split("/")) or "\\" in relative or ":" in relative:
         raise ContractError("UNSAFE_RECOVERY_PATH", "Expected an exact repository-relative file")
     repo_id = recovery.get("repo_id")
     if repo_id:
         from .validation import normalize_workspace, workspace_file_allowed
         try:
-            configured = normalize_workspace(config, workspace) if "code_root" in config or "modules" in config else config
+            config_path, _, config = workspace_configuration(root)
+        except ContractError as exc:
+            raise ContractError("RECOVERY_CONFIG_REQUIRED", "Code Git recovery requires an exact workspace config") from exc
+        try:
+            configured = normalize_workspace(config, config_path.parent)
         except (ContractError, OSError) as exc:
             raise ContractError("RECOVERY_CONFIG_MISMATCH", "Current module layout is unavailable for fixed Git recovery") from exc
         matches = [r for r in configured.get("repos", []) if r.get("repo_id") == repo_id and r.get("root")]
@@ -509,14 +532,11 @@ def _recover_git(knowledge_root, recovery):
         if not workspace_file_allowed(configured, repo_id, relative):
             raise ContractError("RECOVERY_SCOPE_REQUIRED", "Git code recovery must remain within its configured module scope")
         repository = Path(matches[0]["root"])
+        workspace = Path(configured.get("workspace_root", config_path.parent))
         repository = repository.resolve() if repository.is_absolute() else (workspace / repository).resolve()
     else:
-        prefix = root.relative_to(workspace).as_posix() + "/docs-raw/"
-        tail = relative[len(prefix):] if relative.startswith(prefix) else ""
-        raw_classes = {"conventions", "chips", "storys", "specs", "protocols", "troubleshooting"}
-        if tail.split("/", 1)[0] not in raw_classes or "/" not in tail:
-            raise ContractError("RECOVERY_SCOPE_REQUIRED", "Default repository recovery requires a supported raw original")
-        repository = workspace
+        repository = _raw_git_repository(root, pinned_path=relative)
+        _raw_recovery_file(root, (repository / relative).relative_to(root).as_posix())
     safe_path(repository, relative)
     def git(*args):
         return _git_read(repository, *args)
@@ -557,18 +577,12 @@ def git_recovery_for_current(knowledge_root, source_path, expected_bytes):
 
     root = Path(knowledge_root).resolve()
     try:
-        config_path = workspace_config_path(root)
+        repository = _raw_git_repository(root)
+        relative = _raw_recovery_file(root, source_path).relative_to(repository).as_posix()
+        commit = _git_read(repository, "rev-parse", "--verify", "HEAD").decode().strip()
     except (OSError, ContractError):
         return None
-    workspace = config_path.parent
-    if not (workspace / ".git").exists():
-        return None
-    try:
-        commit = _git_read(workspace, "rev-parse", "--verify", "HEAD").decode().strip()
-    except ContractError:
-        return None
-    recovery = {"method": "git", "kind": "git", "commit": commit,
-                "path": root.relative_to(workspace).as_posix() + "/" + source_path, "status": "available"}
+    recovery = {"method": "git", "kind": "git", "commit": commit, "path": relative, "status": "available"}
     try:
         return recovery if _recover_git(root, recovery) == expected_bytes else None
     except (OSError, ContractError):
@@ -722,13 +736,13 @@ def resolve_code_navigation(root, reference, lock, checkout=None, cache=None):
                 "repo_id": repo_id, "source_id": reference["source_id"], "matches": []}
 
     try:
-        config_path = workspace_config_path(root,
+        config_path, config_bytes, config = workspace_configuration(root,
             config_path=checkout["configuration"] if checkout is not None else None)
-        config_bytes = config_path.read_bytes()
         if checkout is not None and (
                 not checkout.get("config_digest") or sha256_bytes(config_bytes) != checkout["config_digest"]):
             return unavailable("Fixed workspace configuration fingerprint differs")
-        config = normalize_workspace(load_yaml(config_bytes), config_path.parent)
+        config = normalize_workspace(config, config_path.parent)
+        workspace = Path(config.get("workspace_root", config_path.parent))
         mapping = next((row for row in config.get("repos", []) if row["repo_id"] == repo_id), None)
         if mapping is None or not workspace_file_allowed(config, repo_id, relative):
             return unavailable("Code reference is outside the current configured module scope")
@@ -738,11 +752,11 @@ def resolve_code_navigation(root, reference, lock, checkout=None, cache=None):
         code_root = Path(repository["root"])
         mapped_root = Path(mapping["root"])
         if not mapped_root.is_absolute():
-            mapped_root = config_path.parent / mapped_root
+            mapped_root = workspace / mapped_root
         if checkout is not None and (not code_root.is_absolute() or code_root.resolve() != mapped_root.resolve()):
             return unavailable("Checkout differs from the sole configured repository mapping")
         if checkout is None and not code_root.is_absolute():
-            code_root = config_path.parent / code_root
+            code_root = workspace / code_root
         source_path = safe_path(code_root.resolve(strict=True), relative)
         try:
             raw = source_path.read_bytes()
@@ -775,15 +789,15 @@ def validate_code_references(card, lock, checkout, rules, *, symbol_cache=None):
     from .validation import normalize_workspace, validate_shape, workspace_file_allowed
     if not isinstance(checkout, dict) or not checkout.get("configuration") or not checkout.get("repos"):
         raise ContractError("CODE_INPUT_UNAVAILABLE", "Fixed checkout and exact configuration are required")
-    configuration = Path(checkout["configuration"])
-    if not configuration.is_absolute() or configuration.is_symlink():
-        raise ContractError("CODE_INPUT_UNAVAILABLE", "Absolute unlinked configuration is required")
-    data = configuration.read_bytes()
+    try:
+        configuration, data, config = workspace_configuration(rules["knowledge_root"], config_path=checkout["configuration"])
+    except ContractError as exc:
+        raise ContractError("CODE_INPUT_UNAVAILABLE", "An exact workspace configuration is required") from exc
     if sha256_bytes(data) != checkout.get("config_digest"):
         raise ContractError("CODE_CONFIGURATION_MISMATCH", "Fixed configuration fingerprint differs")
-    config = load_yaml(data)
     validate_shape("workspace", config, rules)
     config = normalize_workspace(config, configuration.parent)
+    workspace = Path(config.get("workspace_root", configuration.parent))
     registered = {item["repo_id"]: item for item in config["repos"]}
     targets = {item["target_id"]: item for item in config["targets"]}
     for context in card["metadata"]["scope"]["contexts"]:
@@ -810,7 +824,7 @@ def validate_code_references(card, lock, checkout, rules, *, symbol_cache=None):
         root = Path(job_repo.get("root", ""))
         declared = Path(mapping["root"])
         if not declared.is_absolute():
-            declared = configuration.parent / declared
+            declared = workspace / declared
         if not root.is_absolute() or root.resolve() != declared.resolve():
             raise ContractError("CODE_REPOSITORY_MISMATCH", "Checkout differs from the sole configured repository mapping")
         if config.get("mapping_kind") == "modules":
@@ -873,16 +887,12 @@ def _fixed_code_git(root, arguments):
     return result.stdout
 
 
-def _validate_mapped_current_identity(identity, configuration, config, rules, read):
+def _validate_mapped_current_identity(identity, config, rules, read):
     """Recheck automatic repository facts using the same relative module map."""
     from pathlib import Path
     from .validation import workspace_file_allowed
 
     domain = Path(rules["knowledge_root"])
-    try:
-        workspace_config_path(domain, config_path=configuration)
-    except ContractError as exc:
-        raise ContractError("CODE_CONFIGURATION_CHANGED", "Module configuration does not map to the selected knowledge root") from exc
     source_basis = identity.get("basis") == "source"
     target, build_files = identity.get("target"), identity["build_files"]
     declared = None
@@ -906,7 +916,7 @@ def _validate_mapped_current_identity(identity, configuration, config, rules, re
         mapping = registered.get(repo_id)
         if not mapping or item.get("kind") != mapping["kind"] or item.get("workspace_path") != mapping["workspace_path"]:
             raise ContractError("CODE_REPOSITORY_CHANGED", "Accepted repository differs from the relative module mapping")
-        root = (configuration.parent / mapping["root"]).resolve()
+        root = (Path(config["workspace_root"]) / mapping["root"]).resolve()
         kind = mapping["kind"]
         files = item.get("files")
         if not isinstance(files, dict) or not files:
@@ -961,17 +971,16 @@ def validate_current_code_identity(identity, config_path, config_digest, rules, 
         or (not build_files and identity.get("macro_digest") is not None)
     ):
         raise ContractError("CODE_IDENTITY_UNAVAILABLE", "Accepted source/build identity is inconsistent")
-    configuration = Path(config_path)
-    if not configuration.is_absolute() or configuration.is_symlink():
-        raise ContractError("CODE_INPUT_UNAVAILABLE", "An explicit actual configuration is required")
-    raw = read(configuration)
+    try:
+        configuration, raw, config = workspace_configuration(rules["knowledge_root"], config_path=config_path)
+    except ContractError as exc:
+        raise ContractError("CODE_CONFIGURATION_CHANGED", "Configuration does not match the selected knowledge root") from exc
     if sha256_bytes(raw) != config_digest:
         raise ContractError("CODE_CONFIGURATION_CHANGED", "Current configuration differs from accepted context")
-    config = load_yaml(raw)
     validate_shape("workspace", config, rules)
     config = normalize_workspace(config, configuration.parent)
     if config.get("mapping_kind") == "modules":
-        return _validate_mapped_current_identity(identity, configuration, config, rules, read)
+        return _validate_mapped_current_identity(identity, config, rules, read)
     if not isinstance(policy, dict) or not policy or config.get("code_policy") != policy:
         raise ContractError("CODE_POLICY_UNAVAILABLE", "Protected code policy must equal the configuration declaration")
     declared = None

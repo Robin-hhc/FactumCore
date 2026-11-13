@@ -52,7 +52,7 @@ task 固定本轮解析描述符供 P2—P4 复用；PDF 先看 `.build/material
 {"kind":"code","path":"main/<module>/<file>.c","encoding":"gb18030"}
 ```
 
-示例路径须替换为实际文件；无repo_id时path相对项目config.yml所在目录，填写repo_id时相对该已配置仓库。文档用kind=doc，path相对知识根且位于docs-raw；编码字段只用于代码。采用返回的source.id，不自行推算ID。
+示例路径须替换为实际文件。无 repo_id 时，path 相对代码工作区基准，即知识根按 code_root 开头的 ../ 向上定位的目录。默认 code_root 为 ../../main，对应路径 main/<module>/<file>.c。填写 repo_id 时，path 相对对应的已配置仓库。文档用 kind=doc，path 相对知识根且位于 docs-raw。编码字段只用于代码。采用返回的 source.id。
 
 外部dbox沿用本机目录映射，私人绝对路径留在被忽略的local配置；当前映射不可读时说明实际缺口。目录映射不提供执行或发布权限，不自动下载网页资料。
 

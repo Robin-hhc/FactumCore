@@ -13,7 +13,7 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-patrol-sync
-  prompt: '复用已知项目与执行端；否则读当前工作区 AGENTS.md、config.yml，确定知识根，位置不明确才询问用户。在数据所在端的原生知识根调用仓内 CLI，交接实际项目、知识根、执行端及已验证的 CLI 命令前缀（含指定解释器），后续节点沿用。
+  prompt: '复用宿主绑定或本次已确认的知识根与执行端，读取该根的 AGENTS.md 和 config.yml。知识根或执行端仍不明确时询问用户。在数据所在端的知识根调用仓内 CLI，交接实际项目、知识根、执行端及已验证的 CLI 命令前缀（含指定解释器），后续节点沿用。
 
     使用 hs-knowledge-patrol-sync 采用明确配置的同步 argv/cwd；成功或未配置同步后进入 L2，新 CLI 加载同步后的实际实现。'
   exits:
@@ -51,7 +51,7 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-source
-  prompt: '复用已知项目与执行端；否则读当前工作区 AGENTS.md、config.yml，确定知识根，位置不明确才询问用户。在数据所在端的原生知识根调用仓内 CLI，交接实际项目、知识根、执行端及已验证的 CLI 命令前缀（含指定解释器），后续节点沿用。
+  prompt: '复用宿主绑定或本次已确认的知识根与执行端，读取该根的 AGENTS.md 和 config.yml。知识根或执行端仍不明确时询问用户。在数据所在端的知识根调用仓内 CLI，交接实际项目、知识根、执行端及已验证的 CLI 命令前缀（含指定解释器），后续节点沿用。
 
     使用 hs-knowledge-source 调用 ingest scan --source 实际来源ID；完整采用本次 L2 选定的 raw 或 code 来源，不把该 ID 当作整轮巡检的范围，也不自行扫描其它来源。沿用已验证的 CLI 命令前缀、parser 选项、review_text_budget 和 review_page_budget，普通续办不使用 reprocess: true。有 task.pdf_review 时交接起点、宽候选及页索引，不默认读完整本或整个候选包。prepared 交 P2；unchanged 只表示 L2 本次选定来源无待办，回 L2 重新选择，由 L2 判断整轮是否无待办。'
   exits:

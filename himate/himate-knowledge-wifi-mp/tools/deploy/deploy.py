@@ -1,4 +1,4 @@
-"""Install dependencies and capabilities, then copy project entry templates."""
+"""Install knowledge runtime dependencies, OCR models, and capabilities."""
 
 from __future__ import annotations
 
@@ -188,17 +188,14 @@ def replacement_target(destination, name, source_roots):
     return target
 
 
-def regular_file(path, *, required=False):
-    """Do not follow an entry-file link when reading templates or overwriting."""
+def require_regular_file(path):
+    """Require a distribution file without following links or junctions."""
     try:
         info = path.lstat()
     except FileNotFoundError:
-        if required:
-            raise ValueError(f"Required distribution file is missing: {path}") from None
-        return False
+        raise ValueError(f"Required distribution file is missing: {path}") from None
     if not stat.S_ISREG(info.st_mode) or getattr(info, "st_file_attributes", 0) & 0x400:
-        raise ValueError(f"Entry must be a regular file, not a link or directory: {path}")
-    return True
+        raise ValueError(f"Distribution file must be a regular file: {path}")
 
 
 def installation_directory(value, default, label, non_interactive):
@@ -208,22 +205,10 @@ def installation_directory(value, default, label, non_interactive):
     return value.expanduser().resolve()
 
 
-def overwrite_entry(path, non_interactive):
-    if non_interactive:
-        return True
-    while True:
-        answer = input(f"Overwrite {path}? [Y/n]: ").strip().casefold()
-        if answer in ("", "y", "yes"):
-            return True
-        if answer in ("n", "no"):
-            return False
-        print("Enter y or n; press Enter to overwrite.")
-
-
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-root", type=Path, default=Path(__file__).resolve().parents[2],
-                        help="Knowledge package containing runtime, skills, workflows and entry templates")
+                        help="Knowledge package containing runtime, skills and workflows")
     parser.add_argument("--skills-root", type=Path, help="OpenFlow Skill installation directory")
     parser.add_argument("--cac-skills-root", type=Path, help="CAC Skill installation directory")
     parser.add_argument("--workflows-root", type=Path, help="OpenFlow Workflow template installation directory")
@@ -231,7 +216,7 @@ def main(argv=None):
     parser.add_argument("--download-models", action="store_true",
                         help="Explicitly allow downloading missing CPU OCR models; otherwise require offline models")
     parser.add_argument("--non-interactive", action="store_true",
-                        help="Use default directories and overwrite existing project entry files without prompting")
+                        help="Use default installation directories without prompting")
     args = parser.parse_args(argv)
     source = args.source_root.expanduser().resolve()
     try:
@@ -247,15 +232,7 @@ def main(argv=None):
                 "OpenFlow Workflow template directory", args.non_interactive), "workflow.yaml"),
         )
         requirements = source / "runtime/requirements.lock.txt"
-        regular_file(requirements, required=True)
-        # The manifest root is a filesystem relationship, not a Git checkout.
-        project_root = (source / "../..").resolve()
-        entries = []
-        for original, name in (("config.yml", "config.yml"), ("AGENTS-code-root.md", "AGENTS.md")):
-            template, target = source / original, project_root / name
-            regular_file(template, required=True)
-            exists = regular_file(target)
-            entries.append((template, target, not exists or overwrite_entry(target, args.non_interactive)))
+        require_regular_file(requirements)
 
         source_roots = [source]
         copied, packages_to_copy = [], {}
@@ -291,13 +268,6 @@ def main(argv=None):
 
         for target, (package, _) in packages_to_copy.items():
             shutil.copytree(package, target, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-        for template, target, replace in entries:
-            if replace:
-                regular_file(target)
-                shutil.copy2(template, target)
-                print(f"Copied {template.name} to {target}")
-            else:
-                print(f"Kept existing {target}")
     except (OSError, ValueError, EOFError, subprocess.CalledProcessError) as exc:
         print(f"Installation failed: {exc}", file=sys.stderr)
         return 1

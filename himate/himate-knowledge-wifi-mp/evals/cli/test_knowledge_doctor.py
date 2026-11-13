@@ -25,9 +25,9 @@ def knowledge(tmp_path):
                         ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".venv"))
     for name in ("knowledge.py", "knowledge.cmd", "knowledge.sh"):
         shutil.copyfile(SOURCE / name, root / name)
-    (workspace / "config.yml").write_text(
+    (root / "config.yml").write_text(
         "schema_version: '2.0'\nworkspace_id: doctor-fixture\n"
-        "knowledge_roots:\n  wifi: himate-knowledge-synthetic\ncode_root: main\nmodules: []\n",
+        "code_root: ../main\nmodules: []\n",
         encoding="utf-8",
     )
     return root
@@ -85,59 +85,31 @@ def test_doctor_ready_includes_verified_rule_version_and_exact_workspace(knowled
     assert data["rules"]["contract_family"] == rules["contract_family"]
     assert data["rules_digest"] == hashlib.sha256((knowledge / "governance/framework.lock.yaml").read_bytes()).hexdigest()
     assert data["rules"]["files_verified"] == len(rules["files"])
-    assert data["config_path"] == str(knowledge.parent / "config.yml")
+    assert data["config_path"] == str(knowledge / "config.yml")
     assert data["configuration"]["knowledge_root"] == str(knowledge.resolve())
     assert data["content_checked"] is False
     assert not (knowledge.parent / "main").exists()
 
 
 @pytest.mark.parametrize("domain", ["bluetooth", "embedded-audio"])
-def test_doctor_discovers_a_non_wifi_domain_without_an_extra_selector(knowledge, domain):
-    config = knowledge.parent / "config.yml"
-    value = yaml.safe_load(config.read_bytes())
-    value["knowledge_roots"] = {domain: knowledge.name}
-    config.write_text(yaml.safe_dump(value), encoding="utf-8")
+def test_doctor_uses_local_config_regardless_of_domain_directory(knowledge, domain):
+    renamed = knowledge.with_name(domain)
+    knowledge.rename(renamed)
 
-    status, report = observe(knowledge)
+    status, report = observe(renamed)
 
     assert status == 0, report
-    assert report["data"]["config_path"] == str(config)
-    assert report["data"]["configuration"]["knowledge_root"] == str(knowledge.resolve())
+    assert report["data"]["config_path"] == str(renamed / "config.yml")
+    assert report["data"]["configuration"]["knowledge_root"] == str(renamed.resolve())
 
 
-def test_doctor_selects_the_current_root_from_multiple_domain_mappings(knowledge):
-    config = knowledge.parent / "config.yml"
+def test_doctor_rejects_project_mapping_in_the_local_config(knowledge):
+    config = knowledge / "config.yml"
     value = yaml.safe_load(config.read_bytes())
-    value["knowledge_roots"] = {
-        "audio": "himate/himate-knowledge-audio",
-        "bluetooth": knowledge.name,
-        "wifi": "himate/himate-knowledge-wifi",
-    }
+    value["knowledge_roots"] = {"bluetooth": knowledge.name}
     config.write_text(yaml.safe_dump(value, sort_keys=False), encoding="utf-8")
 
-    status, report = observe(knowledge)
-
-    assert status == 0, report
-    assert report["data"]["config_path"] == str(config)
-    assert report["data"]["configuration"]["knowledge_root"] == str(knowledge.resolve())
-
-
-def test_doctor_blocks_two_domain_aliases_for_the_same_current_root(knowledge):
-    config = knowledge.parent / "config.yml"
-    value = yaml.safe_load(config.read_bytes())
-    value["knowledge_roots"] = {"bluetooth": knowledge.name, "audio": knowledge.name}
-    config.write_text(yaml.safe_dump(value), encoding="utf-8")
-
-    blocked(knowledge, "CONFIG_AMBIGUOUS")
-
-
-def test_doctor_does_not_ignore_an_unsafe_other_domain_mapping(knowledge):
-    config = knowledge.parent / "config.yml"
-    value = yaml.safe_load(config.read_bytes())
-    value["knowledge_roots"] = {"bluetooth": knowledge.name, "audio": "../other-workspace"}
-    config.write_text(yaml.safe_dump(value), encoding="utf-8")
-
-    blocked(knowledge, "CONFIG_KNOWLEDGE_ROOT_MISMATCH")
+    blocked(knowledge, "CONFIG_INVALID")
 
 
 def test_doctor_blocks_missing_governance_lock(knowledge):
@@ -189,32 +161,36 @@ def test_doctor_blocks_unsupported_rule_capability(knowledge):
     blocked(knowledge, "RULE_CAPABILITY_UNSUPPORTED")
 
 
-def test_doctor_cannot_call_an_ancestor_other_group_configuration_ready(knowledge):
+def test_doctor_does_not_use_ancestor_configuration_when_local_config_is_missing(knowledge):
+    (knowledge / "config.yml").unlink()
     (knowledge.parent / "config.yml").write_text(
-        "schema_version: '2.0'\nknowledge_roots:\n  wifi: another-group\n", encoding="utf-8")
-    blocked(knowledge, "CONFIG_KNOWLEDGE_ROOT_MISMATCH")
+        f"schema_version: '2.0'\nknowledge_roots:\n  wifi: {knowledge.name}\n", encoding="utf-8")
+    blocked(knowledge, "CONFIG_UNAVAILABLE")
 
 
-def test_doctor_skips_a_safe_unrelated_configuration_inside_the_knowledge_root(knowledge):
-    (knowledge / "config.yml").write_text(
-        "schema_version: '2.0'\nknowledge_roots:\n  wifi: unrelated\n", encoding="utf-8")
+def test_doctor_skips_invalid_ancestor_configuration(knowledge):
+    (knowledge.parent / "config.yml").write_text("knowledge_roots: [broken\n", encoding="utf-8")
     status, report = observe(knowledge)
     assert status == 0, report
-    assert report["data"]["config_path"] == str(knowledge.parent / "config.yml")
+    assert report["data"]["config_path"] == str(knowledge / "config.yml")
 
 
 def test_doctor_blocks_missing_configuration(knowledge):
-    (knowledge.parent / "config.yml").unlink()
-    status, report = observe(knowledge)
-    assert status == 3, report
-    # A developer's outer workspace may itself contain another group's config;
-    # it is an explicit mismatch, never an implicit fallback to ready.
-    assert {row["code"] for row in report["diagnostics"]} & {"CONFIG_UNAVAILABLE", "CONFIG_KNOWLEDGE_ROOT_MISMATCH"}
+    (knowledge / "config.yml").unlink()
+    blocked(knowledge, "CONFIG_UNAVAILABLE")
 
 
 @pytest.mark.parametrize("raw", ["knowledge_roots: [broken\n", "schema_version: '2.0'\nknowledge_roots: {}\nknowledge_roots: {}\n"])
 def test_doctor_blocks_bad_or_duplicate_configuration(knowledge, raw):
-    (knowledge.parent / "config.yml").write_text(raw, encoding="utf-8")
+    (knowledge / "config.yml").write_text(raw, encoding="utf-8")
+    blocked(knowledge, "CONFIG_INVALID")
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="POSIX FIFO")
+def test_doctor_rejects_nonregular_local_configuration(knowledge):
+    config = knowledge / "config.yml"
+    config.unlink()
+    os.mkfifo(config)
     blocked(knowledge, "CONFIG_INVALID")
 
 
@@ -232,9 +208,9 @@ def nested_knowledge(knowledge):
     target = workspace / "himate/domain"
     target.parent.mkdir()
     shutil.move(str(knowledge), str(target))
-    config = workspace / "config.yml"
+    config = target / "config.yml"
     config.write_text(config.read_text(encoding="utf-8").replace(
-        "wifi: himate-knowledge-synthetic", "wifi: himate/domain").replace(
+        "code_root: ../main", "code_root: ../../main").replace(
         "modules: []", "modules:\n- path: wifi\n  chips: []\n  sides: []\n  features: []"), encoding="utf-8")
     code = workspace / "main/wifi/config.c"
     code.parent.mkdir(parents=True)
@@ -244,20 +220,18 @@ def nested_knowledge(knowledge):
 
 
 
-def test_doctor_chooses_one_exact_nested_mapping_over_unrelated_nearer_config(knowledge):
+def test_doctor_chooses_nested_knowledge_configuration_over_legacy_mapping(knowledge):
     root, config = nested_knowledge(knowledge)
     (root.parent / "config.yml").write_text(
-        "schema_version: '2.0'\nknowledge_roots:\n  wifi: unrelated-domain\n", encoding="utf-8")
+        "schema_version: '2.0'\nknowledge_roots:\n  wifi: domain\n", encoding="utf-8")
     status, report = observe(root)
     assert status == 0, report
     assert report["data"]["config_path"] == str(config)
 
 
-def test_doctor_ignores_packaged_config_template_in_a_non_git_manifest(knowledge):
+def test_doctor_uses_local_config_in_a_non_git_manifest(knowledge):
     root, config = nested_knowledge(knowledge)
-    template = root / "config.yml"
-    template.write_bytes(config.read_bytes())
-    original = template.read_bytes()
+    original = config.read_bytes()
     assert not (root.parents[1] / ".git").exists()
     assert not (root / ".git").exists()
 
@@ -265,11 +239,10 @@ def test_doctor_ignores_packaged_config_template_in_a_non_git_manifest(knowledge
 
     assert status == 0, report
     assert report["data"]["config_path"] == str(config)
-    assert template.read_bytes() == original
+    assert config.read_bytes() == original
 
 
 @pytest.mark.parametrize("state,doctor_code", [
-    ("ambiguous", "CONFIG_AMBIGUOUS"),
     ("invalid", "CONFIG_INVALID"),
     ("duplicate", "CONFIG_INVALID"),
     ("unsafe", "CONFIG_KNOWLEDGE_ROOT_MISMATCH"),
@@ -278,17 +251,15 @@ def test_doctor_ignores_packaged_config_template_in_a_non_git_manifest(knowledge
 ])
 def test_doctor_fails_closed_on_bad_nested_discovery(knowledge, state, doctor_code):
     root, config = nested_knowledge(knowledge)
-    nearby = root.parent / "config.yml"
-    if state == "ambiguous":
-        nearby.write_text("schema_version: '2.0'\nknowledge_roots:\n  wifi: domain\n", encoding="utf-8")
-    elif state == "invalid":
-        nearby.write_text("knowledge_roots: [broken\n", encoding="utf-8")
+    original = config.read_text(encoding="utf-8")
+    if state == "invalid":
+        config.write_text("modules: [broken\n", encoding="utf-8")
     elif state == "duplicate":
-        nearby.write_text("knowledge_roots: {wifi: other}\nknowledge_roots: {wifi: domain}\n", encoding="utf-8")
+        config.write_text(original + "modules: []\n", encoding="utf-8")
     elif state == "unsafe":
-        nearby.write_text("knowledge_roots: {wifi: '../himate/domain'}\n", encoding="utf-8")
+        config.write_text(original.replace("../../main", "../../main/../outside"), encoding="utf-8")
     elif state == "case_alias":
-        nearby.write_text("knowledge_roots: {wifi: DOMAIN}\n", encoding="utf-8")
+        config.rename(config.with_name("CONFIG.yml"))
     else:
         config.unlink()
     blocked(root, doctor_code)
@@ -296,7 +267,7 @@ def test_doctor_fails_closed_on_bad_nested_discovery(knowledge, state, doctor_co
 
 @pytest.mark.parametrize("version", [None, "99.0"])
 def test_doctor_cannot_mark_a_noncurrent_workspace_contract_ready(knowledge, version):
-    config = knowledge.parent / "config.yml"
+    config = knowledge / "config.yml"
     value = yaml.safe_load(config.read_bytes())
     if version is None:
         value.pop("schema_version")

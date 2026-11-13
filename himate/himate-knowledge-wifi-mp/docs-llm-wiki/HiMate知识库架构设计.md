@@ -68,15 +68,13 @@ flowchart LR
 
 ### 5.1 路径基准
 
-`repo/` 表示 manifest 工作区根，项目入口为 `AGENTS.md` 和 `config.yml`；该根不要求自身是 Git 仓，代码工作区可包含多个实际仓。`knowledge_roots` 和 `code_root` 相对项目配置目录，分别选择知识根和代码根；`modules[].path` 相对 `code_root`，描述允许引用的实际模块。`himate/` 是多个领域知识根的容器。
-
-`knowledge_roots` 的键名仅作标识，不限定为 `wifi`；运行时按当前知识根的实际路径自动选择唯一匹配项，无须额外指定领域。既有 `wifi` 配置保持兼容；同一目录有多个匹配项时拒绝歧义配置。
+`repo/` 表示 manifest 工作区根，可包含多个实际 Git 仓。`himate/` 可包含多个领域知识根，每个知识根各自维护 `AGENTS.md` 和 `config.yml`。调用方选定知识根后，CLI 读取该目录的配置。
 
 模块映射按每个模块自身的 `chips`、`sides` 组合自动派生 Target，不维护固定芯片列表，也不跨模块补造组合。同一芯片同时登记 Host 和 Device 时派生配对，兼容策略仍为未知；缺少标签时只登记代码范围。缺失模块仍保留已声明的 Target，但没有可引用的实际代码绑定。修改 `modules` 后重新读取配置即更新这些映射，无须另行登记 Target；配置标签不证明实际构建、宏或协议条件。
 
-知识根内的 `config.yml` 和 `AGENTS-code-root.md` 是部署源模板，分别复制为 `repo/config.yml` 和 `repo/AGENTS.md`。部署目标由知识包根的 `../..` 确定，不通过 Git 查找；运行时按项目配置的准确映射选择知识根。
+`code_root` 相对知识根，默认布局为 `../../main`。`modules[].path` 相对代码根，描述允许引用的实际模块。代码工作区基准取 `code_root` 开头 `../` 指向的上级目录。以 `../../main` 为例，该基准是 `repo/`。
 
-登记代码时，未填写 `repo_id` 的 `path` 相对项目配置目录；填写 `repo_id` 时，相对对应的已配置代码仓。文档路径相对知识根，位于 `docs-raw/`。路径参数详见[来源规范](../governance/specs/sources.md)。
+登记代码时，未填写 `repo_id` 的 `path` 相对上述代码工作区基准，例如 `main/<module>/<file>.c`。填写 `repo_id` 时，路径相对对应的已配置代码仓。文档路径相对知识根，位于 `docs-raw/`。路径参数详见[来源规范](../governance/specs/sources.md)。
 
 ### 5.2 运行位置与组件分发
 
@@ -84,18 +82,17 @@ flowchart LR
 
 部署入口、分发源码与工具均位于知识根：`deploy.ps1`、`deploy.sh`、`skills/`、`workflows/` 和 `tools/`。Windows 与 Linux 入口共用 Python 后端，交互展示两个 Skill 安装目录和一个 Workflow 模板目录，回车采用默认值，也可输入自定义路径。
 
-默认将 Skill 同时安装到 `~/.openflow/config/skills` 和 `~/.cac/skills`，将 Workflow 安装到 `~/.openflow/config/workflow-templates`。执行前还收集已有项目入口的覆盖选择，默认 `y`，输入 `n` 保留。确认后，沿用执行端 pip 镜像安装面向 Python 3.10—3.12 的锁定 OCR 依赖，并校验知识根的 `artifacts/models/docling-cpu/`。依赖采用普通 PyTorch 发行包，CPU 表示解析器的推理设备选择；Linux 普通包还会安装 CUDA 相关运行依赖，体积按平台和版本核对。完整模型直接复用；否则优先校验 `tools/deploy/models/` 中的清单与内附权重，离线复制到运行目录。内附集合损坏则停止，未携带集合时才预置文件或显式 `--download-models` / `-DownloadModels` 下载，默认不访问模型站点。脚本和锁不追加外网包源，内部镜像需提供锁定发行包及其平台依赖。准备均成功后才删除全部本次同名包目录、复制全部新包，再按选择将两个源模板复制到 manifest 根；依赖或模型准备失败不动旧包或入口，其他包与源文件保留。脚本不下载 Python、不创建虚拟环境、不配置远端 SSH 或注册宿主。
+默认将 Skill 同时安装到 `~/.openflow/config/skills` 和 `~/.cac/skills`，将 Workflow 安装到 `~/.openflow/config/workflow-templates`。部署沿用执行端 pip 配置安装 Python 3.10–3.12 的锁定依赖，准备 `artifacts/models/docling-cpu/` 的本地模型。准备成功后替换同名能力包，其他能力包继续保留。模型复用、离线复制、下载选项和失败处理见[部署说明](../tools/deploy/README.md)。
 
 ### 5.3 HiMate Knowledge目录架构
 
 ```text
 repo/
-├── AGENTS.md / config.yml              项目入口与实际路径配置
 ├── main/                              实际代码工作区，可含多个 Git 仓
 └── himate/
     └── himate-knowledge-wifi-mp/        领域知识根
-        ├── AGENTS.md                  知识根规则
-        ├── AGENTS-code-root.md / config.yml  项目入口源模板
+        ├── AGENTS.md                   领域与代码工作区指引
+        ├── config.yml                  本知识根配置和实际代码范围
         ├── deploy.ps1 / deploy.sh      Windows / Linux 部署入口
         ├── skills/                    Skill 分发源码
         ├── workflows/                 Workflow 模板
@@ -169,8 +166,7 @@ repo/
 |---|---|
 | `knowledge/`、`docs-raw/` | 保留正式卡、导航、原件及本机来源映射；由业务变更和入库流程维护 |
 | `governance/sources.lock.yaml` | 保留来源身份、完整成功事实及PDF累计覆盖，不能用发行包中的空登记覆盖 |
-| 项目 `AGENTS.md`、`config.yml` | 部署时分别询问覆盖，默认 `y`；输入 `n` 保留现有文件，内容按实际项目维护 |
-| 知识根的 `AGENTS-code-root.md`、`config.yml` | 项目入口源模板，部署后仍保留在知识根 |
+| 知识根的 `AGENTS.md`、`config.yml` | 按实际项目维护，框架升级时合并项目已有约定和配置 |
 | `runtime/`、仓内启动器与检查入口 | 按同一发行版本替换程序文件，运行环境独立维护 |
 | `governance/` 中算法、Schema、模板、规则及 `framework.lock.yaml` | 按同一版本更新并保持摘要一致；项目定制规则按需合并，不能整目录删除 |
 | `docs-llm-wiki/`、`evals/` | 更新随版本发布的文件，保留本地 SDD、任务和历史工件 |

@@ -13,7 +13,7 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-source
-  prompt: '复用已知项目与执行端；否则读当前工作区 AGENTS.md、config.yml，确定知识根，位置不明确才询问用户。在数据所在端的原生知识根调用仓内 CLI，交接实际项目、知识根、执行端及已验证的 CLI 命令前缀（含指定解释器），后续节点沿用。
+  prompt: '复用宿主绑定或本次已确认的知识根与执行端，读取该根的 AGENTS.md 和 config.yml。知识根或执行端仍不明确时询问用户。在数据所在端的知识根调用仓内 CLI，交接实际项目、知识根、执行端及已验证的 CLI 命令前缀（含指定解释器），后续节点沿用。
 
     首次进入交接本次任务的原始范围，后续各批保持：未指定来源时运行普通 scan，不把上一批 source_id 作为后续扫描范围；指定文件、目录或来源 ID 时每批采用该范围。沿用已验证的 CLI 命令前缀、parser 选项、review_text_budget 和 review_page_budget。用户明确要求重评时，reprocess: true 仅首次 P1 使用，后续普通续办。
 

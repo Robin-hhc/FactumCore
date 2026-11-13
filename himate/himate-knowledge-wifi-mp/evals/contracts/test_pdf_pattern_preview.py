@@ -189,7 +189,9 @@ def test_preview_metadata_over_quota_keeps_original_page_material(tmp_path):
     assert len(page_previews(full)) == 1
     # The PNG and pre-preview files fit because the measured full bundle also
     # includes the preview's Markdown link and JSON metadata.
-    quota = full["statistics"]["output_bytes"] - 1
+    preview_link = b"![Page 1](images/page_preview_000001.png)"
+    assert preview_link in original["markdown"].encode("utf-8")
+    quota = full["statistics"]["output_bytes"] - len(preview_link)
 
     descriptor, loaded = parse_pattern(tight, data, options={"max_output_bytes": quota})
 

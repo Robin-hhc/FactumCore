@@ -68,12 +68,58 @@ def test_workspace_schema_rejects_empty_or_invalid_knowledge_roots(roots):
 
 
 @pytest.mark.parametrize("domain", ["wifi", "bluetooth"])
-def test_workspace_config_selects_current_root_without_a_domain_argument(tmp_path, domain):
+def test_explicit_legacy_config_still_selects_current_root(tmp_path, domain):
     roots = {"wifi": "himate/himate-knowledge-wifi", "bluetooth": "himate/himate-knowledge-bluetooth"}
     for relative in roots.values():
         (tmp_path / relative).mkdir(parents=True)
     configuration = write(tmp_path, "config.yml", json.dumps({**config(), "knowledge_roots": roots}).encode())
-    assert v.workspace_config_path(tmp_path / roots[domain]) == configuration.resolve()
+    assert v.workspace_config_path(tmp_path / roots[domain], config_path=configuration) == configuration.resolve()
+
+
+def test_workspace_uses_its_local_config_and_preserves_module_identities(tmp_path):
+    root = tmp_path / "himate/domain"
+    root.mkdir(parents=True)
+    write(tmp_path, "main/host/driver.c")
+    legacy = {**config({"path": "host"}), "knowledge_roots": {"domain": "himate/domain"}}
+    write(tmp_path, "config.yml", json.dumps(legacy).encode())
+    with pytest.raises(v.ContractError, match="WORKSPACE_CONFIG_UNAVAILABLE"):
+        v.workspace_config_path(root)
+
+    local = {**legacy, "code_root": "../../main"}
+    del local["knowledge_roots"]
+    assert validate(local) is local
+    configuration = write(root, "config.yml", json.dumps(local).encode())
+    assert v.workspace_config_path(root) == configuration.resolve()
+    old, new = v.normalize_workspace(legacy, tmp_path), v.normalize_workspace(local, root)
+    assert new["workspace_root"] == old["workspace_root"] == str(tmp_path)
+    assert new["code_root_path"] == old["code_root_path"] == str(tmp_path / "main")
+    assert new["repos"] == old["repos"]
+    assert new["architecture"] == old["architecture"]
+
+    other = write(tmp_path, "other/config.yml", json.dumps(local).encode())
+    with pytest.raises(v.ContractError, match="WORKSPACE_CONFIG_UNAVAILABLE"):
+        v.workspace_config_path(root, config_path=other)
+
+
+def test_terminal_parent_hops_preserve_manifest_root_as_code_root(tmp_path):
+    root = tmp_path / "himate/domain"
+    root.mkdir(parents=True)
+    write(tmp_path, "host/driver.c")
+    legacy = {**config({"path": "host"}), "code_root": "."}
+    local = {**legacy, "code_root": "../.."}
+    del local["knowledge_roots"]
+    assert validate(local) is local
+    old, new = v.normalize_workspace(legacy, tmp_path), v.normalize_workspace(local, root)
+    assert new["code_root_path"] == str(tmp_path)
+    assert new["repos"] == old["repos"]
+
+
+@pytest.mark.parametrize("path", ["main/../outside", "../main/../outside", "../", "../.", "/main", "C:/main"])
+def test_knowledge_root_config_only_accepts_leading_parent_hops(tmp_path, path):
+    raw = config()
+    del raw["knowledge_roots"]
+    with pytest.raises(v.ContractError, match="UNSAFE_WORKSPACE_PATH"):
+        v.normalize_workspace({**raw, "code_root": path}, tmp_path)
 
 
 def test_workspace_config_rejects_two_domain_names_for_the_same_root(tmp_path):
@@ -315,6 +361,23 @@ def test_declared_linked_module_is_rejected_even_with_an_in_workspace_target(tmp
         alias.symlink_to(actual, target_is_directory=True)
     with pytest.raises(v.ContractError, match="WORKSPACE_LINKED_PATH"):
         v.normalize_workspace(config({"path": "alias"}), tmp_path)
+
+
+def test_knowledge_root_config_rejects_a_linked_code_root(tmp_path):
+    root = tmp_path / "himate/domain"
+    root.mkdir(parents=True)
+    actual = tmp_path / "actual"
+    actual.mkdir()
+    alias = tmp_path / "main"
+    if sys.platform == "win32":
+        import _winapi
+        _winapi.CreateJunction(str(actual), str(alias))
+    else:
+        alias.symlink_to(actual, target_is_directory=True)
+    raw = {**config(), "code_root": "../../main"}
+    del raw["knowledge_roots"]
+    with pytest.raises(v.ContractError, match="WORKSPACE_LINKED_PATH"):
+        v.normalize_workspace(raw, root)
 
 
 def test_legacy_registration_is_kept_without_mutating_or_auto_authorizing_it(tmp_path):

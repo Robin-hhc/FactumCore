@@ -4,7 +4,6 @@
 /himate/himate-knowledge-wifi-mp/deploy.sh text eol=lf
 /himate/himate-knowledge-wifi-mp/tools/deploy/models/docling-cpu/**/*.onnx binary
 /himate/himate-knowledge-wifi-mp/tools/deploy/models/docling-cpu/**/*.part[0-9][0-9][0-9] binary
-/config.yml -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
 
 # Preserve approved design bytes.
 /himate/himate-knowledge-wifi-mp/docs-llm-wiki/HiMate知识库架构设计.md -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

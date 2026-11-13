@@ -19,8 +19,9 @@ import yaml
 
 from .catalog import Catalog, atomic_write, normalize_page_ranges, pdf_review_result, remaining_page_ranges
 from .cards_v3 import parse_card
-from .validation import ContractError, canonical_bytes, load_yaml, markdown_structure, safe_path, validate_id
-from . import citation_versions, document_parser, source_resources, workspace_config
+from .validation import (ContractError, canonical_bytes, load_yaml, markdown_structure, safe_path, validate_id,
+                         workspace_configuration, workspace_layout)
+from . import citation_versions, document_parser, source_resources
 
 
 FORMATS = document_parser.SUPPORTED_FORMATS
@@ -54,32 +55,23 @@ def read_json(path, *, raw=None):
     return value
 
 
-def workspace(root):
-    path = workspace_config.select(root)
-    return path.parent, load_yaml(path.read_bytes())
-
-
 def source_path(root, source):
     """Resolve a registered file using its declared workspace, never its text."""
     if source["kind"] != "code":
         if source_resources.is_dbox_path(source["path"]):
             return source_resources.dbox_path(root, source["path"])["actual_path"]
         return safe_path(root, source["path"], ["docs-raw"])
-    project, config = workspace(root)
+    config_path, _, config = workspace_configuration(root)
+    layout = workspace_layout(config, config_path.parent)
+    project = Path(layout["workspace_root"])
     relative = source["path"]
     repo = source.get("repo", source.get("repo_id", ""))
     if repo:
-        from .validation import normalize_workspace
-
-        mapped = normalize_workspace(config, project)
-        matches = [item for item in mapped.get("repos", []) if item["repo_id"] == repo]
+        matches = [item for item in layout["repos"] if item["repo_id"] == repo]
         if len(matches) != 1:
             raise ContractError("CODE_REPO_UNAVAILABLE", repo)
         relative = (PurePosixPath(matches[0]["root"]) / relative).as_posix()
     path = safe_path(project, relative)
-    from .validation import workspace_layout
-
-    layout = workspace_layout(config, project)
     if layout.get("mapping_kind") == "modules":
         allowed = [project / item["workspace_path"] for item in layout["modules"]]
         if not any(path.is_relative_to(directory) for directory in allowed):

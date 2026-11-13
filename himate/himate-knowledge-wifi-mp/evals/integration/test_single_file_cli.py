@@ -31,9 +31,9 @@ def knowledge(tmp_path):
     (root / "governance/sources.lock.yaml").write_text(
         "schema_version: '2.0'\nresources: []\nsnapshots: []\n", encoding="utf-8",
     )
-    (project / "config.yml").write_text(
+    (root / "config.yml").write_text(
         "schema_version: '2.0'\nworkspace_id: synthetic\n"
-        "knowledge_roots:\n  wifi: himate/knowledge-test\ncode_root: main\nmodules: []\n",
+        "code_root: ../../main\nmodules: []\n",
         encoding="utf-8",
     )
     (root / "docs-raw/specs").mkdir(parents=True)
@@ -191,7 +191,7 @@ def test_checked_source_binding_survives_reindex_clone_and_recheck(knowledge, tm
                               capture_output=True, text=True, check=True, timeout=30)
 
     git("init", "-q")
-    git("add", "config.yml", raw.relative_to(project).as_posix())
+    git("add", (knowledge / "config.yml").relative_to(project).as_posix(), raw.relative_to(project).as_posix())
     git("commit", "-qm", "Track original")
     status, scanned = invoke(knowledge, "ingest", "scan", "--source", "docs-raw/specs/a.md")
     assert status == 0, scanned
@@ -317,19 +317,33 @@ def test_ingest_scan_returns_one_document_without_legacy_operation_request(knowl
     assert not list((knowledge / "knowledge").rglob("*.md"))
 
 
-def test_ingest_uses_manifest_config_when_the_package_keeps_its_template(knowledge):
+def test_local_configuration_is_used_outside_git_without_reading_ancestor_config(knowledge):
     workspace = knowledge.parents[1]
-    template = knowledge / "config.yml"
-    template.write_bytes((workspace / "config.yml").read_bytes())
-    original = template.read_bytes()
+    config = knowledge / "config.yml"
+    original = config.read_bytes()
+    (workspace / "config.yml").write_text("this: [is invalid", encoding="utf-8")
     assert not (workspace / ".git").exists()
+    code = workspace / "main/driver/sample.c"
+    code.parent.mkdir(parents=True)
+    code.write_text("int receive(void) { return 1; }\n", encoding="utf-8")
+    config.write_bytes(original.replace(b"modules: []", b"modules:\n- path: driver"))
+
+    status, report = invoke(knowledge, "source", "register", request={
+        "kind": "code", "path": "main/driver/sample.c", "source_id": "code-sample",
+    })
+    assert status == 0 and report["phase"] == "registered", report
+
+    digest = hashlib.sha256(code.read_bytes()).hexdigest()
+    status, report = invoke(knowledge, "source", "resolve", request={"source_id": "code-sample", "hash": digest})
+    assert status == 0 and report["phase"] == "resolved", report
+    assert report["data"]["hash"] == digest
     (knowledge / "docs-raw/specs/a.md").write_text("# RX\nDocument in a manifest workspace.\n", encoding="utf-8")
 
     status, report = invoke(knowledge, "ingest", "scan", "--source", "docs-raw/specs/a.md")
 
     assert status == 0 and report["phase"] == "prepared", report
     assert report["data"]["source"]["path"] == "docs-raw/specs/a.md"
-    assert template.read_bytes() == original
+    assert config.read_bytes() == original.replace(b"modules: []", b"modules:\n- path: driver")
 
 
 def test_no_card_commit_keeps_receipt_under_artifacts_without_creating_logs(knowledge):

@@ -148,8 +148,8 @@ def _doctor_rules(root, yaml_available, gaps):
 def _doctor_configuration(root, yaml_available, gaps, rules):
     """Load only the verified metadata selector, never the governance package."""
     data = {"path": None, "status": "not_checked", "knowledge_root": None,
-            "verification": "knowledge_root_mapping_only"}
-    guidance = "Provide the intended workspace config.yml with a knowledge_roots entry mapped to this knowledge root"
+            "verification": "knowledge_root_configuration_only"}
+    guidance = "Provide the module configuration as config.yml inside this knowledge root"
     if not yaml_available or rules["status"] != "verified":
         return data
     try:
@@ -174,20 +174,13 @@ def _doctor_configuration(root, yaml_available, gaps, rules):
         data["status"] = "blocked"
         return data
     try:
-        path = selector["select"](root)
+        path, raw, _ = selector["context"](root)
         data["path"] = str(path)
-        raw = _doctor_read(path)
-        config = selector["configuration"](raw, path)
-        # Selection supports historical readers; ready diagnosis still names
-        # the current workspace contract, without inspecting business assets.
-        if config.get("schema_version") != "2.0":
-            raise selector["WorkspaceConfigError"]("WORKSPACE_CONFIG_INVALID", "Expected workspace contract 2.0", path)
-        if selector["mapped_root"](config, path, root) is None:
-            raise selector["WorkspaceConfigError"]("WORKSPACE_CONFIG_CHANGED", "Selected configuration mapping changed", path)
         if _doctor_read(path) != raw:
             raise selector["WorkspaceConfigError"]("WORKSPACE_CONFIG_CHANGED", "Workspace configuration changed during diagnosis", path)
     except selector["WorkspaceConfigError"] as error:
         codes = {"WORKSPACE_CONFIG_INVALID": "CONFIG_INVALID", "WORKSPACE_CONFIG_AMBIGUOUS": "CONFIG_AMBIGUOUS",
+                 "WORKSPACE_CONFIG_UNAVAILABLE": "CONFIG_UNAVAILABLE",
                  "WORKSPACE_CONFIG_CHANGED": "CONFIG_CHANGED", "UNSAFE_WORKSPACE_PATH": "CONFIG_KNOWLEDGE_ROOT_MISMATCH",
                  "WORKSPACE_LINKED_PATH": "CONFIG_KNOWLEDGE_ROOT_MISMATCH", "PATH_CASE_ALIAS": "CONFIG_KNOWLEDGE_ROOT_MISMATCH"}
         code = codes.get(error.code, "CONFIG_KNOWLEDGE_ROOT_MISMATCH" if error.path else "CONFIG_UNAVAILABLE")

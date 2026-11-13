@@ -71,9 +71,9 @@ def test_txt_original_with_bom_and_crlf_survives_p4_and_p5(tmp_path, source_kind
         original = tmp_path / "main/wifi/design.txt"
         original.parent.mkdir(parents=True)
         original.write_bytes(original_bytes)
-        (tmp_path / "config.yml").write_text(yaml.safe_dump({
-            "schema_version": "2.0", "workspace_id": "txt-copy-test", "knowledge_roots": {"wifi": "library"},
-            "code_root": "main", "modules": [{"path": "wifi"}],
+        (root / "config.yml").write_text(yaml.safe_dump({
+            "schema_version": "2.0", "workspace_id": "txt-copy-test",
+            "code_root": "../main", "modules": [{"path": "wifi"}],
         }), encoding="utf-8")
         module("library").sources(root, "register", {
             "kind": "code", "path": "main/wifi/design.txt", "source_id": "code-text", "encoding": "utf-8"})

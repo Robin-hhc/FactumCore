@@ -36,7 +36,7 @@ def distribution(tmp_path):
     spec = importlib.util.spec_from_file_location("skill_deploy", KNOWLEDGE_ROOT / "tools/deploy/deploy.py")
     backend = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(backend)
-    source = tmp_path / "project with spaces" / "himate" / "knowledge-root"
+    source = tmp_path / "project with spaces" / "custom" / "nested" / "knowledge-root"
     package = source / "skills/hs-knowledge-example"
     (package / "references").mkdir(parents=True)
     (package / "SKILL.md").write_text("current instructions", encoding="utf-8")
@@ -54,8 +54,8 @@ def distribution(tmp_path):
     lock.parent.mkdir(parents=True)
     lock.write_text("PyYAML==6.0.3\nrapidocr==3.10.0\n", encoding="utf-8")
     (source / "config.yml").write_text("workspace_id: synthetic\n", encoding="utf-8")
-    (source / "AGENTS-code-root.md").write_text("# Synthetic project instructions\n", encoding="utf-8")
-    assert not (source.parents[1] / ".git").exists()
+    (source / "AGENTS.md").write_text("# Synthetic knowledge instructions\n", encoding="utf-8")
+    assert not (source.parents[2] / ".git").exists()
     return backend, source, package, workflows, lock
 
 
@@ -66,8 +66,9 @@ def arguments(source, tmp_path):
             "--workflows-root", str(tmp_path / "workflow templates"), "--non-interactive"]
 
 
-def test_copy_all_destinations_then_project_entries_without_git(distribution, tmp_path, monkeypatch):
+def test_copy_all_destinations_without_creating_ancestor_entries(distribution, tmp_path, monkeypatch):
     backend, source, package, workflows, lock = distribution
+    entries = {source / name: (source / name).read_bytes() for name in ("config.yml", "AGENTS.md")}
     skill_targets = [tmp_path / "installed skills", tmp_path / "cac skills"]
     workflow_target = tmp_path / "workflow templates"
     stale = []
@@ -89,7 +90,6 @@ def test_copy_all_destinations_then_project_entries_without_git(distribution, tm
 
     def run(command, **kwargs):
         assert all(path.is_file() for path in stale)
-        assert not (source.parents[1] / "config.yml").exists()
         calls.append((command, kwargs))
         phases.append("install" if command[1:3] == ["-m", "pip"] else "models")
 
@@ -119,9 +119,9 @@ def test_copy_all_destinations_then_project_entries_without_git(distribution, tm
     assert all(not path.exists() for path in stale)
     assert (workflow_target / "user-workflow/workflow.yaml").read_text(encoding="utf-8") == "keep"
     assert not (workflow_target / "not-a-template").exists()
-    for original, name in (("config.yml", "config.yml"), ("AGENTS-code-root.md", "AGENTS.md")):
-        assert (source.parents[1] / name).read_bytes() == (source / original).read_bytes()
-        assert (source / original).is_file()
+    assert {path: path.read_bytes() for path in entries} == entries
+    assert all(not (parent / path.name).exists()
+               for parent in source.parents if parent.is_relative_to(tmp_path) for path in entries)
     assert calls == [
         ([selected_python, "-m", "pip", "install", "-r",
           str(lock)], {"check": True}),
@@ -569,13 +569,13 @@ def test_interrupted_bundle_copy_preserves_old_file_and_removes_partial_temporar
             for p in directory.rglob("*") if p.is_file()} == {required[0]: b"existing local model"}
 
 
-def test_interactive_defaults_show_three_roots_and_keep_one_entry(distribution, tmp_path, monkeypatch):
+def test_interactive_defaults_show_three_installation_roots(distribution, tmp_path, monkeypatch):
     backend, source, package, _, _ = distribution
     home = tmp_path / "synthetic user"
     project = source.parents[1]
     (project / "config.yml").write_text("keep config", encoding="utf-8")
-    (project / "AGENTS.md").write_text("replace instructions", encoding="utf-8")
-    answers, prompts = iter(["", "", "", "n", ""]), []
+    (project / "AGENTS.md").write_text("keep instructions", encoding="utf-8")
+    answers, prompts = iter(["", "", ""]), []
 
     def answer(prompt):
         prompts.append(prompt)
@@ -588,32 +588,26 @@ def test_interactive_defaults_show_three_roots_and_keep_one_entry(distribution, 
     for relative in (".openflow/config/skills", ".cac/skills"):
         assert (home / relative / package.name / "SKILL.md").is_file()
     assert (home / ".openflow/config/workflow-templates/hs-knowledge-ingest/workflow.yaml").is_file()
-    assert len(prompts) == 5
+    assert len(prompts) == 3
     for prompt, relative in zip(prompts, (".openflow/config/skills", ".cac/skills",
                                           ".openflow/config/workflow-templates")):
         assert str(home / relative) in prompt
-    assert str(project / "config.yml") in prompts[3] and "Y/n" in prompts[3]
-    assert str(project / "AGENTS.md") in prompts[4] and "Y/n" in prompts[4]
     assert (project / "config.yml").read_text(encoding="utf-8") == "keep config"
-    assert (project / "AGENTS.md").read_bytes() == (source / "AGENTS-code-root.md").read_bytes()
+    assert (project / "AGENTS.md").read_text(encoding="utf-8") == "keep instructions"
 
 
-def test_interactive_custom_directories_and_yes_overwrite(distribution, tmp_path, monkeypatch):
+def test_interactive_custom_directories(distribution, tmp_path, monkeypatch):
     backend, source, package, _, _ = distribution
     destinations = [tmp_path / name for name in ("custom openflow", "custom cac", "custom workflow")]
-    (source.parents[1] / "config.yml").write_text("old config", encoding="utf-8")
-    (source.parents[1] / "AGENTS.md").write_text("old instructions", encoding="utf-8")
-    answers = iter([*(str(path) for path in destinations), "y", "N"])
+    answers = iter(map(str, destinations))
     monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
     monkeypatch.setattr(backend.subprocess, "run", lambda *args, **kwargs: None)
     assert backend.main(["--source-root", str(source)]) == 0
     assert all((path / package.name / "SKILL.md").is_file() for path in destinations[:2])
     assert (destinations[2] / "hs-knowledge-ingest/workflow.yaml").is_file()
-    assert (source.parents[1] / "config.yml").read_bytes() == (source / "config.yml").read_bytes()
-    assert (source.parents[1] / "AGENTS.md").read_text(encoding="utf-8") == "old instructions"
 
 
-def test_noninteractive_defaults_overwrite_existing_entries(distribution, tmp_path, monkeypatch):
+def test_noninteractive_defaults_keep_existing_entries(distribution, tmp_path, monkeypatch):
     backend, source, package, _, _ = distribution
     home = tmp_path / "synthetic user"
     for name in ("config.yml", "AGENTS.md"):
@@ -624,8 +618,8 @@ def test_noninteractive_defaults_overwrite_existing_entries(distribution, tmp_pa
     for relative in (".openflow/config/skills", ".cac/skills"):
         assert (home / relative / package.name / "SKILL.md").is_file()
     assert (home / ".openflow/config/workflow-templates/hs-knowledge-ingest/workflow.yaml").is_file()
-    assert (source.parents[1] / "config.yml").read_bytes() == (source / "config.yml").read_bytes()
-    assert (source.parents[1] / "AGENTS.md").read_bytes() == (source / "AGENTS-code-root.md").read_bytes()
+    for name in ("config.yml", "AGENTS.md"):
+        assert (source.parents[1] / name).read_text(encoding="utf-8") == "old project entry"
 
 
 @pytest.mark.parametrize("kind", ["skills", "cac", "workflows"])
@@ -655,17 +649,7 @@ def test_replacement_cannot_delete_another_installation_root(distribution, tmp_p
     assert keep.read_bytes() == b"keep" and calls == []
 
 
-@pytest.mark.parametrize("name", ["config.yml", "AGENTS-code-root.md"])
-def test_missing_project_template_fails_before_install(distribution, tmp_path, monkeypatch, name):
-    backend, source, _, _, _ = distribution
-    (source / name).unlink()
-    calls = []
-    monkeypatch.setattr(backend.subprocess, "run", lambda *args, **kwargs: calls.append(args))
-    assert backend.main(arguments(source, tmp_path)) == 1
-    assert calls == []
-
-
-def test_entry_symlink_cannot_overwrite_external_file(distribution, tmp_path, monkeypatch):
+def test_install_does_not_follow_ancestor_config_link(distribution, tmp_path, monkeypatch):
     backend, source, _, _, _ = distribution
     external = tmp_path / "outside.yml"
     external.write_text("keep external", encoding="utf-8")
@@ -675,8 +659,8 @@ def test_entry_symlink_cannot_overwrite_external_file(distribution, tmp_path, mo
         pytest.skip("Symbolic links unavailable")
     calls = []
     monkeypatch.setattr(backend.subprocess, "run", lambda *args, **kwargs: calls.append(args))
-    assert backend.main(arguments(source, tmp_path)) == 1
-    assert calls == [] and external.read_text(encoding="utf-8") == "keep external"
+    assert backend.main(arguments(source, tmp_path)) == 0
+    assert len(calls) == 2 and external.read_text(encoding="utf-8") == "keep external"
 
 
 @pytest.mark.skipif(os.name != "nt", reason="PowerShell wrapper targets Windows")
@@ -743,7 +727,7 @@ def test_powershell_rejects_removed_skip_option_without_starting_python(tmp_path
     pytest.param("sh", marks=pytest.mark.skipif(os.name != "posix", reason="POSIX wrapper")),
     pytest.param("powershell", marks=pytest.mark.skipif(os.name != "nt", reason="Windows wrapper")),
 ])
-def test_wrapper_uses_shared_interaction_and_fixed_project_root(distribution, tmp_path, kind):
+def test_wrapper_uses_shared_interaction_and_leaves_project_files_intact(distribution, tmp_path, kind):
     _, source, package, _, _ = distribution
     project = source.parents[1]
     (project / "config.yml").write_text("keep project", encoding="utf-8")
@@ -778,15 +762,15 @@ def test_wrapper_uses_shared_interaction_and_fixed_project_root(distribution, tm
         command = [powershell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
                    str(wrapper), "-Python", sys.executable]
     destinations = [tmp_path / name for name in ("openflow skill", "cac skill", "openflow workflow")]
-    result = subprocess.run(command, input="\n".join([*(str(path) for path in destinations), "n", "", ""]),
+    result = subprocess.run(command, input="\n".join([*(str(path) for path in destinations), ""]),
                             text=True, capture_output=True, timeout=30, cwd=tmp_path,
                             env={**os.environ, "PYTHONPATH": str(fake), "PYTHONDONTWRITEBYTECODE": "1",
                                  "FACTUM_MODEL_READY": str(models_ready)})
     assert result.returncode == 0, result.stderr
-    assert ".openflow" in result.stdout and ".cac" in result.stdout and "Y/n" in result.stdout
+    assert ".openflow" in result.stdout and ".cac" in result.stdout and "Overwrite" not in result.stdout
     assert all((path / package.name / "SKILL.md").is_file() for path in destinations[:2])
     assert (destinations[2] / "hs-knowledge-ingest/workflow.yaml").is_file()
     assert (project / "config.yml").read_text(encoding="utf-8") == "keep project"
-    assert (project / "AGENTS.md").read_bytes() == (source / "AGENTS-code-root.md").read_bytes()
+    assert (project / "AGENTS.md").read_text(encoding="utf-8") == "old instructions"
     assert models_ready.read_text() == "complete document runtime"
     assert not (project / ".git").exists()

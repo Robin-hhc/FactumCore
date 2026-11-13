@@ -352,9 +352,12 @@ def _workspace_relative(value):
 def _workspace_declaration(config):
     if any(key in config for key in ("repos", "architecture", "targets", "pairs", "code_policy")):
         raise ContractError("WORKSPACE_LAYOUT_MIXED", "Use module mapping or legacy registration, not both")
-    _workspace_relative(config.get("code_root"))
+    try:
+        _, code_directory = workspace_config.code_root_parts(config.get("code_root"), legacy="knowledge_roots" in config)
+    except workspace_config.WorkspaceConfigError as error:
+        raise ContractError(error.code, error.message, error.path) from error
     management = {".git", ".repo", ".hg", ".svn"}
-    if management.intersection(part.casefold() for part in PurePosixPath(config["code_root"]).parts):
+    if management.intersection(part.casefold() for part in PurePosixPath(code_directory).parts):
         raise ContractError("WORKSPACE_MANAGEMENT_PATH", "Repository-manager directories are not code scopes", config["code_root"])
     modules = config.get("modules")
     if not isinstance(modules, list):
@@ -394,22 +397,26 @@ def _workspace_path(root, relative):
     return path
 
 
-def workspace_config_path(knowledge_root, registrations=None, expected_rules=None, *, config_path=None):
-    """Use the same exact-mapping policy as execution-host diagnostics."""
+def workspace_configuration(knowledge_root, registrations=None, expected_rules=None, *, config_path=None):
+    """Use the same configuration and byte validation as host diagnostics."""
     try:
-        return workspace_config.select(knowledge_root, registrations, expected_rules, config_path=config_path)
+        return workspace_config.context(knowledge_root, registrations, expected_rules, config_path=config_path)
     except workspace_config.WorkspaceConfigError as error:
         raise ContractError(error.code, error.message, error.path) from error
 
 
-def workspace_layout(config, workspace_root):
+def workspace_config_path(knowledge_root, registrations=None, expected_rules=None, *, config_path=None):
+    return workspace_configuration(knowledge_root, registrations, expected_rules, config_path=config_path)[0]
+
+
+def workspace_layout(config, config_directory):
     """Resolve declared module directories without repository-manager access.
 
-    The caller supplies the actual workspace root from its registered context.
+    The caller supplies the actual configuration directory.
     No source bytes, Git/mm/manifest metadata or commands are consumed here.
     Module labels describe architecture; source capture fixes actual file hashes.
     """
-    root = Path(workspace_root).absolute()
+    root = Path(config_directory).absolute()
     _workspace_no_links(root)
     root = root.resolve(strict=True)
     if "code_root" not in config and "modules" not in config:
@@ -417,7 +424,11 @@ def workspace_layout(config, workspace_root):
                 **{key: copy.deepcopy(config.get(key, [])) for key in ("repos", "architecture", "targets", "pairs")},
                 "layout_gaps": []}
     _workspace_declaration(config)
-    code_root = _workspace_path(root, config["code_root"])
+    try:
+        root, code_directory = workspace_config.code_location(root, config["code_root"], legacy="knowledge_roots" in config)
+    except workspace_config.WorkspaceConfigError as error:
+        raise ContractError(error.code, error.message, error.path) from error
+    code_root = _workspace_path(root, code_directory)
     gaps, modules, repos, architecture = [], [], {}, []
     if not code_root.exists():
         gaps.append({"code": "code_root_missing", "path": config["code_root"]})
@@ -476,11 +487,11 @@ def workspace_layout(config, workspace_root):
             "layout_gaps": gaps}
 
 
-def normalize_workspace(config, workspace_root):
+def normalize_workspace(config, config_directory):
     """Derive a runtime view; callers continue hashing the original config bytes."""
     if "code_root" not in config and "modules" not in config:
         return copy.deepcopy(config)
-    layout = workspace_layout(config, workspace_root)
+    layout = workspace_layout(config, config_directory)
     result = {**copy.deepcopy(config), **layout}
     result.setdefault("wiki_entities", {})
     result.setdefault("symbol_aliases", {})

@@ -39,9 +39,9 @@ def test_office_figures_p5_cleanup_query_and_independent_source_release(tmp_path
         shutil.copyfile(SOURCE / name, root / name)
     (root / "governance/sources.lock.yaml").write_text(
         "schema_version: '2.0'\nresources: []\nsnapshots: []\n", encoding="utf-8")
-    (project / "config.yml").write_text(
+    (root / "config.yml").write_text(
         "schema_version: '2.0'\nworkspace_id: synthetic\n"
-        "knowledge_roots: {wifi: himate/synthetic}\ncode_root: main\nmodules: []\n", encoding="utf-8")
+        "code_root: ../../main\nmodules: []\n", encoding="utf-8")
     (root / "docs-raw").mkdir()
     (root / "knowledge").mkdir()
     original = root / "docs-raw/design.docx"

@@ -25,7 +25,7 @@ printf '%s' '{"limit":20}' | python -B /absolute/knowledge/root/knowledge.py pan
 
 ## 正式知识版本
 
-执行 `maintain reindex --json` 构建首个面板版本，包括空知识库。成功的 P5 和显式重建在现有 SQLite 写事务内发布新 `view_revision`。重建失败保留上次成功版本。面板查询直接读取发布表，返回轻量分页数据。绑定或维护流程遇到 `PANEL_VIEW_UNAVAILABLE` 时可执行一次重建。版本已换时，客户端收到 `PANEL_REVISION_MISMATCH` 后刷新；筛选不匹配的游标返回 `PANEL_CURSOR_INVALID`。P5 在发布成功后更新本机最新回执。回执写入失败时，P5 仍返回 `completed`，并在 `data.receipt_warning` 报告文件错误。自动化应使用本次命令返回的结果。
+执行 `maintain reindex --json` 构建首个面板版本，包括空知识库。成功的 P5 和显式重建在现有 SQLite 写事务内发布新 `view_revision`。重建失败保留上次成功版本。面板查询直接读取发布表，返回轻量分页数据。绑定或维护流程遇到 `PANEL_VIEW_UNAVAILABLE` 时可执行一次重建。SQLite 锁争用导致读取暂时失败时返回 `PANEL_VIEW_BUSY`，客户端稍后重试同一读请求。版本已换时，客户端收到 `PANEL_REVISION_MISMATCH` 后刷新；筛选不匹配的游标返回 `PANEL_CURSOR_INVALID`。P5 在发布成功后更新本机最新回执。回执写入失败时，P5 仍返回 `completed`，并在 `data.receipt_warning` 报告文件错误。自动化应使用本次命令返回的结果。
 
 Agent 可用 `panel search` 获取候选与版本，将该版本传给 `panel read` 读取同一发布版本。`read --input - --json` 同样接受 `{card_id,view_revision}`。已有无版本的 `read`、`search` 与 `source list` 保持各自的查询语义。版本化详情通过 `card_links: [{target,card_id,anchor?}]` 给出可生成深链的相对链接。 `target` 含正文中的原始片段，`anchor` 是已核对的解码后锚点。导航、原件、外部链接、图片、代码示例和不存在的锚点不进入这个映射。`heading_anchors: [{anchor,line}]` 提供治理解析器支持的正文标题锚点，行号从 `body` 的第一行起算。客户端应按源行设置这些锚点。旧投影可在下一次发布或重建后补出这些字段。
 

@@ -8,6 +8,7 @@ import hashlib
 import os
 from pathlib import Path
 import shutil
+import sqlite3
 import subprocess
 import sys
 
@@ -69,6 +70,20 @@ def _panel_card(root, identity, references, body):
     header = {"id": identity, "doc_ref": references, "code_ref": [], "tags": ["wifi"]}
     target.write_text("---\n" + yaml.safe_dump(header) + "---\n" + body, encoding="utf-8")
     return target
+
+
+def test_panel_reports_busy_until_published_view_can_be_read(knowledge):
+    assert invoke(knowledge, "maintain", "reindex")[0] == 0
+    overview = _panel(knowledge, "overview")
+    writer = sqlite3.connect(knowledge / "artifacts/knowledge.sqlite")
+    try:
+        writer.execute("PRAGMA journal_mode=DELETE").fetchone()
+        writer.execute("BEGIN EXCLUSIVE")
+        status, report = invoke(knowledge, "panel", "overview")
+        assert status == 2 and report["diagnostics"][0]["code"] == "PANEL_VIEW_BUSY", report
+    finally:
+        writer.close()
+    assert _panel(knowledge, "overview", {"view_revision": overview["view_revision"]}) == overview
 
 
 def test_panel_reads_published_cards_and_rejects_stale_revisions(knowledge):

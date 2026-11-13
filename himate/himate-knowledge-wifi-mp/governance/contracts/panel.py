@@ -148,6 +148,18 @@ def publish(catalog, cards, source_changes, search_weights):
         db.execute("INSERT INTO panel_state VALUES(?,?)", (VERSION, json.dumps(overview, ensure_ascii=False)))
 
 
+def _is_sqlite_contention(error):
+    code = getattr(error, "sqlite_errorcode", None)
+    if code is not None:
+        # Extended SQLite result codes store the primary code in their low byte.
+        return (code & 0xff) in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED)
+    # Python 3.10 does not expose SQLite result codes on exceptions.
+    message = str(error)
+    return message == "database is locked" or message.startswith((
+        "database table is locked", "database schema is locked",
+    ))
+
+
 @contextmanager
 def _published(root, expected=None):
     path = safe_path(root, "artifacts/knowledge.sqlite", ["artifacts"])
@@ -163,6 +175,8 @@ def _published(root, expected=None):
                 raise ContractError("PANEL_REVISION_MISMATCH", "The published view changed. Refresh and retry.")
             yield db, overview
     except (sqlite3.Error, json.JSONDecodeError) as error:
+        if isinstance(error, sqlite3.OperationalError) and _is_sqlite_contention(error):
+            raise ContractError("PANEL_VIEW_BUSY", "The published knowledge view is temporarily busy. Retry shortly.") from error
         raise ContractError("PANEL_VIEW_UNAVAILABLE", "Published panel view is unavailable") from error
 
 

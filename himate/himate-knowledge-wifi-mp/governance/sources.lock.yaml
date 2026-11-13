@@ -74,4 +74,120 @@ resources:
   processed_exists: true
   processed_at: '2026-10-30T15:48:44.225733+00:00'
   source_commit: null
-snapshots: []
+- source_id: doc-f1b2902e8bbdf5b03a63
+  kind: raw
+  path: docs-raw/protocols/ieee80211/ieee-80211-08-1214-02-qos-tutorial.pdf
+  processed_hash: 2d974bcc485a457424259bd4e0a5db39a571f41d6f9cf305c45d6011310f9e49
+  processed_exists: true
+  processed_at: '2026-11-13T00:10:29.091490+00:00'
+  source_commit: null
+- source_id: code-77e44563f471c8a40824
+  kind: code
+  path: main/hi1105_host/hmac/hmac_rx_data.c
+  encoding: gb18030
+- source_id: code-09c5d0d222a59e6a0e23
+  kind: code
+  path: main/hi1105_host/hmac/hmac_main.c
+  encoding: gb18030
+- source_id: code-d0a551808e381b01520e
+  kind: code
+  path: main/hi1105_host/wal/wal_linux_ioctl.c
+  encoding: gb18030
+- source_id: doc-80fcddc5f82362442e52
+  kind: raw
+  path: docs-raw/agent-notes/hi1105-host-rx-netif-delivery.md
+  processed_hash: 87faa33a1bf59ff5665a0e110da033cc9345fdf78cdb25774ee0e58e13f47bc6
+  processed_exists: true
+  processed_at: '2026-11-13T00:13:48.386780+00:00'
+  source_commit: null
+snapshots:
+- source_id: doc-f1b2902e8bbdf5b03a63
+  snapshot_id: citation-66d5130ef8659af9a0b97639432fa850a2f8c8f0
+  sha256: 2d974bcc485a457424259bd4e0a5db39a571f41d6f9cf305c45d6011310f9e49
+  bytes: 2182020
+  recovery:
+    method: evidence_object
+    path: logs/evidence/objects/2d974bcc485a457424259bd4e0a5db39a571f41d6f9cf305c45d6011310f9e49.bin
+  format: .pdf
+  card_references:
+  - card_id: ieee80211e-edca-admission-tspec
+    card_sha256: 2463e6839f204ce5c5f4da9b488dde1600bd740e84fdf8d1c660590529483ef5
+    reference_sha256: 061979a3372e5a4c8497b87204a45978a5d81ca92693d79ab50621024154e9bf
+  - card_id: ieee80211e-edca-admission-tspec
+    card_sha256: 2463e6839f204ce5c5f4da9b488dde1600bd740e84fdf8d1c660590529483ef5
+    reference_sha256: 9ac02415fd2063bb1c9c3e4b6e8e59e69b5fc473928f44a7a51857d1b24be438
+  - card_id: ieee80211e-edca-hcca-access-tradeoffs
+    card_sha256: 965a8e5ae51bd91933cc9954439b8c0480de6a91013917a39911f95b8b1beaa9
+    reference_sha256: f947d25ef129d8ed220e136c5212594f15853c56f3906f52746e5daf51dfc142
+  - card_id: ieee80211e-edca-hcca-access-tradeoffs
+    card_sha256: 965a8e5ae51bd91933cc9954439b8c0480de6a91013917a39911f95b8b1beaa9
+    reference_sha256: e1537d2c41382b5e7d97a8bd5ab5b15ea469bebbc27e027edc9a2484bcda4f8c
+- source_id: doc-80fcddc5f82362442e52
+  snapshot_id: citation-266e69ae07e0a00dea88f6260ca59348b6c14510
+  sha256: 87faa33a1bf59ff5665a0e110da033cc9345fdf78cdb25774ee0e58e13f47bc6
+  bytes: 3577
+  recovery:
+    method: evidence_object
+    path: logs/evidence/objects/87faa33a1bf59ff5665a0e110da033cc9345fdf78cdb25774ee0e58e13f47bc6.bin
+  format: .md
+  card_references:
+  - card_id: hi1105-host-rx-netif-delivery
+    card_sha256: 04140107d593398c3c49cb9a1bec92fdc101cb918fa8eff35036d7523dc37a9e
+    reference_sha256: 4a9bfffaf220a3e258520382e03c391fdc1c1908cab564ba443e8f6e663ea203
+- source_id: code-77e44563f471c8a40824
+  snapshot_id: citation-e80eacbf655ab6d974dab89a0fc29b5a5f827f39
+  sha256: c31d2fc4f9ecc6e6bbfe68c76b6b02b3b9610014c35099387a52571e1dec8954
+  bytes: 99678
+  recovery:
+    method: evidence_object
+    path: logs/evidence/objects/c31d2fc4f9ecc6e6bbfe68c76b6b02b3b9610014c35099387a52571e1dec8954.bin
+  format: .c
+  extraction:
+    extractor: code-gb18030:1
+  card_references:
+  - card_id: hi1105-host-rx-netif-delivery
+    card_sha256: 04140107d593398c3c49cb9a1bec92fdc101cb918fa8eff35036d7523dc37a9e
+    reference_sha256: 6f548b7a76437e4da3010c38776c0245ca4a0077058e4bc90156b0ca97c1a072
+  - card_id: hi1105-host-rx-netif-delivery
+    card_sha256: 04140107d593398c3c49cb9a1bec92fdc101cb918fa8eff35036d7523dc37a9e
+    reference_sha256: 31b717db2bb550cbf4ff7f992f087f3efb04a51fe0276a38a078f32d494bb12a
+  - card_id: hi1105-host-rx-netif-delivery
+    card_sha256: 04140107d593398c3c49cb9a1bec92fdc101cb918fa8eff35036d7523dc37a9e
+    reference_sha256: 1ca995a31e5cc8b2cf9e62aff090ba97d41b48678f51cab26f37ffa7a00a1a2b
+- source_id: code-09c5d0d222a59e6a0e23
+  snapshot_id: citation-1ef3310fa4aae1207c26e0d86e04a8edb3af99d3
+  sha256: 3740cad0021250af7539e23d96396b2c92a1d8b793d9f57c45e9655c5f956cbf
+  bytes: 83519
+  recovery:
+    method: evidence_object
+    path: logs/evidence/objects/3740cad0021250af7539e23d96396b2c92a1d8b793d9f57c45e9655c5f956cbf.bin
+  format: .c
+  extraction:
+    extractor: code-gb18030:1
+  card_references:
+  - card_id: hi1105-host-rx-netif-delivery
+    card_sha256: 04140107d593398c3c49cb9a1bec92fdc101cb918fa8eff35036d7523dc37a9e
+    reference_sha256: 51113348d7dc78ac2512660a317208babee03cea07446eddbf166d0cd9655fd3
+  - card_id: hi1105-host-rx-netif-delivery
+    card_sha256: 04140107d593398c3c49cb9a1bec92fdc101cb918fa8eff35036d7523dc37a9e
+    reference_sha256: a80dbfc00905f74470e8d9c04e6c7e265997ab152ec37a61ae50860112a55277
+  - card_id: hi1105-host-rx-netif-delivery
+    card_sha256: 04140107d593398c3c49cb9a1bec92fdc101cb918fa8eff35036d7523dc37a9e
+    reference_sha256: 0a8b5c6e9e22473ce9422f042d3178ff5c7e2597c7c6a60305aa0bf3cc696254
+  - card_id: hi1105-host-rx-netif-delivery
+    card_sha256: 04140107d593398c3c49cb9a1bec92fdc101cb918fa8eff35036d7523dc37a9e
+    reference_sha256: bbeac2d7ec745d951e3879c9f22860d90be3f16c8f849fb50fb1bdc8403c04c4
+- source_id: code-d0a551808e381b01520e
+  snapshot_id: citation-88a7c5af853e16e87c4cd20696b1b4a049e05f68
+  sha256: 5ec553a66102a6b3451e9e08b8410ff31304867269a8fddfcd5fe20aa7db2bdb
+  bytes: 397210
+  recovery:
+    method: evidence_object
+    path: logs/evidence/objects/5ec553a66102a6b3451e9e08b8410ff31304867269a8fddfcd5fe20aa7db2bdb.bin
+  format: .c
+  extraction:
+    extractor: code-gb18030:1
+  card_references:
+  - card_id: hi1105-host-rx-netif-delivery
+    card_sha256: 04140107d593398c3c49cb9a1bec92fdc101cb918fa8eff35036d7523dc37a9e
+    reference_sha256: 5531d9efa7067fb10156b24d537912ed4b2981ab8acba78b72f92fd65a034216

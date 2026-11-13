@@ -11,6 +11,12 @@
 | [rfc8622.txt](rfc8622.txt) | [RFC Editor原TXT](https://www.rfc-editor.org/rfc/rfc8622.txt)、[当前信息页](https://www.rfc-editor.org/info/rfc8622/) | RFC 8622，2019年6月，Standards Track / Proposed Standard | Lower-Effort PHB；更新RFC 8325相关DSCP建议，需在对应业务范围内使用。 |
 | [rfc9956.txt](rfc9956.txt) | [RFC Editor原TXT](https://www.rfc-editor.org/rfc/rfc9956.txt)、[当前信息页](https://www.rfc-editor.org/info/rfc9956/) | RFC 9956，2026年5月，Standards Track / Proposed Standard | Non-Queue-Building PHB；更新RFC 8325针对该codepoint的映射，不构成完整无线实现要求。 |
 
+## 802.11 QoS 教程原件
+
+802.11e 的两张 QoS 卡引用 IEEE 802.11-08/1214-02-00aa（2008-11-10，共 24 个物理页）。这是历史教程。进行本地入库或打开卡片的 PDF 引用前，从 [IEEE 工作组下载原件](https://www.ieee802.org/1/files/public/docs2008/avb-gs-802-11-qos-tutorial-1108.pdf)，保存到本目录的 `ieee-80211-08-1214-02-qos-tutorial.pdf`。下载后核对 SHA-256 `2d974bcc485a457424259bd4e0a5db39a571f41d6f9cf305c45d6011310f9e49`。
+
+验收时将 PDF 放在本轮 `workspace` 对应的 `docs-raw/protocols/ieee80211/` 目录。
+
 ## RFC 8325 的更新与勘误
 
 其官方信息页目前列出RFC 8622和RFC 9956为更新文件，本目录一并保存两份官方原文。

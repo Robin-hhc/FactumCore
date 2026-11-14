@@ -1,0 +1,6 @@
+# Preserve release digests and binary model parts after copying this package into another repository.
+** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+deploy.sh text eol=lf
+knowledge.sh text eol=lf
+tools/deploy/models/docling-cpu/**/*.onnx binary
+tools/deploy/models/docling-cpu/**/*.part[0-9][0-9][0-9] binary

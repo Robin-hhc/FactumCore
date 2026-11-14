@@ -14,7 +14,7 @@ HiMate 将设计文档、规格和代码分析整理为可追溯的知识卡，�
 
 来源文档位于 `docs-raw/`，其中 `agent-notes/` 保存 Agent 生成的分析稿。正式卡位于 `knowledge/`。一份文档可以形成多张主题卡，一张卡也可以融合多份文档和多个代码入口。卡片保存结论、条件、理由和必要证据，而完整来源通过引用读取。
 
-卡头承担稳定身份、文档与代码关系，以及可选标签和整卡生命周期；新卡三个必填、两个可选字段的权威定义见[卡片规范](../governance/specs/cards.md)。标题和知识内容放正文。
+卡头承担稳定身份、文档与代码关系，以及可选标签和整卡生命周期；新卡三个必填、两个可选字段的权威定义见工具包的 `governance/specs/cards.md`。标题和知识内容放正文。
 
 来源登记使用统一的 `source_id` 标识文件，卡头的 `doc_id`、`code_id` 引用相应文件 ID。章节、页码和行段位于引用项中；同一代码文件中的多个函数可以分别引用。普通内容更新沿用文件身份，内容版本由 SHA-256 表示。
 
@@ -38,7 +38,7 @@ Git 用于按需读取已有历史版本。来源提交可以辅助定位原文�
 |---|---|
 | Workflow | 节点顺序、执行角色、分支、返工和巡检循环 |
 | Skill | 单步目标、必要材料、操作指引和交付要求 |
-| 仓内 CLI | 参数处理、文件操作、关系查询、固定检查和索引维护 |
+| 工具包 CLI | 参数处理、文件操作、关系查询、固定检查和索引维护 |
 | `governance/contracts/` | 来源解析、卡片解析、版本检测、符号定位和检索算法 |
 | 作者 Agent | 阅读材料、选择六决策、按主题写卡 |
 | 审阅 Agent | 独立核对事实、条件、遗漏及知识归属 |
@@ -74,66 +74,38 @@ flowchart LR
 
 `code_root` 相对知识根，默认布局为 `../../main`。`modules[].path` 相对代码根，描述允许引用的实际模块。代码工作区基准取 `code_root` 开头 `../` 指向的上级目录。以 `../../main` 为例，该基准是 `repo/`。
 
-登记代码时，未填写 `repo_id` 的 `path` 相对上述代码工作区基准，例如 `main/<module>/<file>.c`。填写 `repo_id` 时，路径相对对应的已配置代码仓。文档路径相对知识根，位于 `docs-raw/`。路径参数详见[来源规范](../governance/specs/sources.md)。
+登记代码时，未填写 `repo_id` 的 `path` 相对上述代码工作区基准，例如 `main/<module>/<file>.c`。填写 `repo_id` 时，路径相对对应的已配置代码仓。文档路径相对知识根，位于 `docs-raw/`。路径参数详见工具包的 `governance/specs/sources.md`。
 
 ### 5.2 运行位置与组件分发
 
-命令在数据所在执行端的原生目录运行。执行端取得仓库代码、选用已有 Python 3.10—3.12，并配置实际项目和知识根。远端任务由宿主已有 SSH 能力调用同一仓内 CLI。
+执行端从已安装的工具包启动 CLI，并通过 `--knowledge-root` 指定数据所在主机的知识根。工具根由启动入口确定，知识根决定配置、原件、卡片、索引和其他业务输出。OpenFlow 或 SSH 通过该执行端的实际路径调用。
 
-部署入口、分发源码与工具均位于知识根：`deploy.ps1`、`deploy.sh`、`skills/`、`workflows/` 和 `tools/`。Windows 与 Linux 入口共用 Python 后端，交互展示两个 Skill 安装目录和一个 Workflow 模板目录，回车采用默认值，也可输入自定义路径。
-
-默认将 Skill 同时安装到 `~/.openflow/config/skills` 和 `~/.cac/skills`，将 Workflow 安装到 `~/.openflow/config/workflow-templates`。部署沿用执行端 pip 配置安装 Python 3.10–3.12 的锁定依赖，准备 `artifacts/models/docling-cpu/` 的本地模型。准备成功后替换同名能力包，其他能力包继续保留。模型复用、离线复制、下载选项和失败处理见[部署说明](../tools/deploy/README.md)。
+部署入口、运行依赖、Skill、Workflow、共用规则和离线模型随同一个工具包发布。Windows 与 Linux 入口共用 Python 后端。默认将 Skill 安装到 `~/.openflow/config/skills` 和 `~/.cac/skills`，将 Workflow 安装到 `~/.openflow/config/workflow-templates`。部署使用 Python 3.10–3.12，从工具包的依赖锁安装。指定知识根时同时准备该库的 `artifacts/models/docling-cpu/`。准备成功后替换同名能力包。参数与模型准备见工具包的 `tools/deploy/README.md`。
 
 ### 5.3 HiMate Knowledge目录架构
 
 ```text
-repo/
-├── main/                              实际代码工作区，可含多个 Git 仓
-└── himate/
-    └── himate-knowledge-wifi-mp/        领域知识根
-        ├── AGENTS.md                   领域与代码工作区指引
-        ├── config.yml                  本知识根配置和实际代码范围
-        ├── deploy.ps1 / deploy.sh      Windows / Linux 部署入口
-        ├── skills/                    Skill 分发源码
-        ├── workflows/                 Workflow 模板
-        ├── tools/
-        │   ├── deploy/                共用部署实现、说明与离线模型包
-        │   │   └── models/            摘要清单、来源说明及 docling-cpu 权重
-        │   └── knowledge/             开发工具
-        ├── knowledge.py / knowledge.cmd / knowledge.sh
-        ├── runtime/                   CLI、运行包和运行依赖锁
-        ├── governance/
-        │   ├── contracts/             共用业务算法
-        │   ├── schemas/               数据格式
-        │   ├── templates/             知识卡模板
-        │   ├── specs/                 规则说明
-        │   ├── sources.lock.yaml      来源身份、完整处理事实及PDF累计覆盖
-        │   └── framework.lock.yaml    治理规则版本与摘要
-        ├── docs-raw/                  原始文档和本机目录映射
-        │   └── agent-notes/           聊天沉淀与源码分析稿
-        ├── knowledge/
-        │   ├── concepts/entities/     实体卡
-        │   ├── concepts/flows/        流程卡
-        │   ├── concepts/protocols/    协议卡
-        │   ├── rules/                 规则卡
-        │   ├── commands/              命令卡
-        │   ├── runbooks/              排查手册
-        │   └── glossaries/            术语卡
-        ├── .build/                    当前页批材料、计划、候选及审阅意见
-        │   └── materials/             原件副本、PDF页材料包及非PDF解析
-        ├── artifacts/
-        │   ├── knowledge.sqlite       共用的关系与检索数据库
-        │   ├── ingest/
-        │   │   ├── latest.json        最近一次入库回执
-        │   │   └── parsed/            可校验复用、删除重建的PDF解析缓存
-        │   ├── query/                 每次搜索的独立结果
-        │   ├── sources/               按需恢复的来源版本
-        │   ├── source-read/           隔离的临时原件阅读任务与到期租约
-        │   ├── patrol/                巡检统计
-        │   └── models/                部署准备并独立维护的本地解析模型
-        ├── evals/                     全部开发测试与公共夹具
-        │   └── deploy/                部署工具测试
-        └── docs-llm-wiki/              设计与使用说明
+himate-knowledge-tools/              可安装在执行端任意目录
+├── deploy.ps1 / deploy.sh           Windows / Linux 安装入口
+├── knowledge.py / knowledge.cmd / knowledge.sh
+├── runtime/                        CLI、发行清单、依赖锁
+├── governance/                     共用算法、Schema、模板、规范与框架锁
+├── tools/deploy/models/             离线模型和清单
+├── skills/                         Skill 分发源码
+├── workflows/                      Workflow 模板
+├── evals/                          开发验证
+└── docs-llm-wiki/                   开发文档、面板 CLI 契约与本地 SDD
+
+repo/                               业务 manifest 工作区示例
+├── main/                           实际代码工作区
+└── himate/himate-knowledge-wifi-mp/
+    ├── AGENTS.md / config.yml       领域指引和配置
+    ├── docs-llm-wiki/               架构设计、详细设计和使用说明
+    ├── docs-raw/                    原件与本机来源映射
+    ├── knowledge/                   正式卡与导航
+    ├── governance/sources.lock.yaml  来源身份和版本
+    ├── .build/                     本轮材料、计划、候选与审阅意见
+    └── artifacts/                  索引、回执、解析缓存与已准备的 OCR 模型
 ```
 
 目录图给出默认领域布局，实际知识根由配置选择。七类卡片沿用 `knowledge/index.md` 的类型目录；导航按需维护，卡片查询和来源关系由数据库提供。
@@ -160,16 +132,17 @@ repo/
 
 ### 5.5 框架更新与目录清理
 
-框架更新替换程序与规则，业务知识更新通过入库流程处理。更新前先完成当前写任务；需要续办的失败任务保留 `.build/`，不要用清空暂存代替重试。
+发布新工具包后由执行端切换版本。已开始的写任务沿用本轮工具版本，失败任务保留 `.build/` 以便续办。领域知识通过业务仓和入库流程更新。
 
 | 内容 | 更新方式 |
 |---|---|
 | `knowledge/`、`docs-raw/` | 保留正式卡、导航、原件及本机来源映射；由业务变更和入库流程维护 |
 | `governance/sources.lock.yaml` | 保留来源身份、完整成功事实及PDF累计覆盖，不能用发行包中的空登记覆盖 |
 | 知识根的 `AGENTS.md`、`config.yml` | 按实际项目维护，框架升级时合并项目已有约定和配置 |
-| `runtime/`、仓内启动器与检查入口 | 按同一发行版本替换程序文件，运行环境独立维护 |
-| `governance/` 中算法、Schema、模板、规则及 `framework.lock.yaml` | 按同一版本更新并保持摘要一致；项目定制规则按需合并，不能整目录删除 |
-| `docs-llm-wiki/`、`evals/` | 更新随版本发布的文件，保留本地 SDD、任务和历史工件 |
+| `runtime/`、工具包启动器与检查入口 | 按同一发行版本替换程序文件，运行环境独立维护 |
+| `governance/` 中算法、Schema、模板、规则及 `framework.lock.yaml` | 随工具包更新并保持摘要一致，领域特有说明从知识根读取 |
+| 知识仓的 `docs-llm-wiki/` | 维护架构、业务流程、使用说明和领域资料分类 |
+| 工具包的 `docs-llm-wiki/`、`evals/` | 维护 CLI 契约、开发文档和验收测试。本地 SDD 和任务草稿由 Git 忽略 |
 | `tools/deploy/models/` | 清单与匹配权重一同更新和交付，不以新清单搭配旧权重；二进制按离线分发方式补齐 |
 | 已安装的同名 Skill、Workflow 包 | 由部署脚本完整替换，其他包保留 |
 

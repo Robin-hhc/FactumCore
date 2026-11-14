@@ -124,7 +124,7 @@ files:
     sha256: 93ebf777706f36c8a69e3caba3b87f0141378d75d51b76e015e2050b20ee7de9
   contracts/markdown_images.py:
     path: governance/contracts/markdown_images.py
-    sha256: bc1df263e3fdae54e7a033cbc9da92fdb38047632b72e20bda17596dfccb6b51
+    sha256: 01816b999514f0129c467d00c36fe59c063169de0e59b341519e2272000633ee
 capabilities:
   checks: '1.0'
   indexing: '1.0'

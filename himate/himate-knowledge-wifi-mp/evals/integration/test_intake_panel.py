@@ -53,7 +53,9 @@ def package(tmp_path):
     staged = tmp_path / "uploads"
     markdown = (b"# WLAN receive design\n\n![Receive timing](figures/receive%20timing.png)\n\n"
                 b"```markdown\n![Fenced example](fenced.png)\n```\n"
-                b"`![Inline example](inline.png)` and \\![Escaped example](escaped.png)\n")
+                b"## `![Heading example](heading.png)` ##\r\n"
+                b"`![Inline example](inline.png)` and \\![Escaped example](escaped.png)\r\n"
+                b"Paragraph continued.\r\n")
     image = BytesIO()
     Image.new("RGB", (12, 8), "navy").save(image, format="PNG")
     return (
@@ -129,6 +131,7 @@ def test_package_save_checks_hashes_replays_and_preserves_p1_path(knowledge, pac
     assert "![Receive timing](images/" in markdown
     assert "figures/receive%20timing.png" not in markdown
     assert "```markdown\n![Fenced example](fenced.png)\n```" in markdown
+    assert "## `![Heading example](heading.png)` ##" in markdown
     assert r"`![Inline example](inline.png)` and \![Escaped example](escaped.png)" in markdown
     manifest = json.loads((knowledge / parsed["manifest_ref"]).read_bytes())
     assert manifest["source_path"] == source["path"]

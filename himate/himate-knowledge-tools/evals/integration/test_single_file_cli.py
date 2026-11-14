@@ -8,6 +8,7 @@ import hashlib
 import os
 from pathlib import Path
 import shutil
+import sqlite3
 import subprocess
 import sys
 
@@ -169,6 +170,70 @@ def test_panel_publishes_only_actual_markdown_card_links(knowledge):
         graph = _panel(knowledge, "graph", {"card_id": identity, "kinds": ["card"], "limit": 1,
                                             "view_revision": read["view_revision"]})
         assert graph["edges"] == expected and graph["next_cursor"] is None
+
+
+def test_panel_global_graph_and_bidirectional_expansion_use_published_edges(knowledge):
+    (knowledge / "docs-raw/specs/shared.md").write_text("# Shared material\n", encoding="utf-8")
+    assert invoke(knowledge, "source", "register",
+                  request={"path": "docs-raw/specs/shared.md", "source_id": "doc-shared"})[0] == 0
+    references = [{"doc_id": "doc-shared", "line_start": 1, "line_end": 1}]
+    _panel_card(knowledge, "a", references, "# A\n\n[Link](b.md).\n")
+    _panel_card(knowledge, "b", references, "# B\n\n[Return link](a.md).\n")
+    (knowledge / "docs-raw/specs/separate.md").write_text("# Separate evidence\n", encoding="utf-8")
+    assert invoke(knowledge, "source", "register",
+                  request={"path": "docs-raw/specs/separate.md", "source_id": "doc-separate"})[0] == 0
+    separate = [{"doc_id": "doc-separate", "line_start": 1, "line_end": 1}]
+    _panel_card(knowledge, "doc-shared", separate, "# Separate card with a colliding ID\n\nIsolation.\n")
+    status, report = invoke(knowledge, "maintain", "reindex")
+    assert status == 0, report
+
+    options = {"scope": "global"}
+    graph = _panel(knowledge, "graph", options)
+    assert graph["node_count"] == 5 and graph["edge_count"] == 5
+    assert graph["truncated"] is False
+    assert [item["id"] for item in graph["nodes"]] == [
+        "card/a", "card/b", "card/doc-shared", "document/doc-separate", "document/doc-shared",
+    ]
+    assert graph["nodes"][-1] == {"id": "document/doc-shared", "kind": "document", "ref_id": "doc-shared",
+                                   "title": "shared.md", "path": "docs-raw/specs/shared.md"}
+    assert graph["edges"] == [
+        {"source": "card/a", "target": "card/b", "kind": "card_link"},
+        {"source": "card/a", "target": "document/doc-shared", "kind": "doc_ref"},
+        {"source": "card/b", "target": "card/a", "kind": "card_link"},
+        {"source": "card/b", "target": "document/doc-shared", "kind": "doc_ref"},
+        {"source": "card/doc-shared", "target": "document/doc-separate", "kind": "doc_ref"},
+    ]
+
+    request = {"scope": "neighbors", "node_id": "document/doc-shared", "kinds": ["card"],
+               "view_revision": graph["view_revision"], "limit": 1}
+    first = _panel(knowledge, "graph", request)
+    second = _panel(knowledge, "graph", {**request, "cursor": first["next_cursor"]})
+    assert first["edges"] == [graph["edges"][1]] and second["edges"] == [graph["edges"][3]]
+    assert [node["id"] for node in second["nodes"]] == ["document/doc-shared", "card/b"]
+    assert second["next_cursor"] is None
+    status, report = invoke(knowledge, "panel", "graph",
+                            request={**request, "kinds": ["code"], "cursor": first["next_cursor"]})
+    assert status == 2 and report["diagnostics"][0]["code"] == "PANEL_CURSOR_INVALID"
+
+    card_request = {**request, "node_id": "card/a"}
+    forward = _panel(knowledge, "graph", card_request)
+    reverse = _panel(knowledge, "graph", {**card_request, "cursor": forward["next_cursor"]})
+    assert [*forward["edges"], *reverse["edges"]] == [graph["edges"][2], graph["edges"][0]]
+    assert _panel(knowledge, "graph", {"card_id": "a", "kinds": ["document"]})["edges"] == [
+        {"source": "a", "target": "document/doc-shared", "kind": "doc_ref"}
+    ]
+
+    with sqlite3.connect(knowledge / "artifacts/knowledge.sqlite") as database:
+        database.execute("DROP TABLE panel_graph_nodes")
+        database.execute("DROP TABLE panel_graph_edges")
+    status, report = invoke(knowledge, "panel", "graph", request=options)
+    assert status != 0 and report["diagnostics"][0]["code"] == "PANEL_VIEW_UNAVAILABLE"
+    assert "maintain reindex" in report["diagnostics"][0]["message"]
+    assert _panel(knowledge, "graph", {"card_id": "a"})["view_revision"] == graph["view_revision"]
+    assert invoke(knowledge, "maintain", "reindex")[0] == 0
+    assert _panel(knowledge, "graph", options)["edges"] == graph["edges"]
+    status, report = invoke(knowledge, "panel", "graph", request=request)
+    assert status != 0 and report["diagnostics"][0]["code"] == "PANEL_REVISION_MISMATCH"
 
 
 def test_checked_source_binding_survives_reindex_clone_and_recheck(knowledge, tmp_path):

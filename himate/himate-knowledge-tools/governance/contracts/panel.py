@@ -20,6 +20,9 @@ CARD_TYPES = {
 }
 KINDS = {"card", "document", "code"}
 VERSION = 2
+GRAPH_MAX_NODES = 4000
+GRAPH_MAX_EDGES = 15000
+GRAPH_MAX_BYTES = 4 * 1024 * 1024
 
 
 def card_detail(card, sources):
@@ -72,6 +75,31 @@ def _card_links(path, structures, card_ids):
     return list(results.values())
 
 
+def _publish_graph(db, summaries, card_ids, files, referenced, edges):
+    db.execute("""CREATE TABLE panel_graph_nodes(
+        id TEXT PRIMARY KEY, kind TEXT NOT NULL, ref_id TEXT NOT NULL, title TEXT NOT NULL,
+        path TEXT NOT NULL) WITHOUT ROWID""")
+    db.execute("""CREATE TABLE panel_graph_edges(
+        source TEXT NOT NULL, target TEXT NOT NULL, kind TEXT NOT NULL,
+        PRIMARY KEY(source,target,kind)) WITHOUT ROWID""")
+    db.execute("CREATE INDEX panel_graph_incoming ON panel_graph_edges(target,source,kind)")
+    db.executemany("INSERT INTO panel_graph_nodes VALUES(?,?,?,?,?)", (
+        ("card/" + identity, "card", identity, summaries[identity]["title"], path)
+        for path, identity in card_ids.items()
+    ))
+    db.executemany("INSERT INTO panel_graph_nodes VALUES(?,?,?,?,?)", (
+        (kind + "/" + identity, kind, identity, PurePosixPath(files[identity]["path"]).name[:160],
+         files[identity]["path"])
+        for kind, identities in referenced.items() for identity in identities
+    ))
+    # Legacy card neighbors are stored under both cards. Keep exactly the row
+    # indexed under the actual source, with globally stable typed endpoints.
+    db.executemany("INSERT INTO panel_graph_edges VALUES(?,?,?)", (
+        ("card/" + source, kind + "/" + target.rsplit("/", 1)[-1], edge_kind)
+        for root_id, kind, _, _, source, target, edge_kind in edges if root_id == source
+    ))
+
+
 def publish(catalog, cards, source_changes, search_weights):
     """Replace the read model inside the existing catalog write transaction."""
     db = catalog.connection
@@ -122,7 +150,8 @@ def publish(catalog, cards, source_changes, search_weights):
                 "recent_cards": [{key: summaries[identity][key] for key in ("id", "title", "type")}
                                  for identity in recent]}
     with catalog.transaction():
-        for table in ("panel_state", "panel_cards", "panel_tags", "panel_terms", "panel_neighbors"):
+        for table in ("panel_state", "panel_cards", "panel_tags", "panel_terms", "panel_neighbors",
+                      "panel_graph_nodes", "panel_graph_edges"):
             db.execute("DROP TABLE IF EXISTS " + table)
         db.execute("CREATE TABLE panel_state(version INTEGER NOT NULL, overview TEXT NOT NULL)")
         db.execute("""CREATE TABLE panel_cards(
@@ -145,6 +174,7 @@ def publish(catalog, cards, source_changes, search_weights):
             FROM search_terms s JOIN panel_cards c ON c.id=s.card_id GROUP BY s.card_id,s.token
         """, (search_weights["title"], search_weights["tags"], search_weights["body"]))
         db.executemany("INSERT INTO panel_neighbors VALUES(?,?,?,?,?,?,?)", edges)
+        _publish_graph(db, summaries, card_ids, files, referenced, edges)
         db.execute("INSERT INTO panel_state VALUES(?,?)", (VERSION, json.dumps(overview, ensure_ascii=False)))
 
 
@@ -277,13 +307,17 @@ def _search(db, revision, request):
             "truncated": len(rows) > top_k}
 
 
-def _graph(db, revision, request):
-    _check(request, ("view_revision", "card_id", "kinds", "cursor", "limit"))
-    identity = validate_id(request.get("card_id"))
+def _graph_kinds(request):
     kinds = request.get("kinds", sorted(KINDS))
     if not isinstance(kinds, list) or any(not isinstance(kind, str) or kind not in KINDS for kind in kinds):
         raise ContractError("PANEL_INVALID_REQUEST", "kinds must contain card, document or code")
-    kinds = sorted(set(kinds))
+    return sorted(set(kinds))
+
+
+def _graph(db, revision, request):
+    _check(request, ("view_revision", "card_id", "kinds", "cursor", "limit"))
+    identity = validate_id(request.get("card_id"))
+    kinds = _graph_kinds(request)
     limit, after, scope = _page(request, ["graph", revision, identity, kinds], 50, width=5)
     card = db.execute("SELECT id,title FROM panel_cards WHERE id=?", (identity,)).fetchone()
     if card is None:
@@ -310,6 +344,71 @@ def _graph(db, revision, request):
         edges.append({"source": row["source"], "target": row["target"], "kind": row["edge_kind"]})
     return {"view_revision": revision, "nodes": list(nodes.values()), "edges": edges,
             "next_cursor": _next(rows, limit, scope, lambda row: [row[column] for column in key])}
+
+
+def _graph_global(db, revision, request):
+    _check(request, ("scope", "view_revision"))
+    node_count = db.execute("SELECT COUNT(*) FROM panel_graph_nodes").fetchone()[0]
+    edge_count = db.execute("SELECT COUNT(*) FROM panel_graph_edges").fetchone()[0]
+    # Reserve room for the result envelope and use the JSON emitter's spacing
+    # to count UTF-8 bytes, including non-ASCII titles and paths.
+    budget = GRAPH_MAX_BYTES - 1024
+    nodes, edges = [], []
+    for row in db.execute("SELECT * FROM panel_graph_nodes ORDER BY id LIMIT ?", (GRAPH_MAX_NODES,)):
+        node = dict(row)
+        size = len(json.dumps(node, ensure_ascii=False).encode("utf-8")) + 2
+        if size > budget:
+            break
+        nodes.append(node)
+        budget -= size
+    if nodes and budget > 0:
+        last_id = nodes[-1]["id"]
+        for row in db.execute("""SELECT * FROM panel_graph_edges WHERE source<=? AND target<=?
+                                 ORDER BY source,target,kind LIMIT ?""", (last_id, last_id, GRAPH_MAX_EDGES)):
+            edge = dict(row)
+            budget -= len(json.dumps(edge, ensure_ascii=False).encode("utf-8")) + 2
+            if budget < 0:
+                break
+            edges.append(edge)
+    return {"view_revision": revision, "nodes": nodes, "edges": edges,
+            "node_count": node_count, "edge_count": edge_count,
+            "truncated": len(nodes) < node_count or len(edges) < edge_count}
+
+
+def _graph_neighbors(db, revision, request):
+    _check(request, ("scope", "view_revision", "node_id", "kinds", "cursor", "limit"))
+    node_id = _text(request, "node_id", 170)
+    kind, separator, ref_id = node_id.partition("/")
+    if not separator or kind not in KINDS:
+        raise ContractError("PANEL_INVALID_REQUEST", "Use a typed node_id from the graph")
+    validate_id(ref_id)
+    root = db.execute("SELECT * FROM panel_graph_nodes WHERE id=?", (node_id,)).fetchone()
+    if root is None:
+        raise ContractError("PANEL_NODE_NOT_FOUND", node_id)
+    kinds = _graph_kinds(request)
+    limit, after, scope = _page(request, ["graph-neighbors", revision, node_id, kinds], 50, width=3)
+    rows = []
+    for endpoint, peer, direction in (("source", "target", "out"), ("target", "source", "in")):
+        comparison = ">=" if direction > after[2] else ">"
+        for kind in kinds:
+            # A typed ID starts with kind followed by a slash. Bound the range
+            # in the same adjacency index used for the keyset cursor.
+            rows.extend(db.execute(f"""
+                SELECT source,target,kind,{peer} AS peer,? AS direction FROM panel_graph_edges
+                WHERE {endpoint}=? AND {peer}>=? AND {peer}<? AND ({peer},kind) {comparison} (?,?)
+                ORDER BY {peer},kind LIMIT ?
+            """, (direction, node_id, kind + "/", kind + "0", *after[:2], limit + 1)))
+    key = lambda row: [row["peer"], row["kind"], row["direction"]]
+    rows.sort(key=key)
+    page = rows[:limit]
+    nodes = [dict(root)]
+    if page:
+        peers = sorted({row["peer"] for row in page})
+        marks = ",".join("?" for _ in peers)
+        nodes.extend(map(dict, db.execute(f"SELECT * FROM panel_graph_nodes WHERE id IN ({marks}) ORDER BY id", peers)))
+    return {"view_revision": revision, "nodes": nodes,
+            "edges": [{column: row[column] for column in ("source", "target", "kind")} for row in page],
+            "next_cursor": _next(rows, limit, scope, key)}
 
 
 def run(root, action, request):
@@ -355,4 +454,13 @@ def run(root, action, request):
             return _cards(db, revision, request), "listed"
         if action == "search":
             return _search(db, revision, request), "searched"
-        return _graph(db, revision, request), "listed"
+        if "scope" not in request:
+            return _graph(db, revision, request), "listed"
+        graph_scope = request["scope"]
+        if graph_scope not in ("global", "neighbors"):
+            raise ContractError("PANEL_INVALID_REQUEST", "scope must be global or neighbors")
+        if db.execute("""SELECT COUNT(*) FROM sqlite_master WHERE type='table'
+                        AND name IN ('panel_graph_nodes','panel_graph_edges')""").fetchone()[0] != 2:
+            raise ContractError("PANEL_VIEW_UNAVAILABLE", "Build the graph view with maintain reindex")
+        graph = _graph_global if graph_scope == "global" else _graph_neighbors
+        return graph(db, revision, request), "listed"

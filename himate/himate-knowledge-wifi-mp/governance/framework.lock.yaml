@@ -1,6 +1,6 @@
 schema_version: '2.0'
 contract_family: aiot-wifi
-tool_version: 0.18.0
+tool_version: 0.19.0
 files:
   contracts/__init__.py:
     path: governance/contracts/__init__.py
@@ -22,7 +22,7 @@ files:
     sha256: e86d2fae148cbdbdd3fb98d819c93597b8f68bb3ef46ef174c74f583b486927d
   contracts/ingest.py:
     path: governance/contracts/ingest.py
-    sha256: 8ebccaeee00a2158318a90102f70658c3783195c316c60c07b3fa3c61a4938cc
+    sha256: c2fa4d499e0cf946cf3a21545e9f00cff8636ca2cb4ddf081eace74ef79d21d7
   contracts/knowledge.py:
     path: governance/contracts/knowledge.py
     sha256: 2b165355fa1548c9c5e58bc9fe3e0c0802d0e02bdbc61c498b37424785faebe9
@@ -31,10 +31,10 @@ files:
     sha256: c9e35e5d69af461e0a4922cb3246b4b722c3cace4ca4fa820749dadc67818b80
   contracts/panel.py:
     path: governance/contracts/panel.py
-    sha256: 66059c10bddf7097bc51b11322fc8137ea148b58beaa0e72a84885aadf265c40
+    sha256: 2a2e58fa942cb451376d3a2da235ff650c3abf06dfc3dc847364f36388281246
   contracts/raw_materials.py:
     path: governance/contracts/raw_materials.py
-    sha256: f0692289b40c71c3594febe9c18dffb6d526fb8e79e246d53119af5ce5c0b52c
+    sha256: 85697d5486c7fff5fcdd0ec149e53ab224a520542040fee0b1d4aa03354cc8fc
   contracts/runtime.py:
     path: governance/contracts/runtime.py
     sha256: 29d30672e95806e22836f4a69ce1ff6d47baccd27716a0a975894a2a88759f9a
@@ -109,7 +109,7 @@ files:
     sha256: afbe4024ce2203b508604e84a2c092b7a6af7fa315fd4a6fcb4803d2c04ee308
   contracts/document_parser.py:
     path: governance/contracts/document_parser.py
-    sha256: 2558cc8268cf0146970b60153156a4b9b1886c3b46d18fd8a093d201423d6a72
+    sha256: 248143ad1c7de540d243c9e3e9d082f53e4685f24e4e1b1b55050953208c3933
   contracts/source_read.py:
     path: governance/contracts/source_read.py
     sha256: 7c5f2dfd955850281419d9f7a4f22ee80b4f3328f32c894588d791b926c94b2c
@@ -119,6 +119,12 @@ files:
   contracts/pdf_text.py:
     path: governance/contracts/pdf_text.py
     sha256: 1bfcee60d495241cc18784e7868bc95d013bafb373292572bee804043de2ded1
+  contracts/intake.py:
+    path: governance/contracts/intake.py
+    sha256: 93ebf777706f36c8a69e3caba3b87f0141378d75d51b76e015e2050b20ee7de9
+  contracts/markdown_images.py:
+    path: governance/contracts/markdown_images.py
+    sha256: 735432dca74ebaac138c4c97d91374c97ea1a6068a412a6c201b6b5322a7ad03
 capabilities:
   checks: '1.0'
   indexing: '1.0'

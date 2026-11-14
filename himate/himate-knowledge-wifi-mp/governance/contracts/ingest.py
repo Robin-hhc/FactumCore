@@ -21,7 +21,7 @@ from .catalog import Catalog, atomic_write, normalize_page_ranges, pdf_review_re
 from .cards_v3 import parse_card
 from .validation import (ContractError, canonical_bytes, load_yaml, markdown_structure, safe_path, validate_id,
                          workspace_configuration, workspace_layout)
-from . import citation_versions, document_parser, source_resources
+from . import citation_versions, document_parser, intake, source_resources
 
 
 FORMATS = document_parser.SUPPORTED_FORMATS
@@ -136,16 +136,27 @@ def _raw_files(root, selected=None):
     """Enumerate supported documents; each original is read once by observe."""
     raw = safe_path(root, "docs-raw")
     found = []
+    packages = {}
     if raw.exists():
         for parent, directories, names in os.walk(raw, followlinks=False, onerror=lambda error: (_ for _ in ()).throw(error)):
+            location = Path(parent)
+            directories[:] = [name for name in directories if not name.startswith(intake.TEMP_PREFIX)]
             for directory in list(directories):
-                if (Path(parent) / directory).is_symlink():
+                if (location / directory).is_symlink():
                     raise ContractError("LINKED_SOURCE", "Raw source directories must not be links", directory)
+            document = packages.get(location.parent)
+            if document is None and intake.MARKER in names:
+                package = intake.package_manifest(location)
+                if package:
+                    document = location / package["document_path"]
+            if document is not None:
+                packages[location] = document
             for name in sorted(names):
                 if name in IGNORED or Path(name).suffix.lower() not in FORMATS:
                     continue
-                reference = (Path(parent) / name).relative_to(root).as_posix()
-                found.append(reference)
+                if document is not None and location / name != document:
+                    continue
+                found.append((location / name).relative_to(root).as_posix())
     # An explicitly limited ordinary scope does not depend on an unrelated dbox.
     config = raw / "sources/dbox.local.yml"
     use_dbox = selected is None or source_resources.is_dbox_path(selected)
@@ -455,8 +466,10 @@ def scan(root, request):
                 if _pdf_source(source):
                     parsed = document_parser.prepare_pdf(root, source, selected["content"], options=request.get("parser"))
                 else:
+                    assets = (intake.package_assets(root, source["path"], expected_sha256=source["hash"])
+                              if suffix == ".md" else None)
                     parsed = document_parser.parse(root, source, selected["content"], ".build/materials/parsed",
-                                                   options=request.get("parser"))
+                                                   options=request.get("parser"), local_images=assets)
                 source["parsed"] = parsed
                 source["text_ref"] = parsed["text_ref"]
                 # Keep the old entry usable without changing the parser's
@@ -584,8 +597,10 @@ def _parsed_document(root, source, data, context, *, options=None):
         parsed = index.get(index_key)
         if parsed is None:
             component = sha(identity.encode("utf-8"))[:20] + "-" + digest[:16] + "-" + options_hash[:16]
+            assets = (intake.package_assets(root, source["path"], expected_sha256=digest)
+                      if PurePosixPath(source["path"]).suffix.lower() == ".md" else None)
             parsed = document_parser.parse(root, source, data,
-                                           f".build/materials/references/{component}", options=options)
+                                           f".build/materials/references/{component}", options=options, local_images=assets)
             index[index_key] = parsed
             write_json(document_parser.safe_path(root, index_ref, [".build/materials"]), index)
         loaded = document_parser.load(root, parsed, expected_source_id=identity, expected_sha256=digest)

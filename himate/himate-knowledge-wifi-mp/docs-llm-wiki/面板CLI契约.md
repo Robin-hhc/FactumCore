@@ -15,9 +15,14 @@ printf '%s' '{"limit":20}' | python -B /absolute/knowledge/root/knowledge.py pan
 | `panel search` | `{view_revision?,query,tags?,top_k?}` | `{view_revision,matches,truncated}`，候选沿用整卡检索字段和权重 |
 | `panel read` | `{view_revision?,card_id}` | 完整读卡结果与 `view_revision` |
 | `panel graph` | `{view_revision?,card_id,kinds?,cursor?,limit?}` | `{view_revision,nodes:[{id,title,kind,ref_id?}],edges:[{source,target,kind}],next_cursor}` |
-| `panel raw-list` | `{path?,cursor?,limit?}` | `{path,items:[{name,path,kind,size}],next_cursor}` |
+| `panel raw-list` | `{path?,cursor?,limit?}` | `{path,items:[{name,path,kind,size,category?,empty?}],next_cursor}` |
 | `panel raw-path` | `{path}` | `{name,path,kind,size,absolute_path}`，供可信文件服务使用 |
 | `panel raw-save` | `{path,staged_path,expected_size?,expected_sha256?}` | `{name,path,kind,size,sha256}` |
+| `panel raw-mkdir` | `{path}` | `{path}`，阶段 `created` |
+| `panel raw-rmdir` | `{path}` | `{path}`，阶段 `removed` |
+| `panel intake-categories` | `{}` | `{categories:[{id,label,description}]}` |
+| `panel intake-preflight` | `{files:[{path,staged_path,size,sha256}]}` | `{categories,items,ignored}` |
+| `panel intake-save` | `{category,document_path,files:[{path,staged_path,expected_size,expected_sha256}]}` | `{name,path,kind,size,sha256}` |
 
 `overview` 的文档和代码数量分别去重统计被正式卡引用的来源。类型项为 `{type,count}`，最近卡片为 `{id,title,type}`，按文件更新时间取至多 10 张。类型由目录映射，旧 draft 不进入面板，其他旧卡仍可浏览。卡片列表按 ID 排序，查询可按正文词项、卡片类型和单个标签过滤。标题、摘要和标签只显示列表所需的短值，完整内容可用 `read` 取得。
 
@@ -37,6 +42,10 @@ P4 检查在本批暂存记录实际核对过的来源字节。P5 将这些引�
 
 `path` 相对 `docs-raw/`，空串表示目录根。目录项 `kind` 为 `directory` 时 `size` 为 `null`，普通文件为 `file`。目录浏览读取物理文件，可显示尚未登记的文件。链接、隐藏项和本机 dbox 映射配置不参与浏览。保存目标必须是已有普通目录下支持入库的文件名，原件投递限于仓内目录。
 
+目录项的 `category` 表示可作为归档分类的普通目录，`empty` 表示该分类物理为空。即使目录里只有隐藏文件，也不能通过 `raw-rmdir` 删除，命令返回 `RAW_DIRECTORY_NOT_EMPTY`。用 `raw-mkdir` 在根或已有分类下创建一个子目录，遇到同名或大小写冲突时返回 `RAW_TARGET_EXISTS`。特殊目录 `sources/`、资料包及其子目录不参与分类或目录变更。删除空目录不改动已有来源记录。
+
 OpenFlow 先在服务端完整接收上传，再将可信的绝对暂存文件名传给 `raw-save`。浏览器只提供业务相对路径和字节，由宿主构造 `staged_path`。CLI 流式校验并写到目标目录的临时文件，同目录原子提交完整字节。目标已存在或与同目录的名称只差大小写时，返回 `RAW_TARGET_EXISTS`。文件大小或 hash 对不上返回 `RAW_STAGE_MISMATCH`。暂存文件由宿主清理，返回文件相对路径与 SHA-256 即可确认保存。原件注册及正式知识更新由之后的 CI 完成。
+
+OpenFlow 批量上传使用 `intake-preflight`。CLI 返回当前原件目录的分类、标题和短摘录，以及每个 Markdown 本地图片的匹配结果。分类来源是绑定库中实际存在的普通目录，支持诸如 `protocols/2026` 的多级路径。分类 ID 和显示名均使用该相对路径。`intake-categories` 可单独读取最新分类。图片按文档相对路径匹配上传文件。外部图片链接显示提示，内嵌位图随 Markdown 原文保存。OpenFlow 调用模型建议分类，用户确认后调用 `intake-save`。CLI 复核分类目录、文件字节和附件关系，有附件时按原相对路径整组保存。相同目标和字节的重试返回原有回执。P1 只登记资料包的主文档，从清单校验并解析配图。需要修订图片时按新资料版本归档。
 
 `raw-path` 返回已校验普通文件的真实路径，供可信服务按文件权限提供下载或预览。浏览器只接收相对引用和内容。找不到路径返回 `RAW_NOT_FOUND`。原件目录读取与投递不触发入库扫描、卡片更新或索引重建。

@@ -273,26 +273,32 @@ def _external_images(data, suffix):
 
 def _sanitize_markdown_images(text):
     """Native Markdown cannot authorize image fetches through its rendered view."""
+    from .markdown_images import mask_markdown_literals
+
     found = []
     patterns = [r"<img\b[^>]*>", r"!\[[^\]]*\]\((?:[^()]|\([^()]*\))*\)",
                 r"!\[[^\]]*\]\s*\[[^\]]*\]", r"!\[[^\]]*\]"]
-    def replace(match):
-        found.append(match[0])
-        return "[Image not read; inspect the original source]" + "\n" * match[0].count("\n")
-    for pattern in patterns:
-        text = re.sub(pattern, replace, text, flags=re.IGNORECASE)
-    return text, found
+    masked = mask_markdown_literals(text)
+    chunks, cursor = [], 0
+    for match in re.finditer("|".join(patterns), masked, flags=re.IGNORECASE):
+        original = text[match.start():match.end()]
+        found.append(original)
+        chunks.extend((text[cursor:match.start()], "[Image not read; inspect the original source]",
+                       "\n" * original.count("\n")))
+        cursor = match.end()
+    return "".join((*chunks, text[cursor:])), found
 
 
 def _markdown_image_uris(text):
-    from .markdown_images import markdown_image_tokens
+    from .markdown_images import markdown_image_tokens, mask_markdown_literals
 
+    masked = mask_markdown_literals(text)
     values = []
-    for match in re.finditer(r"!\[[^\]]*\]\(\s*(?:<([^>]+)>|([^\s)]+))", text):
+    for match in re.finditer(r"!\[[^\]]*\]\(\s*(?:<([^>]+)>|([^\s)]+))", masked):
         values.append(match[1] or match[2])
-    if re.search(r"<img\b|!\[[^\]]*\]\s*\[", text, re.IGNORECASE):
+    if re.search(r"<img\b|!\[[^\]]*\]\s*\[", masked, re.IGNORECASE):
         raise ContractError("PARSE_DESCRIPTOR_INVALID", "Unsupported raw/reference image syntax in material Markdown")
-    values.extend(uri for _start, _end, uri in markdown_image_tokens(text) if uri)
+    values.extend(uri for _start, _end, uri in markdown_image_tokens(text, masked=masked) if uri)
     return values
 
 

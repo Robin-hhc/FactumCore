@@ -51,7 +51,9 @@ def _no_ingest_mutation(root, registry):
 @pytest.fixture
 def package(tmp_path):
     staged = tmp_path / "uploads"
-    markdown = b"# WLAN receive design\n\n![Receive timing](figures/receive%20timing.png)\n"
+    markdown = (b"# WLAN receive design\n\n![Receive timing](figures/receive%20timing.png)\n\n"
+                b"```markdown\n![Fenced example](fenced.png)\n```\n"
+                b"`![Inline example](inline.png)` and \\![Escaped example](escaped.png)\n")
     image = BytesIO()
     Image.new("RGB", (12, 8), "navy").save(image, format="PNG")
     return (
@@ -126,6 +128,8 @@ def test_package_save_checks_hashes_replays_and_preserves_p1_path(knowledge, pac
     markdown = (knowledge / parsed["markdown_ref"]).read_text(encoding="utf-8")
     assert "![Receive timing](images/" in markdown
     assert "figures/receive%20timing.png" not in markdown
+    assert "```markdown\n![Fenced example](fenced.png)\n```" in markdown
+    assert r"`![Inline example](inline.png)` and \![Escaped example](escaped.png)" in markdown
     manifest = json.loads((knowledge / parsed["manifest_ref"]).read_bytes())
     assert manifest["source_path"] == source["path"]
     assert any(row["ref"] == parsed["images"][0]["ref"] and row["sha256"] == image["sha256"]

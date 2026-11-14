@@ -109,7 +109,7 @@ files:
     sha256: afbe4024ce2203b508604e84a2c092b7a6af7fa315fd4a6fcb4803d2c04ee308
   contracts/document_parser.py:
     path: governance/contracts/document_parser.py
-    sha256: 248143ad1c7de540d243c9e3e9d082f53e4685f24e4e1b1b55050953208c3933
+    sha256: 2267fbb91654aa9badcf4f4338ec1aa68a8df0e2eea611aed13eee29c5fec5d5
   contracts/source_read.py:
     path: governance/contracts/source_read.py
     sha256: 7c5f2dfd955850281419d9f7a4f22ee80b4f3328f32c894588d791b926c94b2c
@@ -124,7 +124,7 @@ files:
     sha256: 93ebf777706f36c8a69e3caba3b87f0141378d75d51b76e015e2050b20ee7de9
   contracts/markdown_images.py:
     path: governance/contracts/markdown_images.py
-    sha256: 735432dca74ebaac138c4c97d91374c97ea1a6068a412a6c201b6b5322a7ad03
+    sha256: bc1df263e3fdae54e7a033cbc9da92fdb38047632b72e20bda17596dfccb6b51
 capabilities:
   checks: '1.0'
   indexing: '1.0'

@@ -405,7 +405,9 @@ def test_markdown_material_copies_verified_local_and_embedded_images(tmp_path):
                 "![Inline](data:image/png;base64," + encoded + ")\n"
                 "![Reference][diagram]\n"
                 '<img src="images/timing.png">\n\n'
-                "[diagram]: images/timing.png\n").encode()
+                "[diagram]: images/timing.png\n\n"
+                "```markdown\n![Fenced](example.png)\n```\n"
+                "`<img src='example.png'>` and \\![Escaped](example.png)\n").encode()
     source = {"id": "document", "path": "docs-raw/design.md"}
     descriptor = parser.parse(tmp_path, source, original, ".build/materials/parsed",
                               local_images={"images/timing.png": (asset, parser.sha256_bytes(asset.read_bytes()))})
@@ -416,7 +418,9 @@ def test_markdown_material_copies_verified_local_and_embedded_images(tmp_path):
     assert len({image["ref"] for image in descriptor["images"]}) == 1
     assert (tmp_path / descriptor["images"][0]["ref"]).read_bytes() == asset.read_bytes()
     assert "data:image" not in loaded["markdown"]
-    assert "<img" not in loaded["markdown"]
+    assert '<img src="images/timing.png">' not in loaded["markdown"]
+    assert "```markdown\n![Fenced](example.png)\n```" in loaded["markdown"]
+    assert r"`<img src='example.png'>` and \![Escaped](example.png)" in loaded["markdown"]
 
 
 @pytest.mark.parametrize("image_uri", ["https://example.invalid/picture.png", "../private.png", "data:image/png;base64,AA=="])

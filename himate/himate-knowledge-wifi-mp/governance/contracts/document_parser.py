@@ -5,6 +5,8 @@ Descriptors bind fixed inputs and files; cached materials never own review progr
 """
 from __future__ import annotations
 
+from base64 import b64decode
+from bisect import bisect_right
 from collections import Counter, defaultdict
 from importlib import metadata
 from io import BytesIO
@@ -271,24 +273,112 @@ def _external_images(data, suffix):
 
 def _sanitize_markdown_images(text):
     """Native Markdown cannot authorize image fetches through its rendered view."""
+    from .markdown_images import mask_markdown_literals
+
     found = []
     patterns = [r"<img\b[^>]*>", r"!\[[^\]]*\]\((?:[^()]|\([^()]*\))*\)",
                 r"!\[[^\]]*\]\s*\[[^\]]*\]", r"!\[[^\]]*\]"]
-    def replace(match):
-        found.append(match[0])
-        return "[Image not read; inspect the original source]" + "\n" * match[0].count("\n")
-    for pattern in patterns:
-        text = re.sub(pattern, replace, text, flags=re.IGNORECASE)
-    return text, found
+    masked = mask_markdown_literals(text)
+    chunks, cursor = [], 0
+    for match in re.finditer("|".join(patterns), masked, flags=re.IGNORECASE):
+        original = text[match.start():match.end()]
+        found.append(original)
+        chunks.extend((text[cursor:match.start()], "[Image not read; inspect the original source]",
+                       "\n" * original.count("\n")))
+        cursor = match.end()
+    return "".join((*chunks, text[cursor:])), found
 
 
 def _markdown_image_uris(text):
+    from .markdown_images import markdown_image_tokens, mask_markdown_literals
+
+    masked = mask_markdown_literals(text)
     values = []
-    for match in re.finditer(r"!\[[^\]]*\]\(\s*(?:<([^>]+)>|([^\s)]+))", text):
+    for match in re.finditer(r"!\[[^\]]*\]\(\s*(?:<([^>]+)>|([^\s)]+))", masked):
         values.append(match[1] or match[2])
-    if re.search(r"<img\b|!\[[^\]]*\]\s*\[", text, re.IGNORECASE):
+    if re.search(r"<img\b|!\[[^\]]*\]\s*\[", masked, re.IGNORECASE):
         raise ContractError("PARSE_DESCRIPTOR_INVALID", "Unsupported raw/reference image syntax in material Markdown")
+    values.extend(uri for _start, _end, uri in markdown_image_tokens(text, masked=masked) if uri)
     return values
+
+
+def _markdown_material(root, output, text, assets, max_bytes):
+    from .markdown_images import markdown_image_tokens
+    from .raw_materials import _open_stage
+
+    try:
+        from PIL import Image
+    except ImportError:
+        Image = None
+    image_errors = (OSError, ValueError, SyntaxError) + ((Image.DecompressionBombError,) if Image else ())
+
+    replacements, images, refs, unresolved = {}, [], {}, []
+    chunks = []
+    used_bytes = used_files = 0
+    cursor = 0
+    newlines = [match.start() for match in re.finditer("\n", text)]
+    marker = secrets.token_hex(16)
+    for start, end, uri in markdown_image_tokens(text):
+        original = text[start:end]
+        if uri in refs:
+            local = refs[uri]
+        else:
+            local = None
+            try:
+                if Image is None:
+                    data = b""
+                elif uri in assets:
+                    asset, expected_sha256 = assets[uri]
+                    with _open_stage(str(asset)) as stream:
+                        data = stream.read(max_bytes - used_bytes + 1)
+                    if len(data) > max_bytes - used_bytes or sha256_bytes(data) != expected_sha256:
+                        data = b""
+                elif uri and re.match(r"data:image/(?:png|jpe?g|gif|webp|bmp|tiff?);base64,", uri, re.IGNORECASE):
+                    encoded = uri.partition(",")[2]
+                    data = b64decode(encoded, validate=True) if len(encoded) <= (max_bytes - used_bytes) * 4 // 3 + 4 else b""
+                else:
+                    data = b""
+                if data and len(data) <= max_bytes - used_bytes:
+                    with Image.open(BytesIO(data)) as picture:
+                        suffix = {"PNG": "png", "JPEG": "jpg", "GIF": "gif", "WEBP": "webp",
+                                  "BMP": "bmp", "TIFF": "tiff"}.get(picture.format)
+                        if picture.width * picture.height > _PREVIEW_LIMITS["max_pixels"]:
+                            suffix = None
+                        picture.verify()
+                    if suffix:
+                        local = "images/" + sha256_bytes(data) + "." + suffix
+                        destination = output / local
+                        if not destination.exists():
+                            if used_files >= _MAX_PARSE_FILES - 4:
+                                local = None
+                            else:
+                                destination.parent.mkdir(exist_ok=True)
+                                destination.write_bytes(data)
+                                used_bytes += len(data)
+                                used_files += 1
+            except image_errors:
+                local = None
+            refs[uri] = local
+        placeholder = f"{marker}:{len(replacements)}:{marker}"
+        if local:
+            line = bisect_right(newlines, start) + 1
+            image_ref = (output / local).relative_to(root).as_posix()
+            images.append({"ref": image_ref, "locator": {"kind": "lines", "start": line, "end": line},
+                           "role": "document_picture", "provenance": [], "ocr_status": "not_requested",
+                           "description_status": "agent_required"})
+            match = re.match(r"!\[([^\]\n]*)\]", original)
+            alt = match[1] if match else "Image"
+            replacements[placeholder] = f"![{alt}]({local})"
+        else:
+            unresolved.append(original)
+            replacements[placeholder] = "[Image not read; inspect the original source]"
+        chunks.extend((text[cursor:start], placeholder, "\n" * original.count("\n")))
+        cursor = end
+    chunks.append(text[cursor:])
+    markdown, remaining = _sanitize_markdown_images("".join(chunks))
+    if replacements:
+        markdown = re.sub(f"{marker}:[0-9]+:{marker}", lambda match: replacements[match[0]], markdown)
+    return markdown, unresolved + remaining, images
 
 
 def _native_text(data):
@@ -819,7 +909,7 @@ def _docling(root, source, data, output, options, page_range, source_hash, profi
     return text, segments, images, gaps, sorted(document.pages)
 
 
-def parse(root, source, data, output_ref, options=None, page_range=None):
+def parse(root, source, data, output_ref, options=None, page_range=None, *, local_images=None):
     """Create a fresh operation bundle from already-fixed original bytes."""
     started = time.perf_counter()
     root = Path(root).absolute()
@@ -845,6 +935,8 @@ def parse(root, source, data, output_ref, options=None, page_range=None):
     profile = _profile(options, suffix, root)
     if page_range is not None:
         profile["page_range"] = list(page_range)
+    if suffix == ".md":
+        profile["picture_export"] = "verified-markdown-bitmaps:1"
     source_hash, profile_hash = sha256_bytes(data), sha256_bytes(canonical_bytes(profile))
     output.mkdir(parents=True)
     _workspace_no_links(output)
@@ -853,8 +945,9 @@ def parse(root, source, data, output_ref, options=None, page_range=None):
     if suffix in {".md", ".txt"}:
         text = _native_text(data)
         if suffix == ".md":
-            text, unresolved = _sanitize_markdown_images(text)
-            gaps.extend(_gap("EXTERNAL_IMAGE_NOT_READ", "Markdown image was not fetched: " + ref, severity="review") for ref in unresolved)
+            text, unresolved, images = _markdown_material(root, output, text, local_images or {}, options["max_output_bytes"])
+            gaps.extend(_gap("EXTERNAL_IMAGE_NOT_READ", "Markdown image was not read: " + ref[:200],
+                             severity="review") for ref in unresolved)
         segments = [{"locator": {"kind": "lines", "start": n, "end": n}, "text": line} for n, line in enumerate(text.splitlines(), 1)]
         (output / "document.md").write_bytes(text.encode("utf-8"))
         _write_json(output / "document.json", {"schema_name": "HiMateTextDocument", "text": text})

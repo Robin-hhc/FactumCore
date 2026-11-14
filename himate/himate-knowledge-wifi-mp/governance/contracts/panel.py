@@ -10,7 +10,7 @@ import sqlite3
 from urllib.parse import unquote, urlsplit
 from uuid import uuid4
 
-from . import citation_versions, indexing, raw_materials
+from . import citation_versions, indexing, intake, raw_materials
 from .validation import ContractError, canonical_bytes, markdown_structure, safe_path, sha256_bytes, validate_id
 
 
@@ -340,11 +340,26 @@ def run(root, action, request):
     if action == "raw-save":
         _check(request, ("path", "staged_path", "expected_size", "expected_sha256"))
         return raw_materials.save(root, request), "saved"
+    if action == "raw-mkdir":
+        _check(request, ("path",))
+        return raw_materials.mkdir(root, _text(request, "path", 1024)), "created"
+    if action == "raw-rmdir":
+        _check(request, ("path",))
+        return raw_materials.rmdir(root, _text(request, "path", 1024)), "removed"
+    if action == "intake-categories":
+        _check(request, ())
+        return {"categories": raw_materials.categories(root)}, "listed"
+    if action == "intake-preflight":
+        _check(request, ("files",))
+        return intake.preflight(root, request), "checked"
+    if action == "intake-save":
+        _check(request, ("category", "document_path", "files"))
+        return intake.save(root, request), "saved"
     if action == "read":
         _check(request, ("card_id", "view_revision"))
         return read_card(root, validate_id(request.get("card_id")), request.get("view_revision")), "read"
     if action not in {"overview", "cards", "graph", "search"}:
-        raise ContractError("INVALID_ACTION", "Use panel overview, cards, graph, search, read, raw-list, raw-save or raw-path")
+        raise ContractError("INVALID_ACTION", "Unknown knowledge panel action")
     with _published(root, request.get("view_revision")) as (db, overview):
         if action == "overview":
             _check(request, ("view_revision",))

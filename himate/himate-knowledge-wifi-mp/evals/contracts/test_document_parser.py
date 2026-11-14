@@ -381,13 +381,46 @@ def test_existing_plain_text_source_bytes_are_not_rewritten(tmp_path, suffix):
     assert [row["text"] for row in segments] == decoded.splitlines()
 
 
-@pytest.mark.parametrize("syntax", ["![figure](https://example.invalid/picture.png)", "![figure](../private.png)", "![figure][asset]\n\n[asset]: https://example.invalid/picture.png", '<img src="file:///etc/passwd">'])
+@pytest.mark.parametrize("syntax", ["![figure](https://example.invalid/picture.png)", "![figure](../private.png)",
+                                    "![figure [detail]](https://example.invalid/picture.png)",
+                                    "![figure][asset]\n\n[asset]: https://example.invalid/picture.png",
+                                    '<img src="file:///etc/passwd">'])
 def test_unread_native_markdown_images_cannot_make_renderer_fetch_resources(tmp_path, syntax):
     descriptor, loaded = parse_bytes(tmp_path, data=("Requirement.\n" + syntax).encode())
     assert "![" not in loaded["markdown"]
     assert "<img" not in loaded["markdown"]
     assert "Image not read" in loaded["markdown"]
     assert any(g["code"] == "EXTERNAL_IMAGE_NOT_READ" for g in descriptor["gaps"])
+
+
+def test_markdown_material_copies_verified_local_and_embedded_images(tmp_path):
+    from base64 import b64encode
+
+    from PIL import Image
+
+    asset = tmp_path / "timing.png"
+    Image.new("RGB", (12, 8), color="blue").save(asset)
+    encoded = b64encode(asset.read_bytes()).decode("ascii")
+    original = ("# Design\n\n![Timing](images/timing.png)\n"
+                "![Inline](data:image/png;base64," + encoded + ")\n"
+                "![Reference][diagram]\n"
+                '<img src="images/timing.png">\n\n'
+                "[diagram]: images/timing.png\n\n"
+                "```markdown\n![Fenced](example.png)\n```\n"
+                "`<img src='example.png'>` and \\![Escaped](example.png)\n").encode()
+    source = {"id": "document", "path": "docs-raw/design.md"}
+    descriptor = parser.parse(tmp_path, source, original, ".build/materials/parsed",
+                              local_images={"images/timing.png": (asset, parser.sha256_bytes(asset.read_bytes()))})
+    loaded = parser.load(tmp_path, descriptor, expected_source_id=source["id"],
+                         expected_sha256=parser.sha256_bytes(original))
+    assert descriptor["parse_status"] == "parsed"
+    assert [image["locator"]["start"] for image in descriptor["images"]] == [3, 4, 5, 6]
+    assert len({image["ref"] for image in descriptor["images"]}) == 1
+    assert (tmp_path / descriptor["images"][0]["ref"]).read_bytes() == asset.read_bytes()
+    assert "data:image" not in loaded["markdown"]
+    assert '<img src="images/timing.png">' not in loaded["markdown"]
+    assert "```markdown\n![Fenced](example.png)\n```" in loaded["markdown"]
+    assert r"`<img src='example.png'>` and \![Escaped](example.png)" in loaded["markdown"]
 
 
 @pytest.mark.parametrize("image_uri", ["https://example.invalid/picture.png", "../private.png", "data:image/png;base64,AA=="])

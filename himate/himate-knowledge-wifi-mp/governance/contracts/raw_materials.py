@@ -1,5 +1,6 @@
 """Browse and save physical raw materials for a trusted local host."""
 
+import errno
 import hashlib
 import heapq
 import os
@@ -16,6 +17,8 @@ from .workspace_config import WorkspaceConfigError, no_links, relative_path
 
 PRIVATE_NAMES = {"dbox.local.yml"}
 RESERVED_NAMES = {"agents.md", "index.md", "readme.md", "dbox.example.yml", "dbox.local.yml.example"}
+PACKAGE_MARKER = ".intake-package.json"
+MAX_PATH = 1024
 
 
 def _visible(name):
@@ -57,10 +60,120 @@ def _info(target, path, *, directory=False):
     return info
 
 
+def _has_package_marker(directory):
+    return os.path.lexists(directory / PACKAGE_MARKER)
+
+
+def _category_allowed(path, directory):
+    if not path or len(path) > MAX_PATH:
+        return False
+    parts = path.split("/")
+    if parts[0].casefold() == "sources" or not all(_visible(part) for part in parts):
+        return False
+    for _ in parts:
+        if _has_package_marker(directory):
+            return False
+        directory = directory.parent
+    return True
+
+
+def category_directory(root, path, *, error="RAW_UNSAFE_PATH"):
+    """Resolve one existing ordinary directory, using the same rules as discovery."""
+    directory = _raw_path(root, path, directory=True)
+    if not _category_allowed(path, directory):
+        raise ContractError(error, "Expected an ordinary category directory", path)
+    return directory, _info(directory, path, directory=True)
+
+
+def categories(root):
+    raw = _raw_path(root, "", directory=True)
+    _info(raw, "", directory=True)
+    result = []
+    for directory, children, _ in os.walk(raw, followlinks=False):
+        parent = Path(directory)
+        allowed = []
+        for name in children:
+            child = parent / name
+            relative = child.relative_to(raw).as_posix()
+            if (len(relative) > MAX_PATH or not _visible(name)
+                    or (parent == raw and name.casefold() == "sources")):
+                continue
+            try:
+                if _linked(child.lstat()) or _has_package_marker(child):
+                    continue
+            except FileNotFoundError:
+                continue
+            allowed.append(name)
+            result.append({"id": relative, "label": relative, "description": ""})
+        children[:] = allowed
+    return sorted(result, key=lambda row: row["id"])
+
+
+def _raw_write_lock(root):
+    lock = safe_path(root, "artifacts/raw-save.lock", ["artifacts"])
+    no_links(lock)
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    return _file_lock(lock)
+
+
+def mkdir(root, path):
+    if not isinstance(path, str) or not path or len(path) > MAX_PATH:
+        raise ContractError("RAW_UNSAFE_PATH", "Expected a new directory path relative to docs-raw", path)
+    parent_path, _, name = path.rpartition("/")
+    if (not _visible(name) or (not parent_path and name.casefold() == "sources")
+            or path.startswith("/")):
+        raise ContractError("RAW_UNSAFE_PATH", "Invalid new raw directory", path)
+    with _raw_write_lock(root):
+        if parent_path:
+            parent, _ = category_directory(root, parent_path)
+        else:
+            parent = _raw_path(root, "", directory=True)
+            _info(parent, "", directory=True)
+        try:
+            if any(child.name.casefold() == name.casefold() for child in parent.iterdir()):
+                raise FileExistsError(name)
+            (parent / name).mkdir()
+        except FileExistsError as error:
+            raise ContractError("RAW_TARGET_EXISTS", "A file or folder with that name already exists", path) from error
+        except OSError as error:
+            raise ContractError("RAW_MKDIR_FAILED", "Cannot create the raw directory", path) from error
+    return {"path": path}
+
+
+def rmdir(root, path):
+    with _raw_write_lock(root):
+        directory, _ = category_directory(root, path)
+        try:
+            directory.rmdir()
+        except FileNotFoundError as error:
+            raise ContractError("RAW_NOT_FOUND", "Raw path does not exist", path) from error
+        except OSError as error:
+            if error.errno in {errno.ENOTEMPTY, errno.EEXIST} or getattr(error, "winerror", None) == 145:
+                raise ContractError("RAW_DIRECTORY_NOT_EMPTY", "Raw directory is not empty", path) from error
+            raise ContractError("RAW_RMDIR_FAILED", "Cannot remove the raw directory", path) from error
+    return {"path": path}
+
+
 def list_entries(root, path, after, count):
     directory = _raw_path(root, path, directory=True)
     _info(directory, path, directory=True)
     prefix = path + "/" if path else ""
+    ordinary_parent = not path or _category_allowed(path, directory)
+
+    def directory_details(item):
+        child = directory / item["name"]
+        category = (ordinary_parent and len(item["path"]) <= MAX_PATH
+                    and (bool(path) or item["name"].casefold() != "sources")
+                    and not _has_package_marker(child))
+        empty = False
+        if category:
+            try:
+                with os.scandir(child) as contents:
+                    empty = next(contents, None) is None
+            except OSError:
+                pass
+        return {**item, "category": category, "empty": empty}
+
     with os.scandir(directory) as entries:
         def visible_entries():
             for entry in entries:
@@ -77,7 +190,8 @@ def list_entries(root, path, after, count):
                 elif stat.S_ISREG(info.st_mode):
                     yield {"name": entry.name, "path": prefix + entry.name, "kind": "file", "size": info.st_size}
 
-        return heapq.nsmallest(count, visible_entries(), key=lambda item: item["name"])
+        rows = heapq.nsmallest(count, visible_entries(), key=lambda item: item["name"])
+    return [directory_details(item) if item["kind"] == "directory" else item for item in rows]
 
 
 def file_path(root, path):
@@ -108,19 +222,22 @@ def _open_stage(value):
         raise ContractError("RAW_INVALID_STAGE", "Cannot open a trusted regular staging file") from error
 
 
-def save(root, request):
+def save(root, request, *, category_only=False):
     path = request.get("path")
     if not isinstance(path, str) or not all(_visible(part) for part in path.split("/")):
         raise ContractError("RAW_UNSAFE_PATH", "Invalid raw path")
     parts = path.split("/")
     parent_path = "/".join(parts[:-1])
-    directory = _raw_path(root, parent_path, directory=True)
+    if category_only:
+        directory, parent = category_directory(root, parent_path, error="INTAKE_CATEGORY_INVALID")
+    else:
+        directory = _raw_path(root, parent_path, directory=True)
+        parent = _info(directory, parent_path, directory=True)
     target = directory / parts[-1]
     if (tuple(part.casefold() for part in parts[:2]) == ("sources", "dbox")
             or target.name.casefold() in RESERVED_NAMES
             or target.suffix.lower() not in SUPPORTED_FORMATS):
         raise ContractError("RAW_UNSUPPORTED_TARGET", "Choose a supported raw document filename", path)
-    parent = _info(directory, parent_path, directory=True)
     if any(child.name.casefold() == target.name.casefold() for child in directory.iterdir()):
         raise ContractError("RAW_TARGET_EXISTS", "A file with that name already exists", path)
     size_expected = request.get("expected_size")
@@ -152,15 +269,16 @@ def save(root, request):
                 or (size_expected is not None and size != size_expected)
                 or (hash_expected is not None and observed != hash_expected)):
             raise ContractError("RAW_STAGE_MISMATCH", "Staging size or hash changed")
-        lock = safe_path(root, "artifacts/raw-save.lock", ["artifacts"])
-        no_links(lock)
-        lock.parent.mkdir(parents=True, exist_ok=True)
         try:
             # Serialize the casefold check across cooperating CLI processes.
             # The link also prevents replacement by a non-cooperating writer.
-            with _file_lock(lock):
-                current = _raw_path(root, parent_path, directory=True)
-                if not os.path.samestat(parent, _info(current, parent_path, directory=True)):
+            with _raw_write_lock(root):
+                if category_only:
+                    current, observed_parent = category_directory(root, parent_path, error="INTAKE_CATEGORY_INVALID")
+                else:
+                    current = _raw_path(root, parent_path, directory=True)
+                    observed_parent = _info(current, parent_path, directory=True)
+                if not os.path.samestat(parent, observed_parent):
                     raise ContractError("RAW_UNSAFE_PATH", "Raw target directory changed", path)
                 if any(child.name.casefold() == target.name.casefold() for child in current.iterdir()):
                     raise ContractError("RAW_TARGET_EXISTS", "A file with that name already exists", path)

@@ -255,7 +255,7 @@ def model_preparation(distribution, tmp_path, tmp_path_factory):
     knowledge = data_root(short_root / "data root")
     contracts = source / "governance/contracts"
     contracts.mkdir(parents=True)
-    for name in ("__init__.py", "document_parser.py", "validation.py", "workspace_config.py"):
+    for name in ("__init__.py", "document_parser.py", "runtime.py", "validation.py", "workspace_config.py"):
         shutil.copyfile(TOOL_ROOT / "governance/contracts" / name, contracts / name)
     required = (
         "docling-project--docling-layout-heron/config.json",

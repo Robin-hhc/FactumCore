@@ -1,6 +1,6 @@
 schema_version: '2.0'
 contract_family: aiot-wifi
-tool_version: 0.20.0
+tool_version: 0.20.1
 files:
   contracts/__init__.py:
     path: governance/contracts/__init__.py
@@ -109,19 +109,19 @@ files:
     sha256: fc6d518c32ac6eed3e803ad04c621c5413125f14253109dc8724a1c466028c81
   contracts/document_parser.py:
     path: governance/contracts/document_parser.py
-    sha256: 2267fbb91654aa9badcf4f4338ec1aa68a8df0e2eea611aed13eee29c5fec5d5
+    sha256: 7c82928cc1719a522f797f9f38f9c72382bac3d1dfb12f0edd3d2b3a764eda9e
   contracts/source_read.py:
     path: governance/contracts/source_read.py
     sha256: 7c5f2dfd955850281419d9f7a4f22ee80b4f3328f32c894588d791b926c94b2c
   contracts/pdf_pictures.py:
     path: governance/contracts/pdf_pictures.py
-    sha256: 0017bd31df2f38871d2773271301c1cb90d8235a87499e5804928dca5208370c
+    sha256: 328d047894a497fe1438832737a48fa33873713c70dadec2cccd010db395d6e4
   contracts/pdf_text.py:
     path: governance/contracts/pdf_text.py
     sha256: 1bfcee60d495241cc18784e7868bc95d013bafb373292572bee804043de2ded1
   contracts/intake.py:
     path: governance/contracts/intake.py
-    sha256: 93ebf777706f36c8a69e3caba3b87f0141378d75d51b76e015e2050b20ee7de9
+    sha256: 8b482b0762c21c85671147539a53a126b3dc5515c0f3c7b1f8389eef39a212e2
   contracts/markdown_images.py:
     path: governance/contracts/markdown_images.py
     sha256: 01816b999514f0129c467d00c36fe59c063169de0e59b341519e2272000633ee

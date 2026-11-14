@@ -1,6 +1,7 @@
 """Real PDF picture bytes survive native decoder gaps without losing draw locations."""
 
 from io import BytesIO
+import os
 from pathlib import Path
 import sys
 
@@ -123,6 +124,35 @@ def test_real_iccbased_flate_picture_is_exported_as_source_bound_pixels(tmp_path
     assert "<!-- image -->" not in loaded["markdown"]
     assert not any(gap["code"] == "IMAGE_UNAVAILABLE" for gap in descriptor["gaps"])
     assert "Actual image requirement" in loaded["text"]
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Requires native Windows extended-length paths")
+def test_cached_pdf_pictures_use_native_long_paths_with_portable_refs(tmp_path):
+    # Match a checkout with enough path depth to put only picture filenames
+    # beyond MAX_PATH, while the manifest and cache directories still fit.
+    root = tmp_path / ("n" * max(1, 112 - len(str(tmp_path)) - 1))
+    root.mkdir()
+    source = {"id": "synthetic-pdf-pictures", "path": "docs-raw/specs/pictures.pdf"}
+    data = picture_pdf()
+    digest = parser.sha256_bytes(data)
+    descriptor = parser.prepare_pdf(root, source, data)
+    loaded = parser.load(root, descriptor, expected_source_id=source["id"], expected_sha256=digest)
+
+    assert descriptor["parse_status"] == "parsed", descriptor["gaps"]
+    assert not descriptor["gaps"]
+    rows = picture_rows(loaded["manifest"])
+    assert len(rows) == 1 and rows[0]["ref"]
+    reference = rows[0]["ref"]
+    assert reference.startswith("artifacts/ingest/parsed/") and "\\" not in reference
+    target = root / reference
+    assert len(str(target)) > 260
+    native = Path(module("runtime").native_path(target))
+    assert_blue_picture(native)
+    assert "![Image](images/" in loaded["markdown"]
+    assert parser.prepare_pdf(root, source, data) == descriptor
+    native.write_bytes(native.read_bytes() + b"changed")
+    with pytest.raises(ContractError, match="PARSE_MATERIAL_CHANGED"):
+        parser.load(root, descriptor, expected_source_id=source["id"], expected_sha256=digest)
 
 
 @pytest.mark.parametrize("repeat", [12, 2000])

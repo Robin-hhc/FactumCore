@@ -7,8 +7,8 @@ from pathlib import Path, PurePosixPath
 import posixpath
 import re
 import shutil
-import tempfile
 from urllib.parse import unquote, urlsplit
+from uuid import uuid4
 from zipfile import BadZipFile
 
 from . import raw_materials
@@ -315,7 +315,11 @@ def save(root, request):
             current, observed_parent = raw_materials.category_directory(root, category, error="INTAKE_CATEGORY_INVALID")
             if not os.path.samestat(parent, observed_parent):
                 raise ContractError("RAW_UNSAFE_PATH", "原件目录在保存期间发生变化", category)
-            temporary = Path(tempfile.mkdtemp(dir=current, prefix=TEMP_PREFIX))
+            candidate = current / (TEMP_PREFIX + uuid4().hex)
+            # Windows mode 0o700 installs a private DACL even after rename.
+            # Inherit the raw directory ACL so the published package is readable by Agents.
+            candidate.mkdir(mode=0o777 if os.name == "nt" else 0o700)
+            temporary = candidate
         manifest = {"schema_version": "1.0", "document_path": document, "files": _copy_package(temporary, files)}
         (temporary / MARKER).write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
         with raw_materials._raw_write_lock(root):

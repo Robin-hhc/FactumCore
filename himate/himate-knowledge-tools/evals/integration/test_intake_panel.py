@@ -3,6 +3,8 @@
 from hashlib import sha256
 from io import BytesIO
 import json
+import os
+import subprocess
 
 import pytest
 from PIL import Image
@@ -102,6 +104,9 @@ def test_package_save_checks_hashes_replays_and_preserves_p1_path(knowledge, pac
     assert receipt["sha256"] == document["sha256"]
     archived = knowledge / "docs-raw" / receipt["path"]
     image_path = category / "receive" / image["path"]
+    if os.name == "nt":
+        package_acl = subprocess.check_output(["icacls.exe", str(category / "receive")])
+        assert b"(I)" in package_acl
     assert sha256(archived.read_bytes()).hexdigest() == document["sha256"]
     assert sha256(image_path.read_bytes()).hexdigest() == image["sha256"]
     _no_ingest_mutation(knowledge, registry)

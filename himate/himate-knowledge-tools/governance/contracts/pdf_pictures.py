@@ -13,6 +13,7 @@ import math
 from pathlib import Path
 import time
 
+from .runtime import native_path
 from .validation import _workspace_no_links
 
 
@@ -35,13 +36,15 @@ class _Assets:
         self.files = 0
         self.available = False
         try:
-            _workspace_no_links(output)
-            for path in output.rglob("*"):
+            disk_output = Path(native_path(output))
+            _workspace_no_links(disk_output)
+            for path in disk_output.rglob("*"):
                 if path.is_file():
                     self.bytes += path.stat().st_size
                     self.files += 1
-            (output / "images").mkdir(exist_ok=True)
-            _workspace_no_links(output / "images")
+            images = disk_output / "images"
+            images.mkdir(exist_ok=True)
+            _workspace_no_links(images)
             self.available = True
         except (OSError, ValueError):
             pass
@@ -67,7 +70,7 @@ class _Assets:
             if not self.ready() or self.bytes + len(raw) > self.limit:
                 return None
             relative = Path("images") / (digest + ".png")
-            target = self.output / relative
+            target = Path(native_path(self.output / relative))
             _workspace_no_links(target)
             target.write_bytes(raw)
             self.bytes += len(raw)

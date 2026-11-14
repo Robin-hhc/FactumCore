@@ -19,6 +19,7 @@ import sys
 import time
 from urllib.parse import unquote
 
+from .runtime import native_path
 from .validation import ContractError, _workspace_no_links, canonical_bytes, read_json, safe_path as _relative_path, sha256_bytes, validate_id
 
 
@@ -54,8 +55,16 @@ OCR_MODEL_FILES = (
 
 def safe_path(root, reference, allowed_prefixes=None, *, directory_entries=None):
     path = _relative_path(root, reference, allowed_prefixes, _directory_entries=directory_entries)
-    _workspace_no_links(path)
+    _workspace_no_links(Path(native_path(path)))
     return path
+
+
+def _material_files(output):
+    """Pair portable bundle names with the native paths used for filesystem I/O."""
+    directory = Path(native_path(output))
+    for path in directory.rglob("*"):
+        if path.is_file():
+            yield path.relative_to(directory), path
 
 
 def _output(root, reference):
@@ -517,7 +526,7 @@ def _pdf_page_previews(root, data, output, options, page_range, pages, source_ha
         if pixels > limits["max_pixels"]:
             gaps.append(_gap("PAGE_PREVIEW_PIXEL_LIMIT", "Selected pages exceed the total preview pixel budget; no pages were rendered", severity="review"))
         else:
-            existing = sum(path.stat().st_size for path in output.rglob("*") if path.is_file())
+            existing = sum(path.stat().st_size for _, path in _material_files(output))
             byte_budget = min(limits["max_png_bytes"], max(0, options["max_output_bytes"] - existing))
             for number, (width, height) in zip(selected, dimensions):
                 page, bitmap = pdf[number - 1], None
@@ -541,7 +550,7 @@ def _pdf_page_previews(root, data, output, options, page_range, pages, source_ha
                 target = safe_path(output, local_ref, ["images"])
                 target.parent.mkdir(exist_ok=True)
                 _workspace_no_links(target.parent)
-                target.write_bytes(raw)
+                Path(native_path(target)).write_bytes(raw)
                 ref = target.relative_to(root).as_posix()
                 asset = {"ref": ref, "local_ref": local_ref, "page": number, "width": width, "height": height, "bytes": len(raw)}
                 metadata_record["assets"].append(asset)
@@ -568,7 +577,7 @@ def _attach_previews(output, preview, max_output_bytes):
     body["meta"]["himate__page_previews"] = preview
     encoded = canonical_bytes(document)
     additions = "".join(f"\n\nPhysical page {asset['page']} preview (rendered, not an extracted source bitmap):\n\n![Page {asset['page']}]({asset['local_ref']})" for asset in preview["assets"]).encode("utf-8")
-    sizes = [path.stat().st_size for path in output.rglob("*") if path.is_file()]
+    sizes = [path.stat().st_size for _, path in _material_files(output)]
     output_bytes = sum(sizes) - document_path.stat().st_size + len(encoded) + len(additions)
     if len(sizes) > _MAX_PARSE_FILES:
         return _gap("PAGE_PREVIEW_FILE_LIMIT", "Page previews exceed the remaining output file budget", severity="review")
@@ -640,11 +649,12 @@ def _validate_previews(root, output, manifest, document, registered):
                 or matches[0].get("source_sha256") != manifest["source_sha256"]):
             raise ContractError("PARSE_DESCRIPTOR_INVALID", "Preview image identity differs")
         from PIL import Image
-        with Image.open(path) as image:
+        disk = Path(native_path(path))
+        with Image.open(disk) as image:
             if image.format != "PNG" or image.size != (asset.get("width"), asset.get("height")):
                 raise ContractError("PARSE_DESCRIPTOR_INVALID", "Preview PNG geometry differs")
             image.verify()
-        if path.stat().st_size != asset.get("bytes"):
+        if disk.stat().st_size != asset.get("bytes"):
             raise ContractError("PARSE_DESCRIPTOR_INVALID", "Preview byte count differs")
         rendered.append(page)
         refs.add(ref)
@@ -888,7 +898,7 @@ def _docling(root, source, data, output, options, page_range, source_hash, profi
         if isinstance(uri, str) and uri.startswith("images/"):
             if uri not in image_refs:
                 asset = safe_path(output, uri, ["images"], directory_entries=image_directories)
-                image_refs[uri] = asset.relative_to(root).as_posix() if asset.is_file() else None
+                image_refs[uri] = asset.relative_to(root).as_posix() if Path(native_path(asset)).is_file() else None
             image_ref = image_refs[uri]
         pattern_texture = picture["self_ref"] in pattern_textures
         if image_ref is None and not pattern_texture:
@@ -980,7 +990,7 @@ def parse(root, source, data, output_ref, options=None, page_range=None, *, loca
             images.extend(preview_images)
         else:
             for asset in preview["assets"]:
-                safe_path(output, asset["local_ref"], ["images"]).unlink()
+                Path(native_path(safe_path(output, asset["local_ref"], ["images"]))).unlink()
             gaps.append(budget_gap)
             preview = None
         previews = {asset["page"]: asset["ref"] for asset in (preview or {}).get("assets", [])}
@@ -995,12 +1005,11 @@ def parse(root, source, data, output_ref, options=None, page_range=None, *, loca
             gaps.append(gap)
     converted = time.perf_counter()
     files, directories = [], {}
-    for path in sorted(output.rglob("*")):
-        if path.is_file():
-            relative = path.relative_to(root).as_posix()
-            safe_path(root, relative, [output_ref], directory_entries=directories)
-            raw = path.read_bytes()
-            files.append({"ref": relative, "bytes": len(raw), "sha256": sha256_bytes(raw)})
+    for local, path in sorted(_material_files(output)):
+        relative = output_ref + "/" + local.as_posix()
+        safe_path(root, relative, [output_ref], directory_entries=directories)
+        raw = path.read_bytes()
+        files.append({"ref": relative, "bytes": len(raw), "sha256": sha256_bytes(raw)})
     output_bytes = sum(row["bytes"] for row in files)
     if output_bytes > options["max_output_bytes"]:
         raise ContractError("PARSE_OUTPUT_LIMIT", "Parsed materials exceed max_output_bytes", output_ref)
@@ -1059,11 +1068,11 @@ def load(root, descriptor, *, expected_source_id, expected_sha256):
             raise ContractError("PARSE_DESCRIPTOR_INVALID", "Duplicate parser output")
         registered.add(ref)
         asset = safe_path(root, ref, [output_ref], directory_entries=directories)
-        raw = asset.read_bytes()
+        raw = Path(native_path(asset)).read_bytes()
         if len(raw) != row.get("bytes") or sha256_bytes(raw) != row.get("sha256"):
             raise ContractError("PARSE_MATERIAL_CHANGED", "Parser output bytes differ", ref)
     expected_files = {manifest_ref} | registered
-    actual_files = {p.relative_to(root).as_posix() for p in output.rglob("*") if p.is_file()}
+    actual_files = {output_ref + "/" + local.as_posix() for local, _ in _material_files(output)}
     if actual_files != expected_files:
         raise ContractError("PARSE_MATERIAL_CHANGED", "Parser output file set differs")
     for field in ("text_ref", "markdown_ref", "document_ref", "locators_ref"):

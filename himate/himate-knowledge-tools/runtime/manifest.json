@@ -1,7 +1,7 @@
 {
   "assets": {
     "governance/framework.lock.yaml": {
-      "sha256": "b8dfee10299ee43059996da7cc5157109b80322fc9011fbb44d0ad966a361093"
+      "sha256": "de393e1dc74b9157bdc349042abc9ef57244217dddf7beac792f0e7d9e56b514"
     }
   },
   "entrypoints": {
@@ -36,5 +36,5 @@
     }
   },
   "schema_version": "1.1",
-  "version": "0.20.1"
+  "version": "0.21.0"
 }

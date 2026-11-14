@@ -15,6 +15,8 @@ printf '%s' '{"limit":20}' | python -B /absolute/tool/root/knowledge.py panel ca
 | `panel search` | `{view_revision?,query,tags?,top_k?}` | `{view_revision,matches,truncated}`，候选沿用整卡检索字段和权重 |
 | `panel read` | `{view_revision?,card_id}` | 完整读卡结果与 `view_revision` |
 | `panel graph` | `{view_revision?,card_id,kinds?,cursor?,limit?}` | `{view_revision,nodes:[{id,title,kind,ref_id?}],edges:[{source,target,kind}],next_cursor}` |
+| `panel graph` | `{scope:"global",view_revision?}` | `{view_revision,nodes,edges,node_count,edge_count,truncated}` |
+| `panel graph` | `{scope:"neighbors",node_id,view_revision?,kinds?,cursor?,limit?}` | `{view_revision,nodes,edges,next_cursor}` |
 | `panel raw-list` | `{path?,cursor?,limit?}` | `{path,items:[{name,path,kind,size,category?,empty?}],next_cursor}` |
 | `panel raw-path` | `{path}` | `{name,path,kind,size,absolute_path}`，供可信文件服务使用 |
 | `panel raw-save` | `{path,staged_path,expected_size?,expected_sha256?}` | `{name,path,kind,size,sha256}` |
@@ -26,7 +28,15 @@ printf '%s' '{"limit":20}' | python -B /absolute/tool/root/knowledge.py panel ca
 
 `overview` 的文档和代码数量分别去重统计被正式卡引用的来源。类型项为 `{type,count}`，最近卡片为 `{id,title,type}`，按文件更新时间取至多 10 张。类型由目录映射，旧 draft 不进入面板，其他旧卡仍可浏览。卡片列表按 ID 排序，查询可按正文词项、卡片类型和单个标签过滤。标题、摘要和标签只显示列表所需的短值，完整内容可用 `read` 取得。
 
-图谱从指定卡读取一跳。节点类型是 `card`、`document`、`code`，`kinds` 筛选邻居类型。边类型是 `doc_ref`、`code_ref`、`card_link`、`related_to`。卡片 Markdown 正文中指向同一发布视图内其他卡的相对链接形成 `card_link`，每对卡按方向合并一条。同卡同来源的多处定位聚为一条边，旧卡显式声明的 `related_to` 保留方向。源 ID 与卡 ID 冲突时，源节点提供 `ref_id`，用于来源查询。图页最多 50 条边和 51 个节点，其他列表每页最多 100 项。默认每页 30 项。下一页使用原筛选条件、`view_revision` 和原样传回的 `next_cursor`，末页游标为 `null`。实时原件目录使用名称排序，原件增删会在之后的请求中反映。
+## 图谱
+
+带 `scope` 的请求共享由发布事务生成的图。节点包括正式卡、被这些卡引用的原件及代码文件，保留没有关系的正式卡。节点字段为 `{id,kind,ref_id,title,path}`。图 ID 按类型固定为 `card/<ref_id>`、`document/<ref_id>` 或 `code/<ref_id>`；读卡或查来源时传原始 `ref_id`。路径与对应卡片或来源登记一致。边为 `{source,target,kind}`，两端使用图 ID。边类型是 `doc_ref`、`code_ref`、`card_link`、`related_to`。同卡同来源的多个定位聚为一条边。指向同一发布视图内另一张卡的有效 Markdown 链接按方向去重，旧卡显式声明的 `related_to` 保留方向和独立类型。具体引用定位通过读卡获得。
+
+- `global` 提供全库轻量拓扑。响应包含全库节点与关系总数，画布可按类型筛选。最多返回 4,000 个节点、15,000 条边，并限制单次 JSON 为 4 MiB。超过任一上限时稳定地返回部分数据并标记 `truncated: true`，每条已返回的边两端都在节点列表中。
+- `neighbors` 从任意图节点读取传入和传出关系，包括来源到引用卡的反向浏览。逐点调用可继续沿图展开。中心始终返回，`kinds` 只筛选另一端；每页默认 30 条边，最多 50 条边和 51 个节点。下一页使用原节点、筛选条件、同一 `view_revision` 和原样传回的 `next_cursor`。最后一页游标为 `null`。
+- 不传 `scope` 时沿用按 `card_id` 读取一跳的旧接口和节点 ID。历史面板版本可继续用于旧接口。首次使用新图谱时，若发布视图缺少图索引，执行 `maintain reindex` 构建新版本。
+
+其他列表每页最多 100 项，默认每页 30 项。实时原件目录使用名称排序，原件增删会在之后的请求中反映。
 
 ## 正式知识版本
 

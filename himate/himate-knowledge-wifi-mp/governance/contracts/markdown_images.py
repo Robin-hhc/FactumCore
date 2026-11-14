@@ -32,7 +32,7 @@ _MARKDOWN.inline.ruler.at("backticks", lambda state, silent: _track_literal(back
 _MARKDOWN.inline.ruler.at("escape", lambda state, silent: _track_literal(escape, state, silent))
 
 
-def _inline_literals(token, lines, offsets, env):
+def _inline_literals(token, lines, offsets, env, *, atx_heading):
     content = token.content
     ranges = []
     _MARKDOWN.inline.parse(content, _MARKDOWN, {**env, "literal_source": content, "literal_ranges": ranges}, [])
@@ -44,7 +44,11 @@ def _inline_literals(token, lines, offsets, env):
         return
     starts, sources = [0], []
     for line, fragment in enumerate(fragments, start_line):
-        original = lines[line].rstrip(" \t")
+        original = lines[line]
+        if atx_heading:
+            original = re.sub(r"[ \t]+#+[ \t]*$", "", original)
+        if not original.endswith(fragment):
+            original = original.rstrip(" \t")
         sources.append(offsets[line] + len(original) - len(fragment)
                        if original.endswith(fragment) else None)
         starts.append(starts[-1] + len(fragment) + 1)
@@ -58,22 +62,25 @@ def _inline_literals(token, lines, offsets, env):
 
 def mask_markdown_literals(text):
     """Blank literal Markdown spans in a scan-only copy without moving source positions."""
-    if not _START.search(text) and "<img" not in text.lower():
+    if not _START.search(text):
         return text
-    normalized = re.sub(r"\r(?!\n)", "\n", text.replace("\r\n", " \n"))
-    lines = normalized.split("\n")
+    parts = re.split(r"(\r\n?|\n)", text)
+    lines = parts[::2]
     offsets = [0]
-    for line in lines:
-        offsets.append(offsets[-1] + len(line) + 1)
+    for line, separator in zip(lines, parts[1::2]):
+        offsets.append(offsets[-1] + len(line) + len(separator))
+    offsets.append(len(text))
     tokens, env = [], {}
-    _MARKDOWN.block.parse(normalized, _MARKDOWN, env, tokens)
+    _MARKDOWN.block.parse("\n".join(lines), _MARKDOWN, env, tokens)
     ranges = []
-    for token in tokens:
+    for index, token in enumerate(tokens):
         if token.type in {"fence", "code_block"}:
             start, end = token.map
             ranges.append((offsets[start], min(offsets[end], len(text))))
         elif token.type == "inline" and token.map and _START.search(token.content):
-            ranges.extend(_inline_literals(token, lines, offsets, env))
+            previous = tokens[index - 1] if index else None
+            atx_heading = previous and previous.type == "heading_open" and previous.markup.startswith("#")
+            ranges.extend(_inline_literals(token, lines, offsets, env, atx_heading=atx_heading))
     if not ranges:
         return text
     chunks, cursor = [], 0

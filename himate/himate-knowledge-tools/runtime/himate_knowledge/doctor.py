@@ -217,9 +217,8 @@ def _matches_pin(actual, expected):
         return False
 
 
-def doctor(tool_root, knowledge_root, manifest):
+def inspect_dependencies(requirements):
     gaps, dependencies = [], []
-    requirements = tool_root / "runtime/requirements.lock.txt"
     for line in requirements.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
@@ -243,11 +242,20 @@ def doctor(tool_root, knowledge_root, manifest):
             actual = importlib.metadata.version(name)
         except importlib.metadata.PackageNotFoundError:
             actual = None
-        dependencies.append({"name": name, "expected": expected, "actual": actual})
-        if not _matches_pin(actual, expected):
+        ready = _matches_pin(actual, expected)
+        status = "ready" if ready else "missing" if actual is None else "mismatch"
+        dependencies.append({"name": name, "expected": expected, "actual": actual, "status": status})
+        if not ready:
             gaps.append({"code": "DEPENDENCY_UNAVAILABLE", "message": name + " requires " + expected})
-    yaml_available = any(row["name"].casefold() == "pyyaml" and _matches_pin(row["actual"], row["expected"])
-                         for row in dependencies)
+    return dependencies, gaps
+
+
+def doctor(tool_root, knowledge_root, manifest):
+    requirements = tool_root / "runtime/requirements.lock.txt"
+    reports, gaps = inspect_dependencies(requirements)
+    yaml_available = any(row["name"].casefold() == "pyyaml" and row["status"] == "ready"
+                         for row in reports)
+    dependencies = [{key: value for key, value in row.items() if key != "status"} for row in reports]
     if not yaml_available:
         _doctor_gap(gaps, "YAML_PARSER_UNAVAILABLE", "Pinned PyYAML is required to inspect rule/configuration data",
                     requirements, "Prepare the pinned dependencies on this execution host and rerun doctor")

@@ -34,6 +34,10 @@ OpenFlow 面板宿主通过 `OPENFLOW_KNOWLEDGE_TOOLKIT_ROOT` 指定工具包目
 
 日常升级时，将新版工具包放在约定的工具目录，使用同一解释器重新安装。若选择新工具目录，更新宿主配置路径。已注册的 `knowledge` 命令仍指向原工具目录，迁移时可用 `install-command --bin-dir <新命令目录>` 注册后调整 PATH。知识库维护者继续在自己的库中维护 `config.yml` 和 `AGENTS.md`。
 
+## 检查或补齐宿主 Python 依赖
+
+`<Python> -B <工具包>/tools/deploy/environment.py check` 检查工具包锁中的适用依赖，返回一条 JSON，包含当前解释器、工具版本、各包的要求版本和已装版本。`install` 为同一个 Python 补齐锁定依赖，通过 JSON 行报告检查、安装和等待复查的阶段。安装成功后重新运行 `check` 确认结果。OpenFlow 在知识库页提供检查入口，用户点击安装后在宿主后台运行同一命令。这两个操作无需传知识根。Skills、Workflows 和 OCR 模型继续通过 `deploy.ps1` 或 `deploy.sh` 准备。
+
 ## 为现有知识库准备 OCR
 
 只需查询、录入常规文档或安装能力时，安装无需指定知识库。需要 `standard` OCR 时，为对应知识库另加 `--knowledge-root` / `-KnowledgeRoot`。该目录必须已经存在并包含 `config.yml`，模型安装到该知识库的 `artifacts/models/docling-cpu/`。

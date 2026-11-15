@@ -10,6 +10,10 @@ import subprocess
 import sys
 
 
+def install_dependencies(python, requirements, **process_options):
+    subprocess.run([python, "-m", "pip", "install", "-r", str(requirements)], check=True, **process_options)
+
+
 OCR_PREPARE = """from pathlib import Path
 import hashlib
 import json
@@ -277,7 +281,7 @@ def main(argv=None):
             copied.append((label, count, destination))
 
         # Prepare first: dependency or model failure must leave old capabilities intact.
-        subprocess.run([args.python, "-m", "pip", "install", "-r", str(requirements)], check=True)
+        install_dependencies(args.python, requirements)
         print(f"Installed runtime dependencies with {args.python}")
         if knowledge is not None:
             subprocess.run([args.python, "-c", OCR_PREPARE, str(source), str(knowledge),

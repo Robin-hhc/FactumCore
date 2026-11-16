@@ -30,13 +30,15 @@ Windows PowerShell：
 <已准备的 Python> -B <工具包>/knowledge.py doctor --knowledge-root <知识库> --json
 ```
 
-OpenFlow 面板宿主通过 `OPENFLOW_KNOWLEDGE_TOOLKIT_ROOT` 指定工具包目录，通过 `OPENFLOW_KNOWLEDGE_PYTHON` 指定解释器路径，并在面板绑定需要操作的知识库。SSH 执行使用远端的工具包、解释器和知识库原生路径。命令行可选用工具包的 `install-command` 命令注册 `knowledge`，自动化建议使用宿主配置的工具路径和知识根。部署脚本不会修改用户 PATH。
+OpenFlow 面板宿主通过 `OPENFLOW_KNOWLEDGE_TOOLKIT_ROOT` 指定工具包目录，通过 `OPENFLOW_KNOWLEDGE_PYTHON` 指定解释器路径，并在面板绑定需要操作的知识库。SSH 执行使用远端的工具包、解释器和知识库原生路径。命令行可用工具包的 `install-command` 命令单独注册 `knowledge`。完整部署入口 `deploy.ps1` 和 `deploy.sh` 保留原有安装行为。
 
-日常升级时，将新版工具包放在约定的工具目录，使用同一解释器重新安装。若选择新工具目录，更新宿主配置路径。已注册的 `knowledge` 命令仍指向原工具目录，迁移时可用 `install-command --bin-dir <新命令目录>` 注册后调整 PATH。知识库维护者继续在自己的库中维护 `config.yml` 和 `AGENTS.md`。
+日常升级时，将新版工具包放在约定的工具目录，使用同一解释器重新安装。若工具包或解释器迁移，更新宿主配置并重跑环境安装，以更新工具包管理的 `knowledge` 命令。知识库维护者继续在自己的库中维护 `config.yml` 和 `AGENTS.md`。
 
-## 检查或补齐宿主 Python 依赖
+## 检查或安装宿主运行环境
 
-`<Python> -B <工具包>/tools/deploy/environment.py check` 检查工具包锁中的适用依赖，返回一条 JSON，包含当前解释器、工具版本、各包的要求版本和已装版本。`install` 为同一个 Python 补齐锁定依赖，通过 JSON 行报告检查、安装和等待复查的阶段。安装成功后重新运行 `check` 确认结果。OpenFlow 在知识库页提供检查入口，用户点击安装后在宿主后台运行同一命令。这两个操作无需传知识根。Skills、Workflows 和 OCR 模型继续通过 `deploy.ps1` 或 `deploy.sh` 准备。
+`<Python> -B <工具包>/tools/deploy/environment.py check` 只读检查锁定的 Python 依赖与 `knowledge` 命令，返回一条 JSON。状态为 `needs_install` 时需要安装依赖，`needs_cli` 表示依赖齐全、命令待注册或待修复，`ready` 表示依赖齐全且已验证命令可以启动。返回的 `command` 包含命令目录和当前进程的 `PATH` 是否能找到该入口。
+
+`install` 用同一个 Python 补齐并复查依赖，再按需注册并试运行 `knowledge`，通过 JSON 行报告进度。OpenFlow 知识库页在宿主后台运行同一入口。这两个操作无需传知识根。Windows 默认把命令安装到 `%LOCALAPPDATA%\HiMate\bin`，并将其加入执行账户的用户 `PATH`。终端进程需刷新环境，可重开终端或重新登录。Linux 默认安装到 `~/.local/bin`，终端或服务可按部署环境配置 `PATH`。传 `--bin-dir <目录>` 可指定命令目录，由调用者配置 `PATH`。Skills、Workflows 和 OCR 模型继续通过 `deploy.ps1` 或 `deploy.sh` 准备。
 
 ## 为现有知识库准备 OCR
 

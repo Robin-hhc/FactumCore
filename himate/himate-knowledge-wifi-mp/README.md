@@ -2,7 +2,7 @@
 
 HiMate 将设计文档、规格和代码分析蒸馏为可追溯知识卡，供 Agent 在开发和问题定位时检索使用。
 
-参照[使用说明](docs-llm-wiki/使用说明.md)部署工具包 `himate-tools` 和能力包 `himate-skills`。在 OpenFlow 知识库页绑定本库并检查环境，再添加原件，运行入库流程后即可查阅正式知识。扫描文档可按需为本库准备离线 OCR 模型。
+参照[使用指南](docs-llm-wiki/使用说明.md)部署工具包 `himate-tools` 和能力包 `himate-skills`。在 OpenFlow 知识库页绑定本库并检查环境，再添加原件，运行入库流程后即可查阅正式知识。扫描文档可按需为本库准备离线 OCR 模型。
 
 | 任务 | 入口 |
 |---|---|
@@ -14,4 +14,4 @@ HiMate 将设计文档、规格和代码分析蒸馏为可追溯知识卡，供 
 
 本目录是知识根，随业务维护 `AGENTS.md`、`config.yml`、原件、来源登记和正式卡。默认布局为 `repo/himate/himate-knowledge-wifi-mp/`，`repo/` 是可包含多个代码仓的 manifest 工作区根。
 
-架构、详细流程和 WiFi 资料分类见[设计与使用文档](docs-llm-wiki/README.md)。
+架构、详细流程和日常操作见[设计与使用文档](docs-llm-wiki/README.md)。

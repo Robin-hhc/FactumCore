@@ -17,8 +17,8 @@ config.local.yml
 *.env
 
 # Project development artifacts stay local; shared design and usage remain versioned.
-/himate/himate-knowledge-tools/docs-llm-wiki/sdd/
-/himate/himate-knowledge-tools/docs-llm-wiki/task.md
+/himate/himate-tools/docs-llm-wiki/sdd/
+/himate/himate-tools/docs-llm-wiki/task.md
 
 # Business sources are registered separately; keep the explanatory README only.
 /main/*

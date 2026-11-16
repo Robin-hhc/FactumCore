@@ -1,0 +1,101 @@
+version: 1
+id: hs-knowledge-ingest
+name: 知识入库
+description: 在本次选定范围内逐批处理来源或PDF页段；P5成功回P1继续扫描，P1确认无待办才正常结束。
+kind: custom
+source: user_created
+entry:
+  skill: hs-knowledge-source
+entry_node: prepare_sources
+nodes:
+- id: prepare_sources
+  title: P1 选择文件并准备材料
+  type: skill
+  owner: coder
+  skill: hs-knowledge-source
+  prompt: |-
+    首次进入时，复用宿主绑定或本次已确认的知识根与执行端，读取该根的 AGENTS.md 和 config.yml。知识根或执行端仍不明确时询问用户。使用该执行端已注册的 knowledge 命令或宿主提供的已安装 CLI 入口，以知识根为工作目录，显式传入 --knowledge-root，运行 doctor --json。回执的知识根正确且 phase 为 ready 后才继续；环境阻塞时报告实际缺口。交接执行端、知识根、CLI 调用入口和 data.runtime_version，后续节点沿用同一入口、版本和目标。
+
+    保留任务原始范围和解析、预算配置，后续各批沿用。使用 hs-knowledge-source。prepared 时交接本批 task 与材料入口，unchanged 时汇总原始范围内各批实际处理的来源、页段和卡片变动。
+  exits:
+  - id: prepared
+    label: 本轮材料已准备
+    condition: 本次文件、来源 ID、hash 和关联卡入口已由脚本保存。
+    target: plan_change
+  - id: unchanged
+    label: 没有待办
+    condition: 本次任务原始范围扫描成功且没有待办，已汇总各批实际结果。
+    target: __end__
+- id: plan_change
+  title: P2 阅读并制定编辑计划
+  type: skill
+  owner: coder
+  skill: hs-knowledge-change-plan
+  prompt: |-
+    使用 hs-knowledge-change-plan，接收本批 task 和材料。content_planned 时向 P3 交接 .build/plan.md 与材料入口。deferred 时报告必要缺口、已完成批次和当前未完成来源，结束本次任务。
+  exits:
+  - id: content_planned
+    label: 编辑计划已明确
+    condition: 本轮 plan.md 已列明候选 id/path，并明确卡动作、结论变化、条件、依据和保留部分。
+    target: materialize_view
+  - id: deferred
+    label: 本文件暂缓
+    condition: 必要依据不足，已说明阻塞及实际已完成范围；本文件仍未完成，本次范围不宣称全部完成。
+    target: __end__
+- id: materialize_view
+  title: P3 按计划写完整卡
+  type: skill
+  owner: coder
+  skill: hs-knowledge-view-materialize
+  prompt: |-
+    使用 hs-knowledge-view-materialize，接收当前计划、材料及返工意见。ready 时交接候选与删除清单（如有）；needs_plan 时交接需重判的问题。
+  exits:
+  - id: ready
+    label: 完整候选稿已保存
+    condition: 本轮 cards/ 和必要 changes.json 已完整表达最终改动，正式知识未修改。
+    target: lint_view
+  - id: needs_plan
+    label: 调整编辑决定
+    condition: 结论、归卡或旧结论去向需要重新判断。
+    target: plan_change
+- id: lint_view
+  title: P4 检查并独立审阅
+  type: skill
+  owner: reviewer
+  skill: hs-knowledge-review
+  prompt: |-
+    由独立 reviewer 使用 hs-knowledge-review 审阅本批。passed 时将审阅通过结果交给 P5；needs_plan 或 needs_revision 时交接具体问题及依据。修订稿仍经过本节点。
+  exits:
+  - id: passed
+    label: 检查与内容审阅通过
+    condition: 脚本检查及独立内容审阅实际完成，无未解决必要问题。
+    target: apply_view
+  - id: needs_plan
+    label: 重新判断内容
+    condition: 事实、条件、依据或归卡决定需要作者重判。
+    target: plan_change
+  - id: needs_revision
+    label: 修订稿件
+    condition: 决定可保留，但表达、格式、定位、落位拼写或组稿需要修订。
+    target: materialize_view
+- id: apply_view
+  title: P5 入库并更新索引
+  type: skill
+  owner: coder
+  skill: hs-knowledge-apply
+  prompt: |-
+    收到 P4 审阅通过后才使用 hs-knowledge-apply。执行失败时保留暂存，按原批次重试 P5 或报告失败。若候选需要修改且确认本批尚未写入正式库，将问题交 needs_revision。
+
+    completed 时交接实际 commit 回执，回 P1 按任务原始范围继续。
+  exits:
+  - id: completed
+    label: 本批已入库
+    condition: 本轮卡片和索引更新成功，已保存本批处理事实，并按 source_complete 区分部分或全文完成。
+    target: prepare_sources
+  - id: needs_revision
+    label: 修订稿件
+    condition: 确认本批尚未写入正式库，需修改候选并重新通过独立审阅。
+    target: materialize_view
+artifacts:
+  primary: []
+  optional: []

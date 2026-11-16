@@ -1,0 +1,152 @@
+"""Instruction packaging and the five-step graph, independent of host runtime."""
+
+from __future__ import annotations
+
+import importlib.util
+import shutil
+
+import pytest
+import yaml
+
+from support.contracts import CAPABILITIES_ROOT, TOOL_ROOT
+
+
+def validator_module():
+    path = TOOL_ROOT / "evals/validate_design.py"
+    spec = importlib.util.spec_from_file_location("workflow_validation", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.fixture
+def distribution(tmp_path):
+    capabilities = tmp_path / "himate-skills"
+    for name in ("skills", "workflows"):
+        shutil.copytree(CAPABILITIES_ROOT / name, capabilities / name,
+                        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    for relative in ("knowledge.py", "knowledge.sh", "knowledge.cmd", "runtime/manifest.json",
+                     "runtime/requirements.lock.txt", "runtime/himate_knowledge/__init__.py",
+                     "runtime/himate_knowledge/cli.py"):
+        path = tmp_path / "himate-tools" / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("synthetic runtime placeholder\n", encoding="utf-8")
+    return capabilities
+
+
+def validate_distribution(capabilities):
+    return validator_module().validate(capabilities.with_name("himate-tools"))
+
+
+def test_current_distribution_is_structurally_valid():
+    assert validator_module().validate(TOOL_ROOT, CAPABILITIES_ROOT) == []
+
+
+def test_five_steps_keep_decision_writing_and_independent_review_separate():
+    graph = yaml.safe_load((CAPABILITIES_ROOT / "workflows/hs-knowledge-ingest/workflow.yaml").read_bytes())
+    nodes = {row["id"]: row for row in graph["nodes"]}
+    assert list(nodes) == ["prepare_sources", "plan_change", "materialize_view", "lint_view", "apply_view"]
+    assert [row["owner"] for row in nodes.values()] == ["coder", "coder", "coder", "reviewer", "coder"]
+    assert {row["id"]: row["target"] for row in nodes["plan_change"]["exits"]}["content_planned"] == "materialize_view"
+    assert {row["id"]: row["target"] for row in nodes["lint_view"]["exits"]} == {
+        "passed": "apply_view", "needs_plan": "plan_change", "needs_revision": "materialize_view",
+    }
+
+
+def test_ingest_completed_batch_returns_to_scan_before_normal_completion():
+    graph = yaml.safe_load((CAPABILITIES_ROOT / "workflows/hs-knowledge-ingest/workflow.yaml").read_bytes())
+    edges = {row["id"]: {edge["id"]: edge["target"] for edge in row["exits"]}
+             for row in graph["nodes"]}
+    assert edges["apply_view"] == {"completed": "prepare_sources", "needs_revision": "materialize_view"}
+    assert edges["prepare_sources"] == {"prepared": "plan_change", "unchanged": "__end__"}
+    assert edges["plan_change"]["deferred"] == "__end__"
+
+
+def test_patrol_reselects_after_completed_or_already_completed_selected_source():
+    graph = yaml.safe_load((CAPABILITIES_ROOT / "workflows/hs-knowledge-lint/workflow.yaml").read_bytes())
+    edges = {row["id"]: {edge["id"]: edge["target"] for edge in row["exits"]}
+             for row in graph["nodes"]}
+    assert edges["apply_view"] == {"completed": "plan_patrol", "needs_revision": "materialize_view"}
+    assert edges["prepare_sources"]["unchanged"] == "plan_patrol"
+    assert edges["plan_patrol"]["needs_ingest"] == "prepare_sources"
+    assert edges["plan_patrol"]["unchanged"] == "complete_patrol"
+    assert edges["plan_change"]["deferred"] == "complete_patrol"
+
+
+@pytest.mark.parametrize("workflow,node_id,exit_id,wrong_target", [
+    ("hs-knowledge-ingest", "apply_view", "completed", "__end__"),
+    ("hs-knowledge-ingest", "apply_view", "needs_revision", "prepare_sources"),
+    ("hs-knowledge-ingest", "plan_change", "deferred", "prepare_sources"),
+    ("hs-knowledge-lint", "apply_view", "completed", "prepare_sources"),
+    ("hs-knowledge-lint", "apply_view", "needs_revision", "plan_patrol"),
+    ("hs-knowledge-lint", "prepare_sources", "unchanged", "complete_patrol"),
+    ("hs-knowledge-lint", "plan_change", "deferred", "plan_patrol"),
+])
+def test_loop_boundaries_cannot_terminate_early_or_repeat_blocked_sources(
+        distribution, workflow, node_id, exit_id, wrong_target):
+    path = distribution / "workflows" / workflow / "workflow.yaml"
+    value = yaml.safe_load(path.read_bytes())
+    node = next(row for row in value["nodes"] if row["id"] == node_id)
+    next(edge for edge in node["exits"] if edge["id"] == exit_id)["target"] = wrong_target
+    path.write_text(yaml.safe_dump(value), encoding="utf-8")
+    assert any(node_id + ": unsafe or missing transition" in error
+               for error in validate_distribution(distribution))
+
+
+@pytest.mark.parametrize("skill", ["record", "explore", "lint"])
+def test_retired_skills_cannot_reappear_as_active_packages(distribution, skill):
+    package = distribution / "skills" / ("hs-knowledge-" + skill)
+    package.mkdir(parents=True, exist_ok=True)
+    (package / "SKILL.md").write_text("---\nname: retired\ndescription: old capability\n---\n", encoding="utf-8")
+    assert any("active Skill set mismatch" in error for error in validate_distribution(distribution))
+
+
+@pytest.mark.parametrize("resource", ["scripts/cli.py", "tests/test_hidden.py", "requirements.lock.txt"])
+def test_skill_packages_do_not_own_execution_or_test_code(distribution, resource):
+    path = distribution / "skills/hs-knowledge-query" / resource
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("synthetic wrong owner", encoding="utf-8")
+    assert any("Skill source owns implementation" in error for error in validate_distribution(distribution))
+
+
+def test_authoring_template_links_resolve_within_the_skill_package(distribution):
+    package = distribution / "skills/hs-knowledge-view-materialize"
+    (package / "references/templates/entity.md").unlink()
+    assert any("unavailable local reference templates/entity.md" in error
+               for error in validate_distribution(distribution))
+
+
+@pytest.mark.parametrize("workflow", ["hs-knowledge-ingest", "hs-knowledge-lint"])
+def test_review_cannot_run_as_the_author(distribution, workflow):
+    path = distribution / "workflows" / workflow / "workflow.yaml"
+    value = yaml.safe_load(path.read_bytes())
+    next(row for row in value["nodes"] if row["id"] == "lint_view")["owner"] = "coder"
+    path.write_text(yaml.safe_dump(value), encoding="utf-8")
+    assert any("lint_view: wrong Skill/owner/type" in error for error in validate_distribution(distribution))
+
+
+@pytest.mark.parametrize("node_id", ["sync_workspace", "plan_patrol", "refresh_index", "complete_patrol"])
+def test_each_patrol_step_has_its_own_narrow_skill(distribution, node_id):
+    path = distribution / "workflows/hs-knowledge-lint/workflow.yaml"
+    value = yaml.safe_load(path.read_bytes())
+    next(row for row in value["nodes"] if row["id"] == node_id)["skill"] = "hs-knowledge-maintain"
+    path.write_text(yaml.safe_dump(value), encoding="utf-8")
+    assert any(node_id + ": wrong Skill/owner/type" in error for error in validate_distribution(distribution))
+
+
+def test_review_revisions_return_to_the_correct_author_step(distribution):
+    path = distribution / "workflows/hs-knowledge-ingest/workflow.yaml"
+    value = yaml.safe_load(path.read_bytes())
+    review = next(row for row in value["nodes"] if row["id"] == "lint_view")
+    next(row for row in review["exits"] if row["id"] == "needs_revision")["target"] = "prepare_sources"
+    path.write_text(yaml.safe_dump(value), encoding="utf-8")
+    assert any("lint_view: unsafe or missing transition" in error for error in validate_distribution(distribution))
+
+
+@pytest.mark.parametrize("workflow", ["hs-knowledge-ingest", "hs-knowledge-lint"])
+def test_canvas_cannot_contain_a_retired_record_node(distribution, workflow):
+    path = distribution / "workflows" / workflow / "layouts.yaml"
+    value = yaml.safe_load(path.read_bytes())
+    value["canvas"]["nodes"]["record_ingest"] = {"x": 0, "y": 0}
+    path.write_text(yaml.safe_dump(value), encoding="utf-8")
+    assert any("layout identity/node set mismatch" in error for error in validate_distribution(distribution))

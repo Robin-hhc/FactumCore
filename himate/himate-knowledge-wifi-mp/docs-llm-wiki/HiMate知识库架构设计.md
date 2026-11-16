@@ -6,7 +6,7 @@ HiMate 将设计文档、规格和代码分析整理为可追溯的知识卡，�
 
 系统以单个知识根为管理边界。文档更新通过 ingest 处理，周期治理通过 lint 发现原件和已引用代码的变化，查询通过精确词项、显式标签及整卡退役筛选定位候选。每个知识根串行执行内容更新，定时触发由执行环境提供。
 
-独立 ingest 在用户选定范围内逐批运行 P1—P5，P5 成功返回 P1，范围无待办才正常结束。lint 由 L2 选择来源并复用 P1—P5，成功或所选来源已无待办后回 L2；暂缓汇总阻塞，失败保留本批材料重试。工作流调度沿用现有来源处理事实，不另建全库完成水位。
+独立 ingest 在用户选定范围内逐批运行 P1—P5，P5 成功返回 P1，范围无待办才正常结束。lint 由 L2 选择来源并复用 P1—P5，成功或所选来源已无待办后回 L2，暂缓时汇总阻塞。P5 确认尚未写入正式库且候选需要修改时回 P3 再审，执行失败保留原批次重试。工作流调度沿用现有来源处理事实。
 
 ## 2. 知识与来源模型
 
@@ -14,7 +14,7 @@ HiMate 将设计文档、规格和代码分析整理为可追溯的知识卡，�
 
 来源文档位于 `docs-raw/`，其中 `agent-notes/` 保存 Agent 生成的分析稿。正式卡位于 `knowledge/`。一份文档可以形成多张主题卡，一张卡也可以融合多份文档和多个代码入口。卡片保存结论、条件、理由和必要证据，而完整来源通过引用读取。
 
-卡头承担稳定身份、文档与代码关系，以及可选标签和整卡生命周期；新卡三个必填、两个可选字段的权威定义见工具包的 `governance/specs/cards.md`。标题和知识内容放正文。
+卡头承担稳定身份、文档与代码关系，以及可选标签和整卡生命周期。新卡的三个必填字段、两个可选字段及示例由 `hs-knowledge-view-materialize` Skill 随包提供。标题和知识内容放正文，字段由 CLI 校验。
 
 来源登记使用统一的 `source_id` 标识文件，卡头的 `doc_id`、`code_id` 引用相应文件 ID。章节、页码和行段位于引用项中；同一代码文件中的多个函数可以分别引用。普通内容更新沿用文件身份，内容版本由 SHA-256 表示。
 
@@ -74,27 +74,31 @@ flowchart LR
 
 `code_root` 相对知识根，默认布局为 `../../main`。`modules[].path` 相对代码根，描述允许引用的实际模块。代码工作区基准取 `code_root` 开头 `../` 指向的上级目录。以 `../../main` 为例，该基准是 `repo/`。
 
-登记代码时，未填写 `repo_id` 的 `path` 相对上述代码工作区基准，例如 `main/<module>/<file>.c`。填写 `repo_id` 时，路径相对对应的已配置代码仓。文档路径相对知识根，位于 `docs-raw/`。路径参数详见工具包的 `governance/specs/sources.md`。
+登记代码时，未填写 `repo_id` 的 `path` 相对上述代码工作区基准，例如 `main/<module>/<file>.c`。填写 `repo_id` 时，路径相对对应的已配置代码仓。文档路径相对知识根，位于 `docs-raw/`。登记和预览的命令示例见 `hs-knowledge-view-materialize` 随包的 `references/source-commands.md`。
 
 ### 5.2 运行位置与组件分发
 
 执行端从已安装的工具包启动 CLI，并通过 `--knowledge-root` 指定数据所在主机的知识根。工具根由启动入口确定，知识根决定配置、原件、卡片、索引和其他业务输出。OpenFlow 或 SSH 通过该执行端的实际路径调用。
 
-部署入口、运行依赖、Skill、Workflow、共用规则和离线模型随同一个工具包发布。Windows 与 Linux 入口共用 Python 后端。默认将 Skill 安装到 `~/.openflow/config/skills` 和 `~/.cac/skills`，将 Workflow 安装到 `~/.openflow/config/workflow-templates`。部署使用 Python 3.10–3.12，从工具包的依赖锁安装。指定知识根时同时准备该库的 `artifacts/models/docling-cpu/`。准备成功后替换同名能力包。参数与模型准备见工具包的 `tools/deploy/README.md`。
+工具包提供安装入口、运行依赖、共用规则、CLI 和离线模型。能力包提供自带参考与模板的 Skill，以及引用 Skill ID 的 Workflow。Agent 在节点加载对应 Skill，结合任务输入查阅随包材料并调用已安装的 CLI。
+
+Windows 与 Linux 入口共用 Python 后端。安装脚本默认查找同级 `himate-skills/`，也可指定能力包位置。默认将 Skill 安装到 `~/.openflow/config/skills` 和 `~/.cac/skills`，将 Workflow 安装到 `~/.openflow/config/workflow-templates`。部署使用 Python 3.10–3.12，从工具包的依赖锁安装。指定知识根时同时准备该库的 `artifacts/models/docling-cpu/`。准备成功后替换同名能力包。参数与模型准备见工具包的 `tools/deploy/README.md`。
 
 ### 5.3 HiMate Knowledge目录架构
 
 ```text
-himate-knowledge-tools/              可安装在执行端任意目录
+himate-tools/                       可安装在执行端任意目录
 ├── deploy.ps1 / deploy.sh           Windows / Linux 安装入口
 ├── knowledge.py / knowledge.cmd / knowledge.sh
 ├── runtime/                        CLI、发行清单、依赖锁
-├── governance/                     共用算法、Schema、模板、规范与框架锁
+├── governance/                     共用算法、Schema、规范、导航模板与框架锁
 ├── tools/deploy/models/             离线模型和清单
-├── skills/                         Skill 分发源码
-├── workflows/                      Workflow 模板
 ├── evals/                          开发验证
 └── docs-llm-wiki/                   开发文档、面板 CLI 契约与本地 SDD
+
+himate-skills/                      独立能力包，部署时默认与工具包同级
+├── skills/                         步骤指引、参考与写作模板
+└── workflows/                      节点、角色、交接、出口与画布
 
 repo/                               业务 manifest 工作区示例
 ├── main/                           实际代码工作区
@@ -140,11 +144,11 @@ repo/                               业务 manifest 工作区示例
 | `governance/sources.lock.yaml` | 保留来源身份、完整成功事实及PDF累计覆盖，不能用发行包中的空登记覆盖 |
 | 知识根的 `AGENTS.md`、`config.yml` | 按实际项目维护，框架升级时合并项目已有约定和配置 |
 | `runtime/`、工具包启动器与检查入口 | 按同一发行版本替换程序文件，运行环境独立维护 |
-| `governance/` 中算法、Schema、模板、规则及 `framework.lock.yaml` | 随工具包更新并保持摘要一致，领域特有说明从知识根读取 |
+| `governance/` 中算法、Schema、规则及 `framework.lock.yaml` | 随工具包更新并保持摘要一致，领域特有说明从知识根读取 |
 | 知识仓的 `docs-llm-wiki/` | 维护架构、业务流程、使用说明和领域资料分类 |
 | 工具包的 `docs-llm-wiki/`、`evals/` | 维护 CLI 契约、开发文档和验收测试。本地 SDD 和任务草稿由 Git 忽略 |
 | `tools/deploy/models/` | 清单与匹配权重一同更新和交付，不以新清单搭配旧权重；二进制按离线分发方式补齐 |
-| 已安装的同名 Skill、Workflow 包 | 由部署脚本完整替换，其他包保留 |
+| 已安装的同名 Skill、Workflow 包 | 从能力包由部署脚本完整替换，其他包保留 |
 
 空闲时可清理已消费报告、可重建数据库和 Python/测试工具缓存。`artifacts/` 可能同时存放模型、环境和本机材料，不整目录删除；临时原件阅读使用专用释放与过期回收命令。已有备份和历史证据按项目保留规则单独管理。
 

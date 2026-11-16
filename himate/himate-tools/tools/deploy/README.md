@@ -30,15 +30,17 @@ Windows PowerShell：
 <已准备的 Python> -B <工具包>/knowledge.py doctor --knowledge-root <知识库> --json
 ```
 
-OpenFlow 面板宿主通过 `OPENFLOW_KNOWLEDGE_TOOLKIT_ROOT` 指定工具包目录，通过 `OPENFLOW_KNOWLEDGE_PYTHON` 指定解释器路径，并在面板绑定需要操作的知识库。SSH 执行使用远端的工具包、解释器和知识库原生路径。命令行可用工具包的 `install-command` 命令单独注册 `knowledge`。完整部署入口 `deploy.ps1` 和 `deploy.sh` 保留原有安装行为。
+OpenFlow 宿主通过绝对路径 `OPENFLOW_KNOWLEDGE_TOOLKIT_ROOT` 指定工具包目录，可用 `OPENFLOW_KNOWLEDGE_PYTHON` 指定 Python 绝对路径。面板中另选需要操作的知识库。SSH 执行使用远端的工具包、解释器和知识库原生路径。OpenFlow 的面板命令以宿主配置为准。终端可以通过环境安装注册 `knowledge`，或单独运行 `<Python> -B <工具包>/knowledge.py install-command`。
 
 日常升级时，将新版工具包放在约定的工具目录，使用同一解释器重新安装。若工具包或解释器迁移，更新宿主配置并重跑环境安装，以更新工具包管理的 `knowledge` 命令。知识库维护者继续在自己的库中维护 `config.yml` 和 `AGENTS.md`。
 
 ## 检查或安装宿主运行环境
 
-`<Python> -B <工具包>/tools/deploy/environment.py check` 只读检查锁定的 Python 依赖与 `knowledge` 命令，返回一条 JSON。状态为 `needs_install` 时需要安装依赖，`needs_cli` 表示依赖齐全、命令待注册或待修复，`ready` 表示依赖齐全且已验证命令可以启动。返回的 `command` 包含命令目录和当前进程的 `PATH` 是否能找到该入口。
+`<Python> -B <工具包>/tools/deploy/environment.py check` 只读检查锁定的 Python 依赖与 `knowledge` 命令。`needs_install` 表示需要补齐依赖，`needs_cli` 表示命令待注册或待修复，`ready` 表示依赖齐全且受管理的命令可以启动。可以在绑定前从 OpenFlow 知识库页面的「环境检查」运行。检查和安装均在执行 OpenFlow 的宿主机上进行。
 
-`install` 用同一个 Python 补齐并复查依赖，再按需注册并试运行 `knowledge`，通过 JSON 行报告进度。OpenFlow 知识库页在宿主后台运行同一入口。这两个操作无需传知识根。Windows 默认把命令安装到 `%LOCALAPPDATA%\HiMate\bin`，并将其加入执行账户的用户 `PATH`。终端进程需刷新环境，可重开终端或重新登录。Linux 默认安装到 `~/.local/bin`，终端或服务可按部署环境配置 `PATH`。传 `--bin-dir <目录>` 可指定命令目录，由调用者配置 `PATH`。Skills、Workflows 和 OCR 模型继续通过 `deploy.ps1` 或 `deploy.sh` 准备。
+`install` 用同一个 Python 补齐并复查依赖，再按需注册并试运行 `knowledge`。依赖齐全时直接处理命令。OpenFlow 在后台运行并展示阶段进度，结束后重新检查。检查和安装均无需传知识根。完整的 `deploy.ps1` 和 `deploy.sh` 负责依赖、Skills、Workflows 和按需准备的 OCR 模型。终端命令注册由环境安装或 `install-command` 单独处理。
+
+Windows 上，环境安装默认把命令放到 `%LOCALAPPDATA%\HiMate\bin`，并将其加入执行账户的用户 `PATH`。单独使用 `install-command` 时，可加 `--add-path` 更新用户 `PATH`。打开新的终端后检查 `knowledge` 是否可用，旧终端可能需要重开或重新登录。Windows 工具包 0.22.3 起按 `PATH` 和 `PATHEXT` 排查同名命令，若另一入口优先匹配，先检查 `PATH` 顺序。Linux 默认命令目录为 `~/.local/bin`，由终端或服务配置 `PATH`。手动执行环境入口时可以传 `--bin-dir <目录>` 指定命令目录，由调用者配置 `PATH`。
 
 ## 为现有知识库准备 OCR
 

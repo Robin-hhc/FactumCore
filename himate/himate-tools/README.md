@@ -4,7 +4,7 @@
 
 在本目录运行 `.\deploy.ps1` 或 `sh ./deploy.sh` 安装依赖和能力。部署默认使用同级的 `himate-skills/`。能力放在别处时用 `-CapabilitiesRoot` 或 `--capabilities-root` 指定。需要为某个库准备 OCR 时，显式传 `-KnowledgeRoot` 或 `--knowledge-root`。
 
-安装后使用所选解释器启动本目录的 `knowledge.py`，并传入数据所在主机上的知识根。例如：
+OpenFlow 知识库页的「环境检查」可补齐宿主依赖、注册并验证 `knowledge` 命令。终端的 `PATH` 可找到命令后，运行 `knowledge doctor --knowledge-root <知识库> --json`。也可用所选解释器直接启动工具包入口，并传入数据所在主机上的知识根。
 
 ```powershell
 python -B "D:\Department Tools\himate-tools\knowledge.py" doctor --knowledge-root "E:\业务\himate-knowledge-xxx" --json

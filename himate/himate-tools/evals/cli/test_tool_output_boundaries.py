@@ -121,3 +121,27 @@ def test_windows_registration_preserves_existing_path_and_notifies_once(tmp_path
     assert current == r"C:\Existing Bin" + ";" + str(home_bin)
     assert installer._user_path(home_bin, add=True)
     assert notifications == [True]
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows can search the current directory implicitly")
+def test_windows_command_conflicts_only_consider_directories_on_path(tmp_path, monkeypatch):
+    from support.contracts import runtime_module
+
+    installer = runtime_module("command_install")
+    process_bin = tmp_path / "test process path"
+    process_bin.mkdir()
+    launcher = process_bin / "knowledge.cmd"
+    monkeypatch.chdir(SOURCE)
+    monkeypatch.setenv("PATH", '"' + str(process_bin) + '"')
+    monkeypatch.setenv("PATHEXT", ".COM;.EXE;.CMD")
+
+    assert Path("knowledge.cmd").is_file()
+    assert installer._resolved_command(launcher) == (False, None)
+
+    launcher.write_text("managed command", encoding="utf-8")
+    assert installer._resolved_command(launcher) == (True, None)
+
+    foreign = process_bin / "knowledge.exe"
+    foreign.write_bytes(b"unrelated command")
+    found, shadowed_by = installer._resolved_command(launcher)
+    assert not found and Path(shadowed_by) == foreign

@@ -118,8 +118,26 @@ def _path_key(path):
     return os.path.normcase(os.path.normpath(path))
 
 
+def _find_on_path():
+    if os.name != "nt":
+        return shutil.which("knowledge")
+
+    # Windows shutil.which can search the working directory before PATH.
+    # The tool package has its own launcher there, outside the user's PATH.
+    extensions = (os.environ.get("PATHEXT") or ".COM;.EXE;.BAT;.CMD;.VBS;.JS;.WS;.MSC").split(os.pathsep)
+    for item in os.get_exec_path():
+        directory = item.strip().strip('"')
+        if not directory:
+            continue
+        for extension in extensions:
+            candidate = Path(directory) / ("knowledge" + extension)
+            if extension and candidate.is_file():
+                return str(candidate)
+    return None
+
+
 def _resolved_command(launcher):
-    found = shutil.which("knowledge")
+    found = _find_on_path()
     if not found:
         return False, None
     if _path_key(Path(found).resolve()) == _path_key(launcher):

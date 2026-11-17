@@ -12,8 +12,30 @@ import sys
 from .protocol import FRAMEWORK_LOCK, NodeError as CommandError, domain, envelope, relative_to_existing_root
 
 
-COMMANDS = ("ingest", "source", "query", "search", "read", "patrol", "maintain", "panel",
-            "review", "lint", "apply", "status", "doctor", "install-command")
+HELP_FLAGS = {"-h", "--help", "-help"}
+COMMAND_HELP = {
+    "ingest": ("{scan,check,commit}", "Ingest sources into the knowledge base.\n\n"
+               "  scan    Find source changes and prepare work.\n"
+               "  check   Validate the proposed cards and their evidence.\n"
+               "  commit  Publish the checked changes."),
+    "source": ("[ACTION]", "Manage or read registered sources.\n\n"
+               "Actions: list (default), register, resolve, extract, renew, release, cleanup, configure."),
+    "query": ("[TEXT | search TEXT | read CARD_ID]", "Search the knowledge base or read a card."),
+    "search": ("[TEXT]", "Search knowledge cards by text and optional tags."),
+    "read": ("[CARD_ID]", "Read a full knowledge card."),
+    "patrol": ("{sync,plan,reindex,complete}", "Plan and track knowledge maintenance."),
+    "maintain": ("[{audit,reindex}]", "Audit references or rebuild the published view. Audit is the default."),
+    "panel": ("ACTION", "Read the published view or manage raw materials.\n\n"
+              "Published view: overview, cards, search, read, graph.\n"
+              "Raw materials: raw-list, raw-path, raw-save, raw-mkdir, raw-rmdir.\n"
+              "Upload intake: intake-categories, intake-preflight, intake-save."),
+    "review": ("", "Validate the proposed cards and their evidence."),
+    "lint": ("", "Validate published knowledge cards."),
+    "apply": ("", "Publish the checked changes."),
+    "status": ("", "Show the current ingest task or latest receipt."),
+    "doctor": ("", "Check the runtime, dependencies, configuration and rules."),
+    "install-command": ("[--bin-dir DIR] [--add-path]", "Install the knowledge command launcher."),
+}
 
 
 class CommandParser(argparse.ArgumentParser):
@@ -21,10 +43,15 @@ class CommandParser(argparse.ArgumentParser):
         raise CommandError("INVALID_ARGUMENT", message)
 
 
-def parser():
-    result = CommandParser(description=__doc__)
-    result.add_argument("command", choices=COMMANDS)
-    result.add_argument("arguments", nargs="*")
+def parser(version):
+    commands = "\n".join(f"  {name:<17} {details.splitlines()[0]}" for name, (_, details) in COMMAND_HELP.items())
+    result = CommandParser(prog="knowledge", description=__doc__, add_help=False,
+                           formatter_class=argparse.RawDescriptionHelpFormatter,
+                           epilog=f"Commands:\n{commands}\n\nUse 'knowledge help COMMAND' for command help.")
+    result.add_argument("command", choices=COMMAND_HELP, metavar="COMMAND")
+    result.add_argument("arguments", nargs="*", metavar="ARG")
+    result.add_argument("-h", "--help", "-help", action="help", help="show this help message and exit")
+    result.add_argument("--version", action="version", version=f"%(prog)s {version}")
     for name in ("action", "input", "output", "knowledge-root", "rules-digest",
                  "source", "path", "receipt", "bin-dir"):
         result.add_argument("--" + name)
@@ -36,6 +63,29 @@ def parser():
     result.add_argument("--add-path", action="store_true")
     result.add_argument("--include-deprecated", action="store_true", default=None)
     return result
+
+
+def show_help(arguments, command_parser):
+    if not arguments or arguments == ["help"]:
+        command_parser.print_help()
+        return True
+    if len(arguments) == 2 and arguments[0] == "help":
+        command = arguments[1]
+        if command not in COMMAND_HELP:
+            raise CommandError("INVALID_ARGUMENT", f"Unknown command for help: {command}")
+    else:
+        command = arguments[0]
+        end_of_options = arguments.index("--") if "--" in arguments else len(arguments)
+        if command not in COMMAND_HELP or HELP_FLAGS.isdisjoint(arguments[1:end_of_options]):
+            return False
+    syntax, details = COMMAND_HELP[command]
+    usage = " ".join(filter(None, ("%(prog)s", syntax, "[options]")))
+    argparse.ArgumentParser(
+        prog=f"knowledge {command}", usage=usage, description=details,
+        epilog="See 'knowledge --help' for shared options such as --knowledge-root, --input and --json.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    ).print_help()
+    return True
 
 
 def _unique(pairs):
@@ -201,21 +251,25 @@ def execute(args, root, tool_root, manifest_digest):
     return envelope("failed" if code else "ok", phase, data), code
 
 
-def emit(value, as_json):
+def emit(value, as_json, *, failed):
     if as_json:
         print(json.dumps(value, ensure_ascii=False))
     else:
-        print(value["status"] + ": " + value["phase"])
-        print(json.dumps(value.get("data", {}), ensure_ascii=False, indent=2))
+        stream = sys.stderr if failed else sys.stdout
+        print(value["status"] + ": " + value["phase"], file=stream)
+        print(json.dumps(value.get("data", {}), ensure_ascii=False, indent=2), file=stream)
         for item in value.get("diagnostics", []):
-            print(str(item.get("code", "")) + ": " + str(item.get("message", "")))
+            print(str(item.get("code", "")) + ": " + str(item.get("message", "")), file=stream)
 
 
 def main(argv=None, *, tool_root, manifest):
     arguments = list(sys.argv[1:] if argv is None else argv)
     args = None
     try:
-        args = parser().parse_intermixed_args(arguments)
+        command_parser = parser(manifest["version"])
+        if show_help(arguments, command_parser):
+            return 0
+        args = command_parser.parse_intermixed_args(arguments)
         root = None
         if args.command != "install-command" or args.knowledge_root is not None:
             root = _knowledge_root(args.knowledge_root, tool_root, diagnostic=args.command == "doctor")
@@ -232,12 +286,12 @@ def main(argv=None, *, tool_root, manifest):
             value, code = execute(args, root, tool_root, manifest["assets"][FRAMEWORK_LOCK]["sha256"])
         if output is not None:
             _output(output, value)
-        emit(value, args.json)
+        emit(value, args.json, failed=bool(code))
         return code
     except Exception as error:
         diagnostic = {"code": getattr(error, "code", "INVALID_INPUT"), "message": str(error)}
         if getattr(error, "path", ""):
             diagnostic["path"] = str(error.path)
         value = envelope("error", "invalid", diagnostics=[diagnostic])
-        emit(value, args.json if args else "--json" in arguments)
+        emit(value, args.json if args else "--json" in arguments, failed=True)
         return 2

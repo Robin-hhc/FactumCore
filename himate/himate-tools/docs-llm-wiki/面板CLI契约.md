@@ -8,6 +8,8 @@ printf '%s' '{"limit":20}' | python -B /absolute/tool/root/knowledge.py panel ca
 
 成功读取 `status: "ok"` 和 `data`。失败读取 `diagnostics[].code` 和 `message`。卡、来源、路径等 ID 相对已绑定知识根解释。
 
+带 `--json` 的业务命令在成功和失败时都将单条 JSON 结果写入 stdout。命令启动后的纯文本错误写入 stderr。帮助和版本查询不需要知识根，可执行 `knowledge`、`knowledge --help`、`knowledge help panel` 或 `knowledge panel --help`。总帮助也接受 `-h`、`-help` 和 `help`。`knowledge --version` 显示工具包版本。
+
 ## 环境检查和安装
 
 环境入口可在首次绑定前执行。`<Python> -B <工具包>/tools/deploy/environment.py check` 返回一行 JSON，包含 `status`、`tool_root`、`toolkit_version`、`python`、`python_version`、`dependencies`、`diagnostics` 和 `command`。`dependencies` 的每项包含 `name`、`expected`、`actual` 和 `status`（`ready`、`missing` 或 `mismatch`）。每条诊断包含 `code` 和 `message`。
@@ -16,7 +18,7 @@ printf '%s' '{"limit":20}' | python -B /absolute/tool/root/knowledge.py panel ca
 | --- | --- |
 | `needs_install` | Python 依赖缺失或版本不符，优先处理依赖 |
 | `needs_cli` | 依赖齐全，命令待注册、修复或启动验证失败 |
-| `ready` | 依赖齐全，受管理的启动入口通过 `--help` 验证 |
+| `ready` | 依赖齐全，受管理的启动入口执行 `--help` 并返回 0。此项验证无需绑定知识库 |
 
 检查只读。无法加载工具包或依赖清单时，返回非零退出码和 `status: "unavailable"` 的诊断。`command` 为 `null` 或 `{path,bin_dir,dispatcher,installed,path_registered,on_path,shadowed_by}`。`installed` 表示启动文件与所选工具及 Python 匹配，并符合默认目录的注册要求。`path_registered` 表示 Windows 当前账户的用户 `PATH` 已登记该目录。`on_path` 表示当前进程的 `PATH` 实际优先解析到该命令，`shadowed_by` 记录优先匹配到的其他命令。Linux 上 `ready` 可以与 `on_path: false` 同时出现。
 

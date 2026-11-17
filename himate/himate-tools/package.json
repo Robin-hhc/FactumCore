@@ -1,6 +1,6 @@
 {
   "name": "@himate/knowledge-cli",
-  "version": "0.22.7",
+  "version": "0.22.8",
   "description": "HiMate Knowledge CLI launcher",
   "license": "UNLICENSED",
   "bin": {
@@ -24,6 +24,7 @@
     "NPM-PUBLISH.md"
   ],
   "scripts": {
+    "prepack": "node scripts/clean-cache.js",
     "postinstall": "node scripts/install.js"
   },
   "publishConfig": {

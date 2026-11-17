@@ -94,6 +94,8 @@ function main() {
         {
           package: "@himate/knowledge-cli",
           version: require(path.join(PACKAGE_ROOT, "package.json")).version,
+          packageRoot: PACKAGE_ROOT,
+          launcherSha256: sha256(path.join(PACKAGE_ROOT, "bin/knowledge.js")),
           installedAt: new Date().toISOString(),
         },
         null,

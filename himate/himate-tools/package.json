@@ -1,6 +1,6 @@
 {
   "name": "@himate/knowledge-cli",
-  "version": "0.22.4",
+  "version": "0.22.5",
   "description": "HiMate Knowledge CLI launcher",
   "license": "UNLICENSED",
   "bin": {
@@ -20,7 +20,8 @@
     "tools/deploy/README.md",
     "tools/knowledge/",
     ".gitattributes",
-    "README.md"
+    "README.md",
+    "NPM-PUBLISH.md"
   ],
   "scripts": {
     "postinstall": "node scripts/install.js"

@@ -40,6 +40,8 @@ Windows 和 Linux 使用**同一条命令**，不需要区分平台：
 
 ```bash
 npm i -g @himate/knowledge-cli --registry http://10.143.57.12:4873
+knowledge setup
+# 需要离线 OCR 模型包时
 npm i -g @himate/knowledge-models --registry http://10.143.57.12:4873
 ```
 
@@ -62,7 +64,7 @@ npm i -g @himate/knowledge-models --registry http://10.143.57.12:4873
 - `postinstall` 用 `process.platform` 区分路径分隔符与可执行权限
 - 启动器按平台探测 Python：Windows 依次试 `py -3.11`、`py -3.12`、`py -3.10`、`python`、`python3`；Linux 依次试 `python3`、`python`、`python3.11`、`python3.12`、`python3.10`
 
-Linux 全局安装若提示权限不足，使用 `sudo`，或先把 npm 全局目录指到用户目录：
+Linux 全局安装若提示权限不足，可把 npm 全局目录指到当前用户目录。运行 npm 安装与使用 `knowledge` 采用同一账户：
 
 ```bash
 npm config set prefix ~/.npm-global
@@ -75,7 +77,9 @@ export PATH="$HOME/.npm-global/bin:$PATH"
 knowledge --version
 knowledge -h
 knowledge help ingest
-knowledge status --knowledge-root /path/to/kb
+knowledge doctor --environment-only --json
+knowledge doctor --knowledge-root /path/to/kb --json
+knowledge ingest status --knowledge-root /path/to/kb
 ```
 
 同时注册了长别名 `himate-knowledge`，与 `knowledge` 完全等价。
@@ -101,4 +105,6 @@ CLI 安装脚本只覆盖代码目录，不会删除 `tools/deploy/models/`。
 - 安装时不要加 `--ignore-scripts`，否则文件不会复制到 `~/.himate/knowledge`
 - 模型包安装时会按 `manifest.json` 校验每个分片的字节数与 SHA-256，校验失败会中止安装
 - 两个包的安装顺序不限：先装 CLI 或先装模型都可以
-- 首次安装后仍需按需安装 Python 依赖：`knowledge doctor` 会报告缺失项
+- 本机需要可用的 Node.js、Python 3.10–3.12 和该 Python 的 pip。npm 注册 `knowledge` 入口，`knowledge setup` 为入口实际使用的 Python 补齐锁定依赖并复查。必要时先用 `HIMATE_KNOWLEDGE_PYTHON` 选定解释器。
+- `knowledge setup` 复用 npm 启动器。需要诊断环境时可运行 `knowledge doctor --environment-only --json`，无需选择知识库。
+- 模型 npm 包提供工具侧离线模型。知识库启用 `standard` OCR 时，仍为相应知识根准备模型。 [OCR 部署说明](tools/deploy/README.md#为现有知识库准备-ocr)

@@ -36,11 +36,11 @@ OpenFlow 宿主通过绝对路径 `OPENFLOW_KNOWLEDGE_TOOLKIT_ROOT` 指定工具
 
 ## 检查或安装宿主运行环境
 
-`<Python> -B <工具包>/tools/deploy/environment.py check` 只读检查锁定的 Python 依赖与 `knowledge` 命令。`needs_install` 表示需要补齐依赖，`needs_cli` 表示命令待注册或待修复，`ready` 表示依赖齐全且受管理的命令可以启动。可以在绑定前从 OpenFlow 知识库页面的「环境检查」运行。检查和安装均在执行 OpenFlow 的宿主机上进行。
+`knowledge doctor --environment-only --json` 只读检查锁定的 Python 依赖和命令入口。`needs_install` 表示需要补齐依赖，`needs_cli` 表示命令待注册或待修复，`ready` 表示环境就绪。终端和 OpenFlow 都能在绑定前调用这项检查。
 
-`install` 用同一个 Python 补齐并复查依赖，再按需注册并试运行 `knowledge`。依赖齐全时直接处理命令。OpenFlow 在后台运行并展示阶段进度，结束后重新检查。检查和安装均无需传知识根。完整的 `deploy.ps1` 和 `deploy.sh` 负责依赖、Skills、Workflows 和按需准备的 OCR 模型。终端命令注册由环境安装或 `install-command` 单独处理。
+`knowledge setup` 用同一个 Python 按需补齐依赖，再确认 npm 或手动部署的命令入口。OpenFlow 在宿主执行 `setup --jsonl`，展示阶段进度并在结束后复查。首次手动注册前，用 `<Python> -B <工具包>/knowledge.py` 加上同样的子命令。环境操作无需传知识根。`tools/deploy/environment.py check|install` 保留原有自动化接口。
 
-Windows 上，环境安装默认把命令放到 `%LOCALAPPDATA%\HiMate\bin`，并将其加入执行账户的用户 `PATH`。单独使用 `install-command` 时，可加 `--add-path` 更新用户 `PATH`。打开新的终端后检查 `knowledge` 是否可用，旧终端可能需要重开或重新登录。Windows 工具包 0.22.3 起按 `PATH` 和 `PATHEXT` 排查同名命令，若另一入口优先匹配，先检查 `PATH` 顺序。Linux 默认命令目录为 `~/.local/bin`，由终端或服务配置 `PATH`。手动执行环境入口时可以传 `--bin-dir <目录>` 指定命令目录，由调用者配置 `PATH`。
+通过 npm 部署时，`setup` 复用 npm 注册的入口。手动部署时，Windows 默认把命令放到 `%LOCALAPPDATA%\HiMate\bin` 并加入执行账户的用户 `PATH`。Linux 默认命令目录为 `~/.local/bin`，由终端或服务配置 `PATH`。手动部署可以用 `--bin-dir` 选择命令目录。在 Windows 单独注册时可运行 `install-command --add-path`。打开新终端后可运行 `knowledge --version` 确认入口。
 
 ## 为现有知识库准备 OCR
 

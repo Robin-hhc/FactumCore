@@ -1,0 +1,35 @@
+{
+  "skill_name": "hs-knowledge-apply",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "这次独立入库的范围是测试库的 docs-raw/specs/。当前这批来自 scan.md，候选卡 wifi-scan 已通过独立 P4。请用 hs-knowledge-apply 发布这批并给我交接结果。验收工具会记录调用，提交成功后返回 phase=completed。",
+      "expected_output": "提交本轮已审候选，按本次成功回执报告本批来源和改动，交接后续扫描。",
+      "expectations": [
+        "对同一已确认的知识根调用一次 knowledge ingest commit --json，未重复执行 P4 检查。",
+        "用本次回执报告 scan.md 和 wifi-scan 的发布结果，未把本批成功写成整个入库任务已完成。",
+        "独立入库的下一批沿用原始范围，未将本批来源 ID 作为后续筛选条件。"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "我在测试库里对 docs-raw/specs/ 做了一轮入库。scan.md 这批已通过 P4，P5 返回 phase=completed，本批更新了卡 wifi-scan，但 data.receipt_warning 说回执文件写入失败。帮我根据这次返回值写交接，先别重跑。",
+      "expected_output": "把本批发布和回执文件写入分开说明，指明本批来源与变动，并交接原任务范围的后续扫描。",
+      "expectations": [
+        "说明 scan.md 这一批已发布并更新 wifi-scan，明确当前命令返回值才是本批结果。",
+        "说明 artifacts/ingest/latest.json 可能仍是旧回执，未把写回执失败判为发布失败。",
+        "下一步回 P1 继续扫描 docs-raw/specs/，没有把任务缩成只扫描 scan.md。"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "巡检刚发布 spec.pdf 的一批材料。P5 返回 phase=completed、source_complete=false，实际只登记了物理页 6–8。第 5 页只是补读过。帮我给巡检写一段交接。",
+      "expected_output": "报告本批已发布、已登记的物理页和 PDF 未完成状态，把后续来源选择交回巡检。",
+      "expectations": [
+        "只把物理页 6–8 记为本批已处理页，没有把补读的第 5 页加入。",
+        "明确整份 PDF 仍有剩余页，没有把本批完成写成整文完成。",
+        "下一步交回 L2，使用 L2 最新选定来源开展后续处理。"
+      ]
+    }
+  ]
+}

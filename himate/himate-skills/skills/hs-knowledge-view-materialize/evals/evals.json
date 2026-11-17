@@ -1,0 +1,24 @@
+{
+  "skill_name": "hs-knowledge-view-materialize",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "按 .build/plan.md 写完整候选。计划只有 scan-timing，正式路径 knowledge/rules/scan-timing.md。文档 doc-radio 的第 8–12 行证实设备 A 的新等待时间，旧稿还有设备 B 的历史条件和仍有效的历史证据。没有需要引用的代码，把 80211 当标签。",
+      "expected_output": "生成一张保留计划 ID、有效旧内容和准确文档定位的完整 Markdown 候选。",
+      "expectations": [
+        "唯一候选为 .build/cards/rules/scan-timing.md，卡头 id 为 scan-timing 且没有 path 字段。",
+        "doc_ref 使用已登记的 doc-radio 与真实行段，code_ref 为空数组。",
+        "YAML 解析后标签 80211 是字符串，正文同时保留设备 B 的历史条件及有效证据。"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "这次 P2 写的计划是 cards: []，他说整批材料核对后没有新知识。麻烦用 hs-knowledge-view-materialize 接这一步，整理好交给审阅。",
+      "expected_output": "按空清单交接计划和材料给审阅者，无候选稿需要生成。",
+      "expectations": [
+        ".build/cards/ 中没有为本批生成 Markdown 候选，也没有额外的正式卡变更。",
+        "保留原编辑计划，并将空清单及本批材料入口交给 P4。"
+      ]
+    }
+  ]
+}

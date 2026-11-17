@@ -1,0 +1,24 @@
+{
+  "skill_name": "hs-knowledge-maintain",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "请对已绑定的测试库做一次正式卡引用审计。验收工具会记录调用，返回 phase=failed，findings 里有 SOURCE_MISSING，来源是 doc-retry，路径是 docs-raw/specs/retry.md。正式卡 retry-rule 引用了它。库里还有一批正在处理的候选卡，请把审计结果单独交给我。",
+      "expected_output": "把回执判作发现引用问题，报告缺失来源、关联卡和未改变的入库现场。",
+      "expectations": [
+        "在已确认的测试库运行 knowledge maintain audit --json，并根据此次回执整理结论。",
+        "报告缺失路径 docs-raw/specs/retry.md、对应 SOURCE_MISSING、来源 ID doc-retry 和关联卡 retry-rule。",
+        "没有删除引用、编辑正式卡、清理 .build 或触发同步。"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "这次引用审计返回 phase=passed、findings=[]。我昨天还放了一份新 PDF 到原始资料，尚未被任何卡引用。这能说明那份 PDF 已入库吗？我只要这次审计的结论。",
+      "expected_output": "准确解释空审计结果的覆盖范围，指出新 PDF 的处理状态需由入库记录确认。",
+      "expectations": [
+        "说明本次审计在正式卡已引用的来源范围内未发现问题。",
+        "说明审计结果无法确认未被引用的新 PDF 是否已处理，未触发入库或巡检。"
+      ]
+    }
+  ]
+}

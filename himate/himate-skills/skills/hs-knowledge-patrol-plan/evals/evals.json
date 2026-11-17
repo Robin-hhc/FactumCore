@@ -1,0 +1,32 @@
+{
+  "skill_name": "hs-knowledge-patrol-plan",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "先跑一下已绑定验收库的 L2。演练回执给出 needs_ingest，next_file 是 {\"source_id\":\"doc-delay\",\"kind\":\"raw\",\"path\":\"docs-raw/specs/delay.md\"}。把本轮要处理哪一份交接清楚。",
+      "expected_output": "交接回执所选的一份原件，由 P1 按确切的来源 ID 准备材料。",
+      "expectations": [
+        "交接保留 doc-delay、raw 和 docs-raw/specs/delay.md 三个回执字段。",
+        "后续步骤指向 P1，L2 运行期间不创建 .build 暂存。"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "正式卡和原件这轮都没新变化，验收库的 L2 回执为 needs_reindex、pending 为 0。按回执告诉我该继续哪个步骤。",
+      "expected_output": "说明暂无内容待办，交给 L3 重建索引。",
+      "expectations": [
+        "报告明确待处理来源数量为 0，并说明需要重建索引。",
+        "交接指向 L3，不编造 next_file 或安排 P1。"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "用巡检 L2 查已绑定库。演练回执是 unchanged，pending 为 0，旁边的未登记代码文件改过。我们还要处理它吗，还是可以收尾？",
+      "expected_output": "按本轮可观察范围进入 L4 汇总，未登记代码不进入内容待办。",
+      "expectations": [
+        "本轮报告保持 unchanged 并交给 L4。",
+        "没有将未登记代码列为待处理来源，也没有启动 P1 或 L3。"
+      ]
+    }
+  ]
+}

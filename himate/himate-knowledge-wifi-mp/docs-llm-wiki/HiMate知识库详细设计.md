@@ -377,7 +377,7 @@ Skill 包提供指引、参考和写作模板。Workflow 与 Skill 同在独立�
 
 OpenFlow 面板在宿主用 `OPENFLOW_KNOWLEDGE_TOOLKIT_ROOT` 指向工具包的绝对路径，需要固定解释器时用 `OPENFLOW_KNOWLEDGE_PYTHON` 指定绝对路径。知识库绑定单独指向数据所在的目录。宿主用经校验的解释器和工具包入口操作已绑定的知识根。Workflow 或 Agent 通过 SSH 执行时，使用远端的 CLI、路径和权限。
 
-「环境检查」读取同一宿主和解释器上的环境状态。环境未创建、Python 组件或依赖缺失、依赖版本不匹配时返回 `needs_install`。缺少 `venv` 或 `ensurepip` 时，通过 `VENV_MODULE_MISSING` 提示补齐所选 Python 的组件。依赖齐全但命令待注册或待修复时返回 `needs_cli`，依赖与命令均验证通过时返回 `ready`。点击「安装环境」后启动后台任务，按需安装依赖、注册 `knowledge` 并复查。两个动作均不需要传入知识根。界面按已收到的阶段显示进度和结果。终端能否直接找到命令取决于其 PATH。此入口处理宿主运行环境，能力包和 OCR 模型仍由部署入口准备。
+「环境检查」读取同一宿主和解释器上的环境状态。依赖缺失或版本不匹配时返回 `needs_install`，所选解释器缺少 pip 时附上 `DEPENDENCY_PIP_MISSING`。依赖齐全但命令待注册或待修复时返回 `needs_cli`，依赖与命令均验证通过时返回 `ready`。点击「安装环境」后启动后台任务，用选定的 Python 运行 pip，按需安装依赖、注册 `knowledge` 并复查。两个动作均不需要传入知识根。界面按已收到的阶段显示进度和结果。终端能否直接找到命令取决于其 PATH。此入口处理宿主运行环境，能力包和 OCR 模型仍由部署入口准备。
 
 ### 6.6 开发测试与验收
 

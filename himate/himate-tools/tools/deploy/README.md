@@ -24,7 +24,7 @@ Windows PowerShell：
 
 交互安装会询问未指定的目录，回车采用默认值。自动化使用 `--non-interactive` / `-NonInteractive`。`--source-root` / `-SourceRoot` 指定工具包，默认使用部署入口所在目录。能力包单独存放时用 `--capabilities-root` / `-CapabilitiesRoot` 指向同时包含 `skills/` 和 `workflows/` 的目录。未设置时优先使用相邻的 `himate-skills`，其次兼容旧工具包根下的 `skills/` 和 `workflows/`。部署按 `SKILL.md` 和 `workflow.yaml` 识别待安装的包，按包名替换并保留目标目录的其他包。
 
-如果通过 npm 安装 CLI，npm 会在全局命令目录注册 `knowledge`。只从源码部署时，管理员在执行机器上用已准备的 Python 从工具包内部入口初始化环境并注册 `knowledge`。
+如果通过 npm 安装 CLI，npm 会在全局命令目录注册 `knowledge`。只从源码部署时，管理员在执行机器上用已准备的 Python 从工具包内部入口安装依赖并注册 `knowledge`。
 
 ```text
 <已准备的 Python> -B <工具包>/knowledge.py setup --json
@@ -36,16 +36,15 @@ Windows PowerShell：
 
 ## 检查或安装宿主运行环境
 
-`knowledge doctor --environment-only --json` 只读检查 Python 能否准备虚拟环境、锁定依赖和命令入口。`needs_install` 表示需要准备虚拟环境或补齐 Python 组件、依赖，`needs_cli` 表示命令待注册或待修复，`ready` 表示环境就绪。终端和 OpenFlow 都能在绑定前调用这项检查。
+`knowledge doctor --environment-only --json` 只读检查选定的 Python、锁定依赖和命令入口。`needs_install` 表示依赖缺失或版本不匹配，`needs_cli` 表示命令待注册或待修复，`ready` 表示环境就绪。终端和 OpenFlow 都能在绑定前调用这项检查。
 
-检查报告中的 `VENV_MODULE_MISSING` 表示当前 Python 缺少创建环境所需的 `venv` 或 `ensurepip`。专用环境尚未创建时，可以用 `bootstrap_python` 和 `bootstrap_python_version` 核对基础解释器路径和版本。
+`knowledge setup` 通过选定的 Python 执行 `<Python> -m pip install -r <工具包>/runtime/requirements.lock.txt`，随后用同一解释器复查。安装沿用本机 pip 的软件源与代理设置，并遵守发行版策略。所选 Python 需要已有 pip 和可写的安装位置。报告中的 `python` 和 `python_version` 给出安装目标的解释器路径和版本。
 
-- Ubuntu 或 Debian 上，由管理员安装与所选 Python 版本匹配的 `venv` 系统包。例如使用 Python 3.10 时，运行 `sudo apt install python3.10-venv`。使用发行版默认 Python 时可安装 `python3-venv`。 [Ubuntu 3.10 venv 包](https://packages.ubuntu.com/jammy/python3.10-venv)
-- Windows 上，通过完整的 Python 3.10–3.12 安装程序补装标准库和 `pip` 功能。已有安装可用安装程序的「Modify」修改功能。 [Python Windows 安装说明](https://docs.python.org/3.12/using/windows.html#modifying-an-install)
+终端使用 `HIMATE_KNOWLEDGE_PYTHON` 指定解释器绝对路径。OpenFlow 使用宿主的 `OPENFLOW_KNOWLEDGE_PYTHON`，可在启动环境或安装根 `.ini` 中配置，修改后重启宿主。需要使用已有虚拟环境时，指定该环境内的 Python。
 
-补齐组件后重新运行 `knowledge setup`。如果第一次安装已创建专用虚拟环境但缺少 pip，重试会在原环境补齐 pip 并继续安装锁定依赖。
+检查显示 `DEPENDENCY_PIP_MISSING` 时，选择带 pip 的 Python。系统发行版限制安装或权限不足时，选择允许安装依赖的解释器，按需要更新相应配置，再运行 `knowledge setup`。
 
-`knowledge setup` 沿用明确指定的已有虚拟环境，默认创建 `~/.himate/knowledge/.venv`，在其中安装依赖并复查。OpenFlow 在宿主执行 `setup --jsonl`，展示阶段进度并在结束后复查。环境操作无需传知识根。`tools/deploy/environment.py check|install` 保留原有自动化接口。安装失败时按结果中的原因及本机日志定位问题。
+OpenFlow 在宿主执行 `setup --jsonl`，展示阶段进度并在结束后复查。环境操作无需传知识根。`tools/deploy/environment.py check|install` 保留原有自动化接口。安装失败时按结果中的原因及本机日志定位问题。
 
 通过 npm 部署时，`setup` 复用 npm 全局命令目录的启动器。手动部署时，Windows 默认生成 `%LOCALAPPDATA%\HiMate\bin\knowledge.cmd` 并将目录加入执行账户的用户 `PATH`。Linux 默认生成 `~/.local/bin/knowledge`，由终端或服务配置 `PATH`。手动部署可以用 `--bin-dir` 选择命令目录。Windows 已准备依赖时，管理员也可用首次注册示例中的内部入口执行 `install-command --add-path`。打开新终端后运行 `knowledge --version` 确认入口。
 

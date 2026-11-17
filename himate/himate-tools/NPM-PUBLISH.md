@@ -59,7 +59,6 @@ npm i -g @himate/knowledge-models --registry http://10.143.57.12:4873 --allow-sc
 ```
 ~/.himate/knowledge/
 ├── knowledge.py         工具包内部入口
-├── .venv/
 ├── logs/
 ├── runtime/
 ├── governance/
@@ -72,7 +71,7 @@ npm i -g @himate/knowledge-models --registry http://10.143.57.12:4873 --allow-sc
 
 - npm 只注册 `knowledge` 命令。Windows 的 `knowledge.cmd`、`knowledge.ps1` 和 Linux 的 `knowledge` 软链由 npm 生成，位于 npm 的全局命令目录。
 - `postinstall` 用 `process.platform` 区分路径分隔符与可执行权限
-- 启动器优先使用已准备的虚拟环境。首次运行从系统查找受支持的 Python 3.10–3.12，`knowledge setup` 用它创建专用环境并安装锁定依赖。
+- 启动器从系统查找 Python 3.10–3.12。`knowledge setup` 用选定的解释器执行 `python -m pip install -r`，在其安装位置补齐工具包锁定的依赖。
 
 Linux 全局安装若提示权限不足，可把 npm 全局目录指到当前用户目录。运行 npm 安装与使用 `knowledge` 采用同一账户：
 
@@ -92,7 +91,7 @@ knowledge doctor --knowledge-root /path/to/kb --json
 knowledge ingest status --knowledge-root /path/to/kb
 ```
 
-可用 `HIMATE_KNOWLEDGE_PYTHON` 指定解释器。指定已有虚拟环境时沿用该环境，指定系统 Python 时用于初始化专用环境。
+可用 `HIMATE_KNOWLEDGE_PYTHON` 指定解释器的绝对路径。已有虚拟环境可通过指定其中的 Python 来使用。
 
 ```bash
 export HIMATE_KNOWLEDGE_PYTHON=/usr/bin/python3.11
@@ -109,7 +108,7 @@ npm i -g @himate/knowledge-cli@latest --registry http://10.143.57.12:4873
 npm i -g @himate/knowledge-cli@latest --registry http://10.143.57.12:4873 --allow-scripts=@himate/knowledge-cli
 ```
 
-CLI 安装脚本保留 `.venv/`、`logs/` 和 `tools/deploy/models/`。更新后运行 `knowledge doctor --environment-only`，如有新的依赖缺口再运行 `knowledge setup`。
+CLI 安装脚本保留 `logs/` 和 `tools/deploy/models/`。需要继续使用旧版本创建的 `.venv` 时，通过 `HIMATE_KNOWLEDGE_PYTHON` 显式指定其中的解释器。更新后运行 `knowledge doctor --environment-only`，如有新的依赖缺口再运行 `knowledge setup`。
 
 升级到 0.23.0 时，将自动化脚本中的旧命令名 `himate-knowledge` 改为 `knowledge`。
 
@@ -119,7 +118,7 @@ CLI 安装脚本保留 `.venv/`、`logs/` 和 `tools/deploy/models/`。更新后
 - 部分 npm 11 版本会提醒用户检查安装脚本。内网另有脚本策略时，按该策略和客户端支持的参数选择命令
 - 模型包安装时会按 `manifest.json` 校验每个分片的字节数与 SHA-256，校验失败会中止安装
 - 两个包的安装顺序不限：先装 CLI 或先装模型都可以
-- 本机需要可用的 Node.js 和 Python 3.10–3.12。首次创建虚拟环境需要基础 Python 带有 `venv` 和 `ensurepip`。检查返回 `VENV_MODULE_MISSING` 时，按执行端系统补齐组件后再运行 `knowledge setup`。 [各平台处理方式](tools/deploy/README.md#检查或安装宿主运行环境)
+- 本机需要可用的 Node.js 和 Python 3.10–3.12。补装依赖时，选定的 Python 需要可用的 pip，且 pip 的安装位置需要允许写入。系统发行版管理 Python 时，按该发行版的策略选择允许安装依赖的解释器。 [宿主环境配置](tools/deploy/README.md#检查或安装宿主运行环境)
 - 安装失败可按提示检查本机 `~/.himate/knowledge/logs/` 下的日志。命令输出包含错误原因，便于 OpenFlow 显示处理提示。
 - `knowledge setup` 复用 npm 启动器。需要诊断环境时可运行 `knowledge doctor --environment-only --json`，无需选择知识库。
 - 模型 npm 包提供工具侧离线模型。知识库启用 `standard` OCR 时，仍为相应知识根准备模型。 [OCR 部署说明](tools/deploy/README.md#为现有知识库准备-ocr)

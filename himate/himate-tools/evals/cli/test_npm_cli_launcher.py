@@ -50,12 +50,14 @@ def launcher(tmp_path, npm_release):
     account = tmp_path / "profile & tools ! 资料"
     account.mkdir()
     directory = account / ".himate/knowledge"
-    managed = directory / ".venv"
+    legacy = directory / ".venv"
     bin_dir = tmp_path / "registered & commands 资料"
     shim_dir = prefix if os.name == "nt" else prefix / "bin"
     shim = shim_dir / ("knowledge.cmd" if os.name == "nt" else "knowledge")
     environment = dict(os.environ)
     environment["USERPROFILE" if os.name == "nt" else "HOME"] = str(account)
+    if os.name == "nt":
+        environment["APPDATA"] = str(account / "AppData/Roaming")
     for key in ("HIMATE_KNOWLEDGE_PYTHON", "NODE_OPTIONS", "NODE_PATH"):
         environment.pop(key, None)
     # Run the installed package's lifecycle entry explicitly so this fixture is
@@ -82,12 +84,12 @@ def launcher(tmp_path, npm_release):
         assert result.returncode == 0, (result.stdout, result.stderr)
         return json.loads(result.stdout)
 
-    return directory, managed, run, doctor
+    return directory, legacy, run, doctor, environment
 
 
 def test_npm_cli_has_one_public_shim_and_one_runtime_entrypoint(npm_release, launcher):
     _, prefix, package = npm_release
-    tool, _, run, _ = launcher
+    tool, _, run, _, _ = launcher
     metadata = json.loads((package / "package.json").read_text(encoding="utf-8"))
     assert metadata["bin"] == {"knowledge": "bin/knowledge.js"}
     shim_dir = prefix if os.name == "nt" else prefix / "bin"
@@ -102,55 +104,76 @@ def test_npm_cli_has_one_public_shim_and_one_runtime_entrypoint(npm_release, lau
     assert result.stdout.strip() == f"knowledge {metadata['version']}"
 
 
-def test_npm_cli_uses_account_environment_without_system_python_on_path(launcher, tmp_path):
-    _, managed, _, doctor = launcher
-    expected = venv(managed)
+def test_npm_cli_uses_explicit_python_even_with_legacy_environment(launcher, tmp_path):
+    _, legacy, _, doctor, _ = launcher
+    venv(legacy)
     external = venv(tmp_path / "explicit project environment")
 
-    assert Path(doctor()["python"]) == expected
-    assert Path(doctor(override=BASE_PYTHON)["python"]) == expected
+    assert Path(doctor(override=BASE_PYTHON)["python"]) == BASE_PYTHON
     assert Path(doctor(override=external)["python"]) == external
+    assert (legacy / "pyvenv.cfg").is_file()
 
 
-def test_npm_cli_uses_path_venv_only_as_base_bootstrap(launcher, tmp_path):
-    _, managed, _, doctor = launcher
+def test_npm_cli_uses_path_python_without_creating_an_environment(launcher, tmp_path):
+    _, legacy, _, doctor, _ = launcher
     discovered = venv(tmp_path / "activated project env")
 
     report = doctor(search_path=discovered.parent)
 
-    assert report["python"] is None
-    assert report["diagnostics"][0]["code"] == "VENV_REQUIRED"
-    assert Path(report["bootstrap_python"]) != discovered
-    assert not managed.exists()
+    assert report["python_version"].split(".")[:2] in [["3", "10"], ["3", "11"], ["3", "12"]]
+    if os.name != "nt":
+        assert Path(report["python"]).parent == discovered.parent
+    assert not legacy.exists()
 
 
-def test_npm_cli_rejects_linked_default_environment(launcher, tmp_path):
-    _, managed, run, doctor = launcher
+def test_npm_cli_leaves_linked_legacy_environment_alone(launcher, tmp_path):
+    _, legacy, run, doctor, _ = launcher
     external = tmp_path / "other project env"
     executable = venv(external)
     if os.name == "nt":
         from _winapi import CreateJunction
 
-        CreateJunction(str(external), str(managed))
+        CreateJunction(str(external), str(legacy))
     else:
-        managed.symlink_to(external, target_is_directory=True)
+        legacy.symlink_to(external, target_is_directory=True)
 
     report = doctor(override=BASE_PYTHON)
 
-    assert report["python"] is None and report["diagnostics"][0]["code"] == "VENV_REQUIRED"
+    assert Path(report["python"]) == BASE_PYTHON
     # Explicit reuse of the target environment stays supported.
     assert Path(doctor(override=executable)["python"]) == executable
     result = run("doctor", "--environment-only", "--json")
-    # With an available system Python the launcher reports the missing environment.
-    # Otherwise the linked directory cannot bootstrap the CLI at all.
     if result.returncode == 0:
-        assert json.loads(result.stdout)["python"] is None
+        assert Path(json.loads(result.stdout)["python"]) != legacy / PYTHON_IN_VENV
     else:
         assert result.returncode == 1 and "No supported Python found" in result.stderr
+    assert (legacy / "pyvenv.cfg").is_file()
+
+
+def test_npm_cli_reads_selected_pythons_user_site(launcher):
+    _, _, _, doctor, environment = launcher
+    probe = subprocess.run([str(BASE_PYTHON), "-E", "-B", "-X", "utf8", "-c",
+                            "import site; print(site.getusersitepackages() if site.ENABLE_USER_SITE else '')"],
+                           env=environment, capture_output=True, encoding="utf-8", check=True, timeout=30)
+    if not probe.stdout.strip():
+        pytest.skip("The selected base Python disables the user site")
+    site = Path(probe.stdout.strip())
+    account = Path(environment["USERPROFILE" if os.name == "nt" else "HOME"])
+    assert site.is_relative_to(account)
+    requirements = (SOURCE / "runtime/requirements.lock.txt").read_text(encoding="utf-8").splitlines()
+    expected = next(line.split("==", 1)[1] for line in requirements if line.casefold().startswith("pyyaml=="))
+    installed = site / f"pyyaml-{expected}.dist-info"
+    installed.mkdir(parents=True)
+    (installed / "METADATA").write_text(f"Name: PyYAML\nVersion: {expected}\n", encoding="utf-8")
+
+    report = doctor(override=BASE_PYTHON)
+
+    dependency = next(item for item in report["dependencies"] if item["name"].casefold() == "pyyaml")
+    assert dependency["actual"] == expected and dependency["status"] == "ready"
 
 
 def test_npm_cli_propagates_error_status_and_json(launcher):
-    _, _, run, _ = launcher
+    _, _, run, _, _ = launcher
 
     result = run("setup", "--json", "--jsonl", override=BASE_PYTHON)
 
@@ -159,7 +182,7 @@ def test_npm_cli_propagates_error_status_and_json(launcher):
 
 
 def test_npm_cli_skips_configured_python_39(launcher):
-    _, managed, _, doctor = launcher
+    _, _, _, doctor, _ = launcher
     old_python = shutil.which("python3.9")
     if not old_python and os.name == "nt" and shutil.which("py"):
         installed = subprocess.run(["py", "-3.9", "-I", "-c", "import sys; print(sys.executable)"],
@@ -169,6 +192,7 @@ def test_npm_cli_skips_configured_python_39(launcher):
     if not old_python:
         pytest.skip("Python 3.9 is not installed on this host")
 
-    expected = venv(managed)
+    report = doctor(override=old_python, search_path=BASE_PYTHON.parent)
 
-    assert Path(doctor(override=old_python)["python"]) == expected
+    assert Path(report["python"]) != Path(old_python)
+    assert report["python_version"].split(".")[:2] in [["3", "10"], ["3", "11"], ["3", "12"]]

@@ -4,9 +4,9 @@
 
 ## 首次安装
 
-准备支持创建虚拟环境的 Python 3.10–3.12。配置好内网 npm 源后，可运行 `npm install -g @himate/knowledge-cli` 安装命令。使用 npm 12 时加上 `--allow-scripts=@himate/knowledge-cli`。再运行 `knowledge doctor --environment-only` 检查环境。需要安装时运行 `knowledge setup`，默认使用执行账户下的 `~/.himate/knowledge/.venv`，终端无需激活。已注册的 npm 启动器继续使用。Agent 通过 SSH 在服务器执行时，在该服务器准备 Python 和工具。
+准备带 pip 的 Python 3.10–3.12，确认该环境允许安装依赖。配置好内网 npm 源后，运行 `npm install -g @himate/knowledge-cli` 安装命令。使用 npm 12 时加上 `--allow-scripts=@himate/knowledge-cli`。再运行 `knowledge setup`，用选定的解释器安装锁定依赖并复查。需要查看环境状态时可用 `knowledge doctor --environment-only`。Agent 通过 SSH 在服务器执行时，在该服务器准备 Python 和工具。
 
-如果检查提示 `VENV_MODULE_MISSING`，先在运行 `knowledge` 的机器上补齐 `venv` 或 `ensurepip`，再运行 `knowledge setup`。 [各平台处理方式](../../himate-tools/tools/deploy/README.md#检查或安装宿主运行环境)
+终端可用 `HIMATE_KNOWLEDGE_PYTHON` 指定允许安装依赖的 Python 绝对路径。需要使用已有虚拟环境时，指定该环境内的解释器。 [宿主环境配置](../../himate-tools/tools/deploy/README.md#检查或安装宿主运行环境)
 
 从源码部署时，把 `himate-tools/`、`himate-skills/` 和业务知识仓放到对应执行环境，在工具包根运行对应安装命令。部署默认从同级的 `himate-skills/` 安装 Skill 和 Workflow，也可为指定业务库准备离线 OCR 模型。
 

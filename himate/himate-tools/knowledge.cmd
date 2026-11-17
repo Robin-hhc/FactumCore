@@ -1,4 +1,13 @@
 @echo off
+set "MANAGED_PYTHON=%~dp0.venv\Scripts\python.exe"
+if defined HIMATE_KNOWLEDGE_PYTHON (
+  "%HIMATE_KNOWLEDGE_PYTHON%" -c "import sys; sys.exit(0 if sys.prefix != sys.base_prefix else 1)" >nul 2>&1
+  if not errorlevel 1 goto configured
+)
+if exist "%MANAGED_PYTHON%" (
+  "%MANAGED_PYTHON%" -c "import sys" >nul 2>&1
+  if not errorlevel 1 goto managed
+)
 if defined HIMATE_KNOWLEDGE_PYTHON goto configured
 py -3.11 -c "import sys" >nul 2>&1
 if not errorlevel 1 goto python311
@@ -12,6 +21,9 @@ echo Knowledge requires a prepared Python 3.10, 3.11 or 3.12 on this execution h
 exit /b 3
 :configured
 "%HIMATE_KNOWLEDGE_PYTHON%" -B "%~dp0knowledge.py" %*
+exit /b %errorlevel%
+:managed
+"%MANAGED_PYTHON%" -B "%~dp0knowledge.py" %*
 exit /b %errorlevel%
 :python311
 py -3.11 -B "%~dp0knowledge.py" %*

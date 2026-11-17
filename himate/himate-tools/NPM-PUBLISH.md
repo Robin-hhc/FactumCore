@@ -39,10 +39,10 @@ npm publish --registry http://10.143.57.12:4873
 Windows 和 Linux 使用**同一条命令**，不需要区分平台：
 
 ```bash
-npm i -g @himate/knowledge-cli --registry http://10.143.57.12:4873
+npm i -g @himate/knowledge-cli --registry http://10.143.57.12:4873 --allow-scripts=@himate/knowledge-cli
 knowledge setup
 # 需要离线 OCR 模型包时
-npm i -g @himate/knowledge-models --registry http://10.143.57.12:4873
+npm i -g @himate/knowledge-models --registry http://10.143.57.12:4873 --allow-scripts=@himate/knowledge-models
 ```
 
 安装后内容落在：
@@ -97,7 +97,7 @@ export HIMATE_KNOWLEDGE_PYTHON=/usr/bin/python3.11
 只更新 CLI，模型不动：
 
 ```bash
-npm i -g @himate/knowledge-cli@latest --registry http://10.143.57.12:4873
+npm i -g @himate/knowledge-cli@latest --registry http://10.143.57.12:4873 --allow-scripts=@himate/knowledge-cli
 ```
 
 CLI 安装脚本保留 `.venv/`、`logs/` 和 `tools/deploy/models/`。更新后运行 `knowledge doctor --environment-only`，如有新的依赖缺口再运行 `knowledge setup`。
@@ -105,6 +105,7 @@ CLI 安装脚本保留 `.venv/`、`logs/` 和 `tools/deploy/models/`。更新后
 ## 6. 注意事项
 
 - 安装时不要加 `--ignore-scripts`，否则文件不会复制到 `~/.himate/knowledge`
+- npm 11 默认拦截依赖的安装脚本，安装命令需带 `--allow-scripts=<包名>`（见上文），否则只会看到警告、文件不会复制
 - 模型包安装时会按 `manifest.json` 校验每个分片的字节数与 SHA-256，校验失败会中止安装
 - 两个包的安装顺序不限：先装 CLI 或先装模型都可以
 - 本机需要可用的 Node.js 和支持创建虚拟环境的 Python 3.10–3.12。Debian 或 Ubuntu 缺少 `ensurepip` 时，安装报错会提示与所选 Python 版本配套的 `venv` 系统包。

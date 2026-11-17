@@ -1,6 +1,6 @@
 schema_version: '2.0'
 contract_family: aiot-wifi
-tool_version: 0.22.5
+tool_version: 0.22.6
 files:
   contracts/__init__.py:
     path: governance/contracts/__init__.py

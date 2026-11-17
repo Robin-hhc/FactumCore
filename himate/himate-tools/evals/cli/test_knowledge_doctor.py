@@ -37,9 +37,9 @@ def knowledge(tmp_path):
     return root
 
 
-def observe(root, *, no_site=False, site_packages=None):
+def observe(root, *, no_site=False, site_packages=None, python=sys.executable):
     before = {p.relative_to(root).as_posix(): p.read_bytes() for p in root.rglob("*") if p.is_file()}
-    command = [sys.executable, "-B"] + (["-S"] if no_site else [])
+    command = [str(python), "-B"] + (["-S"] if no_site else [])
     environment = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8")
     environment.pop("PYTHONPATH", None)
     arguments = [str(root / "knowledge.py"), "doctor", "--knowledge-root", str(root), "--json"]
@@ -101,6 +101,38 @@ def test_doctor_ready_includes_verified_rule_version_and_exact_workspace(knowled
     assert data["configuration"]["knowledge_root"] == str(knowledge.resolve())
     assert data["content_checked"] is False
     assert not (knowledge.parent / "main").exists()
+
+
+@pytest.mark.parametrize("selection", ["base", "managed", "explicit", "linked"])
+def test_doctor_selects_python_before_loading_dependencies(knowledge, selection):
+    (knowledge / ".install.json").write_text('{"package":"@himate/knowledge-cli"}', encoding="utf-8")
+    base_python = Path(sys._base_executable)
+    managed = knowledge / ".venv"
+    executable = Path("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    if selection in {"managed", "explicit"}:
+        subprocess.run([str(base_python), "-I", "-m", "venv", "--without-pip", str(managed)],
+                       check=True, capture_output=True, timeout=30)
+
+    invoked = base_python
+    expected = managed / executable if selection == "managed" else base_python
+    if selection in {"explicit", "linked"}:
+        external = knowledge.parent / "explicit-venv"
+        subprocess.run([str(base_python), "-I", "-m", "venv", "--without-pip", str(external)],
+                       check=True, capture_output=True, timeout=30)
+        if selection == "explicit":
+            invoked = expected = external / executable
+        else:
+            try:
+                managed.symlink_to(external, target_is_directory=True)
+            except OSError as error:
+                pytest.skip(f"Directory symlinks are unavailable: {error}")
+
+    _, report = observe(knowledge, python=invoked)
+
+    assert Path(report["data"]["python"]) == expected
+    if selection in {"managed", "explicit"}:
+        assert "YAML_PARSER_UNAVAILABLE" in {row["code"] for row in report["diagnostics"]}
+    assert managed.exists() == (selection != "base")
 
 
 @pytest.mark.parametrize("domain", ["bluetooth", "embedded-audio"])

@@ -63,11 +63,13 @@ def _npm_owned_dispatcher(metadata, version):
         if (not package.is_absolute() or package.name != "knowledge-cli" or package.parent.name != "@himate"
                 or package.parent.parent.name != "node_modules" or metadata.get("version") != version):
             return None
-        dispatcher = package / "bin/knowledge.js"
         package_json = json.loads((package / "package.json").read_text(encoding="utf-8"))
+        reference = package_json["bin"]["knowledge"]
         if (package_json["name"] != NPM_PACKAGE or package_json["version"] != version
-                or package_json["bin"]["knowledge"] != "bin/knowledge.js"
-                or hashlib.sha256(dispatcher.read_bytes()).hexdigest() != metadata["launcherSha256"]):
+                or reference not in ("distribution/npm/knowledge.js", "bin/knowledge.js")):
+            return None
+        dispatcher = package / reference
+        if hashlib.sha256(dispatcher.read_bytes()).hexdigest() != metadata["launcherSha256"]:
             return None
         return dispatcher.resolve(strict=True)
     except (KeyError, OSError, TypeError, ValueError):
@@ -115,11 +117,16 @@ def _verify_command(tool_root, command):
                    env=_child_environment())
 
 
-def _report(tool_root, version, bin_dir):
+def _report(tool_root, version, bin_dir, *, dependencies_only=False):
     dependencies, gaps = doctor.inspect_dependencies(tool_root / "runtime/requirements.lock.txt")
     dependencies_missing = bool(gaps)
     if dependencies_missing and find_spec("pip") is None:
         gaps.insert(0, {"code": "DEPENDENCY_PIP_MISSING", "message": PIP_MISSING_MESSAGE})
+    result = {"status": "needs_install" if dependencies_missing else "ready", "python": sys.executable,
+              "python_version": platform.python_version(), "toolkit_version": version,
+              "tool_root": str(tool_root), "dependencies": dependencies, "diagnostics": gaps, "command": None}
+    if dependencies_only:
+        return result
     command = None
     try:
         if bin_dir is None:
@@ -145,9 +152,8 @@ def _report(tool_root, version, bin_dir):
         gaps.append({"code": "NPM_LAUNCHER_UNAVAILABLE", "message": NPM_REPAIR_MESSAGE})
     if status == "ready" and (os.name != "nt" or npm) and bin_dir is None and not command["on_path"]:
         gaps.append({"code": "COMMAND_NOT_ON_PATH", "message": "知识命令已安装，请将命令目录加入终端 PATH。"})
-    return {"status": status, "python": sys.executable,
-            "python_version": platform.python_version(), "toolkit_version": version,
-            "tool_root": str(tool_root), "dependencies": dependencies, "diagnostics": gaps, "command": command}
+    result.update(status=status, command=command)
+    return result
 
 
 def _emit(event, output, *, progress=False):
@@ -280,18 +286,21 @@ def _python_key(python):
     return os.path.normcase(os.path.normpath(python))
 
 
-def _fresh_report(tool_root, version, bin_dir):
+def _fresh_report(tool_root, version, bin_dir, *, dependencies_only=False):
     # A first per-user install may create the user site directory after this
     # process started. Reopen the selected Python to inspect its new sys.path.
     argv = [sys.executable, "-E", "-B", str(tool_root / "knowledge.py"), "doctor", "--environment-only", "--json"]
     if bin_dir is not None:
         argv.extend(["--bin-dir", str(bin_dir)])
+    if dependencies_only:
+        argv.append("--dependencies-only")
+    statuses = {"ready", "needs_install"} if dependencies_only else {"ready", "needs_install", "needs_cli"}
     try:
         process = subprocess.run(argv, cwd=tool_root, stdin=subprocess.DEVNULL, capture_output=True,
                                  text=True, encoding="utf-8", errors="replace", timeout=30, env=_child_environment())
         result = json.loads(process.stdout)
         if (process.returncode == 0 and isinstance(result, dict)
-                and result.get("status") in {"ready", "needs_install", "needs_cli"}
+                and result.get("status") in statuses
                 and isinstance(result.get("python"), str)
                 and _python_key(result["python"]) == _python_key(sys.executable)
                 and result.get("tool_root") == str(tool_root) and result.get("toolkit_version") == version):
@@ -342,7 +351,7 @@ def _install_dependencies(tool_root, log):
         _run_logged([*pip, "install", "-r", requirements], cwd, log, "install dependencies")
 
 
-def _install(tool_root, version, bin_dir, result, progress, *, legacy):
+def _install(tool_root, version, bin_dir, result, progress, *, legacy, dependencies_only):
     log_path = None
 
     def fail(phase, code, message):
@@ -370,7 +379,7 @@ def _install(tool_root, version, bin_dir, result, progress, *, legacy):
                 return fail("installing", error.code, str(error))
             except (OSError, subprocess.SubprocessError) as error:
                 return fail("installing", *_install_diagnostic(error))
-        result = _fresh_report(tool_root, version, bin_dir)
+        result = _fresh_report(tool_root, version, bin_dir, dependencies_only=dependencies_only)
         if result is None:
             return fail("verifying", "DEPENDENCY_CHECK_FAILED", DEPENDENCY_CHECK_MESSAGE)
         if result["status"] == "needs_install":
@@ -396,7 +405,7 @@ def _install(tool_root, version, bin_dir, result, progress, *, legacy):
         except (OSError, ValueError, subprocess.SubprocessError):
             return fail("registering", "CLI_REGISTRATION_FAILED", "无法写入知识命令，请检查命令目录后重试。")
 
-    progress("verifying", "正在复查 Python 依赖和知识命令。")
+    progress("verifying", "正在复查 Python 依赖。" if dependencies_only else "正在复查 Python 依赖和知识命令。")
     if result["status"] == "needs_cli":
         report = _fresh_report if log_path else _try_report
         result = report(tool_root, version, bin_dir)
@@ -411,14 +420,14 @@ def _install(tool_root, version, bin_dir, result, progress, *, legacy):
     return result, 0
 
 
-def _try_report(tool_root, version, bin_dir):
+def _try_report(tool_root, version, bin_dir, *, dependencies_only=False):
     try:
-        return _report(tool_root, version, bin_dir)
+        return _report(tool_root, version, bin_dir, dependencies_only=dependencies_only)
     except (OSError, ValueError, ImportError, subprocess.SubprocessError):
         return None
 
 
-def run_environment(tool_root, manifest, action, *, bin_dir=None, output="text", legacy=False):
+def run_environment(tool_root, manifest, action, *, bin_dir=None, output="text", legacy=False, dependencies_only=False):
     def progress(phase, message):
         _emit({"phase": phase, "message": message}, output, progress=True)
 
@@ -426,7 +435,7 @@ def run_environment(tool_root, manifest, action, *, bin_dir=None, output="text",
     if installing:
         progress("checking", "正在检查工具包和 Python 依赖。")
     version = manifest["version"]
-    result = _try_report(tool_root, version, bin_dir)
+    result = _try_report(tool_root, version, bin_dir, dependencies_only=dependencies_only)
     code = 0
     if result is None:
         if installing:
@@ -437,16 +446,17 @@ def run_environment(tool_root, manifest, action, *, bin_dir=None, output="text",
             code = 1
     elif installing:
         if result["status"] == "ready":
-            progress("verifying", "Python 依赖和知识命令已就绪。")
+            progress("verifying", "Python 依赖已就绪。" if dependencies_only else "Python 依赖和知识命令已就绪。")
         else:
             try:
                 with _setup_lock(managed_home(tool_root)):
-                    result = _try_report(tool_root, version, bin_dir)
+                    result = _try_report(tool_root, version, bin_dir, dependencies_only=dependencies_only)
                     if result is None:
                         result, code = _failure("checking", "DEPENDENCY_CHECK_FAILED", DEPENDENCY_CHECK_MESSAGE,
                                                 legacy=legacy)
                     else:
-                        result, code = _install(tool_root, version, bin_dir, result, progress, legacy=legacy)
+                        result, code = _install(tool_root, version, bin_dir, result, progress, legacy=legacy,
+                                                dependencies_only=dependencies_only)
             except NodeError as error:
                 result, code = _failure("installing", error.code, str(error), legacy=legacy)
             except OSError as error:

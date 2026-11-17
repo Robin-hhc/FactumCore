@@ -10,10 +10,6 @@ import subprocess
 import sys
 
 
-def install_dependencies(python, requirements, **process_options):
-    subprocess.run([python, "-m", "pip", "install", "-r", str(requirements)], check=True, **process_options)
-
-
 OCR_PREPARE = """from pathlib import Path
 import hashlib
 import json
@@ -25,7 +21,10 @@ import tempfile
 
 tool_root, root = map(Path, sys.argv[1:3])
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(tool_root / "governance"))
+governance = tool_root / "runtime/governance"
+if not governance.exists():
+    governance = tool_root / "governance"
+sys.path.insert(0, str(governance))
 from contracts.document_parser import OCR_MODEL_FILES, _models, safe_path
 from contracts.validation import ContractError
 
@@ -72,13 +71,22 @@ def validate_entry(bundle, row):
     return path
 
 
+def bundled_models():
+    for reference in ("distribution/models", "tools/deploy/models"):
+        base = safe_path(tool_root, reference)
+        if not base.exists():
+            continue
+        bundle = safe_path(base, "docling-cpu")
+        if bundle.exists():
+            return base, bundle
+    return None
+
+
 def install_bundle(options):
-    base = safe_path(tool_root, "tools/deploy/models")
-    if not base.exists():
+    models = bundled_models()
+    if models is None:
         return False
-    bundle = safe_path(base, "docling-cpu")
-    if not bundle.exists():
-        return False
+    base, bundle = models
     inspect_tree(base)
     if not bundle.is_dir():
         raise RuntimeError(f"Expected bundled model directory: {bundle}")
@@ -278,6 +286,8 @@ def main(argv=None):
         )
         requirements = source / "runtime/requirements.lock.txt"
         require_regular_file(requirements)
+        entrypoint = source / "knowledge.py"
+        require_regular_file(entrypoint)
 
         copied, packages_to_copy = [], {}
         for label, packages, destination, marker in targets:
@@ -294,8 +304,7 @@ def main(argv=None):
             copied.append((label, count, destination))
 
         # Prepare first: dependency or model failure must leave old capabilities intact.
-        install_dependencies(args.python, requirements)
-        print(f"Installed runtime dependencies with {args.python}")
+        subprocess.run([args.python, "-E", "-B", str(entrypoint), "setup", "--dependencies-only"], check=True)
         if knowledge is not None:
             subprocess.run([args.python, "-c", OCR_PREPARE, str(source), str(knowledge),
                             "download" if args.download_models else "local"], check=True)
@@ -318,7 +327,7 @@ def main(argv=None):
         return 1
     for label, count, destination in copied:
         print(f"Copied {count} {label} to {destination}")
-    print(f"Knowledge CLI: {source / 'knowledge.py'}")
+    print(f"Knowledge CLI: {entrypoint}")
     return 0
 
 

@@ -1,6 +1,6 @@
 # 面板 CLI 契约
 
-终端和 Agent 使用 `knowledge`。OpenFlow 通过宿主的 `OPENFLOW_KNOWLEDGE_TOOLKIT_ROOT` 定位工具包内部入口 `knowledge.py`，沿用同一套 CLI 命令和结果。工具包目录使用绝对路径，并与已绑定的知识根分开。宿主可用 `OPENFLOW_KNOWLEDGE_PYTHON` 指定 Python 3.10–3.12 的绝对路径。CLI 在宿主传入的解释器执行，环境检查、依赖安装和业务操作都使用该解释器。业务操作显式传入已绑定的知识根，通过 stdin 接收 JSON 对象。
+终端、Agent 和 OpenFlow 使用同一套 `knowledge` 命令与结果。OpenFlow 默认从宿主 PATH 选择全局安装的 `knowledge`，业务操作以已绑定的知识根为工作目录，显式传入 `--knowledge-root` 并通过 stdin 接收 JSON 对象。环境检查和安装可在绑定前运行。可用 `HIMATE_KNOWLEDGE_PYTHON` 或宿主的 `OPENFLOW_KNOWLEDGE_PYTHON` 指定解释器。仍从源码部署的宿主可显式设置 `OPENFLOW_KNOWLEDGE_TOOLKIT_ROOT`。
 
 ```sh
 printf '%s' '{"limit":20}' | python -B /absolute/tool/root/knowledge.py library cards --knowledge-root /absolute/knowledge/root --input - --json
@@ -24,7 +24,7 @@ printf '%s' '{"limit":20}' | python -B /absolute/tool/root/knowledge.py library 
 
 `knowledge setup --jsonl` 发出 `checking`、按需的 `installing` 和 `registering`，以及 `verifying`，最后发送一条结果。`installing` 阶段用所选解释器执行 `python -m pip install -r` 安装锁定依赖。成功时最终状态为 `ready`，退出码为 0，`python` 指向通过复查的解释器。失败结果带 `phase`、`code`、`message` 和 `diagnostics` 并退出非零，可用的本机日志路径由 `log_path` 给出。只需要最终一条结果时使用 `setup --json`。重复执行会跳过已完成的安装阶段，复用 npm 启动器或按需准备手动安装的启动器。
 
-OpenFlow 用 `POST /api/knowledge/environment/check` 检查，用 `POST /api/knowledge/environment/install` 开启后台安装，两者以 JSON `{}` 提交。用 `GET /api/knowledge/environment/install` 查询当前任务。宿主同一时间执行一项安装，结束后独立复查 `ready`。尚未提供公开子命令的旧工具包继续使用原环境脚本和旧 `panel` 命令。
+OpenFlow 用 `POST /api/knowledge/environment/check` 检查，用 `POST /api/knowledge/environment/install` 开启后台安装，两者以 JSON `{}` 提交。用 `GET /api/knowledge/environment/install` 查询当前任务。宿主同一时间执行一项安装，转发 `setup --jsonl` 的阶段进度，以退出码和最终 `ready` 报告判定成功。面板业务命令仍兼容旧 `panel` 命令。
 
 ## 面板操作
 

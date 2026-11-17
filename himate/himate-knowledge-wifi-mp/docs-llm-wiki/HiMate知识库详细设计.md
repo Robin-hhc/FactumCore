@@ -375,12 +375,12 @@ Skill 包提供指引、参考和写作模板。Workflow 与 Skill 同在独立�
 
 工具包的 `deploy.sh` 和 `deploy.ps1` 安装锁定的 Docling 依赖和独立能力包中的 OpenFlow Skill、CAC Skill、OpenFlow Workflow。提供实际知识根时可同时准备该库的 OCR 模型。知识根的 `config.yml` 和 `AGENTS.md` 由维护者按实际项目更新。部署顺序与选项见[使用指南](使用说明.md#首次安装)。
 
-OpenFlow 面板在宿主用 `OPENFLOW_KNOWLEDGE_TOOLKIT_ROOT` 指向工具包的绝对路径，需要固定解释器时用 `OPENFLOW_KNOWLEDGE_PYTHON` 指定绝对路径。知识库绑定单独指向数据所在的目录。宿主用经校验的解释器和工具包入口操作已绑定的知识根。Workflow 或 Agent 通过 SSH 执行时，使用远端的 CLI、路径和权限。
+OpenFlow 默认使用宿主 PATH 上的全局 `knowledge`。绑定后在知识根运行命令并显式传入 `--knowledge-root`。需要固定解释器时可设 `HIMATE_KNOWLEDGE_PYTHON`，也可由宿主通过 `OPENFLOW_KNOWLEDGE_PYTHON` 单独覆盖。显式配置 `OPENFLOW_KNOWLEDGE_TOOLKIT_ROOT` 的旧源码部署沿用原入口。Workflow 或 Agent 通过 SSH 执行时，使用远端的 CLI、路径和权限。
 
-「环境检查」读取同一宿主和解释器上的环境状态。依赖缺失或版本不匹配时返回 `needs_install`，所选解释器缺少 pip 时附上 `DEPENDENCY_PIP_MISSING`。依赖齐全但命令待注册或待修复时返回 `needs_cli`，依赖与命令均验证通过时返回 `ready`。点击「安装环境」后启动后台任务，用选定的 Python 运行 pip，按需安装依赖、注册 `knowledge` 并复查。两个动作均不需要传入知识根。界面按已收到的阶段显示进度和结果。终端能否直接找到命令取决于其 PATH。此入口处理宿主运行环境，能力包和 OCR 模型仍由部署入口准备。
+「环境检查」通过 `knowledge doctor --environment-only` 读取宿主环境状态。依赖缺失或版本不匹配时返回 `needs_install`，所选解释器缺少 pip 时附上 `DEPENDENCY_PIP_MISSING`。依赖齐全但命令待注册或待修复时返回 `needs_cli`，依赖与命令均验证通过时返回 `ready`。点击「安装环境」后，OpenFlow 在后台调用 `knowledge setup --jsonl`。CLI 用同一解释器按需安装依赖、注册 `knowledge` 并复查，界面按 CLI 发出的阶段和最终结果显示进度。两个动作均可在绑定知识根前执行。终端能否直接找到命令取决于其 PATH。能力包和 OCR 模型由部署入口准备。
 
 ### 6.6 开发测试与验收
 
-知识能力、共用算法与部署工具的开发测试统一在工具包源码的 `evals/`，其中部署测试位于 `evals/deploy/`；同一工具包的 `tools/deploy/` 保留部署实现、说明与离线模型包。测试入口、分层和运行方法以 工具包的 `evals/README.md` 为准。
+工具包的 `evals/` 放开发和部署测试，`distribution/` 放部署实现和离线模型包，`docs/` 放部署说明。测试入口、分层和运行方法见工具包的 `evals/README.md`。
 
 流程验证覆盖单文件选择、双向关系、六决策交接、引用定位、整卡词项与标签检索、退役筛选、旧卡读取和搜索缓存升级、P4 返工、无卡成功、删除与读取失败的区别，以及 P5 重试和处理标记推进。命令与隔离合成测试验证对应机制；实际宿主触发、真实资料的蒸馏质量、公司权限和服务器运行行为分别在目标环境验证。

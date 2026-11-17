@@ -39,7 +39,7 @@ def test_partial_pdf_review_preserves_last_complete_version_and_merges_pages(lib
 
 def test_source_schema_limits_pdf_processing_to_its_explicit_fields():
     schema = json.loads((Path(__file__).resolve().parents[2]
-                         / "governance/schemas/sources.schema.json").read_text(encoding="utf-8"))
+                         / "runtime/governance/schemas/sources.schema.json").read_text(encoding="utf-8"))
     validator = Draft202012Validator(schema)
     source = {"source_id": "doc-pdf", "kind": "raw", "path": "docs-raw/protocol.PDF"}
 

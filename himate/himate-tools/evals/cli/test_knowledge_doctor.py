@@ -20,9 +20,8 @@ def knowledge(tmp_path):
     workspace = tmp_path / "doctor workspace"
     root = workspace / "himate-knowledge-synthetic"
     root.mkdir(parents=True)
-    for name in ("governance", "runtime"):
-        shutil.copytree(SOURCE / name, root / name,
-                        ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".venv"))
+    shutil.copytree(SOURCE / "runtime", root / "runtime",
+                    ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".venv"))
     shutil.copyfile(SOURCE / "knowledge.py", root / "knowledge.py")
     (root / "config.yml").write_text(
         "schema_version: '2.0'\nworkspace_id: doctor-fixture\n"
@@ -30,6 +29,7 @@ def knowledge(tmp_path):
         encoding="utf-8",
     )
     (root / "docs-raw").mkdir()
+    (root / "governance").mkdir()
     (root / "governance/sources.lock.yaml").write_text(
         "schema_version: '2.0'\nresources: []\nsnapshots: []\n", encoding="utf-8"
     )
@@ -65,7 +65,7 @@ def blocked(root, code):
 
 
 def mutate_lock(root, update):
-    path = root / "governance/framework.lock.yaml"
+    path = root / "runtime/governance/framework.lock.yaml"
     lock = yaml.safe_load(path.read_bytes())
     update(lock)
     path.write_text(yaml.safe_dump(lock, sort_keys=False), encoding="utf-8")
@@ -74,10 +74,10 @@ def mutate_lock(root, update):
 
 def seal_rules(root):
     """Model an issued lock when testing the framework's own diagnostics."""
-    path = root / "governance/framework.lock.yaml"
+    path = root / "runtime/governance/framework.lock.yaml"
     manifest_path = root / "runtime/manifest.json"
     manifest = json.loads(manifest_path.read_bytes())
-    manifest["assets"]["governance/framework.lock.yaml"]["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+    manifest["assets"]["runtime/governance/framework.lock.yaml"]["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
 
@@ -88,13 +88,14 @@ def test_doctor_ready_includes_verified_rule_version_and_exact_workspace(knowled
     (knowledge / "docs-raw/unreadable-as-yaml.md").write_bytes(b"\xff\x00")
     status, report = observe(knowledge)
     assert status == 0, report
-    rules = yaml.safe_load((knowledge / "governance/framework.lock.yaml").read_bytes())
+    rules = yaml.safe_load((knowledge / "runtime/governance/framework.lock.yaml").read_bytes())
     data = report["data"]
+    assert Path(data["rules_lock"]) == knowledge / "runtime/governance/framework.lock.yaml"
     assert data["rules"]["status"] == "verified"
     assert data["rules"]["tool_version"] == rules["tool_version"]
     assert data["rules"]["schema_version"] == rules["schema_version"]
     assert data["rules"]["contract_family"] == rules["contract_family"]
-    assert data["rules_digest"] == hashlib.sha256((knowledge / "governance/framework.lock.yaml").read_bytes()).hexdigest()
+    assert data["rules_digest"] == hashlib.sha256((knowledge / "runtime/governance/framework.lock.yaml").read_bytes()).hexdigest()
     assert data["rules"]["files_verified"] == len(rules["files"])
     assert data["config_path"] == str(knowledge / "config.yml")
     assert data["configuration"]["knowledge_root"] == str(knowledge.resolve())
@@ -155,37 +156,49 @@ def test_doctor_rejects_project_mapping_in_the_local_config(knowledge):
 
 
 def test_doctor_blocks_missing_governance_lock(knowledge):
-    (knowledge / "governance/framework.lock.yaml").unlink()
+    (knowledge / "runtime/governance/framework.lock.yaml").unlink()
     blocked(knowledge, "RULE_LOCK_UNAVAILABLE")
 
 
 def test_doctor_rejects_a_framework_lock_changed_since_release(knowledge):
-    with (knowledge / "governance/framework.lock.yaml").open("ab") as stream:
+    with (knowledge / "runtime/governance/framework.lock.yaml").open("ab") as stream:
         stream.write(b"\n# local change\n")
     blocked(knowledge, "RULE_LOCK_DIGEST_MISMATCH")
 
 
 @pytest.mark.parametrize("raw", ["files: [broken\n", "schema_version: '2.0'\nschema_version: '2.0'\n"])
 def test_doctor_blocks_malformed_or_duplicate_lock(knowledge, raw):
-    (knowledge / "governance/framework.lock.yaml").write_text(raw, encoding="utf-8")
+    (knowledge / "runtime/governance/framework.lock.yaml").write_text(raw, encoding="utf-8")
     seal_rules(knowledge)
     blocked(knowledge, "RULE_LOCK_INVALID")
 
 
-@pytest.mark.parametrize("key,value", [("schema_version", "99.0"), ("contract_family", "other-group")])
-def test_doctor_blocks_unsupported_contract(knowledge, key, value):
+@pytest.mark.parametrize("key,value", [("schema_version", "99.0"), ("contract_family", "other-group"),
+                                       ("tool_version", "")])
+def test_doctor_and_business_command_reject_incompatible_rule_metadata(knowledge, key, value):
     mutate_lock(knowledge, lambda lock: lock.update({key: value}))
-    blocked(knowledge, "RULE_CONTRACT_UNSUPPORTED")
+    assert_rule_diagnostic(knowledge, "RULE_CONTRACT_UNSUPPORTED")
+
+
+def assert_rule_diagnostic(knowledge, code):
+    blocked(knowledge, code)
+    result = subprocess.run([sys.executable, "-B", str(knowledge / "knowledge.py"), "maintain", "reindex",
+                             "--knowledge-root", str(knowledge), "--json"], cwd=knowledge,
+                            capture_output=True, encoding="utf-8", timeout=60)
+    report = json.loads(result.stdout)
+    assert result.returncode == 2, report
+    assert report["diagnostics"][0]["code"] == code, report
+    assert not (knowledge / ".build").exists()
 
 
 def test_doctor_blocks_missing_registered_rule(knowledge):
-    (knowledge / "governance/contracts/knowledge.py").unlink()
+    (knowledge / "runtime/governance/contracts/knowledge.py").unlink()
     blocked(knowledge, "RULE_FILE_UNAVAILABLE")
 
 
 def test_doctor_does_not_execute_mismatched_governance(knowledge):
     marker = knowledge.parent / "unverified-domain-executed"
-    (knowledge / "governance/contracts/__init__.py").write_text(
+    (knowledge / "runtime/governance/contracts/__init__.py").write_text(
         "from pathlib import Path\nPath(" + repr(str(marker)) + ").write_text('bad')\n", encoding="utf-8")
     blocked(knowledge, "RULE_FILE_DIGEST_MISMATCH")
     assert not marker.exists()
@@ -193,7 +206,7 @@ def test_doctor_does_not_execute_mismatched_governance(knowledge):
 
 def test_doctor_never_executes_a_metadata_selector_with_unverified_bytes(knowledge):
     marker = knowledge.parent / "unverified-selector-executed"
-    (knowledge / "governance/contracts/workspace_config.py").write_text(
+    (knowledge / "runtime/governance/contracts/workspace_config.py").write_text(
         "from pathlib import Path\nPath(" + repr(str(marker)) + ").touch()\n", encoding="utf-8")
     report = blocked(knowledge, "RULE_FILE_DIGEST_MISMATCH")
     assert report["data"]["configuration"]["status"] == "not_checked"
@@ -203,6 +216,11 @@ def test_doctor_never_executes_a_metadata_selector_with_unverified_bytes(knowled
 def test_doctor_blocks_empty_rule_manifest(knowledge):
     mutate_lock(knowledge, lambda lock: lock.update(files={}))
     blocked(knowledge, "RULE_LOCK_INCOMPLETE")
+
+
+def test_doctor_and_business_command_reject_unregistered_domain_dependency(knowledge):
+    mutate_lock(knowledge, lambda lock: lock["files"].pop("contracts/panel.py"))
+    assert_rule_diagnostic(knowledge, "RULE_LOCK_INCOMPLETE")
 
 
 def test_doctor_blocks_unsupported_rule_capability(knowledge):
@@ -330,7 +348,7 @@ def test_doctor_never_imports_the_governance_package_even_when_its_bytes_are_loc
     # Explicit synthetic rule version: metadata selection must not run this
     # package initializer or load any business engine, even after verification.
     marker = knowledge.parent / "governance-package-imported"
-    package = knowledge / "governance/contracts/__init__.py"
+    package = knowledge / "runtime/governance/contracts/__init__.py"
     package.write_text("from pathlib import Path\nPath(" + repr(str(marker)) + ").touch()\n", encoding="utf-8")
     mutate_lock(knowledge, lambda lock: lock["files"]["contracts/__init__.py"].update(
         sha256=hashlib.sha256(package.read_bytes()).hexdigest()))

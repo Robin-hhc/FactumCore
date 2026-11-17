@@ -41,7 +41,7 @@ def write_plan(root, cards, body="Keep the documented knowledge and its chosen l
 def module(name):
     namespace = "_himate_public_contract_tests"
     if namespace not in sys.modules:
-        directory = TOOL_ROOT / "governance/contracts"
+        directory = TOOL_ROOT / "runtime/governance/contracts"
         spec = importlib.util.spec_from_file_location(
             namespace, directory / "__init__.py", submodule_search_locations=[str(directory)],
         )

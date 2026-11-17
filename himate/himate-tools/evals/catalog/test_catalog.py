@@ -303,7 +303,7 @@ def test_legacy_rich_claims_and_original_bytes_are_preserved():
 def test_schema_accepts_concise_header_and_keeps_legacy_symbol_shape():
     import json
     from jsonschema import Draft202012Validator
-    schema = json.loads((Path(__file__).resolve().parents[2] / "governance/schemas/frontmatter.schema.json").read_text())
+    schema = json.loads((Path(__file__).resolve().parents[2] / "runtime/governance/schemas/frontmatter.schema.json").read_text())
     Draft202012Validator(schema).validate({"id": "c", "doc_ref": [{"doc_id": "d", "page_start": 2, "page_end": 4}], "code_ref": []})
     source_schema = {"$defs": schema["$defs"], **schema["properties"]["sources"]["items"]}
     Draft202012Validator(source_schema).validate({"evidence_ref": "e", "source_id": "c", "snapshot_id": "s",
@@ -332,7 +332,7 @@ def test_legacy_concise_draft_is_readable_without_added_scope_or_claims():
     metadata = {"id": "draft", "doc_ref": [{"doc_id": "doc", "section": "Design"}],
                 "code_ref": [], "lifecycle": "draft"}
     raw = ("---\n" + yaml.safe_dump(metadata) + "---\n# Draft\nA retained draft.\n").encode()
-    schema = json.loads((Path(__file__).resolve().parents[2] / "governance/schemas/frontmatter.schema.json").read_text())
+    schema = json.loads((Path(__file__).resolve().parents[2] / "runtime/governance/schemas/frontmatter.schema.json").read_text())
     card = module("cards_v3").parse_card(raw, "knowledge/draft.md", {"schemas": {"card": schema}})
     assert card["legacy"] is True
     assert card["raw"] == raw

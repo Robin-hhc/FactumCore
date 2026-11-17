@@ -38,7 +38,7 @@ python -m pytest himate/himate-tools/evals/ingest -q
 
 Workflow 和跨节点 CLI 验证默认从工具包旁的 `himate-skills/` 读取能力源码。能力源码另存时，验收入口与 `evals/validate_design.py` 都支持 `--capabilities-root <能力源码目录>`。直接运行这组 pytest 时也可通过测试环境变量 `HIMATE_TEST_CAPABILITIES_ROOT` 提供该目录。报告中的测试路径相对工具根。仅有独立工具包时，实际检查组合工作区 Git 忽略规则的用例标记为跳过。
 
-quick 仅选每个职责目录排序后的首个测试文件，是明确的局部冒烟。`--groups` 同样是局部范围；验证按实际修改范围选择，不把每次局部工作都扩成全量测试。真实部署沿用 pip 配置安装锁定的 Docling 多格式解析与 OCR 依赖。指定知识根时，复用该库已有的完整模型或校验内附集合后离线安装。依赖及请求的模型准备成功后，替换本次同名 Skill 和 Workflow 包目录，由宿主加载。具体操作见[部署说明](../tools/deploy/README.md)。
+quick 仅选每个职责目录排序后的首个测试文件，是明确的局部冒烟。`--groups` 同样是局部范围；验证按实际修改范围选择，不把每次局部工作都扩成全量测试。真实部署沿用 pip 配置安装锁定的 Docling 多格式解析与 OCR 依赖。指定知识根时，复用该库已有的完整模型或校验内附集合后离线安装。依赖及请求的模型准备成功后，替换本次同名 Skill 和 Workflow 包目录，由宿主加载。具体操作见[部署说明](../docs/DEPLOY.md)。
 
 输出目录必须全新。运行器保留每组 JUnit、stdout/stderr、实际选择和 `summary.json`；超时、收集失败、空测试组和无效报告不能算通过。`--jobs` 控制测试组并行，不表示生产 ingest/lint 支持并发写入。性能统计只作观察，不设速度门禁；`--baseline` 仅在环境和选择一致时比较。
 
@@ -48,4 +48,4 @@ quick 仅选每个职责目录排序后的首个测试文件，是明确的局�
 
 P2、P3 由作者执行，P4 由独立 reviewer 读计划、旧卡、新稿和依据。合成脚本测试可以验证角色与返工配置，不能替代真实内容审阅质量。真实 Linux、公司文档、代码实现和权限效果由实际试用单列验收。
 
-领域知识库的 `docs-llm-wiki/` 维护使用说明与当前设计。工具包内的 [面板 CLI 契约](../docs-llm-wiki/面板CLI契约.md) 定义宿主接口，本地 `../docs-llm-wiki/sdd/` 保存历史设计和验证记录。历史成绩不并入当前通过数，运行产物不写入 Skill。
+领域知识库的 `docs-llm-wiki/` 维护使用说明与当前设计。工具包内的 [面板 CLI 契约](../docs/面板CLI契约.md) 定义宿主接口，本地 `../docs/sdd/` 保存历史设计和验证记录。历史成绩不并入当前通过数，运行产物不写入 Skill。

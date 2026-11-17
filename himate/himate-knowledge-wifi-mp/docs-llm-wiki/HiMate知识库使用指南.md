@@ -6,7 +6,7 @@
 
 准备带 pip 的 Python 3.10–3.12，确认该环境允许安装依赖。配置好内网 npm 源后，运行 `npm install -g @himate/knowledge-cli` 安装命令。使用 npm 12 时加上 `--allow-scripts=@himate/knowledge-cli`。再运行 `knowledge setup`，用选定的解释器安装锁定依赖并复查。需要查看环境状态时可用 `knowledge doctor --environment-only`。Agent 通过 SSH 在服务器执行时，在该服务器准备 Python 和工具。
 
-终端可用 `HIMATE_KNOWLEDGE_PYTHON` 指定允许安装依赖的 Python 绝对路径。需要使用已有虚拟环境时，指定该环境内的解释器。 [宿主环境配置](../../himate-tools/tools/deploy/README.md#检查或安装宿主运行环境)
+终端和 OpenFlow 都可用 `HIMATE_KNOWLEDGE_PYTHON` 指定允许安装依赖的 Python 绝对路径。需要使用已有虚拟环境时，指定该环境内的解释器。 [宿主环境配置](../../himate-tools/docs/DEPLOY.md#检查或安装宿主运行环境)
 
 从源码部署时，把 `himate-tools/`、`himate-skills/` 和业务知识仓放到对应执行环境，在工具包根运行对应安装命令。部署默认从同级的 `himate-skills/` 安装 Skill 和 Workflow，也可为指定业务库准备离线 OCR 模型。
 
@@ -15,17 +15,17 @@
 | Linux | `sh ./deploy.sh` | 增加 `--knowledge-root '/srv/业务/知识库'` |
 | Windows PowerShell | `.\deploy.ps1` | 增加 `-KnowledgeRoot 'E:\业务\知识库'` |
 
-能力包放在别处时，Linux 加 `--capabilities-root '/srv/himate-skills'`，Windows 加 `-CapabilitiesRoot 'D:\共享工具\himate-skills'`。需要指定解释器时，Linux 加 `--python '<Python路径>'`，Windows 加 `-Python '<Python路径>'`。只从源码部署时，由管理员按工具包 `tools/deploy/README.md` 注册 `knowledge`。这一步完成后，终端、自动化和 Agent 都使用 `knowledge`。
+能力包放在别处时，Linux 加 `--capabilities-root '/srv/himate-skills'`，Windows 加 `-CapabilitiesRoot 'D:\共享工具\himate-skills'`。需要指定解释器时，Linux 加 `--python '<Python路径>'`，Windows 加 `-Python '<Python路径>'`。只从源码部署时，由管理员按[部署说明](../../himate-tools/docs/DEPLOY.md)注册 `knowledge`。
 
 领域负责人维护知识根的 `config.yml` 和 `AGENTS.md`。如果项目提供了可用配置，普通使用者直接使用即可。需要从旧的上级配置升级时，迁入实际 `workspace_id`、模块和查询设置，并从知识根重算 `code_root`。现有业务布局可填写 `../../main`，`modules[].path` 相对代码根。Target 随模块的 `chips`、`sides` 派生。只处理文档时可填写 `modules: []`。
 
-管理员在 OpenFlow 宿主配置 `OPENFLOW_KNOWLEDGE_TOOLKIT_ROOT` 指向工具包绝对路径，可用 `OPENFLOW_KNOWLEDGE_PYTHON` 指定解释器。部署到非默认 OpenFlow 用户目录时，安装参数中的 Skill 和 Workflow 目标应指向该宿主实际使用的配置目录。工作台的环境安装负责 Python 依赖和命令注册，能力包和离线 OCR 模型通过上述部署脚本安装。
+由运行 OpenFlow 的账户全局安装 npm 工具包，验证 `knowledge --version` 后启动或重启 OpenFlow。宿主默认从 PATH 调用这个命令。部署到非默认 OpenFlow 用户目录时，安装参数中的 Skill 和 Workflow 目标应指向该宿主实际使用的配置目录。能力包和离线 OCR 模型通过上述部署脚本安装。
 
 ## 首次进入 OpenFlow 知识库
 
 1. 点击左栏「知识库」。首次引导会在相应控件旁显示气泡，依次介绍绑定、环境检查、添加资料，以及概览、知识和图谱。可跳过，也可用页头「使用指引」重开。
 2. 选择包含 `config.yml` 和 `docs-raw/` 的知识根，点「校验目录」。校验通过后点「保存绑定」。缺依赖时可以从校验页点「检查并安装环境」，也可以使用页头「环境检查」。安装完成后重新校验，再保存绑定。
-3. 检查结果会说明环境就绪、缺 Python 依赖或缺可用的 `knowledge` 命令。后两种都点同一个「安装环境」。宿主按需补齐依赖、部署命令并复查。仅缺命令时直接注册，免去重复安装依赖。
+3. 「环境检查」会显示依赖是否就绪。缺依赖时点「安装环境」，由 `knowledge setup` 安装并复查。如果宿主找不到 `knowledge`，先在运行 OpenFlow 的账户下完成 npm 全局安装并重启。
 4. 可以留在弹窗内看进度，也可以选择「后台继续」。后台进度显示在知识库页头，完成或需要处理时有状态提示。注册失败时查看诊断，修正目录权限或同名命令冲突后，用原按钮重试。
 
 通过 npm 安装时，终端的 PATH 需要包含 npm 的全局命令目录。手动注册时，Windows 会更新执行账户的用户 PATH，已有终端或进程需要重新加载环境。Linux 默认使用 `~/.local/bin`。面板会显示命令路径和宿主进程的 PATH 检查结果。终端已能找到命令后，可从任意目录指定知识根进行检查。

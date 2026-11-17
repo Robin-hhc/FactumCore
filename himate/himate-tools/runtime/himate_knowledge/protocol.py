@@ -8,14 +8,31 @@ import importlib.abc
 import importlib.util
 import json
 import os
+from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 import re
 import stat
 import sys
 
 
-FRAMEWORK_LOCK = "governance/framework.lock.yaml"
-RULE_SUBTREES = tuple("governance/" + name for name in ("contracts", "schemas", "specs", "templates"))
+RULE_ROOT = "runtime/governance"
+RULE_CONTRACT_PREFIX = RULE_ROOT + "/contracts/"
+RULE_SCHEMA_PREFIX = RULE_ROOT + "/schemas/"
+FRAMEWORK_LOCK = RULE_ROOT + "/framework.lock.yaml"
+RULE_SUBTREES = tuple(RULE_ROOT + "/" + name for name in ("contracts", "schemas", "specs", "templates"))
+# Include transitive dependencies of the public CLI actions: verification
+# must catch a missing registration before starting a business command.
+REQUIRED_RULE_FILES = {
+    RULE_CONTRACT_PREFIX + name + ".py"
+    for name in ("__init__", "cards_v3", "catalog", "citation_versions", "document_parser", "indexing",
+                 "ingest", "intake", "knowledge", "library", "markdown_images", "panel", "pdf_pictures",
+                 "pdf_text", "raw_materials", "runtime", "source_read", "source_resources", "staging",
+                 "validation", "workspace_config")
+} | {
+    RULE_SCHEMA_PREFIX + name
+    for name in ("profiles.yaml", "registries.yaml", "workspace.schema.json", "frontmatter.schema.json",
+                 "sources.schema.json", "records.schema.json")
+}
 
 
 class NodeError(ValueError):
@@ -69,8 +86,11 @@ def load_yaml(data):
         pass
 
     def mapping(loader, node, deep=False):
-        return unique([(loader.construct_object(key, deep=deep), loader.construct_object(value, deep=deep))
-                       for key, value in node.value])
+        pairs = [(loader.construct_object(key, deep=deep), loader.construct_object(value, deep=deep))
+                 for key, value in node.value]
+        if any(not isinstance(key, str) for key, _ in pairs):
+            raise NodeError("INVALID_INPUT", "Expected string mapping keys")
+        return unique(pairs)
 
     UniqueLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, mapping)
     value = yaml.load(data.decode("utf-8-sig"), Loader=UniqueLoader)
@@ -162,46 +182,128 @@ def safe(root, relative, prefixes=None):
     return current
 
 
+def read_regular_bytes(path):
+    for part in (path, *path.parents):
+        if part.is_symlink() or (
+            os.path.lexists(part) and getattr(part.lstat(), "st_file_attributes", 0)
+            & stat.FILE_ATTRIBUTE_REPARSE_POINT
+        ):
+            raise ValueError("Linked metadata path is not allowed")
+    if not path.is_file():
+        raise ValueError("Metadata file is missing or unreadable")
+    return path.read_bytes()
+
+
+@dataclass
+class RuleVerification:
+    report: dict
+    lock_bytes: bytes | None = None
+    lock: dict | None = None
+    files: dict[str, bytes] = field(default_factory=dict)
+
+
+def verify_rule_files(tool_root, manifest_digest, *, expected=None, yaml_available=True):
+    """Validate the rule lock and capture its bytes without executing any rules."""
+    path = tool_root / FRAMEWORK_LOCK
+    gaps = []
+    report = {"path": str(path), "status": "not_checked", "digest": None,
+              "schema_version": None, "contract_family": None, "tool_version": None,
+              "files_registered": 0, "files_verified": 0, "gaps": gaps}
+    result = RuleVerification(report)
+
+    def gap(code, message, target):
+        report["status"] = "blocked"
+        gaps.append({"code": code, "message": str(message), "path": str(target),
+                     "next_step": "Restore the matching governance framework and lock on this execution host"})
+
+    try:
+        result.lock_bytes = read_regular_bytes(safe(tool_root, FRAMEWORK_LOCK))
+    except (OSError, ValueError) as error:
+        gap("RULE_LOCK_UNAVAILABLE", error, path)
+        return result
+    report["digest"] = sha(result.lock_bytes)
+    if report["digest"] != manifest_digest:
+        gap("RULE_LOCK_DIGEST_MISMATCH", "Framework lock differs from the installed runtime manifest", path)
+        return result
+    if expected is not None and report["digest"] != expected:
+        gap("RULES_DIGEST_MISMATCH", "Pinned framework-lock bytes differ", path)
+        return result
+    if not yaml_available:
+        return result
+    try:
+        result.lock = load_yaml(result.lock_bytes)
+    except Exception as error:
+        gap("RULE_LOCK_INVALID", "Cannot parse framework lock: " + str(error), path)
+        return result
+
+    lock = result.lock
+    for key in ("schema_version", "contract_family", "tool_version"):
+        value = lock.get(key)
+        report[key] = value if isinstance(value, str) else None
+    if (report["schema_version"] != "2.0" or report["contract_family"] != "aiot-wifi"
+            or not (report["tool_version"] or "").strip()):
+        gap("RULE_CONTRACT_UNSUPPORTED", "Expected aiot-wifi contract 2.0 and an explicit tool version", path)
+    capabilities = lock.get("capabilities")
+    if (not isinstance(capabilities, dict)
+            or any(capabilities.get(name) != "1.0" for name in ("checks", "indexing", "ingest_records"))
+            or any(capabilities.get(name) not in (None, "1.0") for name in
+                   ("workspace_mapping", "code_navigation", "incremental_patrol", "local_dbox"))):
+        gap("RULE_CAPABILITY_UNSUPPORTED", "Required rule capabilities are absent or incompatible", path)
+
+    files = lock.get("files")
+    if not isinstance(files, dict) or not files:
+        gap("RULE_LOCK_INCOMPLETE", "Framework lock has no registered rule files", path)
+        return result
+    report["files_registered"] = len(files)
+    seen = set()
+    for row in files.values():
+        if (not isinstance(row, dict) or not isinstance(row.get("path"), str)
+                or not isinstance(row.get("sha256"), str) or not re.fullmatch(r"[0-9a-f]{64}", row["sha256"])
+                or row["path"] in seen):
+            gap("RULE_LOCK_INVALID", "Invalid or duplicate registered rule entry", path)
+            continue
+        reference = row["path"]
+        seen.add(reference)
+        try:
+            target = safe(tool_root, reference, RULE_SUBTREES)
+        except (OSError, ValueError) as error:
+            gap("RULE_LOCK_INVALID", error, reference)
+            continue
+        try:
+            content = read_regular_bytes(target)
+        except (OSError, ValueError) as error:
+            gap("RULE_FILE_UNAVAILABLE", error, target)
+            continue
+        if sha(content) != row["sha256"]:
+            gap("RULE_FILE_DIGEST_MISMATCH", "Rule bytes differ from the registered digest", target)
+            continue
+        result.files[reference] = content
+    report["files_verified"] = len(result.files)
+    required = REQUIRED_RULE_FILES
+    if isinstance(capabilities, dict) and capabilities.get("code_navigation") == "1.0":
+        required = required | {RULE_CONTRACT_PREFIX + "code_symbols.py"}
+    if required - seen:
+        gap("RULE_LOCK_INCOMPLETE", "Required rules are not registered: " + ", ".join(sorted(required - seen)), path)
+    try:
+        if read_regular_bytes(safe(tool_root, FRAMEWORK_LOCK)) != result.lock_bytes:
+            gap("RULE_LOCK_CHANGED", "Framework lock changed during verification", path)
+    except (OSError, ValueError) as error:
+        gap("RULE_LOCK_CHANGED", error, path)
+    if not gaps:
+        report["status"] = "verified"
+    return result
+
+
 def domain(tool_root, knowledge_root, manifest_digest, expected=None):
-    lock_path = safe(tool_root, FRAMEWORK_LOCK)
-    if not lock_path.is_file():
-        raise NodeError("RULE_LOCK_UNAVAILABLE", "The installed framework lock is unavailable", lock_path)
-    lock_bytes = lock_path.read_bytes()
-    actual = sha(lock_bytes)
-    if actual != manifest_digest:
-        raise NodeError("RULE_LOCK_DIGEST_MISMATCH", "Framework lock differs from the installed runtime manifest", lock_path)
-    if expected is not None and (not re.fullmatch("[0-9a-f]{64}", expected) or actual != expected):
-        raise NodeError("RULES_DIGEST_MISMATCH", "Pinned framework-lock bytes differ")
-    lock = load_yaml(lock_bytes)
-    if lock.get("schema_version") != "2.0":
-        raise NodeError("INCOMPATIBLE_RULES", "Node Skills require contract 2.0")
-    verified = {}
-    for entry in lock.get("files", {}).values():
-        path = safe(tool_root, entry["path"], RULE_SUBTREES)
-        data = path.read_bytes()
-        if sha(data) != entry["sha256"]:
-            raise NodeError(
-                "RULE_DIGEST_MISMATCH", "Rule file differs from lock", entry["path"]
-            )
-        verified[entry["path"]] = data
-    for name in (
-        "__init__.py",
-        "validation.py",
-        "knowledge.py",
-        "source_resources.py",
-        "indexing.py",
-        "catalog.py",
-        "cards_v3.py",
-        "ingest.py",
-        "library.py",
-    ):
-        if "governance/contracts/" + name not in verified:
-            raise NodeError(
-                "UNPINNED_DOMAIN_CODE", "Domain program is not digest-locked", name
-            )
-    contract_names = tuple(sorted(ref[len("governance/contracts/"):-3] for ref in verified
-                                  if ref.startswith("governance/contracts/") and ref.endswith(".py")
-                                  and "/" not in ref[len("governance/contracts/"):]
+    result = verify_rule_files(tool_root, manifest_digest, expected=expected)
+    if result.report["gaps"]:
+        error = result.report["gaps"][0]
+        raise NodeError(error["code"], error["message"], error["path"])
+    verified = result.files
+    actual = result.report["digest"]
+    contract_names = tuple(sorted(ref[len(RULE_CONTRACT_PREFIX):-3] for ref in verified
+                                  if ref.startswith(RULE_CONTRACT_PREFIX) and ref.endswith(".py")
+                                  and "/" not in ref[len(RULE_CONTRACT_PREFIX):]
                                   and not ref.endswith("/__init__.py")))
     namespace = "_hs_domain_" + actual
     if namespace not in sys.modules:
@@ -231,7 +333,7 @@ def domain(tool_root, knowledge_root, manifest_digest, expected=None):
                     if fullname == namespace
                     else fullname[len(namespace) + 1 :]
                 )
-                ref = "governance/contracts/" + name.replace(".", "/") + ".py"
+                ref = RULE_CONTRACT_PREFIX + name.replace(".", "/") + ".py"
                 if ref not in verified:
                     raise ImportError("Unpinned domain module: " + fullname)
                 return importlib.util.spec_from_loader(
@@ -250,8 +352,10 @@ def domain(tool_root, knowledge_root, manifest_digest, expected=None):
         name: sys.modules[namespace + "." + name]
         for name in contract_names
     }
-    rules = modules["validation"].load_rules(tool_root, actual, knowledge_root=knowledge_root)
+    rules = modules["validation"].load_rules(knowledge_root, result.lock, actual, verified)
     for ref, data in verified.items():
-        if safe(tool_root, ref, RULE_SUBTREES).read_bytes() != data:
+        if read_regular_bytes(safe(tool_root, ref, RULE_SUBTREES)) != data:
             raise NodeError("RULES_CHANGED", "Rules changed while loading", ref)
+    if read_regular_bytes(safe(tool_root, FRAMEWORK_LOCK)) != result.lock_bytes:
+        raise NodeError("RULE_LOCK_CHANGED", "Framework lock changed while loading", tool_root / FRAMEWORK_LOCK)
     return modules, rules

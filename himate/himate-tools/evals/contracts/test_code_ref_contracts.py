@@ -39,7 +39,7 @@ def test_code_ref_cannot_be_attached_to_document_evidence():
 
 
 def test_source_schema_accepts_optional_code_ref_without_changing_old_shape():
-    card_schema = json.loads((Path(__file__).parents[2] / "governance/schemas/frontmatter.schema.json").read_bytes())
+    card_schema = json.loads((Path(__file__).parents[2] / "runtime/governance/schemas/frontmatter.schema.json").read_bytes())
     schema = {**card_schema["properties"]["sources"]["items"], "$defs": card_schema["$defs"]}
     validator = Draft202012Validator(schema)
     assert not list(validator.iter_errors(reference()))
@@ -57,7 +57,7 @@ def test_source_schema_accepts_optional_code_ref_without_changing_old_shape():
     ({"kind": "type_alias", "name": "callback_t", "parameter_types": []}, False),
 ])
 def test_schema_supports_real_source_aliases_variables_and_explicit_api_declarations(selector, valid):
-    card_schema = json.loads((Path(__file__).parents[2] / "governance/schemas/frontmatter.schema.json").read_bytes())
+    card_schema = json.loads((Path(__file__).parents[2] / "runtime/governance/schemas/frontmatter.schema.json").read_bytes())
     schema = {**card_schema["properties"]["sources"]["items"], "$defs": card_schema["$defs"]}
     errors = list(Draft202012Validator(schema).iter_errors({**reference(), "code_ref": selector}))
     assert (not errors) is valid
@@ -239,7 +239,7 @@ def target_identity(workspace, chip, side):
             "files": {code.relative_to(code.parents[1]).as_posix(): hashlib.sha256(original).hexdigest()},
         }},
     }
-    schema = json.loads((Path(__file__).parents[2] / "governance/schemas/workspace.schema.json").read_bytes())
+    schema = json.loads((Path(__file__).parents[2] / "runtime/governance/schemas/workspace.schema.json").read_bytes())
     rules = {"knowledge_root": str(domain), "schemas": {"workspace": schema}}
     return identity, config, rules
 

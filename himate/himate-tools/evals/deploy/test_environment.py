@@ -13,7 +13,7 @@ import pytest
 
 
 TOOL_ROOT = Path(__file__).resolve().parents[2]
-ENTRY = TOOL_ROOT / "tools/deploy/environment.py"
+ENTRY = TOOL_ROOT / "distribution/source/environment.py"
 
 
 @pytest.fixture
@@ -215,6 +215,34 @@ def test_install_runs_pinned_pip_on_the_invoked_interpreter_before_registering(
     assert verification_options["timeout"] == 10
 
 
+def test_dependencies_only_uses_setup_install_and_verification_without_launcher(
+        environment, runtime, monkeypatch, capsys):
+    state, _ = runtime
+    calls = []
+
+    def run(argv, **kwargs):
+        calls.append(argv)
+        if "install" in argv:
+            state.dependencies_ready = True
+        return SimpleNamespace(stdout="")
+
+    def unexpected_launcher(*args, **kwargs):
+        pytest.fail("Dependencies-only setup accessed the launcher")
+
+    monkeypatch.setattr(environment, "_inspect_npm_command", unexpected_launcher)
+    monkeypatch.setattr(environment.command_install, "inspect_command", unexpected_launcher)
+    monkeypatch.setattr(environment.command_install, "deploy_command", unexpected_launcher)
+    monkeypatch.setattr(environment.subprocess, "run", run)
+    assert environment.run_environment(TOOL_ROOT, {"version": "test"}, "install",
+                                       output="jsonl", dependencies_only=True) == 0
+    *steps, final = events(capsys)
+    assert [step["phase"] for step in steps] == ["checking", "installing", "verifying"]
+    assert final["status"] == "ready" and final["command"] is None
+    assert state.checked == [False, False, True]
+    assert calls[-1] == [sys.executable, *environment.PYTHON_MODULE_FLAGS, "pip", "install", "-r",
+                         str(TOOL_ROOT / "runtime/requirements.lock.txt")]
+
+
 def test_check_and_retry_when_only_registration_is_needed(environment, runtime, monkeypatch, capsys):
     state, bin_dir = runtime
     state.dependencies_ready = True
@@ -313,24 +341,25 @@ def test_canonical_setup_emits_one_final_result_in_json_mode(environment, runtim
 
 
 @pytest.fixture
-def npm_installation(tmp_path):
+def npm_installation(tmp_path, request):
     tool_root = tmp_path / "installed tool"
     tool_root.mkdir()
     prefix = tmp_path / "npm prefix"
     modules = prefix / ("node_modules" if os.name == "nt" else "lib/node_modules")
     package = modules / "@himate/knowledge-cli"
-    dispatcher = package / "bin/knowledge.js"
+    reference = getattr(request, "param", "distribution/npm/knowledge.js")
+    dispatcher = package / reference
     dispatcher.parent.mkdir(parents=True)
     dispatcher.write_text('throw new Error("The inspection must not execute the npm script");\n', encoding="utf-8")
     (package / "package.json").write_text(json.dumps({
-        "name": "@himate/knowledge-cli", "version": "test", "bin": {"knowledge": "bin/knowledge.js"},
+        "name": "@himate/knowledge-cli", "version": "test", "bin": {"knowledge": reference},
     }), encoding="utf-8")
     marker = {"package": "@himate/knowledge-cli", "version": "test", "packageRoot": str(package),
               "launcherSha256": hashlib.sha256(dispatcher.read_bytes()).hexdigest()}
     (tool_root / ".install.json").write_text(json.dumps(marker), encoding="utf-8")
     if os.name == "nt":
         shim = prefix / "knowledge.cmd"
-        shim.write_text('@ECHO off\n"%_prog%" "%dp0%\\node_modules\\@himate\\knowledge-cli\\bin\\knowledge.js" %*\n',
+        shim.write_text(f'@ECHO off\n"%_prog%" "%dp0%\\{dispatcher.relative_to(prefix)}" %*\n',
                         encoding="utf-8")
     else:
         shim = prefix / "bin/knowledge"
@@ -340,6 +369,7 @@ def npm_installation(tmp_path):
     return tool_root, shim
 
 
+@pytest.mark.parametrize("npm_installation", ("distribution/npm/knowledge.js", "bin/knowledge.js"), indirect=True)
 def test_npm_setup_reuses_launcher_and_invoked_python(environment, npm_installation, monkeypatch, capsys):
     tool_root, shim = npm_installation
     state = SimpleNamespace(ready=False, pip_calls=0)

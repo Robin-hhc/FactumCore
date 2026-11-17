@@ -23,6 +23,7 @@ def test_npm_postinstall_preserves_managed_environment_and_logs(tmp_path):
     previous_runtime = installed / "runtime/obsolete.py"
     environment_config = installed / ".venv/pyvenv.cfg"
     install_log = installed / "logs/setup.log"
+    previously_installed_model = installed / "tools/deploy/models/docling-cpu/saved-model"
     stale_wrapper = installed / "knowledge.sh"
     customized_wrapper = installed / "knowledge.cmd"
     old_wrapper = b"legacy wrapper\n"
@@ -31,6 +32,7 @@ def test_npm_postinstall_preserves_managed_environment_and_logs(tmp_path):
         (previous_runtime, b"previous runtime"),
         (environment_config, b"previous virtual environment"),
         (install_log, b"previous setup diagnostics"),
+        (previously_installed_model, b"independently installed model"),
         (stale_wrapper, old_wrapper),
         (customized_wrapper, customized),
     ):
@@ -52,7 +54,7 @@ def test_npm_postinstall_preserves_managed_environment_and_logs(tmp_path):
         encoding="utf-8",
     )
     subprocess.run(
-        [node, "--require", str(profile), str(TOOL_ROOT / "scripts/install.js")],
+        [node, "--require", str(profile), str(TOOL_ROOT / "distribution/npm/install.js")],
         check=True,
         env={**os.environ, "HIMATE_TEST_INSTALL_HOME": str(home)},
         capture_output=True,
@@ -66,6 +68,9 @@ def test_npm_postinstall_preserves_managed_environment_and_logs(tmp_path):
     assert customized_wrapper.read_bytes() == customized
     assert environment_config.read_bytes() == b"previous virtual environment"
     assert install_log.read_bytes() == b"previous setup diagnostics"
+    assert previously_installed_model.read_bytes() == b"independently installed model"
+    assert not (installed / "distribution/release").exists()
+    assert (installed / "runtime/governance/framework.lock.yaml").is_file()
     assert (installed / "runtime/manifest.json").read_bytes() == (TOOL_ROOT / "runtime/manifest.json").read_bytes()
 
 
@@ -76,11 +81,15 @@ def test_npm_pack_excludes_caches_without_removing_source_files(tmp_path):
     package = tmp_path / "package"
     package.mkdir()
     shutil.copyfile(TOOL_ROOT / "package.json", package / "package.json")
-    shutil.copytree(TOOL_ROOT / "scripts", package / "scripts")
-    included = {"runtime/entry.py", "scripts/install.js", "tools/knowledge/build_runtime_manifest.py"}
-    caches = {"runtime/__pycache__/entry.pyc", "runtime/.pytest_cache/README.md", "runtime/unused.pyo",
-              "tools/knowledge/cache-demo/__pycache__/builder.pyc", "scripts/__pycache__/cache"}
-    for name in (included | caches) - {"scripts/install.js"}:
+    npm_sources = "distribution/npm"
+    shutil.copytree(TOOL_ROOT / npm_sources, package / npm_sources)
+    included = {"runtime/entry.py", "runtime/governance/framework.lock.yaml",
+                f"{npm_sources}/install.js", f"{npm_sources}/knowledge.js",
+                "distribution/source/environment.py"}
+    excluded = {"runtime/__pycache__/entry.pyc", "runtime/.pytest_cache/README.md", "runtime/unused.pyo",
+                "runtime/governance/contracts/__pycache__/contract.pyc", f"{npm_sources}/__pycache__/cache",
+                "distribution/release/build_runtime_manifest.py", "distribution/models/manifest.json"}
+    for name in (included | excluded) - {f"{npm_sources}/install.js", f"{npm_sources}/knowledge.js"}:
         target = package / name
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text("fixture", encoding="utf-8")
@@ -91,7 +100,7 @@ def test_npm_pack_excludes_caches_without_removing_source_files(tmp_path):
     guard.write_text("external fixture", encoding="utf-8")
     link_type = "junction" if os.name == "nt" else "dir"
     subprocess.run([node, "-e", "require('fs').symlinkSync(...process.argv.slice(1))",
-                    str(outside), str(package / "governance"), link_type],
+                    str(outside), str(package / "runtime/governance/linked"), link_type],
                    check=True, capture_output=True, timeout=30)
 
     user_config, global_config = tmp_path / "user.npmrc", tmp_path / "global.npmrc"
@@ -106,7 +115,7 @@ def test_npm_pack_excludes_caches_without_removing_source_files(tmp_path):
     record = payload[0] if isinstance(payload, list) else payload["@himate/knowledge-cli"]
     packaged = {file["path"] for file in record["files"]}
     assert included <= packaged
-    assert packaged.isdisjoint(caches)
-    assert not any(path.startswith("governance/") for path in packaged)
-    assert all((package / path).read_text(encoding="utf-8") == "fixture" for path in caches)
+    assert packaged.isdisjoint(excluded)
+    assert not any(path.startswith("runtime/governance/linked/") for path in packaged)
+    assert all((package / path).read_text(encoding="utf-8") == "fixture" for path in excluded)
     assert guard.read_text(encoding="utf-8") == "external fixture"

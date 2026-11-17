@@ -13,8 +13,8 @@ import pytest
 DOMAIN = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location(
     "workspace_mapping_contract",
-    DOMAIN / "governance/contracts/__init__.py",
-    submodule_search_locations=[str(DOMAIN / "governance/contracts")],
+    DOMAIN / "runtime/governance/contracts/__init__.py",
+    submodule_search_locations=[str(DOMAIN / "runtime/governance/contracts")],
 )
 contract = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = contract
@@ -33,7 +33,7 @@ def config(*modules):
 
 
 def validate(value):
-    schema = json.loads((DOMAIN / "governance/schemas/workspace.schema.json").read_text(encoding="utf-8"))
+    schema = json.loads((DOMAIN / "runtime/governance/schemas/workspace.schema.json").read_text(encoding="utf-8"))
     return v.validate_shape("workspace", value, {"schemas": {"workspace": schema}})
 
 

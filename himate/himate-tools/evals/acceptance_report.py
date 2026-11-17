@@ -29,7 +29,7 @@ def runtime_environment(root):
             data["commit"] = result.stdout.decode("ascii").strip()
     except (OSError, subprocess.TimeoutExpired, UnicodeError):
         pass
-    lock = root / "governance/framework.lock.yaml"
+    lock = root / "runtime/governance/framework.lock.yaml"
     try:
         data["rules_digest"] = hashlib.sha256(lock.read_bytes()).hexdigest()
     except OSError:

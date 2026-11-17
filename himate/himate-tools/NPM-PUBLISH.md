@@ -119,7 +119,7 @@ CLI 安装脚本保留 `.venv/`、`logs/` 和 `tools/deploy/models/`。更新后
 - 部分 npm 11 版本会提醒用户检查安装脚本。内网另有脚本策略时，按该策略和客户端支持的参数选择命令
 - 模型包安装时会按 `manifest.json` 校验每个分片的字节数与 SHA-256，校验失败会中止安装
 - 两个包的安装顺序不限：先装 CLI 或先装模型都可以
-- 本机需要可用的 Node.js 和支持创建虚拟环境的 Python 3.10–3.12。Debian 或 Ubuntu 缺少 `ensurepip` 时，安装报错会提示与所选 Python 版本配套的 `venv` 系统包。
+- 本机需要可用的 Node.js 和 Python 3.10–3.12。首次创建虚拟环境需要基础 Python 带有 `venv` 和 `ensurepip`。检查返回 `VENV_MODULE_MISSING` 时，按执行端系统补齐组件后再运行 `knowledge setup`。 [各平台处理方式](tools/deploy/README.md#检查或安装宿主运行环境)
 - 安装失败可按提示检查本机 `~/.himate/knowledge/logs/` 下的日志。命令输出包含错误原因，便于 OpenFlow 显示处理提示。
 - `knowledge setup` 复用 npm 启动器。需要诊断环境时可运行 `knowledge doctor --environment-only --json`，无需选择知识库。
 - 模型 npm 包提供工具侧离线模型。知识库启用 `standard` OCR 时，仍为相应知识根准备模型。 [OCR 部署说明](tools/deploy/README.md#为现有知识库准备-ocr)

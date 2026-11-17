@@ -4,6 +4,7 @@ from ast import literal_eval
 from contextlib import contextmanager
 import errno
 import hashlib
+from importlib.util import find_spec
 import json
 import os
 from pathlib import Path
@@ -117,6 +118,10 @@ def _verify_command(tool_root, command):
 def _report(tool_root, version, bin_dir):
     dependencies, gaps = doctor.inspect_dependencies(tool_root / "runtime/requirements.lock.txt")
     dependencies_missing = bool(gaps)
+    if dependencies_missing:
+        prerequisite = _venv_diagnostic(creating_venv=False)
+        if prerequisite:
+            gaps.insert(0, prerequisite)
     command = None
     try:
         if bin_dir is None:
@@ -148,7 +153,8 @@ def _report(tool_root, version, bin_dir):
 
 
 def _missing_environment_report(tool_root, version, bin_dir):
-    gaps = [{"code": "VENV_REQUIRED", "message": VENV_REQUIRED_MESSAGE}]
+    prerequisite = _venv_diagnostic(creating_venv=True)
+    gaps = [prerequisite or {"code": "VENV_REQUIRED", "message": VENV_REQUIRED_MESSAGE}]
     command = None
     try:
         if bin_dir is None:
@@ -158,7 +164,8 @@ def _missing_environment_report(tool_root, version, bin_dir):
     except (NodeError, OSError):
         pass
     return {"status": "needs_install", "python": None, "python_version": None,
-            "bootstrap_python": sys.executable, "environment_path": str(managed_home(tool_root) / ".venv"),
+            "bootstrap_python": sys.executable, "bootstrap_python_version": platform.python_version(),
+            "environment_path": str(managed_home(tool_root) / ".venv"),
             "toolkit_version": version, "tool_root": str(tool_root), "dependencies": [],
             "diagnostics": gaps, "command": command}
 
@@ -238,10 +245,25 @@ def _venv_package_hint():
         except OSError:
             release = {}
         if {release.get("ID"), *release.get("ID_LIKE", "").split()} & {"debian", "ubuntu"}:
-            return ("请安装与当前 Python 版本匹配的 venv 组件。系统默认 Python 可运行 "
-                    "sudo apt install python3-venv，指定版本请安装 python" +
-                    f"{sys.version_info.major}.{sys.version_info.minor}-venv。")
-    return "请安装带 venv 和 ensurepip 组件的 Python 3.10–3.12。"
+            version = f"{sys.version_info.major}.{sys.version_info.minor}"
+            return f"请运行 sudo apt install python{version}-venv，然后重试 knowledge setup。"
+    if sys.platform == "win32":
+        return "请使用完整的 Python 3.10–3.12 安装程序，勾选 pip，然后重试 knowledge setup。"
+    return "请安装带 venv 和 ensurepip 的 Python 3.10–3.12，然后重试 knowledge setup。"
+
+
+def _venv_diagnostic(*, creating_venv):
+    missing = []
+    if creating_venv and find_spec("venv") is None:
+        missing.append("venv")
+    if (creating_venv or find_spec("pip") is None) and find_spec("ensurepip") is None:
+        missing.append("ensurepip")
+    if not missing:
+        return None
+    modules = "、".join(missing)
+    return {"code": "VENV_MODULE_MISSING",
+            "message": f"Python {platform.python_version()}（{sys.executable}）缺少 {modules}。"
+                       + _venv_package_hint()}
 
 
 def _install_diagnostic(error, *, creating_venv=False):
@@ -402,6 +424,11 @@ def _install(tool_root, version, bin_dir, python, result, progress, *, legacy):
             return fail("installing", "INSTALL_LOG_UNAVAILABLE", LOG_FAILURE_MESSAGE)
         with log:
             log_path = log.name
+            prerequisite = next((item for item in result["diagnostics"]
+                                 if item["code"] == "VENV_MODULE_MISSING"), None)
+            if prerequisite:
+                log.write(prerequisite["message"] + "\n")
+                return fail("installing", prerequisite["code"], prerequisite["message"])
             creating_venv = python is None
             try:
                 if creating_venv:

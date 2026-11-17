@@ -208,7 +208,7 @@ def test_nondefault_element_profile_is_reproducible_after_p5_cleans_the_bundle(t
                                              expected_sha256=task["source"]["hash"])
     locator = next(row["locator"] for row in loaded["locators"]["segments"] if row["locator"]["kind"] == "element")
     locator = {**locator, "parser": loaded["manifest"]["profile"]["options"]}
-    schema = json.loads((Path(__file__).resolve().parents[2] / "governance/schemas/frontmatter.schema.json").read_bytes())
+    schema = json.loads((Path(__file__).resolve().parents[2] / "runtime/governance/schemas/frontmatter.schema.json").read_bytes())
     validate(locator, schema["$defs"]["document_locator"])
     for missing_or_wrong in ({}, {"threads": 3}):
         candidate(root, "requirement", {"doc_id": task["source"]["source_id"],
@@ -333,7 +333,7 @@ def test_secondary_parse_index_is_checked_again_before_writing(tmp_path, monkeyp
 def test_new_native_locations_are_accepted_by_both_schema_and_card_parser(locator):
     from jsonschema import validate
 
-    schema = json.loads((Path(__file__).resolve().parents[2] / "governance/schemas/frontmatter.schema.json").read_bytes())
+    schema = json.loads((Path(__file__).resolve().parents[2] / "runtime/governance/schemas/frontmatter.schema.json").read_bytes())
     validate(locator, schema["$defs"]["document_locator"])
     module("cards_v3")._document_locator(locator, "knowledge/example.md")
 
@@ -448,7 +448,7 @@ def test_element_resource_limits_are_enforced_by_schema_and_candidate_validation
                "profile_sha256": "b" * 64, "parser": {field: value}}
     with pytest.raises(module("validation").ContractError):
         module("cards_v3")._document_locator(locator, "knowledge/example.md")
-    schema = json.loads((Path(__file__).resolve().parents[2] / "governance/schemas/frontmatter.schema.json").read_bytes())
+    schema = json.loads((Path(__file__).resolve().parents[2] / "runtime/governance/schemas/frontmatter.schema.json").read_bytes())
     with pytest.raises(ValidationError):
         validate(locator, schema["$defs"]["document_locator"])
 
@@ -459,5 +459,5 @@ def test_large_output_budget_is_portable_in_element_references():
     locator = {"kind": "element", "ref": "#/texts/0", "source_sha256": "a" * 64,
                "profile_sha256": "b" * 64, "parser": {"max_output_bytes": 1024 * 1024 * 1024}}
     module("cards_v3")._document_locator(locator, "knowledge/example.md")
-    schema = json.loads((Path(__file__).resolve().parents[2] / "governance/schemas/frontmatter.schema.json").read_bytes())
+    schema = json.loads((Path(__file__).resolve().parents[2] / "runtime/governance/schemas/frontmatter.schema.json").read_bytes())
     validate(locator, schema["$defs"]["document_locator"])

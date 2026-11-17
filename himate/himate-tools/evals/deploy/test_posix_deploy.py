@@ -61,7 +61,7 @@ def test_posix_selects_python_and_forwards_paths_from_another_directory(tmp_path
     assert result.returncode == 0, result.stderr.decode("utf-8", "replace")
     recorded = capture.read_bytes().decode("utf-8").split("\0")[:-1]
     assert Path(recorded[0]) == selected
-    assert Path(recorded[1]) == distribution / "tools/deploy/deploy.py"
+    assert Path(recorded[1]) == distribution / "distribution/source/deploy.py"
     assert recorded[2:] == arguments
     assert not (tmp_path / "skills root").exists()
     assert not (tmp_path / "workflow root").exists()

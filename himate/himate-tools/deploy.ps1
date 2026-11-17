@@ -21,7 +21,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$deployArguments = @((Join-Path $PSScriptRoot 'tools\deploy\deploy.py'),
+$deployArguments = @((Join-Path $PSScriptRoot 'distribution\source\deploy.py'),
                      '--python', $Python)
 if (-not [string]::IsNullOrWhiteSpace($SourceRoot)) {
     $deployArguments += @('--source-root', $SourceRoot)

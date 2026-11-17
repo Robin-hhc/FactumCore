@@ -10,4 +10,4 @@ LLM Wiki 的基本机制、外部实现试用及 HiMate 对照见[LLM Wiki 实�
 
 面板效果图、宿主接口和图谱验收见[OpenFlow 知识库面板设计](OpenFlow面板与知识图谱适配建议.md)。
 
-环境安装参数、面板 CLI 契约和验收入口随 `himate-tools` 的 `docs-llm-wiki/README.md` 提供。OpenFlow 工作台实现见 [F176](https://github.com/xmkid/OpenFlow/pull/29)。
+环境安装参数、面板 CLI 契约和验收入口随 `himate-tools` 的 `docs/README.md` 提供。OpenFlow 工作台实现见 [F176](https://github.com/xmkid/OpenFlow/pull/29)。

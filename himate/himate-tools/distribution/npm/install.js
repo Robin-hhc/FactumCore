@@ -5,7 +5,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-const PACKAGE_ROOT = path.resolve(__dirname, "..");
+const PACKAGE_ROOT = path.resolve(__dirname, "..", "..");
 const INSTALL_ROOT = path.join(os.homedir(), ".himate", "knowledge");
 const STAGING = path.join(INSTALL_ROOT, ".staging-cli-" + process.pid);
 const RUNTIME_MANIFEST = path.join(INSTALL_ROOT, "runtime", "manifest.json");
@@ -17,11 +17,8 @@ const ITEMS = [
   "knowledge.py",
   ".gitattributes",
   "runtime",
-  "governance",
-  "tools/deploy/deploy.py",
-  "tools/deploy/environment.py",
-  "tools/deploy/README.md",
-  "tools/knowledge",
+  "distribution/source",
+  "docs/DEPLOY.md",
 ];
 
 function copyItem(relative) {
@@ -122,7 +119,7 @@ function main() {
           package: PACKAGE_NAME,
           version: require(path.join(PACKAGE_ROOT, "package.json")).version,
           packageRoot: PACKAGE_ROOT,
-          launcherSha256: sha256(path.join(PACKAGE_ROOT, "bin/knowledge.js")),
+          launcherSha256: sha256(path.join(__dirname, "knowledge.js")),
           installedAt: new Date().toISOString(),
         },
         null,

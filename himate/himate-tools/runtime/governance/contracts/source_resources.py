@@ -7,6 +7,8 @@ DBOX_PREFIX = "docs-raw/sources/dbox"
 DBOX_CONFIG = "docs-raw/sources/dbox.local.yml"
 RAW_RECOVERY_ROOTS = tuple("docs-raw/" + name for name in (
     "conventions", "chips", "stories", "storys", "specs", "protocols", "troubleshooting"))
+RETAINED_EVIDENCE = "artifacts/evidence/objects"
+LEGACY_EVIDENCE = "logs/evidence"
 
 
 def is_dbox_path(reference):
@@ -312,17 +314,24 @@ def recover_snapshot(knowledge_root, snapshot, *, allow_local_fallback=True, sta
                                    staged_objects=staged_objects)[0]
 
 
-def _retained_original(knowledge_root, snapshot, path, staged_objects):
+def _retained_original(knowledge_root, snapshot, staged_objects, *, declared=None):
     from . import staging
     from .runtime import NodeError
-    # Existing snapshot declarations remain signed as originally registered.
-    # Only an exact frozen hash determines the additional published address.
-    published = "logs/evidence/published/objects/" + snapshot["sha256"] + ".bin"
-    for reference in dict.fromkeys([path, published]):
-        safe_path(knowledge_root, reference, ["logs/evidence"])
+
+    digest = snapshot["sha256"]
+    if not isinstance(digest, str) or len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
+        raise ContractError("CITATION_SOURCE_UNAVAILABLE", "Invalid retained snapshot digest")
+    references = [declared] if declared is not None else []
+    if "card_references" in snapshot:
+        references.append(f"{RETAINED_EVIDENCE}/{digest}.bin")
+    references.append(f"{LEGACY_EVIDENCE}/published/objects/{digest}.bin")
+    if "card_references" in snapshot:
+        references.append(f"{LEGACY_EVIDENCE}/objects/{digest}.bin")
+    for reference in dict.fromkeys(references):
+        safe_path(knowledge_root, reference, [RETAINED_EVIDENCE, LEGACY_EVIDENCE])
         try:
             data = staging.read_bytes(knowledge_root, reference, staged_objects,
-                                      expected_sha=snapshot["sha256"], expected_size=snapshot["bytes"])
+                                      expected_sha=digest, expected_size=snapshot["bytes"])
             return data, reference
         except FileNotFoundError:
             continue
@@ -342,21 +351,14 @@ def recover_snapshot_source(knowledge_root, snapshot, *, allow_local_fallback=Tr
             if not allow_local_fallback or exc.code not in unavailable:
                 raise
             local = snapshot.get("local_recovery")
-            data = None
-            if isinstance(local, dict) and local.get("method") == "evidence_object":
-                retained = _retained_original(knowledge_root, snapshot, local["path"], staged_objects)
-                if retained is not None:
-                    data, reference = retained
-            if data is None:
-                published = "logs/evidence/published/objects/" + snapshot["sha256"] + ".bin"
-                retained = _retained_original(knowledge_root, snapshot, published, staged_objects)
-                if retained is not None:
-                    data, reference = retained
-            if data is None:
-                current = _current_registered_source(knowledge_root, snapshot)
-                if current is not None:
-                    return current
-                raise
+            declared = local["path"] if isinstance(local, dict) and local.get("method") == "evidence_object" else None
+            retained = _retained_original(knowledge_root, snapshot, staged_objects, declared=declared)
+            if retained is not None:
+                return retained
+            current = _current_registered_source(knowledge_root, snapshot)
+            if current is not None:
+                return current
+            raise
         else:
             reference = "git:" + recovery.get("commit", recovery.get("revision", "")) + ":" + recovery["path"]
         if sha256_bytes(data) != snapshot.get("sha256") or len(data) != snapshot.get("bytes"):
@@ -365,18 +367,13 @@ def recover_snapshot_source(knowledge_root, snapshot, *, allow_local_fallback=Tr
     path = recovery.get("path") if isinstance(recovery, dict) else recovery
     if not path:
         raise ContractError("UNSUPPORTED_RECOVERY", "Immutable local object required")
-    retained = _retained_original(knowledge_root, snapshot, path, staged_objects)
+    retained = _retained_original(knowledge_root, snapshot, staged_objects, declared=path)
     if retained is None:
         current = _current_registered_source(knowledge_root, snapshot) if allow_local_fallback else None
         if current is not None:
             return current
         raise ContractError("SOURCE_INPUT_UNAVAILABLE", "Exact snapshot is unavailable in retained objects, registered current files, or local Git history (at most 1000 path changes; shallow clones may omit the version)")
-    data, path = retained
-    if sha256_bytes(data) != snapshot.get("sha256") or len(data) != snapshot.get(
-        "bytes"
-    ):
-        raise ContractError("EVIDENCE_OBJECT_CHANGED", snapshot.get("snapshot_id"))
-    return data, path
+    return retained
 
 
 def _current_registered_source(knowledge_root, snapshot):

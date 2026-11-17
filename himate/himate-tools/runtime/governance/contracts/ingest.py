@@ -19,8 +19,8 @@ import yaml
 
 from .catalog import Catalog, atomic_write, normalize_page_ranges, pdf_review_result, remaining_page_ranges
 from .cards_v3 import parse_card
-from .validation import (ContractError, canonical_bytes, load_yaml, markdown_structure, safe_path, validate_id,
-                         workspace_configuration, workspace_layout)
+from .validation import (ContractError, _workspace_no_links, canonical_bytes, load_yaml, markdown_structure,
+                         safe_path, validate_id, workspace_configuration, workspace_layout)
 from . import citation_versions, document_parser, intake, source_resources
 
 
@@ -130,6 +130,34 @@ def old_source(root, source, *, commit=None, expected_hash=None):
         if commit or expected_hash and sha(data) == expected_hash:
             return data, revision
     raise ContractError("OLD_SOURCE_UNAVAILABLE", "The processed content is not available in local Git history", source["id"])
+
+
+def recover_bound_source(root, source, snapshot):
+    """Read the exact checked version for both reference validation and preview."""
+    try:
+        data, reference = source_resources.recover_snapshot_source(root, snapshot)
+        return data, reference.split(":", 2)[1] if reference.startswith("git:") else None
+    except ContractError as error:
+        if "card_references" not in snapshot or error.code not in citation_versions.MISSING_VERSION:
+            raise
+
+    expected = snapshot["sha256"]
+    try:
+        path = source_path(root, source)
+        _workspace_no_links(path)
+        data = path.read_bytes()
+    except (OSError, ContractError):
+        data = None
+    if data is not None and len(data) == snapshot["bytes"] and sha(data) == expected:
+        return data, None
+    try:
+        data, commit = old_source(root, source, expected_hash=expected)
+        if len(data) == snapshot["bytes"] and sha(data) == expected:
+            return data, commit
+    except (OSError, ContractError, subprocess.TimeoutExpired):
+        pass
+    raise ContractError("SOURCE_INPUT_UNAVAILABLE", "The exact checked source version is unavailable",
+                        snapshot["snapshot_id"])
 
 
 def _raw_files(root, selected=None):
@@ -686,7 +714,7 @@ def _snapshot_reference_check(root, source, reference, snapshot, registry, conte
     frozen = context.setdefault("frozen", {})
     snapshot_id = snapshot["snapshot_id"]
     if snapshot_id not in frozen:
-        frozen[snapshot_id] = source_resources.recover_snapshot(root, snapshot)
+        frozen[snapshot_id], _ = recover_bound_source(root, source, snapshot)
     data = frozen[snapshot_id]
     locator = reference.get("locator")
     if locator is None:

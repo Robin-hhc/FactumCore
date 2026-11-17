@@ -10,7 +10,6 @@ from .validation import ContractError, _workspace_no_links, canonical_bytes, saf
 
 RECEIPT = ".build/citation-versions.json"
 STAGED = ".build/materials/citation-sources"
-RETAINED = "logs/evidence/objects"
 MISSING_VERSION = {"SOURCE_INPUT_UNAVAILABLE", "GIT_SOURCE_UNAVAILABLE", "PATH_OUTSIDE_ALLOWED_ROOT",
                    "RECOVERY_CONFIG_REQUIRED", "RECOVERY_CONFIG_MISMATCH", "RECOVERY_REPO_UNKNOWN",
                    "RECOVERY_REPO_MISMATCH"}
@@ -45,18 +44,11 @@ def _digest(value):
     return isinstance(value, str) and len(value) == 64 and all(ch in "0123456789abcdef" for ch in value)
 
 
-def retained_bytes(root, snapshot):
-    digest = snapshot["sha256"]
-    if not _digest(digest):
-        raise ContractError("CITATION_SOURCE_UNAVAILABLE", "Invalid retained citation digest")
-    path = _path(root, f"{RETAINED}/{digest}.bin", RETAINED)
-    try:
-        data = path.read_bytes()
-    except FileNotFoundError:
-        return None
-    if len(data) != snapshot["bytes"] or sha256_bytes(data) != digest:
-        raise ContractError("EVIDENCE_OBJECT_CHANGED", snapshot["snapshot_id"])
-    return data
+def _write_retained(root, digest, data):
+    prefix = source_resources.RETAINED_EVIDENCE
+    reference = f"{prefix}/{digest}.bin"
+    _write_exact(_path(root, reference, prefix), data)
+    return reference
 
 
 def stage(root, checked, task_bytes):
@@ -78,10 +70,7 @@ def _snapshot(root, source, digest, data, extractor):
     identity = source["source_id"]
     recovery = source_resources.git_recovery_for_current(root, source["path"], data) if source["kind"] == "raw" else None
     if recovery is None:
-        retained = f"{RETAINED}/{digest}.bin"
-        path = _path(root, retained, RETAINED)
-        _write_exact(path, data)
-        recovery = {"method": "evidence_object", "path": retained}
+        recovery = {"method": "evidence_object", "path": _write_retained(root, digest, data)}
     snapshot = {"source_id": identity, "snapshot_id": "citation-" + sha256_bytes(canonical_bytes([identity, digest]))[:40],
                 "sha256": digest, "bytes": len(data), "recovery": recovery,
                 "format": PurePosixPath(source["path"]).suffix.lower()}
@@ -139,7 +128,7 @@ def persist(root, catalog, drafts, task_bytes):
             except ContractError as error:
                 if error.code not in MISSING_VERSION:
                     raise
-                _write_exact(_path(root, f"{RETAINED}/{digest}.bin", RETAINED), data)
+                _write_retained(root, digest, data)
         available.add((identity, digest))
         association = {key: row[key] for key in ("card_id", "card_sha256", "reference_sha256")}
         bindings = snapshot.setdefault("card_references", [])

@@ -62,21 +62,21 @@ def launcher(tmp_path, npm_release):
         environment.pop(key, None)
     # Run the installed package's lifecycle entry explicitly so this fixture is
     # independent of npm's version-specific script approval policies.
-    result = subprocess.run([str(node), str(package / "scripts/install.js")], cwd=tmp_path, env=environment,
+    result = subprocess.run([str(node), str(package / "distribution/npm/install.js")], cwd=tmp_path, env=environment,
                             capture_output=True, encoding="utf-8", timeout=30)
     assert result.returncode == 0, (result.stdout, result.stderr)
 
-    def run(*arguments, override=None, search_path=None, via_shim=False):
+    def run(*arguments, override=None, search_path=None, via_shim=False, cwd=tmp_path):
         env = dict(environment)
         env["PATH"] = str(search_path if search_path is not None else tmp_path / "empty-path")
         if via_shim:
             command = [str(shim)]
             env["PATH"] = os.pathsep.join((str(shim_dir), str(node.parent), env["PATH"]))
         else:
-            command = [str(node), str(package / "bin/knowledge.js")]
+            command = [str(node), str(package / "distribution/npm/knowledge.js")]
         if override is not None:
             env["HIMATE_KNOWLEDGE_PYTHON"] = str(override)
-        return subprocess.run([*command, *arguments], cwd=tmp_path, env=env,
+        return subprocess.run([*command, *arguments], cwd=cwd, env=env,
                               capture_output=True, encoding="utf-8", timeout=30)
 
     def doctor(**options):
@@ -91,7 +91,7 @@ def test_npm_cli_has_one_public_shim_and_one_runtime_entrypoint(npm_release, lau
     _, prefix, package = npm_release
     tool, _, run, _, _ = launcher
     metadata = json.loads((package / "package.json").read_text(encoding="utf-8"))
-    assert metadata["bin"] == {"knowledge": "bin/knowledge.js"}
+    assert metadata["bin"] == {"knowledge": "distribution/npm/knowledge.js"}
     shim_dir = prefix if os.name == "nt" else prefix / "bin"
     assert not list(shim_dir.glob("himate-knowledge*"))
     for retired in ("knowledge.cmd", "knowledge.sh"):
@@ -124,6 +124,17 @@ def test_npm_cli_uses_path_python_without_creating_an_environment(launcher, tmp_
     if os.name != "nt":
         assert Path(report["python"]).parent == discovered.parent
     assert not legacy.exists()
+
+
+def test_npm_cli_does_not_execute_an_interpreter_from_the_working_directory(launcher, tmp_path):
+    _, _, _, doctor, _ = launcher
+    shadow = venv(tmp_path / "knowledge workspace")
+
+    result = doctor(override=f".{os.sep}{shadow.name}",
+                    search_path=os.pathsep.join((".", str(BASE_PYTHON.parent))),
+                    cwd=shadow.parent)
+
+    assert Path(result["python"]).parent != shadow.parent
 
 
 def test_npm_cli_leaves_linked_legacy_environment_alone(launcher, tmp_path):

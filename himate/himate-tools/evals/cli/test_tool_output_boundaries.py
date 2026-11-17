@@ -24,7 +24,6 @@ def test_command_writes_cannot_target_the_tool_directory(tmp_path, case_alias):
             pytest.skip("Filesystem paths do not have distinct spellings for the same directory")
 
     shutil.copytree(SOURCE / "runtime", tool / "runtime")
-    shutil.copytree(SOURCE / "governance", tool / "governance")
     shutil.copyfile(SOURCE / "knowledge.py", tool / "knowledge.py")
     knowledge = tmp_path / "knowledge-data"
     for part in ("docs-raw", "knowledge"):

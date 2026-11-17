@@ -10,28 +10,45 @@ const SUPPORTED = new Set(["3.10", "3.11", "3.12"]);
 const INSTALL_ROOT = path.join(os.homedir(), ".himate", "knowledge");
 const ENTRY = path.join(INSTALL_ROOT, "knowledge.py");
 
+function pathExecutable(name, directories) {
+  for (const directory of directories) {
+    const candidate = path.join(directory, name);
+    try {
+      if (!fs.statSync(candidate).isFile()) continue;
+      fs.accessSync(candidate, fs.constants.X_OK);
+      return candidate;
+    } catch {
+      // This PATH entry does not contain an executable for this name.
+    }
+  }
+  return null;
+}
+
 function candidateInterpreters() {
   const candidates = [];
+  const directories = (process.env.PATH || "").split(path.delimiter)
+    .map((item) => item.replace(/^"|"$/g, ""))
+    .filter((item) => path.isAbsolute(item));
   const configured = process.env.HIMATE_KNOWLEDGE_PYTHON;
-  if (configured) {
+  if (configured && path.isAbsolute(configured)) {
     candidates.push({ command: configured, prefix: [] });
   }
-  if (process.platform === "win32") {
-    candidates.push(
-      { command: "py", prefix: ["-3.11"] },
-      { command: "py", prefix: ["-3.12"] },
-      { command: "py", prefix: ["-3.10"] },
-      { command: "python", prefix: [] },
-      { command: "python3", prefix: [] }
-    );
-  } else {
-    candidates.push(
-      { command: "python3", prefix: [] },
-      { command: "python", prefix: [] },
-      { command: "python3.11", prefix: [] },
-      { command: "python3.12", prefix: [] },
-      { command: "python3.10", prefix: [] }
-    );
+  const windows = process.platform === "win32";
+  if (windows) {
+    const systemRoot = process.env.SystemRoot;
+    const launcherDirs = systemRoot && path.isAbsolute(systemRoot)
+      ? [...directories, systemRoot] : directories;
+    const launcher = pathExecutable("py.exe", launcherDirs);
+    if (launcher) {
+      for (const version of ["-3.11", "-3.12", "-3.10"]) {
+        candidates.push({ command: launcher, prefix: [version] });
+      }
+    }
+  }
+  const names = windows ? ["python.exe", "python3.exe"] : ["python3", "python", "python3.11", "python3.12", "python3.10"];
+  for (const name of names) {
+    const command = pathExecutable(name, directories);
+    if (command) candidates.push({ command, prefix: [] });
   }
   return candidates;
 }

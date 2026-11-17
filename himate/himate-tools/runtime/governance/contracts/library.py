@@ -11,8 +11,8 @@ from uuid import uuid4
 import yaml
 
 from .catalog import Catalog, atomic_write
-from . import citation_versions, indexing, ingest, panel, source_resources
-from .validation import ContractError, _workspace_no_links, safe_path, validate_id
+from . import indexing, ingest, panel, source_resources
+from .validation import ContractError, safe_path, validate_id
 
 
 SEARCH_VERSION = "card-v1"
@@ -139,36 +139,6 @@ def query(root, request, *, read=False):
         return result, "searched"
 
 
-def _recover_bound_snapshot(root, source, snapshot):
-    try:
-        data, recovered_from = source_resources.recover_snapshot_source(root, snapshot)
-        commit = recovered_from.split(":", 2)[1] if recovered_from.startswith("git:") else None
-        return data, commit
-    except ContractError as error:
-        if "card_references" not in snapshot or error.code not in citation_versions.MISSING_VERSION:
-            raise
-    retained = citation_versions.retained_bytes(root, snapshot)
-    if retained is not None:
-        return retained, None
-    expected = snapshot["sha256"]
-    try:
-        path = ingest.source_path(root, source)
-        _workspace_no_links(path)
-        data = path.read_bytes()
-    except (OSError, ContractError):
-        data = None
-    if data is not None and len(data) == snapshot["bytes"] and ingest.sha(data) == expected:
-        return data, None
-    try:
-        data, commit = ingest.old_source(root, source, expected_hash=expected)
-        if len(data) == snapshot["bytes"] and ingest.sha(data) == expected:
-            return data, commit
-    except (OSError, ContractError, subprocess.TimeoutExpired):
-        pass
-    raise ContractError("SOURCE_INPUT_UNAVAILABLE", "The exact checked source version is unavailable",
-                        snapshot["snapshot_id"])
-
-
 def _resolve_source(root, source, request):
     identity = source["source_id"]
     snapshot_id = request.get("snapshot_id")
@@ -185,7 +155,7 @@ def _resolve_source(root, source, request):
                          if row["snapshot_id"] == snapshot_id and row["source_id"] == identity), None)
         if snapshot is None:
             raise ContractError("SOURCE_SNAPSHOT_MISMATCH", str(snapshot_id))
-        data, commit = _recover_bound_snapshot(root, source, snapshot)
+        data, commit = ingest.recover_bound_source(root, source, snapshot)
     else:
         try:
             data, commit = ingest.old_source(root, source, commit=request.get("commit"), expected_hash=expected)

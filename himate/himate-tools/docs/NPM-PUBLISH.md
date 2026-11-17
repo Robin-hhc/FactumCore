@@ -5,7 +5,7 @@
 | 包 | 目录 | 体积 |
 |---|---|---|
 | `@himate/knowledge-cli` | 仓库根目录 | 约 1.5MB |
-| `@himate/knowledge-models` | `tools/deploy/models/` | 约 397MB |
+| `@himate/knowledge-models` | `distribution/models/` | 约 397MB |
 
 ## 1. Verdaccio 准备
 
@@ -30,7 +30,7 @@ cd <himate-tools>
 npm publish --registry http://10.143.57.12:4873
 
 # 模型
-cd <himate-tools>/tools/deploy/models
+cd <himate-tools>/distribution/models
 npm publish --registry http://10.143.57.12:4873
 ```
 
@@ -60,11 +60,10 @@ npm i -g @himate/knowledge-models --registry http://10.143.57.12:4873 --allow-sc
 ~/.himate/knowledge/
 ├── knowledge.py         工具包内部入口
 ├── logs/
-├── runtime/
-├── governance/
-└── tools/deploy/
-    ├── deploy.py
-    └── models/docling-cpu/
+├── runtime/             CLI、依赖锁和 governance/
+├── distribution/source/
+├── docs/DEPLOY.md
+└── tools/deploy/models/  安装独立模型包时生成
 ```
 
 平台差异由包内脚本自动处理：
@@ -72,6 +71,7 @@ npm i -g @himate/knowledge-models --registry http://10.143.57.12:4873 --allow-sc
 - npm 只注册 `knowledge` 命令。Windows 的 `knowledge.cmd`、`knowledge.ps1` 和 Linux 的 `knowledge` 软链由 npm 生成，位于 npm 的全局命令目录。
 - `postinstall` 用 `process.platform` 区分路径分隔符与可执行权限
 - 启动器从系统查找 Python 3.10–3.12。`knowledge setup` 用选定的解释器执行 `python -m pip install -r`，在其安装位置补齐工具包锁定的依赖。
+- OpenFlow 默认从它启动时的 PATH 找 `knowledge`。安装后用宿主账户验证 `knowledge --version`，随后启动或重启 OpenFlow。 [宿主环境配置](DEPLOY.md#检查或安装宿主运行环境)
 
 Linux 全局安装若提示权限不足，可把 npm 全局目录指到当前用户目录。运行 npm 安装与使用 `knowledge` 采用同一账户：
 
@@ -118,7 +118,7 @@ CLI 安装脚本保留 `logs/` 和 `tools/deploy/models/`。需要继续使用�
 - 部分 npm 11 版本会提醒用户检查安装脚本。内网另有脚本策略时，按该策略和客户端支持的参数选择命令
 - 模型包安装时会按 `manifest.json` 校验每个分片的字节数与 SHA-256，校验失败会中止安装
 - 两个包的安装顺序不限：先装 CLI 或先装模型都可以
-- 本机需要可用的 Node.js 和 Python 3.10–3.12。补装依赖时，选定的 Python 需要可用的 pip，且 pip 的安装位置需要允许写入。系统发行版管理 Python 时，按该发行版的策略选择允许安装依赖的解释器。 [宿主环境配置](tools/deploy/README.md#检查或安装宿主运行环境)
+- 本机需要可用的 Node.js 和 Python 3.10–3.12。补装依赖时，选定的 Python 需要可用的 pip，且 pip 的安装位置需要允许写入。系统发行版管理 Python 时，按该发行版的策略选择允许安装依赖的解释器。 [宿主环境配置](DEPLOY.md#检查或安装宿主运行环境)
 - 安装失败可按提示检查本机 `~/.himate/knowledge/logs/` 下的日志。命令输出包含错误原因，便于 OpenFlow 显示处理提示。
 - `knowledge setup` 复用 npm 启动器。需要诊断环境时可运行 `knowledge doctor --environment-only --json`，无需选择知识库。
-- 模型 npm 包提供工具侧离线模型。知识库启用 `standard` OCR 时，仍为相应知识根准备模型。 [OCR 部署说明](tools/deploy/README.md#为现有知识库准备-ocr)
+- 模型 npm 包提供工具侧离线模型。知识库启用 `standard` OCR 时，仍为相应知识根准备模型。 [OCR 部署说明](DEPLOY.md#为现有知识库准备-ocr)

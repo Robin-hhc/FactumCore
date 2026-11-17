@@ -22,4 +22,4 @@ if [ "$expect_python" = true ] || [ -z "$python" ]; then
 fi
 
 script_dir=$(CDPATH= cd "$(dirname "$0")" && pwd)
-exec "$python" "$script_dir/tools/deploy/deploy.py" "$@"
+exec "$python" "$script_dir/distribution/source/deploy.py" "$@"

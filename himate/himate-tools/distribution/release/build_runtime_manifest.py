@@ -17,7 +17,7 @@ def build(root, version="1.0.0"):
     files = {}
     for path in sorted(runtime.rglob("*")):
         relative = path.relative_to(runtime)
-        if "__pycache__" in relative.parts:
+        if "__pycache__" in relative.parts or relative.parts[0] == "governance":
             continue
         if path.is_symlink() or (path.exists() and getattr(path.lstat(), "st_file_attributes", 0) & 0x400):
             raise ValueError("Linked runtime paths cannot be frozen: " + relative.as_posix())
@@ -27,7 +27,7 @@ def build(root, version="1.0.0"):
     if entrypoint.is_symlink() or not entrypoint.is_file():
         raise ValueError("Missing regular entrypoint: knowledge.py")
     entries = {"knowledge.py": {"sha256": hashlib.sha256(entrypoint.read_bytes()).hexdigest()}}
-    reference = "governance/framework.lock.yaml"
+    reference = "runtime/governance/framework.lock.yaml"
     path = root / reference
     if path.is_symlink() or not path.is_file():
         raise ValueError("Missing regular framework lock: " + reference)

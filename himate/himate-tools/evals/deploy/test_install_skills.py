@@ -1,4 +1,4 @@
-"""Contained deployment and shared interaction; no real pip or user directories."""
+"""Contained deployment and shared interaction using an isolated setup entrypoint."""
 
 import importlib.util
 import hashlib
@@ -33,7 +33,7 @@ def test_ocr_dependencies_accept_standard_mirror_distributions():
 
 @pytest.fixture
 def distribution(tmp_path):
-    spec = importlib.util.spec_from_file_location("skill_deploy", TOOL_ROOT / "tools/deploy/deploy.py")
+    spec = importlib.util.spec_from_file_location("skill_deploy", TOOL_ROOT / "distribution/source/deploy.py")
     backend = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(backend)
     source = tmp_path / "tools with spaces" / "custom" / "nested" / "tool-root"
@@ -53,6 +53,8 @@ def distribution(tmp_path):
     lock = source / "runtime/requirements.lock.txt"
     lock.parent.mkdir(parents=True)
     lock.write_text("PyYAML==6.0.3\nrapidocr==3.10.0\n", encoding="utf-8")
+    (source / "knowledge.py").write_text(
+        "import sys\nassert sys.argv[1:] == ['setup', '--dependencies-only']\n", encoding="utf-8")
     assert not (source.parents[2] / ".git").exists()
     return backend, source, package, workflows, lock
 
@@ -72,7 +74,7 @@ def data_root(path):
 
 
 def test_copy_all_destinations_without_creating_ancestor_entries(distribution, tmp_path, monkeypatch):
-    backend, source, package, workflows, lock = distribution
+    backend, source, package, workflows, _ = distribution
     skill_targets = [tmp_path / "installed skills", tmp_path / "cac skills"]
     workflow_target = tmp_path / "workflow templates"
     stale = []
@@ -95,7 +97,7 @@ def test_copy_all_destinations_without_creating_ancestor_entries(distribution, t
     def run(command, **kwargs):
         assert all(path.is_file() for path in stale)
         calls.append((command, kwargs))
-        phases.append("install" if command[1:3] == ["-m", "pip"] else "models")
+        phases.append("install" if command[-2:] == ["setup", "--dependencies-only"] else "models")
 
     monkeypatch.setattr(backend.subprocess, "run", run)
     original_remove, original_copy = backend.shutil.rmtree, backend.shutil.copytree
@@ -126,8 +128,8 @@ def test_copy_all_destinations_without_creating_ancestor_entries(distribution, t
     assert all(not (parent / name).exists() for parent in (source, *source.parents)
                if parent.is_relative_to(tmp_path) for name in ("config.yml", "AGENTS.md", "artifacts"))
     assert calls == [
-        ([selected_python, "-m", "pip", "install", "-r",
-          str(lock)], {"check": True}),
+        ([selected_python, "-E", "-B", str(source / "knowledge.py"), "setup", "--dependencies-only"],
+         {"check": True}),
     ]
     assert phases[0] == "install" and "models" not in phases
     assert max(index for index, phase in enumerate(phases) if phase == "delete") < phases.index("copy")
@@ -135,7 +137,7 @@ def test_copy_all_destinations_without_creating_ancestor_entries(distribution, t
 
 @pytest.mark.parametrize("explicit", [False, True], ids=["adjacent", "separate"])
 def test_install_reads_capabilities_from_split_package(distribution, tmp_path, monkeypatch, explicit):
-    backend, source, package, _, lock = distribution
+    backend, source, package, _, _ = distribution
     capabilities = tmp_path / "shared capabilities" if explicit else source.parent / "himate-skills"
     capabilities.mkdir()
     for name in ("skills", "workflows"):
@@ -147,7 +149,7 @@ def test_install_reads_capabilities_from_split_package(distribution, tmp_path, m
     monkeypatch.setattr(backend.subprocess, "run", lambda command, **kwargs: calls.append(command))
 
     assert backend.main(options) == 0
-    assert calls == [[sys.executable, "-m", "pip", "install", "-r", str(lock)]]
+    assert calls == [[sys.executable, "-E", "-B", str(source / "knowledge.py"), "setup", "--dependencies-only"]]
     for directory in ("installed skills", "cac skills"):
         installed = tmp_path / directory / package.name / "SKILL.md"
         assert installed.read_bytes() == (capabilities / "skills" / package.name / "SKILL.md").read_bytes()
@@ -172,7 +174,7 @@ def test_split_install_preserves_capability_sources(distribution, tmp_path, monk
     assert skill.read_bytes() == before
 
 
-def test_failed_pip_keeps_packages_and_project_files(distribution, tmp_path, monkeypatch):
+def test_failed_setup_keeps_packages_and_project_files(distribution, tmp_path, monkeypatch):
     backend, source, package, _, _ = distribution
     for root, name, filename in ((tmp_path / "installed skills", package.name, "SKILL.md"),
                                  (tmp_path / "cac skills", package.name, "SKILL.md"),
@@ -246,7 +248,7 @@ def test_explicit_download_is_forwarded_to_selected_python(distribution, tmp_pat
     monkeypatch.setattr(backend.subprocess, "run", lambda command, **kwargs: calls.append(command))
     assert backend.main([*arguments(source, tmp_path), "--knowledge-root", str(knowledge),
                          "--download-models", "--python", "chosen-python"]) == 0
-    assert calls[0][:5] == ["chosen-python", "-m", "pip", "install", "-r"]
+    assert calls[0] == ["chosen-python", "-E", "-B", str(source / "knowledge.py"), "setup", "--dependencies-only"]
     assert calls[1] == ["chosen-python", "-c", backend.OCR_PREPARE, str(source), str(knowledge), "download"]
 
 
@@ -261,7 +263,7 @@ def test_download_requires_knowledge_root(distribution, tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("target", ["missing", "without-config", "distribution", "linked", "alias"])
-def test_install_rejects_invalid_model_target_before_running_pip(distribution, tmp_path, monkeypatch, target):
+def test_install_rejects_invalid_model_target_before_setup(distribution, tmp_path, monkeypatch, target):
     backend, source, _, _, _ = distribution
     knowledge = tmp_path / "data repository"
     if target == "without-config":
@@ -292,10 +294,10 @@ def model_preparation(distribution, tmp_path, tmp_path_factory):
     short_root = tmp_path_factory.mktemp("models")
     source = short_root / "source root"
     knowledge = data_root(short_root / "data root")
-    contracts = source / "governance/contracts"
+    contracts = source / "runtime/governance/contracts"
     contracts.mkdir(parents=True)
     for name in ("__init__.py", "document_parser.py", "runtime.py", "validation.py", "workspace_config.py"):
-        shutil.copyfile(TOOL_ROOT / "governance/contracts" / name, contracts / name)
+        shutil.copyfile(TOOL_ROOT / "runtime/governance/contracts" / name, contracts / name)
     required = (
         "docling-project--docling-layout-heron/config.json",
         "docling-project--docling-layout-heron/preprocessor_config.json",
@@ -418,9 +420,9 @@ def test_model_download_rejects_later_link_before_loading_downloader(model_prepa
         "keep.txt": b"keep external model directory"}
 
 
-def write_model_bundle(model_preparation):
+def write_model_bundle(model_preparation, location="distribution/models"):
     _, required, _, _, command, _ = model_preparation
-    base = Path(command[3]) / "tools/deploy/models"
+    base = Path(command[3]) / location
     bundle = base / "docling-cpu"
     rows = []
     for reference in required:
@@ -539,9 +541,10 @@ def test_interrupted_split_copy_preserves_old_model_and_removes_temporary(model_
             for p in directory.rglob("*") if p.is_file()} == {split["path"]: b"existing local model"}
 
 
-def test_default_model_preparation_installs_verified_bundle_without_downloader(model_preparation):
+@pytest.mark.parametrize("location", ("distribution/models", "tools/deploy/models"))
+def test_default_model_preparation_installs_verified_bundle_without_downloader(model_preparation, location):
     directory, required, downloader, capture, command, environment = model_preparation
-    bundle, manifest, _ = write_model_bundle(model_preparation)
+    bundle, manifest, _ = write_model_bundle(model_preparation, location)
     (bundle / required[0]).chmod(0o640)
     downloader.write_text("raise AssertionError('Bundled models must not import downloader')\n", encoding="utf-8")
     result = subprocess.run([*command[:-1], "local"], env=environment,
@@ -769,7 +772,7 @@ def test_powershell_forwards_options_without_its_own_prompts(tmp_path, explicit_
                             env={**os.environ, "FACTUM_DEPLOY_TEST_CAPTURE": str(capture)})
     assert result.returncode == 0, result.stderr.decode("utf-8", "replace")
     received = json.loads(capture.read_text(encoding="utf-8"))
-    assert Path(received[0]) == TOOL_ROOT / "tools/deploy/deploy.py"
+    assert Path(received[0]) == TOOL_ROOT / "distribution/source/deploy.py"
     if explicit_roots:
         assert received[received.index("--source-root") + 1] == str(source)
         assert received[received.index("--capabilities-root") + 1] == str(tmp_path / "capabilities root")
@@ -821,10 +824,7 @@ def test_wrapper_uses_shared_interaction_and_leaves_project_files_intact(distrib
     project = data_root(tmp_path / "data root")
     (project / "config.yml").write_text("keep project", encoding="utf-8")
     (project / "AGENTS.md").write_text("old instructions", encoding="utf-8")
-    fake = tmp_path / "fake pip"
-    fake.mkdir()
-    (fake / "pip.py").write_text("# Synthetic pip substitute: no installation.\n", encoding="utf-8")
-    contracts = source / "governance/contracts"
+    contracts = source / "runtime/governance/contracts"
     contracts.mkdir(parents=True)
     (contracts / "__init__.py").write_text("", encoding="utf-8")
     (contracts / "document_parser.py").write_text(
@@ -836,9 +836,9 @@ def test_wrapper_uses_shared_interaction_and_leaves_project_files_intact(distrib
         "    return root / reference\n", encoding="utf-8")
     (contracts / "validation.py").write_text("class ContractError(Exception):\n    pass\n", encoding="utf-8")
     models_ready = tmp_path / "models-prepared.txt"
-    backend = source / "tools/deploy/deploy.py"
+    backend = source / "distribution/source/deploy.py"
     backend.parent.mkdir(parents=True)
-    shutil.copyfile(TOOL_ROOT / "tools/deploy/deploy.py", backend)
+    shutil.copyfile(TOOL_ROOT / "distribution/source/deploy.py", backend)
     wrapper_name = "deploy.sh" if kind == "sh" else "deploy.ps1"
     wrapper = source / wrapper_name
     shutil.copyfile(TOOL_ROOT / wrapper_name, wrapper)
@@ -853,7 +853,7 @@ def test_wrapper_uses_shared_interaction_and_leaves_project_files_intact(distrib
     destinations = [tmp_path / name for name in ("openflow skill", "cac skill", "openflow workflow")]
     result = subprocess.run(command, input="\n".join([*(str(path) for path in destinations), ""]),
                             text=True, capture_output=True, timeout=30, cwd=tmp_path,
-                            env={**os.environ, "PYTHONPATH": str(fake), "PYTHONDONTWRITEBYTECODE": "1",
+                            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1",
                                  "FACTUM_MODEL_READY": str(models_ready)})
     assert result.returncode == 0, result.stderr
     assert ".openflow" in result.stdout and ".cac" in result.stdout and "Overwrite" not in result.stdout

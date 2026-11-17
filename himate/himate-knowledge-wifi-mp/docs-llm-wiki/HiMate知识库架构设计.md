@@ -52,7 +52,7 @@ Git 用于按需读取已有历史版本。来源提交可以辅助定位原文�
 | 作者 Agent | 阅读材料、选择六决策、按主题写卡 |
 | 审阅 Agent | 独立核对事实、条件、遗漏及知识归属 |
 
-CLI 执行文件、结构解析、定位与固定检查，可调用预先准备的本地 Docling/OCR 模型；知识判断、图意理解与内容审阅由 Agent 完成，不自动调用远程视觉服务。Skill 包由 `SKILL.md` 和按需阅读的 references 组成；执行代码、依赖和测试集中在对应工程目录。运行包与治理规则分别由 `runtime/manifest.json`、`governance/framework.lock.yaml` 记录版本和文件摘要。
+CLI 执行文件、结构解析、定位与固定检查，可调用预先准备的本地 Docling/OCR 模型；知识判断、图意理解与内容审阅由 Agent 完成，不自动调用远程视觉服务。Skill 包由 `SKILL.md` 和按需阅读的 references 组成；执行代码、依赖和测试集中在对应工程目录。运行包与治理规则分别由 `runtime/manifest.json`、`runtime/governance/framework.lock.yaml` 记录版本和文件摘要。
 
 文档解析由统一模块交付 Markdown 阅读稿、结构 JSON、定位、图片及缺口。PDF 全量解析位于现有 `artifacts/ingest/parsed/` 命名空间，按来源身份、原件 hash 和实际解析配置校验复用；缺失或损坏时生成新材料，不覆盖已经交接的固定 manifest。缓存可删除重建，不保存唯一进度。P1 在 `.build` 准备页材料包，通过固定 manifest 引用和带次数、明细入口的缺口摘要交接，不重复全书图片与缺口元数据。P2—P4 先读取实际范围，图示仍回到原 PDF 或页预览核对；摘要不改变 partial 状态，也不表示图形提取已修复。非 PDF 解析仍位于 `.build/materials/parsed/` 并随批次清理。转换稿不重新登记为另一份 raw 来源，OCR 和转换成功不等于图意已经审阅。
 
@@ -126,15 +126,15 @@ flowchart TD
 
 ### 5.2 运行位置与组件分发
 
-执行端从已安装的工具包启动 CLI，并通过 `--knowledge-root` 指定实际知识根。工具根由启动入口确定，知识根决定配置、原件、卡片、索引和其他业务输出。OpenFlow 工作台的宿主以 `OPENFLOW_KNOWLEDGE_TOOLKIT_ROOT` 查找工具包，可用 `OPENFLOW_KNOWLEDGE_PYTHON` 指定解释器，通过 Python 调用该工具包的入口。页面绑定独立保存知识根路径，使用宿主可访问的绝对路径。Agent 通过 SSH 在另一台机器执行时，使用该机器自己的 Python、CLI 入口、知识根和源码路径。
+执行端使用已安装的 `knowledge` 命令，并通过 `--knowledge-root` 指定实际知识根。工具根由 CLI 确定，知识根决定配置、原件、卡片、索引和其他业务输出。OpenFlow 默认在宿主 PATH 找到全局命令，在已绑定的知识根执行。页面绑定保存宿主可访问的绝对路径。Agent 通过 SSH 在另一台机器执行时，使用该机器自己的 Python、CLI、知识根和源码路径。
 
 工具包提供安装入口、运行依赖、共用规则、CLI 和离线模型。能力包提供自带参考与模板的 Skill，以及引用 Skill ID 的 Workflow。Agent 在节点加载对应 Skill，结合任务输入查阅随包材料并调用已安装的 CLI。
 
-部署使用 Python 3.10–3.12。工具包和能力包可分开存放。Windows 的 `deploy.ps1` 与 Linux 的 `deploy.sh` 共用 Python 后端，默认从同级 `himate-skills/` 安装，也可显式指定能力包及宿主安装目录。默认将 Skill 安装到 `~/.openflow/config/skills` 和 `~/.cac/skills`，将 Workflow 安装到 `~/.openflow/config/workflow-templates`。该部署入口同时处理锁定依赖，传入知识根时准备 `artifacts/models/docling-cpu/`，准备成功后替换同名能力包。参数见工具包的 `tools/deploy/README.md`。
+部署使用 Python 3.10–3.12。工具包和能力包可分开存放。Windows 的 `deploy.ps1` 与 Linux 的 `deploy.sh` 共用 Python 后端，默认从同级 `himate-skills/` 安装，也可显式指定能力包及宿主安装目录。默认将 Skill 安装到 `~/.openflow/config/skills` 和 `~/.cac/skills`，将 Workflow 安装到 `~/.openflow/config/workflow-templates`。该部署入口同时处理锁定依赖，传入知识根时准备 `artifacts/models/docling-cpu/`，准备成功后替换同名能力包。 [部署说明](../../himate-tools/docs/DEPLOY.md)
 
-终端、自动化和 Agent 统一使用 `knowledge`。OpenFlow 通过宿主配置定位工具包内部入口 `knowledge.py`，调用同一 CLI。工作台用 `doctor --environment-only --json` 检查宿主环境，用 `setup --jsonl` 安装环境。CLI 用选定的 Python 运行 pip，在该解释器的安装位置补齐锁定依赖，并用同一解释器复查。环境检查和安装可以在绑定前执行，能力包和 OCR 模型由部署脚本单独准备。
+终端、自动化、Agent 和 OpenFlow 统一使用 `knowledge`。工作台用 `doctor --environment-only --json` 检查宿主环境，用 `setup --jsonl` 安装环境。CLI 用选定的 Python 运行 pip，在该解释器的安装位置补齐锁定依赖，并用同一解释器复查。环境检查和安装可以在绑定前执行，能力包和 OCR 模型由部署脚本单独准备。
 
-npm 在全局命令目录注册 `knowledge`，`setup` 会复用该启动器。手动部署时，Windows 在 `%LOCALAPPDATA%\HiMate\bin` 生成 `knowledge.cmd` 并更新执行账户的 PATH，Linux 默认在 `~/.local/bin` 生成 `knowledge`。工作台按宿主配置定位工具包并单独报告当前进程的 PATH 检查结果。
+npm 在全局命令目录注册 `knowledge`，`setup` 会复用该启动器。宿主须继承包含 npm 命令目录的 PATH。手动部署时，Windows 在 `%LOCALAPPDATA%\HiMate\bin` 生成 `knowledge.cmd` 并更新执行账户的 PATH，Linux 默认在 `~/.local/bin` 生成 `knowledge`。旧源码部署可显式配置 `OPENFLOW_KNOWLEDGE_TOOLKIT_ROOT`，宿主的 `OPENFLOW_KNOWLEDGE_PYTHON` 是可选的解释器覆盖项。
 
 ### 5.3 HiMate Knowledge目录架构
 
@@ -149,19 +149,18 @@ repo/                                      业务 manifest 工作区示例
     │   ├── knowledge/                      正式卡与导航
     │   ├── governance/sources.lock.yaml    来源身份、版本及处理进度
     │   ├── .build/                        本批材料、计划与候选
-    │   └── artifacts/                     索引、回执、解析缓存与运行模型
+    │   └── artifacts/                     索引、回执、解析缓存、引用证据与运行模型
     ├── himate-skills/                      独立能力包
     │   ├── skills/                         步骤指引、参考与写作模板
     │   └── workflows/                      节点、角色、交接、出口与画布
     └── himate-tools/                       独立工具包
+        ├── README.md / AGENTS.md           用户入口与维护指引
+        ├── package.json / knowledge.py     npm 元数据与源码入口
         ├── deploy.ps1 / deploy.sh          Windows / Linux 部署入口
-        ├── bin/knowledge.js               npm 命令启动器
-        ├── knowledge.py                   工具包内部入口
-        ├── runtime/                       CLI、发行清单与依赖锁
-        ├── governance/                    共用算法、Schema、规范与框架锁
-        ├── tools/deploy/                  环境检查、安装实现和离线模型
-        ├── evals/                         开发验证
-        └── docs-llm-wiki/                  部署和面板接口开发文档
+        ├── docs/                          安装、发布和面板接口说明
+        ├── runtime/                       CLI、规则、发行清单与依赖锁
+        ├── distribution/                  npm、源码部署和独立 OCR 模型包
+        └── evals/                         开发测试和验收
 ```
 
 目录图给出默认领域布局，实际知识根由配置选择。七类卡片沿用 `knowledge/index.md` 的类型目录；导航按需维护，卡片查询和来源关系由数据库提供。
@@ -175,8 +174,9 @@ repo/                                      业务 manifest 工作区示例
 | `artifacts/knowledge.sqlite` | 可从来源登记和正式卡重建的派生索引 |
 | `artifacts/ingest/parsed/` | PDF 派生解析缓存，按版本与配置校验复用；可删除重建，正在审阅的固定材料丢失时重新备料审阅，不丢正式进度 |
 | `artifacts/ingest/latest.json`、`query/`、`patrol/`、`sources/` | 运行回执、检索和巡检报告、按需恢复副本；按实际使用情况清理 |
+| `artifacts/evidence/objects/` | 按 SHA-256 保存已发布引用所需的原文版本。随引用保留，本机备份 |
 | `artifacts/source-read/` | 临时文档阅读使用独立 ID，消费后释放并有界回收过期产物 |
-| `tools/deploy/models/` | 随 Git 提交的模型清单和权重；8 个必需模型约 416.18 MB，大权重分片保存，部署自动校验并合并 |
+| `distribution/models/` | 随 Git 提交的模型清单和权重；8 个必需模型约 416.18 MB，大权重分片保存，部署自动校验并合并 |
 | `artifacts/models/` | 部署从内附模型安装、复用或显式下载后独立维护的运行模型，入库和阅读清理均保留 |
 | Python 环境 | 在 `.build` 之外独立准备和维护 |
 
@@ -184,7 +184,7 @@ repo/                                      业务 manifest 工作区示例
 
 独立回源使用 `source extract`，在 `artifacts/source-read/<read_id>/` 生成材料，可限制 PDF 页范围；它不清理 `.build`，不推进处理 hash。读取结束使用 `source release` 释放指定 ID，长时间阅读可 `source renew`，`source cleanup` 只回收过期且不在转换中的任务。不同读取目录、入库暂存、检索报告和模型目录互不清理。新执行端从原件重新转换；原件缺失时不把缓存视为永久归档。
 
-新任务的运行回执集中在 `artifacts/`，无需独立 `logs/` 目录。项目已有的历史记录、备份及来源引用的证据按原路径保留；`logs/evidence/` 中仍被引用的旧证据不能随缓存清理。
+新任务的运行回执和需要本机保留的引用原文统一写入 `artifacts/`。入库校验和引用预览都按来源登记的字节数和摘要恢复原文。项目已有的记录、备份及引用路径继续有效，仍被引用的 `logs/evidence/` 旧对象按原路径保留。
 
 ### 5.5 框架更新与目录清理
 
@@ -196,10 +196,10 @@ repo/                                      业务 manifest 工作区示例
 | `governance/sources.lock.yaml` | 保留来源身份、完整成功事实及PDF累计覆盖，不能用发行包中的空登记覆盖 |
 | 知识根的 `AGENTS.md`、`config.yml` | 按实际项目维护，框架升级时合并项目已有约定和配置 |
 | `runtime/`、工具包启动器与检查入口 | 按同一发行版本替换程序文件，运行环境独立维护 |
-| `governance/` 中算法、Schema、规则及 `framework.lock.yaml` | 随工具包更新并保持摘要一致，领域特有说明从知识根读取 |
+| `runtime/governance/` 中算法、Schema、规则及 `framework.lock.yaml` | 随工具包更新并保持摘要一致，领域特有说明从知识根读取 |
 | 知识仓的 `docs-llm-wiki/` | 维护架构、业务流程、使用说明和领域资料分类 |
-| 工具包的 `docs-llm-wiki/`、`evals/` | 维护 CLI 契约、开发文档和验收测试。本地 SDD 和任务草稿由 Git 忽略 |
-| `tools/deploy/models/` | 清单与匹配权重一同更新和交付，不以新清单搭配旧权重；二进制按离线分发方式补齐 |
+| 工具包的 `docs/`、`evals/` | 维护 CLI 契约、开发文档和验收测试。本地 SDD 和任务草稿由 Git 忽略 |
+| `distribution/models/` | 清单与匹配权重一同更新和交付，二进制按离线分发方式补齐 |
 | 已安装的同名 Skill、Workflow 包 | 从能力包由部署脚本完整替换，其他包保留 |
 
 空闲时可清理已消费报告、可重建数据库和 Python/测试工具缓存。`artifacts/` 可能同时存放模型、环境和本机材料，不整目录删除；临时原件阅读使用专用释放与过期回收命令。已有备份和历史证据按项目保留规则单独管理。

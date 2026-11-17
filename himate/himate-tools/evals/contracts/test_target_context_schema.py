@@ -33,7 +33,7 @@ def context_card(chip):
 
 
 def rules():
-    path = Path(__file__).resolve().parents[2] / "governance/schemas/frontmatter.schema.json"
+    path = Path(__file__).resolve().parents[2] / "runtime/governance/schemas/frontmatter.schema.json"
     return {"schemas": {"card": json.loads(path.read_bytes())}}
 
 

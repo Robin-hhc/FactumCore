@@ -54,16 +54,23 @@ def _unique_pairs(pairs):
     return result
 
 
-def read_json(path):
+def _parse_json(raw, path):
     try:
         return json.loads(
-            Path(path).read_text(encoding="utf-8-sig"),
+            raw.decode("utf-8-sig"),
             object_pairs_hook=_unique_pairs,
             parse_constant=lambda x: (_ for _ in ()).throw(
                 ContractError("NONFINITE_NUMBER", x)
             ),
         )
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise ContractError("INVALID_JSON", exc, path) from exc
+
+
+def read_json(path):
+    try:
+        return _parse_json(Path(path).read_bytes(), path)
+    except OSError as exc:
         raise ContractError("INVALID_JSON", exc, path) from exc
 
 
@@ -188,62 +195,8 @@ def _walk_refs(value):
             _walk_refs(item)
 
 
-def load_rules(tool_root, expected_digest, *, knowledge_root=None):
-    root = Path(tool_root).resolve(strict=True)
-    lock_bytes = safe_path(root, "governance/framework.lock.yaml").read_bytes()
-    if not expected_digest or sha256_bytes(lock_bytes) != expected_digest:
-        raise ContractError("RULES_DIGEST_MISMATCH", "Caller-pinned lock differs")
-    lock = load_yaml(lock_bytes)
-    if (
-        lock.get("schema_version") != "2.0"
-        or lock.get("contract_family") != "aiot-wifi"
-    ):
-        raise ContractError("UNSUPPORTED_CONTRACT_VERSION", "Expected aiot-wifi 2.0")
-    capabilities = lock.get("capabilities", {})
-    if any(capabilities.get(name) != "1.0" for name in ("checks", "indexing", "ingest_records")):
-        raise ContractError("RULE_CAPABILITY_UNAVAILABLE", "Compatible checks, indexing and ingest-record capabilities are required")
-    if capabilities.get("code_navigation") not in (None, "1.0"):
-        raise ContractError("RULE_CAPABILITY_UNAVAILABLE", "Unsupported code navigation capability")
-    entries = lock.get("files", {})
-    if not isinstance(entries, dict):
-        raise ContractError("INVALID_RULE_LOCK", "files must be an object")
-    seen = set()
-    for item in entries.values():
-        path = item.get("path", "")
-        if path in seen:
-            raise ContractError("DUPLICATE_RULE_PATH", path)
-        seen.add(path)
-        if sha256_bytes(safe_path(root, path, ["governance"]).read_bytes()) != item.get(
-            "sha256"
-        ):
-            raise ContractError("RULE_FILE_DIGEST_MISMATCH", "Rule bytes differ", path)
-    code = {
-        "governance/contracts/" + n
-        for n in (
-            "__init__.py",
-            "validation.py",
-            "knowledge.py",
-            "source_resources.py",
-            "indexing.py",
-            "catalog.py",
-            "cards_v3.py",
-            "ingest.py",
-            "library.py",
-        )
-    }
-    if capabilities.get("code_navigation") == "1.0":
-        code.add("governance/contracts/code_symbols.py")
-    if not code.issubset(seen):
-        raise ContractError(
-            "UNPINNED_CONTRACT_CODE", "All domain modules must be pinned"
-        )
-    if not {
-        "governance/schemas/profiles.yaml",
-        "governance/schemas/registries.yaml",
-    }.issubset(seen):
-        raise ContractError(
-            "UNPINNED_RULE_DECLARATION", "Profiles and registries must both be pinned"
-        )
+def load_rules(knowledge_root, lock, rules_digest, files):
+    """Build the domain rule data from the CLI's verified snapshot."""
     schemas = {}
     for kind, name in (
         ("workspace", "workspace"),
@@ -251,15 +204,13 @@ def load_rules(tool_root, expected_digest, *, knowledge_root=None):
         ("sources", "sources"),
         ("record", "records"),
     ):
-        path = "governance/schemas/" + name + ".schema.json"
-        if path not in seen:
-            raise ContractError("UNPINNED_SCHEMA", path)
-        schema = read_json(safe_path(root, path))
+        path = "runtime/governance/schemas/" + name + ".schema.json"
+        schema = _parse_json(files[path], path)
         _walk_refs(schema)
         Draft202012Validator.check_schema(schema)
         schemas[kind] = schema
-    profiles = load_yaml(safe_path(root, "governance/schemas/profiles.yaml"))
-    registries = load_yaml(safe_path(root, "governance/schemas/registries.yaml"))
+    profiles = load_yaml(files["runtime/governance/schemas/profiles.yaml"])
+    registries = load_yaml(files["runtime/governance/schemas/registries.yaml"])
     # Schema stores the executable shape; reject drift from its controlled
     # declarations instead of silently accepting either of two enum truths.
     for field in ("lifecycle", "review_mode"):
@@ -271,9 +222,9 @@ def load_rules(tool_root, expected_digest, *, knowledge_root=None):
     if set(schemas["card"]["properties"]["profile"]["enum"]) != set(profiles["profiles"]):
         raise ContractError("RULE_DECLARATION_MISMATCH", "profile")
     return {
-        "knowledge_root": Path(knowledge_root).resolve(strict=True) if knowledge_root is not None else root,
+        "knowledge_root": Path(knowledge_root).resolve(strict=True),
         "lock": lock,
-        "rules_digest": expected_digest,
+        "rules_digest": rules_digest,
         "schemas": schemas,
         "profiles": profiles,
         "registries": registries,

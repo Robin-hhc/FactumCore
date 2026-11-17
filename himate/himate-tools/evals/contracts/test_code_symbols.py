@@ -10,8 +10,8 @@ import pytest
 
 DOMAIN = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location(
-    "code_symbols_contract", DOMAIN / "governance/contracts/__init__.py",
-    submodule_search_locations=[str(DOMAIN / "governance/contracts")],
+    "code_symbols_contract", DOMAIN / "runtime/governance/contracts/__init__.py",
+    submodule_search_locations=[str(DOMAIN / "runtime/governance/contracts")],
 )
 contracts = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = contracts

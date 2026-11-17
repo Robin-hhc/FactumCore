@@ -86,7 +86,7 @@ def verified_runtime(root):
     if manifest.get("schema_version") != "1.1" or not isinstance(manifest.get("version"), str):
         raise ValueError("Unsupported runtime manifest")
     assets = manifest.get("assets")
-    framework = assets.get("governance/framework.lock.yaml") if isinstance(assets, dict) else None
+    framework = assets.get("runtime/governance/framework.lock.yaml") if isinstance(assets, dict) else None
     digest = framework.get("sha256") if isinstance(framework, dict) else None
     if not isinstance(digest, str) or len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
         raise ValueError("Missing or invalid framework lock digest in runtime manifest")

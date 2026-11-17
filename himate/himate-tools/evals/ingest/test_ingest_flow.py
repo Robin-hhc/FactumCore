@@ -119,6 +119,7 @@ def test_reviewed_no_card_result_is_remembered_and_scan_does_not_repeat_it(tmp_p
 def test_p5_uses_p1_hash_without_reading_the_changed_source_again(tmp_path, monkeypatch):
     root = library_root(tmp_path)
     original = put_doc(root)
+    p1_bytes = original.read_bytes()
     task = scan(root)
     p1_hash = task["source"]["hash"]
     draft(root, "waiting", [task["source"]["doc_id"]])
@@ -140,6 +141,15 @@ def test_p5_uses_p1_hash_without_reading_the_changed_source_again(tmp_path, monk
     assert status == "completed", result
     with module("catalog").Catalog(root) as catalog:
         assert catalog.get_file(task["source"]["doc_id"])["processed_hash"] == p1_hash
+        snapshot, = catalog.registry["snapshots"]
+    expected = f"artifacts/evidence/objects/{p1_hash}.bin"
+    assert snapshot["recovery"] == {"method": "evidence_object", "path": expected}
+    assert (root / expected).read_bytes() == p1_bytes
+    assert not (root / "logs").exists()
+    resolved, status = module("library").sources(root, "resolve", {
+        "source_id": task["source"]["doc_id"], "snapshot_id": snapshot["snapshot_id"]})
+    assert status == "resolved", resolved
+    assert (root / resolved["original_ref"]).read_bytes() == p1_bytes
     next_task = scan(root)
     assert next_task["source"]["hash"] == new_hash
     assert next_task["source"]["change"] == "modified"
@@ -551,6 +561,43 @@ def test_p4_rejects_line_ranges_outside_a_document(tmp_path):
     checked, status = module("ingest").check(root, {})
     assert status == "failed", checked
     assert any(item["code"] == "SOURCE_RANGE_INVALID" for item in checked["findings"])
+
+
+@pytest.mark.parametrize("objects", ["artifacts/evidence/objects", "logs/evidence/objects"])
+def test_bound_git_citation_uses_the_same_retained_version_for_review_and_preview(tmp_path, objects):
+    root = library_root(tmp_path)
+    source_path = "docs-raw/specs/design.md"
+    put_doc(root, "specs/design.md", "# Latest version\n")
+    with module("catalog").Catalog(root) as catalog:
+        catalog.register("raw", source_path, source_id="doc-design")
+    old_bytes = b"# Design\n\nAn older requirement.\n"
+    old_digest = digest(old_bytes)
+    retained = root / objects / f"{old_digest}.bin"
+    retained.parent.mkdir(parents=True)
+    retained.write_bytes(old_bytes)
+    registry_path = root / "governance/sources.lock.yaml"
+    registry = yaml.safe_load(registry_path.read_bytes())
+    registry["snapshots"].append({
+        "snapshot_id": "snap-previous", "source_id": "doc-design", "sha256": old_digest,
+        "bytes": len(old_bytes), "card_references": [],
+        "recovery": {"method": "git", "commit": "0" * 40, "path": source_path},
+    })
+    registry_path.write_text(yaml.safe_dump(registry), encoding="utf-8")
+    formal(root, "previous", [], doc_ref=[{
+        "doc_id": "doc-design", "snapshot_id": "snap-previous", "line_start": 1, "line_end": 3}])
+    request = {"source_id": "doc-design", "snapshot_id": "snap-previous", "hash": old_digest}
+    checked, status = module("ingest").check(root, {"formal": True})
+    assert status == "passed", checked
+    resolved, status = module("library").sources(root, "resolve", request)
+    assert status == "resolved", resolved
+    assert (root / resolved["original_ref"]).read_bytes() == old_bytes
+
+    retained.write_bytes(b"Invalid evidence".ljust(len(old_bytes)))
+    checked, status = module("ingest").check(root, {"formal": True})
+    assert status == "failed" and checked["findings"][0]["code"] == "EVIDENCE_OBJECT_CHANGED", checked
+    with pytest.raises(module("validation").ContractError) as failure:
+        module("library").sources(root, "resolve", request)
+    assert failure.value.code == "EVIDENCE_OBJECT_CHANGED"
 
 
 @pytest.mark.parametrize("extra", [{"aliases": ["old_alias"]}, {"summary": "Old summary"},

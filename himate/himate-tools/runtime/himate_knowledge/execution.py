@@ -25,14 +25,13 @@ def managed_python(tool_root: Path) -> Path:
     return venv / "bin" / "python"
 
 
-def selected_python(tool_root: Path, *, explicit_venv: bool = True) -> Path | None:
+def selected_python(tool_root: Path) -> Path | None:
     current_python = Path(sys.executable)
-    if explicit_venv:
-        if sys.prefix != sys.base_prefix:
-            return current_python
-        # Python 3.10–3.12 does not set the venv prefix when explicitly run with -S.
-        if sys.flags.no_site and (current_python.parent.parent / "pyvenv.cfg").is_file():
-            return current_python
+    if sys.prefix != sys.base_prefix:
+        return current_python
+    # Python 3.10–3.12 does not set the venv prefix when explicitly run with -S.
+    if sys.flags.no_site and (current_python.parent.parent / "pyvenv.cfg").is_file():
+        return current_python
 
     python = managed_python(tool_root)
     directory = python.parent.parent

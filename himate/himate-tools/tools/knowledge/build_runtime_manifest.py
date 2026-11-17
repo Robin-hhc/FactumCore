@@ -23,12 +23,10 @@ def build(root, version="1.0.0"):
             raise ValueError("Linked runtime paths cannot be frozen: " + relative.as_posix())
         if path.is_file() and (path.suffix == ".py" or path.name.endswith(".lock.txt")):
             files[relative.as_posix()] = {"sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
-    entries = {}
-    for name in ("knowledge.py", "knowledge.cmd", "knowledge.sh"):
-        path = root / name
-        if path.is_symlink() or not path.is_file():
-            raise ValueError("Missing regular entrypoint: " + name)
-        entries[name] = {"sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+    entrypoint = root / "knowledge.py"
+    if entrypoint.is_symlink() or not entrypoint.is_file():
+        raise ValueError("Missing regular entrypoint: knowledge.py")
+    entries = {"knowledge.py": {"sha256": hashlib.sha256(entrypoint.read_bytes()).hexdigest()}}
     reference = "governance/framework.lock.yaml"
     path = root / reference
     if path.is_symlink() or not path.is_file():

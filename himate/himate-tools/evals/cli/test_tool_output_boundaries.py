@@ -25,8 +25,7 @@ def test_command_writes_cannot_target_the_tool_directory(tmp_path, case_alias):
 
     shutil.copytree(SOURCE / "runtime", tool / "runtime")
     shutil.copytree(SOURCE / "governance", tool / "governance")
-    for name in ("knowledge.py", "knowledge.cmd", "knowledge.sh"):
-        shutil.copyfile(SOURCE / name, tool / name)
+    shutil.copyfile(SOURCE / "knowledge.py", tool / "knowledge.py")
     knowledge = tmp_path / "knowledge-data"
     for part in ("docs-raw", "knowledge"):
         (knowledge / part).mkdir(parents=True)
@@ -55,8 +54,7 @@ def invoke_command_installer(tool, destination, cwd):
 def test_managed_command_reinstalls_repairs_and_rebinds_after_moving_tool(tmp_path):
     tool = tmp_path / "new checkout"
     shutil.copytree(SOURCE / "runtime", tool / "runtime")
-    for name in ("knowledge.py", "knowledge.cmd", "knowledge.sh"):
-        shutil.copyfile(SOURCE / name, tool / name)
+    shutil.copyfile(SOURCE / "knowledge.py", tool / "knowledge.py")
     destination = tmp_path / "local bin"
 
     first = invoke_command_installer(SOURCE, destination, tmp_path)
@@ -131,7 +129,10 @@ def test_windows_command_conflicts_only_consider_directories_on_path(tmp_path, m
     process_bin = tmp_path / "test process path"
     process_bin.mkdir()
     launcher = process_bin / "knowledge.cmd"
-    monkeypatch.chdir(SOURCE)
+    working = tmp_path / "current working directory"
+    working.mkdir()
+    (working / "knowledge.cmd").write_text("unrelated current directory command", encoding="utf-8")
+    monkeypatch.chdir(working)
     monkeypatch.setenv("PATH", '"' + str(process_bin) + '"')
     monkeypatch.setenv("PATHEXT", ".COM;.EXE;.CMD")
 

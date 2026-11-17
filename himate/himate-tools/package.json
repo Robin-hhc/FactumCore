@@ -1,18 +1,15 @@
 {
   "name": "@himate/knowledge-cli",
-  "version": "0.22.9",
+  "version": "0.23.0",
   "description": "HiMate Knowledge CLI launcher",
   "license": "UNLICENSED",
   "bin": {
-    "knowledge": "bin/knowledge.js",
-    "himate-knowledge": "bin/knowledge.js"
+    "knowledge": "bin/knowledge.js"
   },
   "files": [
     "bin/",
     "scripts/install.js",
     "knowledge.py",
-    "knowledge.cmd",
-    "knowledge.sh",
     "runtime/",
     "governance/",
     "tools/deploy/deploy.py",

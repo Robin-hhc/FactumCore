@@ -24,13 +24,13 @@ Windows PowerShell：
 
 交互安装会询问未指定的目录，回车采用默认值。自动化使用 `--non-interactive` / `-NonInteractive`。`--source-root` / `-SourceRoot` 指定工具包，默认使用部署入口所在目录。能力包单独存放时用 `--capabilities-root` / `-CapabilitiesRoot` 指向同时包含 `skills/` 和 `workflows/` 的目录。未设置时优先使用相邻的 `himate-skills`，其次兼容旧工具包根下的 `skills/` 和 `workflows/`。部署按 `SKILL.md` 和 `workflow.yaml` 识别待安装的包，按包名替换并保留目标目录的其他包。
 
-安装后用同一解释器运行共享 CLI，命令显式绑定实际知识库：
+如果通过 npm 安装 CLI，npm 会在全局命令目录注册 `knowledge`。只从源码部署时，管理员在执行机器上用已准备的 Python 从工具包内部入口初始化环境并注册 `knowledge`。
 
 ```text
-<已准备的 Python> -B <工具包>/knowledge.py doctor --knowledge-root <知识库> --json
+<已准备的 Python> -B <工具包>/knowledge.py setup --json
 ```
 
-OpenFlow 宿主通过绝对路径 `OPENFLOW_KNOWLEDGE_TOOLKIT_ROOT` 指定工具包目录，可用 `OPENFLOW_KNOWLEDGE_PYTHON` 指定 Python 绝对路径。面板中另选需要操作的知识库。SSH 执行使用远端的工具包、解释器和知识库原生路径。OpenFlow 的面板命令以宿主配置为准。终端可以通过环境安装注册 `knowledge`，或单独运行 `<Python> -B <工具包>/knowledge.py install-command`。
+注册后，运行 `knowledge doctor --knowledge-root "<知识根绝对路径>" --json` 核对库配置和工具版本。OpenFlow 宿主通过 `OPENFLOW_KNOWLEDGE_TOOLKIT_ROOT` 指定工具包绝对目录，由宿主调用其中的内部入口 `knowledge.py`。可用 `OPENFLOW_KNOWLEDGE_PYTHON` 指定 Python 绝对路径。面板中另选需要操作的知识库。通过 SSH 执行时，在远端准备 `knowledge`，使用远端的知识根路径。
 
 日常升级时，将新版工具包放在约定的工具目录，使用同一解释器重新安装。若工具包或解释器迁移，更新宿主配置并重跑环境安装，以更新工具包管理的 `knowledge` 命令。知识库维护者继续在自己的库中维护 `config.yml` 和 `AGENTS.md`。
 
@@ -38,9 +38,9 @@ OpenFlow 宿主通过绝对路径 `OPENFLOW_KNOWLEDGE_TOOLKIT_ROOT` 指定工具
 
 `knowledge doctor --environment-only --json` 只读检查锁定的 Python 依赖和命令入口。`needs_install` 表示需要补齐依赖，`needs_cli` 表示命令待注册或待修复，`ready` 表示环境就绪。终端和 OpenFlow 都能在绑定前调用这项检查。
 
-`knowledge setup` 沿用明确指定的已有虚拟环境，默认创建 `~/.himate/knowledge/.venv`，在其中安装依赖并复查。OpenFlow 在宿主执行 `setup --jsonl`，展示阶段进度并在结束后复查。首次手动注册前，用 `<Python> -B <工具包>/knowledge.py` 加上同样的子命令。环境操作无需传知识根。`tools/deploy/environment.py check|install` 保留原有自动化接口。安装失败时按结果中的原因及本机日志定位问题。
+`knowledge setup` 沿用明确指定的已有虚拟环境，默认创建 `~/.himate/knowledge/.venv`，在其中安装依赖并复查。OpenFlow 在宿主执行 `setup --jsonl`，展示阶段进度并在结束后复查。环境操作无需传知识根。`tools/deploy/environment.py check|install` 保留原有自动化接口。安装失败时按结果中的原因及本机日志定位问题。
 
-通过 npm 部署时，`setup` 复用 npm 注册的入口。手动部署时，Windows 默认把命令放到 `%LOCALAPPDATA%\HiMate\bin` 并加入执行账户的用户 `PATH`。Linux 默认命令目录为 `~/.local/bin`，由终端或服务配置 `PATH`。手动部署可以用 `--bin-dir` 选择命令目录。在 Windows 单独注册时可运行 `install-command --add-path`。打开新终端后可运行 `knowledge --version` 确认入口。
+通过 npm 部署时，`setup` 复用 npm 全局命令目录的启动器。手动部署时，Windows 默认生成 `%LOCALAPPDATA%\HiMate\bin\knowledge.cmd` 并将目录加入执行账户的用户 `PATH`。Linux 默认生成 `~/.local/bin/knowledge`，由终端或服务配置 `PATH`。手动部署可以用 `--bin-dir` 选择命令目录。Windows 已准备依赖时，管理员也可用首次注册示例中的内部入口执行 `install-command --add-path`。打开新终端后运行 `knowledge --version` 确认入口。
 
 ## 为现有知识库准备 OCR
 

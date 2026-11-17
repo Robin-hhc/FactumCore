@@ -25,7 +25,7 @@ def distribution(tmp_path):
     for name in ("skills", "workflows"):
         shutil.copytree(CAPABILITIES_ROOT / name, capabilities / name,
                         ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-    for relative in ("knowledge.py", "knowledge.sh", "knowledge.cmd", "runtime/manifest.json",
+    for relative in ("knowledge.py", "runtime/manifest.json",
                      "runtime/requirements.lock.txt", "runtime/himate_knowledge/__init__.py",
                      "runtime/himate_knowledge/cli.py"):
         path = tmp_path / "himate-tools" / relative

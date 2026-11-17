@@ -1,6 +1,6 @@
 # 面板 CLI 契约
 
-OpenFlow 通过宿主的 `OPENFLOW_KNOWLEDGE_TOOLKIT_ROOT` 定位 `knowledge.py`。工具包目录使用绝对路径，并与已绑定的知识根分开。宿主可用 `OPENFLOW_KNOWLEDGE_PYTHON` 指定 Python 3.10–3.12 的绝对路径。显式指定虚拟环境时沿用该环境。默认探测从宿主取得基础解释器，由 CLI 使用当前执行账户的 `~/.himate/knowledge/.venv`。业务操作显式传入已绑定的知识根，通过 stdin 接收 JSON 对象，沿用知识 CLI 的结果封装。
+终端和 Agent 使用 `knowledge`。OpenFlow 通过宿主的 `OPENFLOW_KNOWLEDGE_TOOLKIT_ROOT` 定位工具包内部入口 `knowledge.py`，沿用同一套 CLI 命令和结果。工具包目录使用绝对路径，并与已绑定的知识根分开。宿主可用 `OPENFLOW_KNOWLEDGE_PYTHON` 指定 Python 3.10–3.12 的绝对路径。显式指定虚拟环境时沿用该环境。默认探测从宿主取得基础解释器，由 CLI 使用当前执行账户的 `~/.himate/knowledge/.venv`。业务操作显式传入已绑定的知识根，通过 stdin 接收 JSON 对象。
 
 ```sh
 printf '%s' '{"limit":20}' | python -B /absolute/tool/root/knowledge.py library cards --knowledge-root /absolute/knowledge/root --input - --json

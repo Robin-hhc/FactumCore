@@ -58,8 +58,7 @@ npm i -g @himate/knowledge-models --registry http://10.143.57.12:4873 --allow-sc
 
 ```
 ~/.himate/knowledge/
-├── knowledge.py
-├── knowledge.cmd / knowledge.sh
+├── knowledge.py         工具包内部入口
 ├── .venv/
 ├── logs/
 ├── runtime/
@@ -71,7 +70,7 @@ npm i -g @himate/knowledge-models --registry http://10.143.57.12:4873 --allow-sc
 
 平台差异由包内脚本自动处理：
 
-- npm 根据 `bin` 字段自动生成 Windows 的 `knowledge.cmd` / `knowledge.ps1`，Linux 生成软链
+- npm 只注册 `knowledge` 命令。Windows 的 `knowledge.cmd`、`knowledge.ps1` 和 Linux 的 `knowledge` 软链由 npm 生成，位于 npm 的全局命令目录。
 - `postinstall` 用 `process.platform` 区分路径分隔符与可执行权限
 - 启动器优先使用已准备的虚拟环境。首次运行从系统查找受支持的 Python 3.10–3.12，`knowledge setup` 用它创建专用环境并安装锁定依赖。
 
@@ -93,8 +92,6 @@ knowledge doctor --knowledge-root /path/to/kb --json
 knowledge ingest status --knowledge-root /path/to/kb
 ```
 
-同时注册了长别名 `himate-knowledge`，与 `knowledge` 完全等价。
-
 可用 `HIMATE_KNOWLEDGE_PYTHON` 指定解释器。指定已有虚拟环境时沿用该环境，指定系统 Python 时用于初始化专用环境。
 
 ```bash
@@ -113,6 +110,8 @@ npm i -g @himate/knowledge-cli@latest --registry http://10.143.57.12:4873 --allo
 ```
 
 CLI 安装脚本保留 `.venv/`、`logs/` 和 `tools/deploy/models/`。更新后运行 `knowledge doctor --environment-only`，如有新的依赖缺口再运行 `knowledge setup`。
+
+升级到 0.23.0 时，将自动化脚本中的旧命令名 `himate-knowledge` 改为 `knowledge`。
 
 ## 6. 注意事项
 

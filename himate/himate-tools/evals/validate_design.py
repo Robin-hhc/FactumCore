@@ -88,7 +88,7 @@ def validate(root, capabilities_root=None):
     capabilities_root = (Path(capabilities_root).resolve() if capabilities_root is not None
                          else root.parent / "himate-skills")
     errors = []
-    for ref in ("knowledge.py", "knowledge.sh", "knowledge.cmd", "runtime/manifest.json",
+    for ref in ("knowledge.py", "runtime/manifest.json",
                 "runtime/requirements.lock.txt", "runtime/himate_knowledge/__init__.py",
                 "runtime/himate_knowledge/cli.py"):
         if not (root / ref).is_file():

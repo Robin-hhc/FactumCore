@@ -13,7 +13,7 @@
 | Linux | `sh ./deploy.sh` | 增加 `--knowledge-root '/srv/业务/知识库'` |
 | Windows PowerShell | `.\deploy.ps1` | 增加 `-KnowledgeRoot 'E:\业务\知识库'` |
 
-能力包放在别处时，Linux 加 `--capabilities-root '/srv/himate-skills'`，Windows 加 `-CapabilitiesRoot 'D:\共享工具\himate-skills'`。需要指定解释器时，Linux 加 `--python '<Python路径>'`，Windows 加 `-Python '<Python路径>'`。安装参数见工具包的 `tools/deploy/README.md`。
+能力包放在别处时，Linux 加 `--capabilities-root '/srv/himate-skills'`，Windows 加 `-CapabilitiesRoot 'D:\共享工具\himate-skills'`。需要指定解释器时，Linux 加 `--python '<Python路径>'`，Windows 加 `-Python '<Python路径>'`。只从源码部署时，由管理员按工具包 `tools/deploy/README.md` 注册 `knowledge`。这一步完成后，终端、自动化和 Agent 都使用 `knowledge`。
 
 领域负责人维护知识根的 `config.yml` 和 `AGENTS.md`。如果项目提供了可用配置，普通使用者直接使用即可。需要从旧的上级配置升级时，迁入实际 `workspace_id`、模块和查询设置，并从知识根重算 `code_root`。现有业务布局可填写 `../../main`，`modules[].path` 相对代码根。Target 随模块的 `chips`、`sides` 派生。只处理文档时可填写 `modules: []`。
 
@@ -26,13 +26,13 @@
 3. 检查结果会说明环境就绪、缺 Python 依赖或缺可用的 `knowledge` 命令。后两种都点同一个「安装环境」。宿主按需补齐依赖、部署命令并复查。仅缺命令时直接注册，免去重复安装依赖。
 4. 可以留在弹窗内看进度，也可以选择「后台继续」。后台进度显示在知识库页头，完成或需要处理时有状态提示。注册失败时查看诊断，修正目录权限或同名命令冲突后，用原按钮重试。
 
-通过 npm 安装时，终端和 OpenFlow 执行账户的 PATH 需要包含 npm 的全局命令目录。从源码安装命令时，Windows 会更新执行账户的用户 PATH，已有终端或进程需要重新加载环境。Linux 默认使用 `~/.local/bin`，终端或后台服务的 PATH 需要包含该目录。面板会显示命令路径和当前进程的 PATH 提示。终端已能找到命令后，可从任意目录指定知识根进行检查。
+通过 npm 安装时，终端的 PATH 需要包含 npm 的全局命令目录。手动注册时，Windows 会更新执行账户的用户 PATH，已有终端或进程需要重新加载环境。Linux 默认使用 `~/.local/bin`。面板会显示命令路径和宿主进程的 PATH 检查结果。终端已能找到命令后，可从任意目录指定知识根进行检查。
 
 ```text
 knowledge doctor --knowledge-root "<知识根绝对路径>" --json
 ```
 
-核对 `phase: ready`、`tool_root`、`knowledge_root`、`config_path` 和版本。也可使用已准备的 Python 调用工具包绝对路径下的 `knowledge.py`。
+核对 `phase: ready`、`tool_root`、`knowledge_root`、`config_path` 和版本。
 
 ## 放入文档
 

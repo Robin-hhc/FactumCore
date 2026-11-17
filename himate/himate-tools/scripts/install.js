@@ -8,12 +8,13 @@ const path = require("path");
 const PACKAGE_ROOT = path.resolve(__dirname, "..");
 const INSTALL_ROOT = path.join(os.homedir(), ".himate", "knowledge");
 const STAGING = path.join(INSTALL_ROOT, ".staging-cli-" + process.pid);
+const RUNTIME_MANIFEST = path.join(INSTALL_ROOT, "runtime", "manifest.json");
+const INSTALL_MARKER = path.join(INSTALL_ROOT, ".install.json");
+const PACKAGE_NAME = "@himate/knowledge-cli";
 
 // Models are owned by @himate/knowledge-models and must survive CLI updates.
 const ITEMS = [
   "knowledge.py",
-  "knowledge.cmd",
-  "knowledge.sh",
   ".gitattributes",
   "runtime",
   "governance",
@@ -35,6 +36,8 @@ function copyItem(relative) {
     force: true,
     preserveTimestamps: true,
     verbatimSymlinks: true,
+    // Node 24's unfiltered recursive copy can skip Windows Unicode paths.
+    filter: () => true,
   });
 }
 
@@ -51,8 +54,7 @@ function sha256(file) {
 }
 
 function verifyRuntime() {
-  const manifestPath = path.join(INSTALL_ROOT, "runtime", "manifest.json");
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  const manifest = JSON.parse(fs.readFileSync(RUNTIME_MANIFEST, "utf8"));
   const rows = manifest.entrypoints || {};
   for (const [reference, row] of Object.entries(rows)) {
     const file = path.join(INSTALL_ROOT, reference);
@@ -69,9 +71,35 @@ function verifyRuntime() {
   }
 }
 
+function previousEntrypoints() {
+  try {
+    const installation = JSON.parse(fs.readFileSync(INSTALL_MARKER, "utf8"));
+    const manifest = JSON.parse(fs.readFileSync(RUNTIME_MANIFEST, "utf8"));
+    if (installation?.package === PACKAGE_NAME && typeof installation.version === "string"
+        && installation.version === manifest?.version) {
+      return manifest.entrypoints ?? {};
+    }
+  } catch {
+    // An unrecognized installation does not establish ownership of any wrapper.
+  }
+  return {};
+}
+
+function removeRetiredWrappers(previous) {
+  for (const name of ["knowledge.cmd", "knowledge.sh"]) {
+    const digest = previous[name]?.sha256;
+    const file = path.join(INSTALL_ROOT, name);
+    if (typeof digest === "string" && fs.lstatSync(file, { throwIfNoEntry: false })?.isFile()
+        && sha256(file) === digest) {
+      fs.rmSync(file, { force: true });
+    }
+  }
+}
+
 function main() {
   fs.mkdirSync(INSTALL_ROOT, { recursive: true });
   fs.rmSync(STAGING, { recursive: true, force: true });
+  const previous = previousEntrypoints();
 
   try {
     for (const item of ITEMS) {
@@ -83,16 +111,15 @@ function main() {
     verifyRuntime();
 
     if (process.platform !== "win32") {
-      for (const script of ["knowledge.py", "knowledge.sh"]) {
-        fs.chmodSync(path.join(INSTALL_ROOT, script), 0o755);
-      }
+      fs.chmodSync(path.join(INSTALL_ROOT, "knowledge.py"), 0o755);
     }
+    removeRetiredWrappers(previous);
 
     fs.writeFileSync(
-      path.join(INSTALL_ROOT, ".install.json"),
+      INSTALL_MARKER,
       JSON.stringify(
         {
-          package: "@himate/knowledge-cli",
+          package: PACKAGE_NAME,
           version: require(path.join(PACKAGE_ROOT, "package.json")).version,
           packageRoot: PACKAGE_ROOT,
           launcherSha256: sha256(path.join(PACKAGE_ROOT, "bin/knowledge.js")),

@@ -1,5 +1,6 @@
 """Check npm release contents and preserve existing user state during installation."""
 
+from hashlib import sha256
 import json
 import os
 from pathlib import Path
@@ -22,16 +23,29 @@ def test_npm_postinstall_preserves_managed_environment_and_logs(tmp_path):
     previous_runtime = installed / "runtime/obsolete.py"
     environment_config = installed / ".venv/pyvenv.cfg"
     install_log = installed / "logs/setup.log"
+    stale_wrapper = installed / "knowledge.sh"
+    customized_wrapper = installed / "knowledge.cmd"
+    old_wrapper = b"legacy wrapper\n"
+    customized = b"user-modified wrapper\n"
     for target, contents in (
         (previous_runtime, b"previous runtime"),
         (environment_config, b"previous virtual environment"),
         (install_log, b"previous setup diagnostics"),
+        (stale_wrapper, old_wrapper),
+        (customized_wrapper, customized),
     ):
-        target.parent.mkdir(parents=True)
+        target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(contents)
 
     marker = installed / ".install.json"
     marker.write_text('{"package":"@himate/knowledge-cli","version":"0.22.5"}', encoding="utf-8")
+    previous_manifest = {
+        "schema_version": "1.1", "version": "0.22.5", "entrypoints": {
+            stale_wrapper.name: {"sha256": sha256(old_wrapper).hexdigest()},
+            customized_wrapper.name: {"sha256": sha256(b"previous unmodified command wrapper\n").hexdigest()},
+        },
+    }
+    (installed / "runtime/manifest.json").write_text(json.dumps(previous_manifest), encoding="utf-8")
     profile = tmp_path / "isolated-profile.cjs"
     profile.write_text(
         "require('node:os').homedir = () => process.env.HIMATE_TEST_INSTALL_HOME;\n",
@@ -48,6 +62,8 @@ def test_npm_postinstall_preserves_managed_environment_and_logs(tmp_path):
     package_version = json.loads((TOOL_ROOT / "package.json").read_text(encoding="utf-8"))["version"]
     assert json.loads(marker.read_text(encoding="utf-8"))["version"] == package_version
     assert not previous_runtime.exists()
+    assert not stale_wrapper.exists()
+    assert customized_wrapper.read_bytes() == customized
     assert environment_config.read_bytes() == b"previous virtual environment"
     assert install_log.read_bytes() == b"previous setup diagnostics"
     assert (installed / "runtime/manifest.json").read_bytes() == (TOOL_ROOT / "runtime/manifest.json").read_bytes()

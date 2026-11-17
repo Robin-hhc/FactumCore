@@ -23,8 +23,7 @@ def knowledge(tmp_path):
     for name in ("governance", "runtime"):
         shutil.copytree(SOURCE / name, root / name,
                         ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".venv"))
-    for name in ("knowledge.py", "knowledge.cmd", "knowledge.sh"):
-        shutil.copyfile(SOURCE / name, root / name)
+    shutil.copyfile(SOURCE / "knowledge.py", root / "knowledge.py")
     (root / "config.yml").write_text(
         "schema_version: '2.0'\nworkspace_id: doctor-fixture\n"
         "code_root: ../main\nmodules: []\n",

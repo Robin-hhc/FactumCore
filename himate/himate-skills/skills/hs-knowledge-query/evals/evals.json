@@ -1,0 +1,26 @@
+{
+  "skill_name": "hs-knowledge-query",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "请在已绑定的测试库查「扫描重试」并回源，告诉我能否确认 v3 已实现。验收库能搜到正式卡 scan-retry，正文写的是 v2 设计要求，卡片引用的 docs-raw/specs/scan.md 第 12 行写明 v2 设计应在超时后重试。库中没有 v3 代码或测试记录。",
+      "expected_output": "说明已核对的 v2 设计条件，给出卡 ID 与原件行号，并指出 v3 实现需要的证据。",
+      "expectations": [
+        "先以扫描重试为关键词搜索，再读完整的 scan-retry 并核对当前原件的引用位置。",
+        "引用 scan-retry 和 docs-raw/specs/scan.md 第 12 行，明确重试条件是超时。",
+        "将 v2 依据归为设计要求，未将其当成 v3 实现或实测证据。",
+        "指出仍需 v3 源码或测试记录来确认实现。"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "我用知识库查「扫描重试」，请求是 {\"query\":\"扫描重试\",\"tags\":[\"wifi\"],\"purpose\":\"current\"}，命令退出 2 并提示 QUERY_PARAMETERS_REMOVED。是不是库里没有这条知识？我想保留 wifi 过滤，下一次怎么查？",
+      "expected_output": "指出本次是请求参数错误，给出能保持原关键词和标签的有效检索请求。",
+      "expectations": [
+        "把退出码 2 和 QUERY_PARAMETERS_REMOVED 解释为查询未正常执行，没有报告零命中。",
+        "修正后的请求删除 purpose，保留 query 为扫描重试和 tags 为 [\"wifi\"]。",
+        "没有编造命中卡片或未执行的重试结果。"
+      ]
+    }
+  ]
+}

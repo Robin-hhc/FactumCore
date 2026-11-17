@@ -1,0 +1,35 @@
+{
+  "skill_name": "hs-knowledge-source",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "请用 hs-knowledge-source 看一下 docs-raw/specs/scan-timing.md 要不要入库。测试库里它是已登记的 Markdown，里面的扫描等待时间刚改过，已有一张正式的扫描时序卡引用它。先准备这一批交给下一步。",
+      "expected_output": "准备一批只针对该文件的来源任务，交接可读取的材料和已有引用卡。",
+      "expectations": [
+        "扫描的 --source 指向 docs-raw/specs/scan-timing.md 或其登记 ID，返回阶段为 prepared。",
+        "交接包含 .build/task.json、实际来源 ID、原件副本入口和引用该文件的旧卡。",
+        "扫描前后的原件字节一致。"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "巡检刚选中来源 doc-radio-old。这份文件和成功处理时一样，另一个目录确实还有一份新文档。请按 hs-knowledge-source 处理巡检交给你的这份，确认我该回哪一步。",
+      "expected_output": "仅检查巡检交接的来源，报告该来源暂无待办，返回巡检选源步骤。",
+      "expectations": [
+        "扫描采用 doc-radio-old 作为 --source，保留 unchanged 结果。",
+        "将结果交回 L2 重新选源，报告只针对 doc-radio-old。",
+        "本次工具调用里没有对另一个目录或新文档发起扫描。"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "那份 12 页的 docs-raw/specs/radio.pdf 已发布并登记了第 1–4 页，原件版本没变。请用 hs-knowledge-source 给后面的人准备下一批，沿用上轮配置。",
+      "expected_output": "从第 5 页准备 PDF 续办候选，交接阅读入口和实际候选边界。",
+      "expectations": [
+        "task.pdf_review.start_page 为 5，且候选结束页处于第 5–12 页。",
+        "交接列出 packet_ref、page_index_ref、已登记来源 ID 和实际候选起止页。",
+        "本批扫描的请求中省略 reprocess，保留既有处理进度。"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "skill_name": "hs-knowledge-patrol-reindex",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "验收库的 L2 已确认只有索引待刷新。正式卡 card-delay 已经有了，原件 docs-raw/specs/delay.md 和来源成功处理 hash 都有快照可比较。跑一下 L3，演练工具会真实重建并返回 reindexed。",
+      "expected_output": "确认重建成功并交给 L4，记录索引刷新且正式知识和来源处理状态未被改写。",
+      "expectations": [
+        "CLI 使用 patrol reindex，回执阶段为 reindexed，下一步交给 L4。",
+        "重建前后 card-delay 的文件字节、原件字节和来源成功处理 hash 分别相同。"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "已绑定库走到 L3，演练里重建命令失败，诊断是“database is locked”。帮我说明现在能不能收尾。",
+      "expected_output": "说明索引重建失败，报告锁冲突，L3 未完成。",
+      "expectations": [
+        "报告保留 database is locked 诊断并声明未取得 reindexed 回执。",
+        "未按重建成功交给 L4，也未将任何来源标记为已处理。"
+      ]
+    }
+  ]
+}

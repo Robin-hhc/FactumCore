@@ -12,15 +12,15 @@ printf '%s' '{"limit":20}' | python -B /absolute/tool/root/knowledge.py library 
 
 ## 环境检查和安装
 
-环境入口可在首次绑定前执行。`knowledge doctor --environment-only --json` 返回一行 JSON，包含 `status`、`tool_root`、`toolkit_version`、`python`、`python_version`、`dependencies`、`diagnostics` 和 `command`。专用环境尚未创建时，`python` 和 `python_version` 为 `null`，`bootstrap_python` 和 `environment_path` 分别给出用于创建环境的解释器和目标目录。`dependencies` 每项包含 `name`、`expected`、`actual` 和 `status`（`ready`、`missing` 或 `mismatch`）。每条诊断包含 `code` 和 `message`。生成有效检查报告时退出码为 0，就绪情况以 `status` 为准。
+环境入口可在首次绑定前执行。`knowledge doctor --environment-only --json` 返回一行 JSON，包含 `status`、`tool_root`、`toolkit_version`、`python`、`python_version`、`dependencies`、`diagnostics` 和 `command`。专用环境尚未创建时，`python` 和 `python_version` 为 `null`，`bootstrap_python`、`bootstrap_python_version` 和 `environment_path` 分别给出基础解释器路径、版本和虚拟环境目标目录。`dependencies` 每项包含 `name`、`expected`、`actual` 和 `status`（`ready`、`missing` 或 `mismatch`）。每条诊断包含 `code` 和 `message`。生成有效检查报告时退出码为 0，就绪情况以 `status` 为准。
 
 | `status` | 含义 |
 | --- | --- |
-| `needs_install` | 专用环境未创建，或 Python 依赖缺失或版本不符 |
+| `needs_install` | 专用环境未创建，或 Python 组件、依赖缺失或版本不符 |
 | `needs_cli` | 依赖齐全，命令待注册、修复或启动验证失败 |
 | `ready` | 依赖齐全，受管理的启动入口执行 `--help` 并返回 0。此项验证无需绑定知识库 |
 
-检查只读。无法加载工具包或依赖清单时，返回非零退出码和 `status: "unavailable"` 的诊断。`command` 为 `null` 或 `{path,bin_dir,dispatcher,installed,path_registered,on_path,shadowed_by}`。`installed` 表示启动文件与所选工具及 Python 匹配，并符合默认目录的注册要求。`path_registered` 表示 Windows 当前账户的用户 `PATH` 已登记该目录。`on_path` 表示当前进程的 `PATH` 实际优先解析到该命令，`shadowed_by` 记录优先匹配到的其他命令。Linux 上 `ready` 可以与 `on_path: false` 同时出现。
+检查只读。基础解释器缺少创建虚拟环境所需的 `venv` 或 `ensurepip` 时，报告 `needs_install`，并在 `diagnostics` 返回 `VENV_MODULE_MISSING` 和当前平台的补齐方式。已有虚拟环境需要补装依赖却同时缺少 pip 和 `ensurepip` 时，也返回这条诊断。无法加载工具包或依赖清单时，返回非零退出码和 `status: "unavailable"` 的诊断。`command` 为 `null` 或 `{path,bin_dir,dispatcher,installed,path_registered,on_path,shadowed_by}`。`installed` 表示启动文件与所选工具及 Python 匹配，并符合默认目录的注册要求。`path_registered` 表示 Windows 当前账户的用户 `PATH` 已登记该目录。`on_path` 表示当前进程的 `PATH` 实际优先解析到该命令，`shadowed_by` 记录优先匹配到的其他命令。Linux 上 `ready` 可以与 `on_path: false` 同时出现。
 
 `knowledge setup --jsonl` 发出 `checking`、按需的 `installing` 和 `registering`，以及 `verifying`，最后发送一条结果。创建环境和安装依赖都在 `installing` 阶段完成。成功时最终状态为 `ready`，退出码为 0，`python` 指向通过复查的解释器。失败结果带 `phase`、`code`、`message` 和 `diagnostics` 并退出非零，可用的本机日志路径由 `log_path` 给出。只需要最终一条结果时使用 `setup --json`。重复执行会跳过已完成的安装阶段，复用 npm 启动器或按需准备手动安装的启动器。
 

@@ -36,7 +36,14 @@ Windows PowerShell：
 
 ## 检查或安装宿主运行环境
 
-`knowledge doctor --environment-only --json` 只读检查锁定的 Python 依赖和命令入口。`needs_install` 表示需要补齐依赖，`needs_cli` 表示命令待注册或待修复，`ready` 表示环境就绪。终端和 OpenFlow 都能在绑定前调用这项检查。
+`knowledge doctor --environment-only --json` 只读检查 Python 能否准备虚拟环境、锁定依赖和命令入口。`needs_install` 表示需要准备虚拟环境或补齐 Python 组件、依赖，`needs_cli` 表示命令待注册或待修复，`ready` 表示环境就绪。终端和 OpenFlow 都能在绑定前调用这项检查。
+
+检查报告中的 `VENV_MODULE_MISSING` 表示当前 Python 缺少创建环境所需的 `venv` 或 `ensurepip`。专用环境尚未创建时，可以用 `bootstrap_python` 和 `bootstrap_python_version` 核对基础解释器路径和版本。
+
+- Ubuntu 或 Debian 上，由管理员安装与所选 Python 版本匹配的 `venv` 系统包。例如使用 Python 3.10 时，运行 `sudo apt install python3.10-venv`。使用发行版默认 Python 时可安装 `python3-venv`。 [Ubuntu 3.10 venv 包](https://packages.ubuntu.com/jammy/python3.10-venv)
+- Windows 上，通过完整的 Python 3.10–3.12 安装程序补装标准库和 `pip` 功能。已有安装可用安装程序的「Modify」修改功能。 [Python Windows 安装说明](https://docs.python.org/3.12/using/windows.html#modifying-an-install)
+
+补齐组件后重新运行 `knowledge setup`。如果第一次安装已创建专用虚拟环境但缺少 pip，重试会在原环境补齐 pip 并继续安装锁定依赖。
 
 `knowledge setup` 沿用明确指定的已有虚拟环境，默认创建 `~/.himate/knowledge/.venv`，在其中安装依赖并复查。OpenFlow 在宿主执行 `setup --jsonl`，展示阶段进度并在结束后复查。环境操作无需传知识根。`tools/deploy/environment.py check|install` 保留原有自动化接口。安装失败时按结果中的原因及本机日志定位问题。
 

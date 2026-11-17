@@ -1,6 +1,6 @@
 {
   "name": "@himate/knowledge-cli",
-  "version": "0.22.8",
+  "version": "0.22.9",
   "description": "HiMate Knowledge CLI launcher",
   "license": "UNLICENSED",
   "bin": {
@@ -9,7 +9,7 @@
   },
   "files": [
     "bin/",
-    "scripts/",
+    "scripts/install.js",
     "knowledge.py",
     "knowledge.cmd",
     "knowledge.sh",
@@ -18,13 +18,16 @@
     "tools/deploy/deploy.py",
     "tools/deploy/environment.py",
     "tools/deploy/README.md",
-    "tools/knowledge/",
+    "tools/knowledge/build_runtime_manifest.py",
     ".gitattributes",
     "README.md",
-    "NPM-PUBLISH.md"
+    "NPM-PUBLISH.md",
+    "!**/__pycache__",
+    "!**/.pytest_cache",
+    "!**/*.pyc",
+    "!**/*.pyo"
   ],
   "scripts": {
-    "prepack": "node scripts/clean-cache.js",
     "postinstall": "node scripts/install.js"
   },
   "publishConfig": {

@@ -19,6 +19,7 @@ SLOTS = [
     f"{DOMAIN}/docs-raw/sources/dbox",
     f"{DOMAIN}/docs-raw/sources/wiki",
     f"{DOMAIN}/docs-raw/specs",
+    f"{DOMAIN}/docs-raw/stories",
     f"{DOMAIN}/docs-raw/storys",
     f"{DOMAIN}/docs-raw/troubleshooting",
 ]

@@ -1,18 +1,18 @@
 {
   "assets": {
     "governance/framework.lock.yaml": {
-      "sha256": "c7b51c424172468aeda56cd8f0c68f610f46f3595c914efb2421f0f3a13fd2c5"
+      "sha256": "7034962547c3ce88518d20c452d50c0f4712ac7f5ed54b6b07334cfaea74e31e"
     }
   },
   "entrypoints": {
     "knowledge.cmd": {
-      "sha256": "c52a9d89f85a71c88328f033276ca310a8e341b9c044d8a8718eba955a34414a"
+      "sha256": "7877b5b7046b967d6b2f7def18f4feb60dec53ec9fa8475a26aecd86a5144be4"
     },
     "knowledge.py": {
-      "sha256": "d48cddd5d095f259942e85bc49030d38fc210957bd0b60c1729b8b662f246166"
+      "sha256": "41ef702bb2dc09ce8e96f5095419781cbfd36053c8a29fc7ae520d15db5295ed"
     },
     "knowledge.sh": {
-      "sha256": "22d5bfdde32454ab7e0a4d3909dca60138025857ac7e5c856ef56648b5564f52"
+      "sha256": "1bd75b42a27f7b4de3e6713e50de642b29f717d99f7f811852d18ea02da20e4d"
     }
   },
   "files": {
@@ -32,7 +32,7 @@
       "sha256": "1a9790398ceb3bddcde83a7d3a20431106cb68924d0915c4a163620a4a5c03f0"
     },
     "himate_knowledge/execution.py": {
-      "sha256": "14253d0e5939e9b7245596bbc5011545d4ca6475911edc1c02467d0d3da5c34f"
+      "sha256": "dc3a913d6ac109d21ea7d5d371d0df882c425868ce7539f5dabeefeb91d2960d"
     },
     "himate_knowledge/protocol.py": {
       "sha256": "2d0c0828f8a6374c294286e39d2af82bd53c5c840ac949273d0bb636ebcabab0"
@@ -42,5 +42,5 @@
     }
   },
   "schema_version": "1.1",
-  "version": "0.22.8"
+  "version": "0.22.9"
 }

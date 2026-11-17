@@ -109,7 +109,8 @@ if (!fs.existsSync(ENTRY)) {
   fail(
     "knowledge is not installed at " +
       INSTALL_ROOT +
-      "\nRun: npm i -g @himate/knowledge-cli"
+      "\nRun: npm i -g @himate/knowledge-cli" +
+      "\nOn npm 12, add --allow-scripts=@himate/knowledge-cli to allow the package's install script."
   );
 }
 

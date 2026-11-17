@@ -6,7 +6,7 @@ from .validation import ContractError, canonical_bytes, load_yaml, safe_path, sh
 DBOX_PREFIX = "docs-raw/sources/dbox"
 DBOX_CONFIG = "docs-raw/sources/dbox.local.yml"
 RAW_RECOVERY_ROOTS = tuple("docs-raw/" + name for name in (
-    "conventions", "chips", "storys", "specs", "protocols", "troubleshooting"))
+    "conventions", "chips", "stories", "storys", "specs", "protocols", "troubleshooting"))
 
 
 def is_dbox_path(reference):

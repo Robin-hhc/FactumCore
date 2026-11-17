@@ -1,12 +1,28 @@
 #!/bin/sh
-# Prefer the managed virtual environment, matching bin/knowledge.js.
-root=$(dirname -- "$0")
-managed="$root/.venv/bin/python"
+case $0 in
+  */*) root=${0%/*} ;;
+  *) root=. ;;
+esac
 
-if [ -n "$HIMATE_KNOWLEDGE_PYTHON" ] && "$HIMATE_KNOWLEDGE_PYTHON" -c 'import sys; sys.exit(0 if sys.prefix != sys.base_prefix else 1)' >/dev/null 2>&1; then
-  exec "$HIMATE_KNOWLEDGE_PYTHON" -B "$root/knowledge.py" "$@"
+supported() {
+  "$1" -I -S -B -c 'import sys; sys.exit(not ((3, 10) <= sys.version_info[:2] <= (3, 12)))' >/dev/null 2>&1
+}
+
+if [ -n "${HIMATE_KNOWLEDGE_PYTHON:-}" ] && supported "$HIMATE_KNOWLEDGE_PYTHON"; then
+  exec "$HIMATE_KNOWLEDGE_PYTHON" -I -B "$root/knowledge.py" "$@"
 fi
-if [ -x "$managed" ] && "$managed" -c 'import sys' >/dev/null 2>&1; then
-  exec "$managed" -B "$root/knowledge.py" "$@"
+
+for python in python3 python python3.11 python3.12 python3.10; do
+  if supported "$python"; then
+    exec "$python" -I -S -B "$root/knowledge.py" --_bootstrap-python "$@"
+  fi
+done
+
+# Keep working without system Python on PATH. Do not execute a linked managed root.
+managed="${HOME:-}/.himate/knowledge/.venv"
+if [ -n "${HOME:-}" ] && [ ! -L "$managed" ] && [ -f "$managed/pyvenv.cfg" ] && supported "$managed/bin/python"; then
+  exec "$managed/bin/python" -I -S -B "$root/knowledge.py" --_bootstrap-python "$@"
 fi
-exec "${HIMATE_KNOWLEDGE_PYTHON:-python3}" -B "$root/knowledge.py" "$@"
+
+printf '%s\n' 'Knowledge requires Python 3.10, 3.11 or 3.12 on this execution host.' >&2
+exit 3

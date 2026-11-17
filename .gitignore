@@ -42,6 +42,8 @@ config.local.yml
 !/himate/himate-knowledge-wifi-mp/docs-raw/sources/wiki/README.md
 /himate/himate-knowledge-wifi-mp/docs-raw/specs/*
 !/himate/himate-knowledge-wifi-mp/docs-raw/specs/README.md
+/himate/himate-knowledge-wifi-mp/docs-raw/stories/*
+!/himate/himate-knowledge-wifi-mp/docs-raw/stories/README.md
 /himate/himate-knowledge-wifi-mp/docs-raw/storys/*
 !/himate/himate-knowledge-wifi-mp/docs-raw/storys/README.md
 /himate/himate-knowledge-wifi-mp/docs-raw/troubleshooting/*

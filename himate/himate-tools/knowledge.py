@@ -43,7 +43,6 @@ import importlib.util
 import json
 from pathlib import Path, PurePosixPath
 import secrets
-import subprocess
 import tempfile
 
 
@@ -165,15 +164,6 @@ def main():
             himate_knowledge._runtime_files_snapshot = {
                 reference: hashlib.sha256(raw).hexdigest() for reference, raw in verified.items()
             }
-            from himate_knowledge.execution import selected_python
-
-            python = selected_python(tool_root)
-            if python is not None and python != Path(sys.executable):
-                command = [str(python), "-I", "-B", __file__, *sys.argv[1:]]
-                if _bootstrap_os.name != "nt":
-                    _bootstrap_os.execv(command[0], command)
-                return subprocess.call(command)
-
             from himate_knowledge.cli import main as cli_main
             return cli_main(tool_root=tool_root, manifest=manifest)
         finally:

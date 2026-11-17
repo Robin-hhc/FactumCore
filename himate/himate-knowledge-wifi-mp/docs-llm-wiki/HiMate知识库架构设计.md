@@ -1,6 +1,6 @@
 # HiMate 知识库架构设计
 
-实现基线为 HiMate 工具包 `0.23.1` 和 OpenFlow F176。日常操作见[使用指南](HiMate知识库使用指南.md)，节点契约和页面交互分别见[详细设计](HiMate知识库详细设计.md)与 [OpenFlow F176](https://github.com/xmkid/OpenFlow/pull/29)。
+实现基线为 HiMate 工具包 `0.23.2` 和 OpenFlow F176。日常操作见[使用指南](HiMate知识库使用指南.md)，节点契约和页面交互分别见[详细设计](HiMate知识库详细设计.md)与 [OpenFlow F176](https://github.com/xmkid/OpenFlow/pull/29)。
 
 ## 1. 系统目标
 
@@ -132,7 +132,7 @@ flowchart TD
 
 部署使用 Python 3.10–3.12。工具包和能力包可分开存放。Windows 的 `deploy.ps1` 与 Linux 的 `deploy.sh` 共用 Python 后端，默认从同级 `himate-skills/` 安装，也可显式指定能力包及宿主安装目录。默认将 Skill 安装到 `~/.openflow/config/skills` 和 `~/.cac/skills`，将 Workflow 安装到 `~/.openflow/config/workflow-templates`。该部署入口同时处理锁定依赖，传入知识根时准备 `artifacts/models/docling-cpu/`，准备成功后替换同名能力包。参数见工具包的 `tools/deploy/README.md`。
 
-终端、自动化和 Agent 统一使用 `knowledge`。OpenFlow 通过宿主配置定位工具包内部入口 `knowledge.py`，调用同一 CLI。工作台用 `doctor --environment-only --json` 检查宿主环境，用 `setup --jsonl` 安装环境。CLI 创建或复用执行账户的专用 Python 环境，在该环境补齐锁定依赖并复查。环境检查和安装可以在绑定前执行，能力包和 OCR 模型由部署脚本单独准备。
+终端、自动化和 Agent 统一使用 `knowledge`。OpenFlow 通过宿主配置定位工具包内部入口 `knowledge.py`，调用同一 CLI。工作台用 `doctor --environment-only --json` 检查宿主环境，用 `setup --jsonl` 安装环境。CLI 用选定的 Python 运行 pip，在该解释器的安装位置补齐锁定依赖，并用同一解释器复查。环境检查和安装可以在绑定前执行，能力包和 OCR 模型由部署脚本单独准备。
 
 npm 在全局命令目录注册 `knowledge`，`setup` 会复用该启动器。手动部署时，Windows 在 `%LOCALAPPDATA%\HiMate\bin` 生成 `knowledge.cmd` 并更新执行账户的 PATH，Linux 默认在 `~/.local/bin` 生成 `knowledge`。工作台按宿主配置定位工具包并单独报告当前进程的 PATH 检查结果。
 

@@ -9,13 +9,13 @@ const { spawn, spawnSync } = require("child_process");
 const SUPPORTED = new Set(["3.10", "3.11", "3.12"]);
 const INSTALL_ROOT = path.join(os.homedir(), ".himate", "knowledge");
 const ENTRY = path.join(INSTALL_ROOT, "knowledge.py");
-const VENV = path.join(INSTALL_ROOT, ".venv");
-const MANAGED_PYTHON = process.platform === "win32"
-  ? path.join(VENV, "Scripts", "python.exe")
-  : path.join(VENV, "bin", "python");
 
 function candidateInterpreters() {
   const candidates = [];
+  const configured = process.env.HIMATE_KNOWLEDGE_PYTHON;
+  if (configured) {
+    candidates.push({ command: configured, prefix: [] });
+  }
   if (process.platform === "win32") {
     candidates.push(
       { command: "py", prefix: ["-3.11"] },
@@ -39,65 +39,14 @@ function candidateInterpreters() {
 function inspectInterpreter(candidate) {
   const probe = spawnSync(
     candidate.command,
-    [
-      ...candidate.prefix, "-I", "-B", "-c",
-      "import json, sys; print(json.dumps({'version': '%d.%d' % sys.version_info[:2], " +
-        "'venv': sys.prefix != sys.base_prefix, 'base': sys._base_executable}))",
-    ],
+    [...candidate.prefix, "-I", "-B", "-c", "import sys; print('%d.%d' % sys.version_info[:2])"],
     { encoding: "utf8", windowsHide: true, timeout: 10000 }
   );
-  if (probe.error || probe.status !== 0) {
-    return null;
-  }
-  try {
-    const info = JSON.parse(probe.stdout);
-    return SUPPORTED.has(info.version) ? info : null;
-  } catch (error) {
-    return null;
-  }
-}
-
-function hasManagedVenv() {
-  try {
-    return fs.lstatSync(VENV).isDirectory() && fs.existsSync(path.join(VENV, "pyvenv.cfg"));
-  } catch (error) {
-    return false;
-  }
+  return !probe.error && probe.status === 0 && SUPPORTED.has(probe.stdout.trim());
 }
 
 function findInterpreter() {
-  const configured = process.env.HIMATE_KNOWLEDGE_PYTHON;
-  const explicit = { command: configured, prefix: [] };
-  const explicitInfo = configured ? inspectInterpreter(explicit) : null;
-  if (explicitInfo?.venv) {
-    return explicit;
-  }
-
-  const managed = { command: MANAGED_PYTHON, prefix: [] };
-  if (hasManagedVenv() && inspectInterpreter(managed)?.venv) {
-    return managed;
-  }
-  if (explicitInfo) {
-    return explicit;
-  }
-
-  for (const candidate of candidateInterpreters()) {
-    const info = inspectInterpreter(candidate);
-    if (!info) {
-      continue;
-    }
-    if (!info.venv) {
-      return candidate;
-    }
-    // PATH can point at an activated project venv. Bootstrap from its base Python.
-    if (info.base && path.isAbsolute(info.base)) {
-      const base = { command: info.base, prefix: [] };
-      if (inspectInterpreter(base)?.venv === false) {
-        return base;
-      }
-    }
-  }
-  return null;
+  return candidateInterpreters().find(inspectInterpreter);
 }
 
 function fail(message) {
@@ -124,7 +73,7 @@ if (!python) {
 
 const child = spawn(
   python.command,
-  [...python.prefix, "-I", "-B", ENTRY, ...process.argv.slice(2)],
+  [...python.prefix, "-E", "-B", ENTRY, ...process.argv.slice(2)],
   { stdio: "inherit", windowsHide: false }
 );
 

@@ -167,8 +167,15 @@ def main():
             }
             from himate_knowledge.execution import selected_python
 
-            python = selected_python(tool_root)
-            if python is not None and python != Path(sys.executable):
+            # Platform wrappers start a discovered interpreter in isolated, no-site mode.
+            # It can bootstrap an explicit CLI process without adopting an ambient PATH venv.
+            bootstrap = sys.flags.isolated and sys.flags.no_site and sys.argv[1:2] == ["--_bootstrap-python"]
+            if bootstrap:
+                del sys.argv[1]
+            python = selected_python(tool_root, explicit_venv=not bootstrap)
+            if bootstrap and python is None:
+                python = Path(sys._base_executable)
+            if python is not None and (bootstrap or python != Path(sys.executable)):
                 command = [str(python), "-I", "-B", __file__, *sys.argv[1:]]
                 if _bootstrap_os.name != "nt":
                     _bootstrap_os.execv(command[0], command)

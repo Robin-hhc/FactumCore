@@ -250,12 +250,15 @@ def test_panel_global_graph_and_bidirectional_expansion_use_published_edges(know
     assert status != 0 and report["diagnostics"][0]["code"] == "PANEL_REVISION_MISMATCH"
 
 
-def test_checked_source_binding_survives_reindex_clone_and_recheck(knowledge, tmp_path):
+@pytest.mark.parametrize("category", ["specs", "stories", "storys"])
+def test_checked_source_binding_survives_reindex_clone_and_recheck(knowledge, tmp_path, category):
     if not shutil.which("git"):
         pytest.skip("Git is required to exercise clean-checkout recovery")
     project = knowledge.parents[1]
     relative_root = knowledge.relative_to(project)
-    raw = knowledge / "docs-raw/specs/a.md"
+    source_path = f"docs-raw/{category}/a.md"
+    raw = knowledge / source_path
+    raw.parent.mkdir(parents=True, exist_ok=True)
     older = b"# Original\nExact evidence from the first review.\n"
     newer = b"# Updated\nEvidence checked during the second review.\n"
     raw.write_bytes(older)
@@ -268,7 +271,7 @@ def test_checked_source_binding_survives_reindex_clone_and_recheck(knowledge, tm
     git("init", "-q")
     git("add", (knowledge / "config.yml").relative_to(project).as_posix(), raw.relative_to(project).as_posix())
     git("commit", "-qm", "Track original")
-    status, scanned = invoke(knowledge, "ingest", "scan", "--source", "docs-raw/specs/a.md")
+    status, scanned = invoke(knowledge, "ingest", "scan", "--source", source_path)
     assert status == 0, scanned
     source_id = scanned["data"]["source"]["doc_id"]
     header = {"id": "fixed", "doc_ref": [{"doc_id": source_id, "line_start": 1, "line_end": 2}], "code_ref": []}
@@ -292,6 +295,10 @@ def test_checked_source_binding_survives_reindex_clone_and_recheck(knowledge, tm
     old_hash = hashlib.sha256(older).hexdigest()
     assert original_ref["source_version"] == "bound" and original_ref["source_sha256"] == old_hash
     registry = knowledge / "governance/sources.lock.yaml"
+    snapshot = next(item for item in yaml.safe_load(registry.read_bytes())["snapshots"]
+                    if item["snapshot_id"] == original_ref["snapshot_id"])
+    assert snapshot["recovery"]["method"] == "git"
+    assert snapshot["recovery"]["path"] == raw.relative_to(project).as_posix()
     git("add", raw.relative_to(project).as_posix(), formal.relative_to(project).as_posix(),
         registry.relative_to(project).as_posix())
     git("commit", "-qm", "Publish reference and advance live source")
@@ -307,9 +314,10 @@ def test_checked_source_binding_survives_reindex_clone_and_recheck(knowledge, tm
     status, resolved = invoke(fresh, "source", "resolve",
                               request={"source_id": source_id, "snapshot_id": cloned_ref["snapshot_id"], "hash": old_hash})
     assert status == 0, resolved
+    assert resolved["data"]["commit"] == snapshot["recovery"]["commit"]
     assert (fresh / resolved["data"]["original_ref"]).read_bytes() == older
 
-    assert invoke(knowledge, "ingest", "scan", "--source", "docs-raw/specs/a.md")[0] == 0
+    assert invoke(knowledge, "ingest", "scan", "--source", source_path)[0] == 0
     check_and_publish()
     rebound = _panel(knowledge, "read", {"card_id": "fixed"})["doc_ref"][0]
     assert rebound["source_version"] == "bound" and rebound["source_sha256"] == hashlib.sha256(newer).hexdigest()

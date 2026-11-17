@@ -1,6 +1,6 @@
 # HiMate 知识库架构设计
 
-实现基线为 HiMate 工具包 `0.22.6` 和 OpenFlow F176。日常操作见[使用指南](HiMate知识库使用指南.md)，节点契约和页面交互分别见[详细设计](HiMate知识库详细设计.md)与 [OpenFlow F176](https://github.com/xmkid/OpenFlow/pull/29)。
+实现基线为 HiMate 工具包 `0.22.9` 和 OpenFlow F176。日常操作见[使用指南](HiMate知识库使用指南.md)，节点契约和页面交互分别见[详细设计](HiMate知识库详细设计.md)与 [OpenFlow F176](https://github.com/xmkid/OpenFlow/pull/29)。
 
 ## 1. 系统目标
 

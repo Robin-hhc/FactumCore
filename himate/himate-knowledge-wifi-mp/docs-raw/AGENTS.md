@@ -1,6 +1,6 @@
 # raw 文档入口
 
-本目录保存仓内原件，按 conventions、chips、storys、specs、protocols、troubleshooting 组织；外部资料由 `sources/dbox.local.yml` 映射执行端实际目录。原件只读。`index.md`、`README.md`、`AGENTS.md`、模板及本机配置不作为来源正文；目录不可读不能当作无变化或删除，不跟随原生链接或 junction。
+本目录保存仓内原件，按 conventions、chips、stories、specs、protocols、troubleshooting 组织。已登记的 `storys/` 原件沿用原路径。外部资料由 `sources/dbox.local.yml` 映射执行端实际目录。原件只读。`index.md`、`README.md`、`AGENTS.md`、模板及本机配置不作为来源正文；目录不可读不能当作无变化或删除，不跟随原生链接或 junction。
 
 `agent-notes/` 保存 `hs-knowledge-capture` 产出的分析稿。上库后的 Markdown 由定时治理按普通来源处理，正式卡回查时沿用分析稿原路径。
 

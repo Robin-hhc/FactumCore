@@ -22,24 +22,40 @@ def environment(monkeypatch):
     return environment
 
 
+@pytest.fixture(autouse=True)
+def isolated_home(monkeypatch, tmp_path):
+    home = tmp_path / "isolated home"
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+    monkeypatch.delenv("HIMATE_KNOWLEDGE_PYTHON", raising=False)
+    return home
+
+
+@pytest.fixture
+def selected(environment, monkeypatch):
+    monkeypatch.setattr(environment, "selected_python", lambda _: Path(sys.executable))
+
+
 def test_check_reports_dependencies_without_a_knowledge_root(tmp_path):
     bin_dir = tmp_path / "isolated bin"
-    result = subprocess.run([sys.executable, "-S", "-B", str(ENTRY), "check", "--bin-dir", str(bin_dir)], cwd=tmp_path,
+    base = sys._base_executable
+    result = subprocess.run([base, "-B", str(ENTRY), "check", "--bin-dir", str(bin_dir)], cwd=tmp_path,
                             capture_output=True, check=True, timeout=60)
     payload = json.loads(result.stdout)
     manifest = json.loads((TOOL_ROOT / "runtime/manifest.json").read_text(encoding="utf-8"))
     assert payload["status"] == "needs_install"
     assert Path(payload["tool_root"]) == TOOL_ROOT
-    assert Path(payload["python"]).samefile(sys.executable)
+    assert payload["python"] is None
+    assert Path(payload["bootstrap_python"]).samefile(base)
     assert payload["toolkit_version"] == manifest["version"]
-    pyyaml = next(row for row in payload["dependencies"] if row["name"].casefold() == "pyyaml")
-    assert pyyaml == {"name": pyyaml["name"], "expected": "6.0.3", "actual": None, "status": "missing"}
+    assert payload["dependencies"] == []
+    assert payload["diagnostics"][0]["code"] == "VENV_REQUIRED"
     assert payload["command"]["bin_dir"] == str(bin_dir)
     assert not payload["command"]["installed"]
     assert not list(tmp_path.iterdir())
 
     canonical = subprocess.run([
-        sys.executable, "-S", "-B", str(TOOL_ROOT / "knowledge.py"),
+        base, "-B", str(TOOL_ROOT / "knowledge.py"),
         "doctor", "--environment-only", "--json", "--bin-dir", str(bin_dir),
     ], cwd=tmp_path, capture_output=True, check=True, timeout=60)
     assert json.loads(canonical.stdout) == payload
@@ -48,7 +64,7 @@ def test_check_reports_dependencies_without_a_knowledge_root(tmp_path):
 
 
 @pytest.fixture
-def runtime(environment, monkeypatch, tmp_path):
+def runtime(environment, monkeypatch, tmp_path, selected):
     state = SimpleNamespace(dependencies_ready=False, installed=False, error=None, registered=[], checked=[])
     bin_dir = tmp_path / "isolated bin"
 
@@ -96,8 +112,11 @@ def test_install_runs_pinned_pip_before_registering(environment, runtime, monkey
 
     def run(argv, **kwargs):
         calls.append((argv, kwargs))
+        if "config" in argv:
+            return SimpleNamespace(stdout="global.index-url='https://user:private@packages.test/simple'\n")
         if "pip" in argv:
             state.dependencies_ready = True
+            return SimpleNamespace(stdout="installed packages")
 
     monkeypatch.setattr(environment.subprocess, "run", run)
     assert execute(environment, "install", bin_dir) == 0
@@ -105,13 +124,19 @@ def test_install_runs_pinned_pip_before_registering(environment, runtime, monkey
     assert [step["phase"] for step in steps] == ["checking", "installing", "registering", "verifying"]
     assert final["status"] == "ready"
     assert final["command"]["installed"]
-    assert state.checked == [False, True, True]
+    assert state.checked == [False, False, True, True]
     assert len(state.registered) == 1
-    (argv, options), (verification, verification_options) = calls
-    assert argv == [sys.executable, "-m", "pip", "install", "-r", str(TOOL_ROOT / "runtime/requirements.lock.txt")]
+    (configuration, _), (argv, options), (verification, verification_options) = calls
+    assert configuration == [sys.executable, *environment.PYTHON_MODULE_FLAGS, "pip", "--python=", "config", "list"]
+    assert argv == [sys.executable, *environment.PYTHON_MODULE_FLAGS, "pip", "--require-virtualenv", "install", "-r",
+                    str(TOOL_ROOT / "runtime/requirements.lock.txt")]
     assert options["cwd"] == TOOL_ROOT
     assert options["check"] is True
-    assert options["stdin"] == options["stdout"] == options["stderr"] == subprocess.DEVNULL
+    assert options["stdin"] == subprocess.DEVNULL
+    assert options["stdout"] == subprocess.PIPE
+    assert options["stderr"] == subprocess.STDOUT
+    log = Path(final["log_path"]).read_text(encoding="utf-8")
+    assert "installed packages" in log and "user:private" not in log
     command = final["command"]
     assert verification == ([sys.executable, "-B", command["dispatcher"], "--help"] if os.name == "nt"
                             else [command["path"], "--help"])
@@ -152,22 +177,26 @@ def test_check_and_retry_when_only_registration_is_needed(environment, runtime, 
 def test_install_failure_does_not_emit_raw_pip_output(environment, runtime, monkeypatch, capsys):
     state, bin_dir = runtime
 
-    def fail(*args, **kwargs):
-        raise subprocess.CalledProcessError(1, "pip", stderr=b"private index configuration")
+    def fail(argv, **kwargs):
+        if "config" in argv:
+            return SimpleNamespace(stdout="")
+        raise subprocess.CalledProcessError(1, "pip", stderr=b"private index config https://user:key@packages.test/p?token=abc")
 
     monkeypatch.setattr(environment.subprocess, "run", fail)
     assert execute(environment, "install", bin_dir) == 1
     output = capsys.readouterr().out
     events = [json.loads(line) for line in output.splitlines()]
     assert events[-1]["code"] == "DEPENDENCY_INSTALL_FAILED"
-    assert "private index configuration" not in output
+    assert "private index config" not in output
+    log = Path(events[-1]["log_path"]).read_text(encoding="utf-8")
+    assert "https://packages.test/" in log and "user:key" not in log and "token=abc" not in log
     assert not any(event["phase"] == "verifying" for event in events)
     assert not state.registered
 
 
 def test_failed_dependency_verification_prevents_registration(environment, runtime, monkeypatch, capsys):
     state, bin_dir = runtime
-    monkeypatch.setattr(environment.subprocess, "run", lambda *args, **kwargs: None)
+    monkeypatch.setattr(environment.subprocess, "run", lambda *args, **kwargs: SimpleNamespace(stdout=""))
     assert execute(environment, "install", bin_dir) == 1
     failure = events(capsys)[-1]
     assert failure["phase"] == "verifying"
@@ -241,7 +270,7 @@ def npm_installation(tmp_path):
     return tool_root, shim
 
 
-def test_npm_setup_reuses_launcher_and_selected_python(environment, npm_installation, monkeypatch, capsys):
+def test_npm_setup_reuses_launcher_and_selected_python(environment, npm_installation, monkeypatch, capsys, selected):
     tool_root, shim = npm_installation
     state = SimpleNamespace(ready=False, pip_calls=0)
     monkeypatch.setattr(environment.command_install, "_find_on_path", lambda: str(shim))
@@ -253,9 +282,12 @@ def test_npm_setup_reuses_launcher_and_selected_python(environment, npm_installa
 
     def run(argv, **kwargs):
         assert argv[0] == sys.executable
+        if "config" in argv:
+            return SimpleNamespace(stdout="")
         if "pip" in argv:
             state.pip_calls += 1
             state.ready = True
+            return SimpleNamespace(stdout="")
         else:
             assert argv == [sys.executable, "-B", str(tool_root / "knowledge.py"), "--help"]
 
@@ -272,7 +304,7 @@ def test_npm_setup_reuses_launcher_and_selected_python(environment, npm_installa
     assert state.pip_calls == 1
 
 
-def test_npm_setup_honors_explicit_bin_dir(environment, npm_installation, monkeypatch, capsys, tmp_path):
+def test_npm_setup_honors_explicit_bin_dir(environment, npm_installation, monkeypatch, capsys, tmp_path, selected):
     tool_root, shim = npm_installation
     bin_dir = tmp_path / "custom bin"
     monkeypatch.setattr(environment.command_install, "_find_on_path", lambda: str(shim))
@@ -293,7 +325,7 @@ def test_npm_setup_honors_explicit_bin_dir(environment, npm_installation, monkey
 
 
 @pytest.mark.parametrize("problem", ["missing", "shadowed", "tampered"])
-def test_npm_setup_leaves_unowned_paths_untouched(environment, npm_installation, monkeypatch, capsys, problem):
+def test_npm_setup_leaves_unowned_paths_untouched(environment, npm_installation, monkeypatch, capsys, problem, selected):
     tool_root, shim = npm_installation
     found = str(shim)
     if problem == "missing":
@@ -318,3 +350,145 @@ def test_npm_setup_leaves_unowned_paths_untouched(environment, npm_installation,
     [failure] = events(capsys)
     assert failure["status"] == "failed"
     assert failure["code"] == ("COMMAND_PATH_CONFLICT" if problem == "shadowed" else "NPM_LAUNCHER_UNAVAILABLE")
+
+
+def test_first_setup_creates_venv_and_verifies_in_target(environment, monkeypatch, capsys, tmp_path):
+    target = environment.managed_python(TOOL_ROOT)
+    bin_dir = tmp_path / "isolated bin"
+    state = SimpleNamespace(created=False, ready=False, registered=False, calls=[])
+    monkeypatch.setattr(environment, "selected_python", lambda _: target if state.created else None)
+    monkeypatch.setattr(environment.doctor, "inspect_dependencies", lambda _: pytest.fail("Read bootstrap packages"))
+    for name in ("PIP_TARGET", "PIP_PREFIX", "PIP_ROOT", "PIP_PYTHON", "PYTHONUSERBASE"):
+        monkeypatch.setenv(name, str(tmp_path / "outside"))
+    monkeypatch.setenv("PIP_USER", "1")
+    monkeypatch.setenv("PIP_INDEX_URL", "https://packages.test/simple")
+
+    def run(argv, **kwargs):
+        state.calls.append(argv)
+        assert set(kwargs["env"]).isdisjoint({"PIP_TARGET", "PIP_PREFIX", "PIP_USER", "PIP_ROOT", "PIP_PYTHON",
+                                              "PYTHONUSERBASE"})
+        assert kwargs["env"]["PIP_INDEX_URL"] == "https://packages.test/simple"
+        if "venv" in argv:
+            assert argv == [sys.executable, *environment.PYTHON_MODULE_FLAGS, "venv",
+                            str(environment.managed_home(TOOL_ROOT) / ".venv")]
+            state.created = True
+            return SimpleNamespace(stdout="")
+        assert argv[0] == str(target)
+        if "config" in argv:
+            assert "--python=" in argv
+            return SimpleNamespace(stdout="")
+        if "pip" in argv:
+            assert not state.ready and "--require-virtualenv" in argv
+            state.ready = True
+            return SimpleNamespace(stdout="")
+        assert "--json" in argv and str(bin_dir) in argv and state.ready
+        if "install-command" in argv:
+            state.registered = True
+            return SimpleNamespace(stdout="{}", returncode=0)
+        assert argv[3:5] == ["doctor", "--environment-only"]
+        data = {"status": "ready" if state.registered else "needs_cli", "python": str(target),
+                "tool_root": str(TOOL_ROOT), "toolkit_version": "test", "diagnostics": [],
+                "command": {"installed": state.registered}}
+        return SimpleNamespace(stdout=json.dumps(data), returncode=0)
+
+    monkeypatch.setattr(environment.subprocess, "run", run)
+    assert execute(environment, "install", bin_dir, legacy=False) == 0
+    *steps, final = events(capsys)
+    assert [step["phase"] for step in steps] == ["checking", "installing", "registering", "verifying"]
+    assert final["status"] == "ready" and final["python"] == str(target)
+    assert [argv[3] if argv[1] == "-B" else argv[argv.index("-m") + 1] for argv in state.calls] == [
+        "venv", "pip", "pip", "doctor", "install-command", "doctor"]
+
+
+@pytest.mark.parametrize(("reason", "diagnostic"), [
+    ("error: externally-managed-environment", "DEPENDENCY_EXTERNALLY_MANAGED"),
+    ("ConnectionError: Connection refused", "DEPENDENCY_INDEX_UNAVAILABLE"),
+    ("401 Client Error: Unauthorized", "DEPENDENCY_INDEX_AUTH_FAILED"),
+    ("[Errno 13] Permission denied", "DEPENDENCY_PERMISSION_DENIED"),
+    ("[Errno 28] No space left on device", "DEPENDENCY_DISK_FULL"),
+])
+def test_pip_failures_are_diagnosable(environment, runtime, monkeypatch, capsys, reason, diagnostic):
+    state, bin_dir = runtime
+
+    def run(argv, **kwargs):
+        if "config" in argv:
+            return SimpleNamespace(stdout="")
+        raise subprocess.CalledProcessError(1, argv, output=reason)
+
+    monkeypatch.setattr(environment.subprocess, "run", run)
+    assert execute(environment, "install", bin_dir, output="json", legacy=False) == 1
+    [final] = events(capsys)
+    assert final["code"] == diagnostic
+    assert reason in Path(final["log_path"]).read_text(encoding="utf-8")
+    assert not state.registered
+
+
+def test_missing_venv_support_does_not_install_system_packages(environment, monkeypatch, capsys, tmp_path):
+    monkeypatch.setattr(environment, "selected_python", lambda _: None)
+    monkeypatch.setattr(environment.sys, "platform", "linux")
+    monkeypatch.setattr(environment.platform, "freedesktop_os_release", lambda: {"ID": "ubuntu"})
+
+    def no_ensurepip(argv, **kwargs):
+        assert argv[:-1] == [sys.executable, *environment.PYTHON_MODULE_FLAGS, "venv"]
+        raise subprocess.CalledProcessError(1, argv, output="ensurepip is not available")
+
+    monkeypatch.setattr(environment.subprocess, "run", no_ensurepip)
+    assert execute(environment, "install", tmp_path / "bin", output="json", legacy=False) == 1
+    [final] = events(capsys)
+    assert final["code"] == "VENV_MODULE_MISSING"
+    assert "sudo apt install python3-venv" in final["message"]
+    assert Path(final["log_path"]).is_file()
+
+
+def test_setup_recovers_an_existing_venv_without_pip(environment, runtime, monkeypatch, capsys):
+    state, bin_dir = runtime
+    calls = []
+
+    def run(argv, **kwargs):
+        if "-m" not in argv:
+            return None
+        module = argv[argv.index("-m") + 1]
+        name = "config" if "config" in argv else module
+        calls.append(name)
+        if len(calls) == 1:
+            raise subprocess.CalledProcessError(1, argv, output="No module named pip")
+        if name == "pip":
+            state.dependencies_ready = True
+        return SimpleNamespace(stdout="")
+
+    monkeypatch.setattr(environment.subprocess, "run", run)
+    assert execute(environment, "install", bin_dir, output="json", legacy=False) == 0
+    [final] = events(capsys)
+    assert final["status"] == "ready"
+    assert calls == ["config", "ensurepip", "config", "pip"]
+
+
+def test_concurrent_setup_reports_busy_without_running_pip(environment, runtime, monkeypatch, capsys):
+    state, bin_dir = runtime
+    monkeypatch.setattr(environment.subprocess, "run", lambda *a, **kw: pytest.fail("Unexpected execution"))
+    with environment._setup_lock(environment.managed_home(TOOL_ROOT)):
+        assert execute(environment, "install", bin_dir, output="json", legacy=False) == 1
+    [final] = events(capsys)
+    assert final["code"] == "INSTALL_BUSY"
+    assert not state.registered
+
+
+@pytest.mark.parametrize("option", ["install.target", "global.prefix", "install.root", "global.python", "install.user"])
+def test_setup_blocks_pip_config_that_overrides_install_location(environment, runtime, monkeypatch, capsys, option):
+    state, bin_dir = runtime
+
+    def run(argv, **kwargs):
+        assert argv[-3:] == ["--python=", "config", "list"]
+        return SimpleNamespace(stdout=f"{option}='private-path'\n")
+
+    monkeypatch.setattr(environment.subprocess, "run", run)
+    assert execute(environment, "install", bin_dir, output="json", legacy=False) == 1
+    [final] = events(capsys)
+    assert final["code"] == "DEPENDENCY_LOCATION_OVERRIDE"
+    assert "private-path" not in Path(final["log_path"]).read_text(encoding="utf-8")
+    assert not state.registered
+
+
+def test_pip_config_allows_index_settings_and_explicit_user_false(environment):
+    configuration = "global.index-url='https://mirror.test/simple'\nglobal.user='on'\ninstall.user='false'\n"
+    assert not environment._has_pip_location_override(configuration)

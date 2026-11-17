@@ -51,6 +51,8 @@ npm i -g @himate/knowledge-models --registry http://10.143.57.12:4873
 ~/.himate/knowledge/
 ├── knowledge.py
 ├── knowledge.cmd / knowledge.sh
+├── .venv/
+├── logs/
 ├── runtime/
 ├── governance/
 └── tools/deploy/
@@ -62,7 +64,7 @@ npm i -g @himate/knowledge-models --registry http://10.143.57.12:4873
 
 - npm 根据 `bin` 字段自动生成 Windows 的 `knowledge.cmd` / `knowledge.ps1`，Linux 生成软链
 - `postinstall` 用 `process.platform` 区分路径分隔符与可执行权限
-- 启动器按平台探测 Python：Windows 依次试 `py -3.11`、`py -3.12`、`py -3.10`、`python`、`python3`；Linux 依次试 `python3`、`python`、`python3.11`、`python3.12`、`python3.10`
+- 启动器优先使用已准备的虚拟环境。首次运行从系统查找受支持的 Python 3.10–3.12，`knowledge setup` 用它创建专用环境并安装锁定依赖。
 
 Linux 全局安装若提示权限不足，可把 npm 全局目录指到当前用户目录。运行 npm 安装与使用 `knowledge` 采用同一账户：
 
@@ -84,7 +86,7 @@ knowledge ingest status --knowledge-root /path/to/kb
 
 同时注册了长别名 `himate-knowledge`，与 `knowledge` 完全等价。
 
-指定 Python 解释器：
+可用 `HIMATE_KNOWLEDGE_PYTHON` 指定解释器。指定已有虚拟环境时沿用该环境，指定系统 Python 时用于初始化专用环境。
 
 ```bash
 export HIMATE_KNOWLEDGE_PYTHON=/usr/bin/python3.11
@@ -98,13 +100,14 @@ export HIMATE_KNOWLEDGE_PYTHON=/usr/bin/python3.11
 npm i -g @himate/knowledge-cli@latest --registry http://10.143.57.12:4873
 ```
 
-CLI 安装脚本只覆盖代码目录，不会删除 `tools/deploy/models/`。
+CLI 安装脚本保留 `.venv/`、`logs/` 和 `tools/deploy/models/`。更新后运行 `knowledge doctor --environment-only`，如有新的依赖缺口再运行 `knowledge setup`。
 
 ## 6. 注意事项
 
 - 安装时不要加 `--ignore-scripts`，否则文件不会复制到 `~/.himate/knowledge`
 - 模型包安装时会按 `manifest.json` 校验每个分片的字节数与 SHA-256，校验失败会中止安装
 - 两个包的安装顺序不限：先装 CLI 或先装模型都可以
-- 本机需要可用的 Node.js、Python 3.10–3.12 和该 Python 的 pip。npm 注册 `knowledge` 入口，`knowledge setup` 为入口实际使用的 Python 补齐锁定依赖并复查。必要时先用 `HIMATE_KNOWLEDGE_PYTHON` 选定解释器。
+- 本机需要可用的 Node.js 和支持创建虚拟环境的 Python 3.10–3.12。Debian 或 Ubuntu 缺少 `ensurepip` 时，安装报错会提示与所选 Python 版本配套的 `venv` 系统包。
+- 安装失败可按提示检查本机 `~/.himate/knowledge/logs/` 下的日志。命令输出包含错误原因，便于 OpenFlow 显示处理提示。
 - `knowledge setup` 复用 npm 启动器。需要诊断环境时可运行 `knowledge doctor --environment-only --json`，无需选择知识库。
 - 模型 npm 包提供工具侧离线模型。知识库启用 `standard` OCR 时，仍为相应知识根准备模型。 [OCR 部署说明](tools/deploy/README.md#为现有知识库准备-ocr)

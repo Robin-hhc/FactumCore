@@ -1,6 +1,6 @@
 # 面板 CLI 契约
 
-OpenFlow 通过宿主的 `OPENFLOW_KNOWLEDGE_TOOLKIT_ROOT` 定位 `knowledge.py`。工具包目录使用绝对路径，并与已绑定的知识根分开。宿主按 `OPENFLOW_KNOWLEDGE_PYTHON` 指定的绝对路径选择 Python 3.10–3.12，未指定时从宿主机探测。业务操作用该解释器运行 CLI，显式传入已绑定的知识根。通过 stdin 接收 JSON 对象，沿用知识 CLI 的结果封装。
+OpenFlow 通过宿主的 `OPENFLOW_KNOWLEDGE_TOOLKIT_ROOT` 定位 `knowledge.py`。工具包目录使用绝对路径，并与已绑定的知识根分开。宿主可用 `OPENFLOW_KNOWLEDGE_PYTHON` 指定 Python 3.10–3.12 的绝对路径，未指定时从宿主机探测。CLI 沿用已选的虚拟环境，或切换到当前执行账户的 `~/.himate/knowledge/.venv`。业务操作显式传入已绑定的知识根，通过 stdin 接收 JSON 对象，沿用知识 CLI 的结果封装。
 
 ```sh
 printf '%s' '{"limit":20}' | python -B /absolute/tool/root/knowledge.py library cards --knowledge-root /absolute/knowledge/root --input - --json
@@ -12,17 +12,17 @@ printf '%s' '{"limit":20}' | python -B /absolute/tool/root/knowledge.py library 
 
 ## 环境检查和安装
 
-环境入口可在首次绑定前执行。`knowledge doctor --environment-only --json` 返回一行 JSON，包含 `status`、`tool_root`、`toolkit_version`、`python`、`python_version`、`dependencies`、`diagnostics` 和 `command`。`dependencies` 每项包含 `name`、`expected`、`actual` 和 `status`（`ready`、`missing` 或 `mismatch`）。每条诊断包含 `code` 和 `message`。生成有效检查报告时退出码为 0，就绪情况以 `status` 为准。
+环境入口可在首次绑定前执行。`knowledge doctor --environment-only --json` 返回一行 JSON，包含 `status`、`tool_root`、`toolkit_version`、`python`、`python_version`、`dependencies`、`diagnostics` 和 `command`。专用环境尚未创建时，`python` 和 `python_version` 为 `null`，`bootstrap_python` 和 `environment_path` 分别给出用于创建环境的解释器和目标目录。`dependencies` 每项包含 `name`、`expected`、`actual` 和 `status`（`ready`、`missing` 或 `mismatch`）。每条诊断包含 `code` 和 `message`。生成有效检查报告时退出码为 0，就绪情况以 `status` 为准。
 
 | `status` | 含义 |
 | --- | --- |
-| `needs_install` | Python 依赖缺失或版本不符，优先处理依赖 |
+| `needs_install` | 专用环境未创建，或 Python 依赖缺失或版本不符 |
 | `needs_cli` | 依赖齐全，命令待注册、修复或启动验证失败 |
 | `ready` | 依赖齐全，受管理的启动入口执行 `--help` 并返回 0。此项验证无需绑定知识库 |
 
 检查只读。无法加载工具包或依赖清单时，返回非零退出码和 `status: "unavailable"` 的诊断。`command` 为 `null` 或 `{path,bin_dir,dispatcher,installed,path_registered,on_path,shadowed_by}`。`installed` 表示启动文件与所选工具及 Python 匹配，并符合默认目录的注册要求。`path_registered` 表示 Windows 当前账户的用户 `PATH` 已登记该目录。`on_path` 表示当前进程的 `PATH` 实际优先解析到该命令，`shadowed_by` 记录优先匹配到的其他命令。Linux 上 `ready` 可以与 `on_path: false` 同时出现。
 
-`knowledge setup --jsonl` 发出 `checking`、按需的 `installing` 和 `registering`，以及 `verifying`，最后发送一条结果。成功时最终状态为 `ready`，退出码为 0。失败结果带 `phase`、`code`、`message` 和 `diagnostics` 并退出非零。只需要最终一条结果时使用 `setup --json`。重复执行会跳过已完成的安装阶段，复用 npm 启动器或按需准备手动安装的启动器。
+`knowledge setup --jsonl` 发出 `checking`、按需的 `installing` 和 `registering`，以及 `verifying`，最后发送一条结果。创建环境和安装依赖都在 `installing` 阶段完成。成功时最终状态为 `ready`，退出码为 0，`python` 指向通过复查的解释器。失败结果带 `phase`、`code`、`message` 和 `diagnostics` 并退出非零，可用的本机日志路径由 `log_path` 给出。只需要最终一条结果时使用 `setup --json`。重复执行会跳过已完成的安装阶段，复用 npm 启动器或按需准备手动安装的启动器。
 
 OpenFlow 用 `POST /api/knowledge/environment/check` 检查，用 `POST /api/knowledge/environment/install` 开启后台安装，两者以 JSON `{}` 提交。用 `GET /api/knowledge/environment/install` 查询当前任务。宿主同一时间执行一项安装，结束后独立复查 `ready`。尚未提供公开子命令的旧工具包继续使用原环境脚本和旧 `panel` 命令。
 

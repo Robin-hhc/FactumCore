@@ -38,7 +38,7 @@ OpenFlow 宿主通过绝对路径 `OPENFLOW_KNOWLEDGE_TOOLKIT_ROOT` 指定工具
 
 `knowledge doctor --environment-only --json` 只读检查锁定的 Python 依赖和命令入口。`needs_install` 表示需要补齐依赖，`needs_cli` 表示命令待注册或待修复，`ready` 表示环境就绪。终端和 OpenFlow 都能在绑定前调用这项检查。
 
-`knowledge setup` 用同一个 Python 按需补齐依赖，再确认 npm 或手动部署的命令入口。OpenFlow 在宿主执行 `setup --jsonl`，展示阶段进度并在结束后复查。首次手动注册前，用 `<Python> -B <工具包>/knowledge.py` 加上同样的子命令。环境操作无需传知识根。`tools/deploy/environment.py check|install` 保留原有自动化接口。
+`knowledge setup` 沿用明确指定的已有虚拟环境，默认创建 `~/.himate/knowledge/.venv`，在其中安装依赖并复查。OpenFlow 在宿主执行 `setup --jsonl`，展示阶段进度并在结束后复查。首次手动注册前，用 `<Python> -B <工具包>/knowledge.py` 加上同样的子命令。环境操作无需传知识根。`tools/deploy/environment.py check|install` 保留原有自动化接口。安装失败时按结果中的原因及本机日志定位问题。
 
 通过 npm 部署时，`setup` 复用 npm 注册的入口。手动部署时，Windows 默认把命令放到 `%LOCALAPPDATA%\HiMate\bin` 并加入执行账户的用户 `PATH`。Linux 默认命令目录为 `~/.local/bin`，由终端或服务配置 `PATH`。手动部署可以用 `--bin-dir` 选择命令目录。在 Windows 单独注册时可运行 `install-command --add-path`。打开新终端后可运行 `knowledge --version` 确认入口。
 

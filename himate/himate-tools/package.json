@@ -1,0 +1,34 @@
+{
+  "name": "@himate/knowledge-cli",
+  "version": "0.22.4",
+  "description": "HiMate Knowledge CLI launcher",
+  "license": "UNLICENSED",
+  "bin": {
+    "knowledge": "bin/knowledge.js",
+    "himate-knowledge": "bin/knowledge.js"
+  },
+  "files": [
+    "bin/",
+    "scripts/",
+    "knowledge.py",
+    "knowledge.cmd",
+    "knowledge.sh",
+    "runtime/",
+    "governance/",
+    "tools/deploy/deploy.py",
+    "tools/deploy/environment.py",
+    "tools/deploy/README.md",
+    "tools/knowledge/",
+    ".gitattributes",
+    "README.md"
+  ],
+  "scripts": {
+    "postinstall": "node scripts/install.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

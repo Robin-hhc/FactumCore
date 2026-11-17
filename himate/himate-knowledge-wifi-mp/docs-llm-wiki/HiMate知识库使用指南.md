@@ -4,9 +4,9 @@
 
 ## 首次安装
 
-把部门工具包 `himate-tools/`、能力包 `himate-skills/` 和业务知识仓放到对应执行环境。准备有 pip 的 Python 3.10–3.12，建议使用独立虚拟环境。Windows 使用工具包 `0.22.3` 或包含 Windows PATH 查找修复的后续版本。Agent 通过 SSH 在服务器执行时，在该服务器准备 Python 和工具，使用服务器上的实际路径。
+准备有 pip 的 Python 3.10–3.12，建议使用独立虚拟环境。配置好内网 npm 源后，可运行 `npm install -g @himate/knowledge-cli` 安装命令，再运行 `knowledge doctor --environment-only` 检查环境，缺依赖时运行 `knowledge setup`。依赖安装到所选 Python，已注册的 npm 启动器继续使用。Agent 通过 SSH 在服务器执行时，在该服务器准备 Python 和工具。
 
-在工具包根运行对应安装命令。工具包提供 CLI、依赖和离线模型，部署默认从同级的 `himate-skills/` 安装 Skill 和 Workflow。
+从源码部署时，把 `himate-tools/`、`himate-skills/` 和业务知识仓放到对应执行环境，在工具包根运行对应安装命令。部署默认从同级的 `himate-skills/` 安装 Skill 和 Workflow，也可为指定业务库准备离线 OCR 模型。
 
 | 系统 | 安装命令 | 为指定库准备 OCR |
 |---|---|---|
@@ -26,7 +26,7 @@
 3. 检查结果会说明环境就绪、缺 Python 依赖或缺可用的 `knowledge` 命令。后两种都点同一个「安装环境」。宿主按需补齐依赖、部署命令并复查。仅缺命令时直接注册，免去重复安装依赖。
 4. 可以留在弹窗内看进度，也可以选择「后台继续」。后台进度显示在知识库页头，完成或需要处理时有状态提示。注册失败时查看诊断，修正目录权限或同名命令冲突后，用原按钮重试。
 
-Windows 的默认命令安装会更新 OpenFlow 执行账户的用户 PATH，已有终端或进程需要重新加载环境。Linux 默认安装到 `~/.local/bin`，终端或后台服务的 PATH 需要包含该目录。面板会显示命令路径和当前进程的 PATH 提示。终端已能找到命令后，可从任意目录指定知识根进行检查。
+通过 npm 安装时，终端和 OpenFlow 执行账户的 PATH 需要包含 npm 的全局命令目录。从源码安装命令时，Windows 会更新执行账户的用户 PATH，已有终端或进程需要重新加载环境。Linux 默认使用 `~/.local/bin`，终端或后台服务的 PATH 需要包含该目录。面板会显示命令路径和当前进程的 PATH 提示。终端已能找到命令后，可从任意目录指定知识根进行检查。
 
 ```text
 knowledge doctor --knowledge-root "<知识根绝对路径>" --json

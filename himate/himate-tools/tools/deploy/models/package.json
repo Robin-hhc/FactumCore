@@ -1,0 +1,22 @@
+{
+  "name": "@himate/knowledge-models",
+  "version": "0.22.4",
+  "description": "Docling CPU OCR model bundle for HiMate Knowledge",
+  "license": "UNLICENSED",
+  "files": [
+    "docling-cpu/",
+    "manifest.json",
+    "README.md",
+    "source-cards/",
+    "scripts/"
+  ],
+  "scripts": {
+    "postinstall": "node scripts/install.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

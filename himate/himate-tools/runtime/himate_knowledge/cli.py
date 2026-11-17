@@ -1,4 +1,4 @@
-"""Small public commands for a single-file knowledge workflow."""
+"""Set up, read, publish and maintain a HiMate knowledge base."""
 
 from __future__ import annotations
 
@@ -13,18 +13,47 @@ from .protocol import FRAMEWORK_LOCK, NodeError as CommandError, domain, envelop
 
 
 HELP_FLAGS = {"-h", "--help", "-help"}
+LIBRARY_ACTIONS = ("overview", "cards", "graph", "search", "read")
+RAW_ACTIONS = {
+    "list": "raw-list",
+    "path": "raw-path",
+    "save": "raw-save",
+    "mkdir": "raw-mkdir",
+    "rmdir": "raw-rmdir",
+    "categories": "intake-categories",
+    "preflight": "intake-preflight",
+    "save-package": "intake-save",
+}
+INGEST_ALIASES = {"review": "check", "apply": "commit", "status": "status"}
+COMMAND_GROUPS = (
+    ("Set up the execution environment", ("doctor", "setup", "install-command")),
+    ("Find and read knowledge", ("search", "read", "library")),
+    ("Manage raw materials and evidence", ("raw", "source")),
+    ("Publish knowledge", ("ingest",)),
+    ("Maintain the knowledge base", ("maintain", "patrol")),
+    ("Compatibility commands", ("query", "panel", "review", "lint", "apply", "status")),
+)
 COMMAND_HELP = {
-    "ingest": ("{scan,check,commit}", "Ingest sources into the knowledge base.\n\n"
+    "ingest": ("{scan,check,commit,status}", "Ingest sources into the knowledge base.\n\n"
                "  scan    Find source changes and prepare work.\n"
                "  check   Validate the proposed cards and their evidence.\n"
-               "  commit  Publish the checked changes."),
+               "  commit  Publish the checked changes.\n"
+               "  status  Show the current ingest task or latest receipt."),
     "source": ("[ACTION]", "Manage or read registered sources.\n\n"
                "Actions: list (default), register, resolve, extract, renew, release, cleanup, configure."),
     "query": ("[TEXT | search TEXT | read CARD_ID]", "Search the knowledge base or read a card."),
     "search": ("[TEXT]", "Search knowledge cards by text and optional tags."),
     "read": ("[CARD_ID]", "Read a full knowledge card."),
     "patrol": ("{sync,plan,reindex,complete}", "Plan and track knowledge maintenance."),
-    "maintain": ("[{audit,reindex}]", "Audit references or rebuild the published view. Audit is the default."),
+    "maintain": ("[{audit,lint,reindex}]", "Maintain the knowledge base.\n\n"
+                 "  audit    Audit source references. This is the default.\n"
+                 "  lint     Validate the formal knowledge cards.\n"
+                 "  reindex  Rebuild the published view."),
+    "library": ("{" + ",".join(LIBRARY_ACTIONS) + "}", "Browse and read the published knowledge view.\n\n"
+                "Pass view_revision in the JSON input to pin the published snapshot."),
+    "raw": ("ACTION", "Manage files in the raw materials directory.\n\n"
+            "Directory: list, path, save, mkdir, rmdir.\n"
+            "Upload intake: categories, preflight, save-package."),
     "panel": ("ACTION", "Read the published view or manage raw materials.\n\n"
               "Published view: overview, cards, search, read, graph.\n"
               "Raw materials: raw-list, raw-path, raw-save, raw-mkdir, raw-rmdir.\n"
@@ -33,7 +62,10 @@ COMMAND_HELP = {
     "lint": ("", "Validate published knowledge cards."),
     "apply": ("", "Publish the checked changes."),
     "status": ("", "Show the current ingest task or latest receipt."),
-    "doctor": ("", "Check the runtime, dependencies, configuration and rules."),
+    "doctor": ("[--environment-only [--bin-dir DIR]]", "Check the runtime, dependencies, configuration and rules.\n\n"
+               "Use --environment-only to check dependencies and the launcher without a knowledge root."),
+    "setup": ("[--bin-dir DIR] [--json | --jsonl]", "Install missing dependencies and set up the knowledge launcher.\n\n"
+              "Use --json for the final result or --jsonl for progress events and the final result."),
     "install-command": ("[--bin-dir DIR] [--add-path]", "Install the knowledge command launcher."),
 }
 
@@ -44,10 +76,13 @@ class CommandParser(argparse.ArgumentParser):
 
 
 def parser(version):
-    commands = "\n".join(f"  {name:<17} {details.splitlines()[0]}" for name, (_, details) in COMMAND_HELP.items())
+    commands = "\n\n".join(
+        heading + ":\n" + "\n".join(f"  {name:<17} {COMMAND_HELP[name][1].splitlines()[0]}" for name in names)
+        for heading, names in COMMAND_GROUPS
+    )
     result = CommandParser(prog="knowledge", description=__doc__, add_help=False,
                            formatter_class=argparse.RawDescriptionHelpFormatter,
-                           epilog=f"Commands:\n{commands}\n\nUse 'knowledge help COMMAND' for command help.")
+                           epilog=f"{commands}\n\nUse 'knowledge help COMMAND' for command help.")
     result.add_argument("command", choices=COMMAND_HELP, metavar="COMMAND")
     result.add_argument("arguments", nargs="*", metavar="ARG")
     result.add_argument("-h", "--help", "-help", action="help", help="show this help message and exit")
@@ -59,7 +94,10 @@ def parser(version):
     # the old flag without a value; never silently broaden an old query.
     result.add_argument("--purpose", nargs="?", const="", help=argparse.SUPPRESS)
     result.add_argument("--top-k", type=int)
-    result.add_argument("--json", action="store_true")
+    output_modes = result.add_mutually_exclusive_group()
+    output_modes.add_argument("--json", action="store_true")
+    output_modes.add_argument("--jsonl", action="store_true", help="stream setup progress as JSON lines")
+    result.add_argument("--environment-only", action="store_true", help="check the environment without a knowledge root")
     result.add_argument("--add-path", action="store_true")
     result.add_argument("--include-deprecated", action="store_true", default=None)
     return result
@@ -188,24 +226,40 @@ def execute(args, root, tool_root, manifest_digest):
     words = list(args.arguments)
     action = args.action or (words.pop(0) if words and args.command not in {"search", "read", "query"} else None)
     command = args.command
+    if command in INGEST_ALIASES:
+        command, action, words = "ingest", INGEST_ALIASES[command], []
     if command == "ingest":
         if words:
-            raise CommandError("INVALID_ARGUMENT", "Use ingest scan, check or commit")
+            raise CommandError("INVALID_ARGUMENT", "Use ingest scan, check, commit or status")
         if action == "scan":
             data, phase = ingest.scan(root, request)
         elif action == "check":
             data, phase = ingest.check(root, request, rules)
         elif action == "commit":
             data, phase = ingest.commit(root, request)
+        elif action == "status":
+            task = root / ".build/task.json"
+            latest = root / "artifacts/ingest/latest.json"
+            if not latest.is_file():
+                # Existing roots can retain their last receipt without migration.
+                latest = root / "logs/ingest/latest.json"
+            data = ingest.read_json(task if task.is_file() else latest) if task.is_file() or latest.is_file() else {}
+            phase = "prepared" if task.is_file() else "completed" if latest.is_file() else "idle"
         else:
-            raise CommandError("INVALID_ACTION", "Use ingest scan, check or commit")
+            raise CommandError("INVALID_ACTION", "Use ingest scan, check, commit or status")
     elif command == "source":
         if words:
             raise CommandError("INVALID_ARGUMENT", "Source parameters belong in --input")
         data, phase = library.sources(root, action or "list", request)
-    elif command == "panel":
+    elif command in {"panel", "library", "raw"}:
         if words:
-            raise CommandError("INVALID_ARGUMENT", "Panel parameters belong in --input")
+            raise CommandError("INVALID_ARGUMENT", f"{command.capitalize()} parameters belong in --input")
+        if command == "library" and action not in LIBRARY_ACTIONS:
+            raise CommandError("INVALID_ACTION", "Unknown library action. Run knowledge help library")
+        if command == "raw":
+            if action not in RAW_ACTIONS:
+                raise CommandError("INVALID_ACTION", "Unknown raw action. Run knowledge help raw")
+            action = RAW_ACTIONS[action]
         data, phase = modules["panel"].run(root, action, request)
     elif command in {"query", "search", "read"}:
         if command == "query" and words and words[0] in {"search", "read"}:
@@ -224,7 +278,9 @@ def execute(args, root, tool_root, manifest_digest):
         if words:
             raise CommandError("INVALID_ARGUMENT", "Use patrol sync, plan, reindex or complete")
         data, phase = library.patrol(root, action, request)
-    elif command == "lint":
+    elif command == "lint" or (command == "maintain" and action == "lint"):
+        if command == "maintain" and words:
+            raise CommandError("INVALID_ARGUMENT", "Maintain lint parameters belong in --input")
         data, phase = ingest.check(root, {**request, "formal": True}, rules)
     elif command == "maintain":
         if action == "reindex":
@@ -232,19 +288,7 @@ def execute(args, root, tool_root, manifest_digest):
         elif action in (None, "audit", "references", "audit-references"):
             data, phase = library.audit(root)
         else:
-            raise CommandError("INVALID_ACTION", "Use maintain audit or reindex")
-    elif command == "review":
-        data, phase = ingest.check(root, request, rules)
-    elif command == "apply":
-        data, phase = ingest.commit(root, request)
-    elif command == "status":
-        task = root / ".build/task.json"
-        latest = root / "artifacts/ingest/latest.json"
-        if not latest.is_file():
-            # Existing roots can retain their last receipt without migration.
-            latest = root / "logs/ingest/latest.json"
-        data = ingest.read_json(task if task.is_file() else latest) if task.is_file() or latest.is_file() else {}
-        phase = "prepared" if task.is_file() else "completed" if latest.is_file() else "idle"
+            raise CommandError("INVALID_ACTION", "Use maintain audit, lint or reindex")
     else:
         raise CommandError("INVALID_COMMAND", command)
     code = 1 if phase == "failed" else 0
@@ -270,6 +314,19 @@ def main(argv=None, *, tool_root, manifest):
         if show_help(arguments, command_parser):
             return 0
         args = command_parser.parse_intermixed_args(arguments)
+        if args.environment_only and args.command != "doctor":
+            raise CommandError("INVALID_ARGUMENT", "--environment-only is for doctor")
+        if args.jsonl and args.command != "setup":
+            raise CommandError("INVALID_ARGUMENT", "--jsonl is for setup")
+        if args.environment_only or args.command == "setup":
+            if args.arguments or args.add_path or any(option is not None for option in (
+                    args.action, args.input, args.output, args.knowledge_root, args.rules_digest,
+                    args.source, args.path, args.receipt, args.purpose, args.top_k, args.include_deprecated)):
+                raise CommandError("INVALID_ACTION", "This environment command accepts no knowledge request")
+            from .environment import run_environment
+            action = "check" if args.environment_only else "install"
+            output_mode = "jsonl" if args.jsonl else "json" if args.json else "text"
+            return run_environment(tool_root, manifest, action, bin_dir=args.bin_dir, output=output_mode)
         root = None
         if args.command != "install-command" or args.knowledge_root is not None:
             root = _knowledge_root(args.knowledge_root, tool_root, diagnostic=args.command == "doctor")
@@ -293,5 +350,5 @@ def main(argv=None, *, tool_root, manifest):
         if getattr(error, "path", ""):
             diagnostic["path"] = str(error.path)
         value = envelope("error", "invalid", diagnostics=[diagnostic])
-        emit(value, args.json if args else "--json" in arguments, failed=True)
+        emit(value, (args.json or args.jsonl) if args else bool({"--json", "--jsonl"}.intersection(arguments)), failed=True)
         return 2

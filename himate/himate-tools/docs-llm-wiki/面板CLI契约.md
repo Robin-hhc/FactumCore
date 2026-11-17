@@ -1,18 +1,18 @@
 # 面板 CLI 契约
 
-OpenFlow 通过宿主的 `OPENFLOW_KNOWLEDGE_TOOLKIT_ROOT` 定位 `knowledge.py` 和 `tools/deploy/environment.py`。工具包目录使用绝对路径，并与已绑定的知识根分开。宿主按 `OPENFLOW_KNOWLEDGE_PYTHON` 指定的绝对路径选择 Python 3.10–3.12，未指定时从宿主机探测。面板操作直接使用该解释器运行 `knowledge.py`，显式传入已绑定的知识根。业务命令从 stdin 接收 JSON 对象，沿用知识 CLI 的结果封装。
+OpenFlow 通过宿主的 `OPENFLOW_KNOWLEDGE_TOOLKIT_ROOT` 定位 `knowledge.py`。工具包目录使用绝对路径，并与已绑定的知识根分开。宿主按 `OPENFLOW_KNOWLEDGE_PYTHON` 指定的绝对路径选择 Python 3.10–3.12，未指定时从宿主机探测。业务操作用该解释器运行 CLI，显式传入已绑定的知识根。通过 stdin 接收 JSON 对象，沿用知识 CLI 的结果封装。
 
 ```sh
-printf '%s' '{"limit":20}' | python -B /absolute/tool/root/knowledge.py panel cards --knowledge-root /absolute/knowledge/root --input - --json
+printf '%s' '{"limit":20}' | python -B /absolute/tool/root/knowledge.py library cards --knowledge-root /absolute/knowledge/root --input - --json
 ```
 
 成功读取 `status: "ok"` 和 `data`。失败读取 `diagnostics[].code` 和 `message`。卡、来源、路径等 ID 相对已绑定知识根解释。
 
-带 `--json` 的业务命令在成功和失败时都将单条 JSON 结果写入 stdout。命令启动后的纯文本错误写入 stderr。帮助和版本查询不需要知识根，可执行 `knowledge`、`knowledge --help`、`knowledge help panel` 或 `knowledge panel --help`。总帮助也接受 `-h`、`-help` 和 `help`。`knowledge --version` 显示工具包版本。
+带 `--json` 的业务命令在成功和失败时都将单条 JSON 结果写入 stdout。命令启动后的纯文本错误写入 stderr。帮助和版本查询不需要知识根，可执行 `knowledge`、`knowledge --help`、`knowledge help library` 或 `knowledge library --help`。总帮助也接受 `-h`、`-help` 和 `help`。`knowledge --version` 显示工具包版本。
 
 ## 环境检查和安装
 
-环境入口可在首次绑定前执行。`<Python> -B <工具包>/tools/deploy/environment.py check` 返回一行 JSON，包含 `status`、`tool_root`、`toolkit_version`、`python`、`python_version`、`dependencies`、`diagnostics` 和 `command`。`dependencies` 的每项包含 `name`、`expected`、`actual` 和 `status`（`ready`、`missing` 或 `mismatch`）。每条诊断包含 `code` 和 `message`。
+环境入口可在首次绑定前执行。`knowledge doctor --environment-only --json` 返回一行 JSON，包含 `status`、`tool_root`、`toolkit_version`、`python`、`python_version`、`dependencies`、`diagnostics` 和 `command`。`dependencies` 每项包含 `name`、`expected`、`actual` 和 `status`（`ready`、`missing` 或 `mismatch`）。每条诊断包含 `code` 和 `message`。生成有效检查报告时退出码为 0，就绪情况以 `status` 为准。
 
 | `status` | 含义 |
 | --- | --- |
@@ -22,33 +22,35 @@ printf '%s' '{"limit":20}' | python -B /absolute/tool/root/knowledge.py panel ca
 
 检查只读。无法加载工具包或依赖清单时，返回非零退出码和 `status: "unavailable"` 的诊断。`command` 为 `null` 或 `{path,bin_dir,dispatcher,installed,path_registered,on_path,shadowed_by}`。`installed` 表示启动文件与所选工具及 Python 匹配，并符合默认目录的注册要求。`path_registered` 表示 Windows 当前账户的用户 `PATH` 已登记该目录。`on_path` 表示当前进程的 `PATH` 实际优先解析到该命令，`shadowed_by` 记录优先匹配到的其他命令。Linux 上 `ready` 可以与 `on_path: false` 同时出现。
 
-`install` 以 JSON 行发出 `checking`、`installing`（需要 pip 时）、`registering`（需要注册时）和 `verifying`。它先复查依赖，再注册命令。成功以最终 `ready` 报告和退出码 0 结束。失败事件包含 `phase`、`code`、`message`、`diagnostics`，并以非零退出码结束。已装依赖会在下一次检查时复用，注册失败重试时可以跳过 pip。同名文件冲突为 `COMMAND_EXISTS`，默认目录的命令被 `PATH` 中更优先的入口遮挡为 `COMMAND_PATH_CONFLICT`。Windows 0.22.3 起按 `PATH` 和 `PATHEXT` 查找，单独存在于当前目录的工具包启动文件不会触发这个冲突。
+`knowledge setup --jsonl` 发出 `checking`、按需的 `installing` 和 `registering`，以及 `verifying`，最后发送一条结果。成功时最终状态为 `ready`，退出码为 0。失败结果带 `phase`、`code`、`message` 和 `diagnostics` 并退出非零。只需要最终一条结果时使用 `setup --json`。重复执行会跳过已完成的安装阶段，复用 npm 启动器或按需准备手动安装的启动器。
 
-OpenFlow 用 `POST /api/knowledge/environment/check` 检查，用 `POST /api/knowledge/environment/install` 开启后台安装，两者以 JSON `{}` 提交。用 `GET /api/knowledge/environment/install` 查询当前任务。宿主进程同一时间只执行一项环境安装，重复提交返回正在执行的任务。安装结束后宿主独立复查 `ready`。支持环境脚本但只提供 `ready`、`needs_install` 的旧工具包可继续走原有依赖流程，`command` 可以省略。缺少环境脚本时，环境入口提示更新工具包。
+OpenFlow 用 `POST /api/knowledge/environment/check` 检查，用 `POST /api/knowledge/environment/install` 开启后台安装，两者以 JSON `{}` 提交。用 `GET /api/knowledge/environment/install` 查询当前任务。宿主同一时间执行一项安装，结束后独立复查 `ready`。尚未提供公开子命令的旧工具包继续使用原环境脚本和旧 `panel` 命令。
 
 ## 面板操作
 
+以下是推荐公开命令。旧 `panel` 动作继续接受相同请求并返回相同结果。
+
 | 动作 | 请求 | `data` |
 | --- | --- | --- |
-| `panel overview` | `{view_revision?}` | `{view_revision,card_count,document_count,code_count,types,recent_cards}` |
-| `panel cards` | `{view_revision?,query?,type?,tag?,cursor?,limit?}` | `{view_revision,items:[{id,title,type,tags,summary}],next_cursor}` |
-| `panel search` | `{view_revision?,query,tags?,top_k?}` | `{view_revision,matches,truncated}`，候选沿用整卡检索字段和权重 |
-| `panel read` | `{view_revision?,card_id}` | 完整读卡结果与 `view_revision` |
-| `panel graph` | `{view_revision?,card_id,kinds?,cursor?,limit?}` | `{view_revision,nodes:[{id,title,kind,ref_id?}],edges:[{source,target,kind}],next_cursor}` |
-| `panel graph` | `{scope:"global",view_revision?}` | `{view_revision,nodes,edges,node_count,edge_count,truncated}` |
-| `panel graph` | `{scope:"neighbors",node_id,view_revision?,kinds?,cursor?,limit?}` | `{view_revision,nodes,edges,next_cursor}` |
-| `panel raw-list` | `{path?,cursor?,limit?}` | `{path,items:[{name,path,kind,size,category?,empty?}],next_cursor}` |
-| `panel raw-path` | `{path}` | `{name,path,kind,size,absolute_path}`，供可信文件服务使用 |
-| `panel raw-save` | `{path,staged_path,expected_size?,expected_sha256?}` | `{name,path,kind,size,sha256}` |
-| `panel raw-mkdir` | `{path}` | `{path}`，阶段 `created` |
-| `panel raw-rmdir` | `{path}` | `{path}`，阶段 `removed` |
-| `panel intake-categories` | `{}` | `{categories:[{id,label,description}]}` |
-| `panel intake-preflight` | `{files:[{path,staged_path,size,sha256}]}` | `{categories,items,ignored}` |
-| `panel intake-save` | `{category,document_path,files:[{path,staged_path,expected_size,expected_sha256}]}` | `{name,path,kind,size,sha256}` |
+| `library overview` | `{view_revision?}` | `{view_revision,card_count,document_count,code_count,types,recent_cards}` |
+| `library cards` | `{view_revision?,query?,type?,tag?,cursor?,limit?}` | `{view_revision,items:[{id,title,type,tags,summary}],next_cursor}` |
+| `library search` | `{view_revision?,query,tags?,top_k?}` | `{view_revision,matches,truncated}`，候选沿用整卡检索字段和权重 |
+| `library read` | `{view_revision?,card_id}` | 完整读卡结果与 `view_revision` |
+| `library graph` | `{view_revision?,card_id,kinds?,cursor?,limit?}` | `{view_revision,nodes:[{id,title,kind,ref_id?}],edges:[{source,target,kind}],next_cursor}` |
+| `library graph` | `{scope:"global",view_revision?}` | `{view_revision,nodes,edges,node_count,edge_count,truncated}` |
+| `library graph` | `{scope:"neighbors",node_id,view_revision?,kinds?,cursor?,limit?}` | `{view_revision,nodes,edges,next_cursor}` |
+| `raw list` | `{path?,cursor?,limit?}` | `{path,items:[{name,path,kind,size,category?,empty?}],next_cursor}` |
+| `raw path` | `{path}` | `{name,path,kind,size,absolute_path}`，供可信文件服务使用 |
+| `raw save` | `{path,staged_path,expected_size?,expected_sha256?}` | `{name,path,kind,size,sha256}` |
+| `raw mkdir` | `{path}` | `{path}`，阶段 `created` |
+| `raw rmdir` | `{path}` | `{path}`，阶段 `removed` |
+| `raw categories` | `{}` | `{categories:[{id,label,description}]}` |
+| `raw preflight` | `{files:[{path,staged_path,size,sha256}]}` | `{categories,items,ignored}` |
+| `raw save-package` | `{category,document_path,files:[{path,staged_path,expected_size,expected_sha256}]}` | `{name,path,kind,size,sha256}` |
 
 OpenFlow 的绑定响应使用 `ETag` 标识所选知识库。浏览器后续以 `If-Match` 传回该值，宿主对旧绑定的请求返回 `KNOWLEDGE_BINDING_CHANGED`。它与 CLI 的 `view_revision` 分别标识库绑定和发布版本。首次校验通过 `doctor` 检查配置和规则，再试读原件根目录。依赖缺失阻止校验时，宿主返回 `KNOWLEDGE_BINDING_DEPENDENCIES_REQUIRED`，界面引导先安装环境再校验。确认保存绑定时才尝试读取 `overview`，发布视图缺失时执行一次 `maintain reindex`。
 
-`/api/knowledge/operation` 只接受已列入宿主允许列表的操作及参数。发布卡片的路径深链由宿主先查出卡 ID，再调用 `panel read`，并核对返回的卡 ID 和路径。CLI 的 `panel read` 接收 `card_id` 和可选的 `view_revision`。
+`/api/knowledge/operation` 只接受已列入宿主允许列表的操作及参数。发布卡片的路径深链由宿主先查出卡 ID，再调用 `library read`，并核对返回的卡 ID 和路径。CLI 的 `library read` 接收 `card_id` 和可选的 `view_revision`。
 
 `overview` 的文档和代码数量分别去重统计被正式卡引用的来源。类型项为 `{type,count}`，最近卡片为 `{id,title,type}`，按文件更新时间取至多 10 张。类型由目录映射，旧 draft 不进入面板，其他旧卡仍可浏览。卡片列表按 ID 排序，查询可按正文词项、卡片类型和单个标签过滤。标题、摘要和标签只显示列表所需的短值，完整内容可用 `read` 取得。
 
@@ -66,7 +68,7 @@ OpenFlow 的绑定响应使用 `ETag` 标识所选知识库。浏览器后续以
 
 执行 `maintain reindex --json` 构建首个面板版本，包括空知识库。成功的 P5 和显式重建在现有 SQLite 写事务内发布新 `view_revision`。重建失败保留上次成功版本。面板查询直接读取发布表，返回轻量分页数据。绑定或维护流程遇到 `PANEL_VIEW_UNAVAILABLE` 时可执行一次重建。SQLite 锁争用导致读取暂时失败时返回 `PANEL_VIEW_BUSY`，客户端稍后重试同一读请求。版本已换时，客户端收到 `PANEL_REVISION_MISMATCH` 后刷新；筛选不匹配的游标返回 `PANEL_CURSOR_INVALID`。P5 在发布成功后更新本机最新回执。回执写入失败时，P5 仍返回 `completed`，并在 `data.receipt_warning` 报告文件错误。自动化应使用本次命令返回的结果。
 
-Agent 可用 `panel search` 获取候选与版本，将该版本传给 `panel read` 读取同一发布版本。`read --input - --json` 同样接受 `{card_id,view_revision}`。已有无版本的 `read`、`search` 与 `source list` 保持各自的查询语义。版本化详情通过 `card_links: [{target,card_id,anchor?}]` 给出可生成深链的相对链接。 `target` 含正文中的原始片段，`anchor` 是已核对的解码后锚点。导航、原件、外部链接、图片、代码示例和不存在的锚点不进入这个映射。`heading_anchors: [{anchor,line}]` 提供治理解析器支持的正文标题锚点，行号从 `body` 的第一行起算。客户端应按源行设置这些锚点。旧投影可在下一次发布或重建后补出这些字段。
+Agent 可用 `library search` 获取候选与版本，将该版本传给 `library read` 读取同一发布版本。`read --input - --json` 同样接受 `{card_id,view_revision}`。已有无版本的 `read`、`search` 与 `source list` 保持各自的查询语义。版本化详情通过 `card_links: [{target,card_id,anchor?}]` 给出可生成深链的相对链接。 `target` 含正文中的原始片段，`anchor` 是已核对的解码后锚点。导航、原件、外部链接、图片、代码示例和不存在的锚点不进入这个映射。`heading_anchors: [{anchor,line}]` 提供治理解析器支持的正文标题锚点，行号从 `body` 的第一行起算。客户端应按源行设置这些锚点。旧投影可在下一次发布或重建后补出这些字段。
 
 P4 检查在本批暂存记录实际核对过的来源字节。P5 将这些引用和精确来源版本关联到现有来源登记，正式卡保持审阅时的字节。卡片关联摘要统一 CRLF/LF，原件 SHA-256 按原始字节计算。重建只使用已持久化的绑定。对同样的卡片和引用重新核对并发布时，关联更新为这次核对的版本，历史快照仍可按 ID 查询。
 

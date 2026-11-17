@@ -158,7 +158,7 @@ flowchart LR
 
 同一次浏览从概览取得 `view_revision`，再用该值读取列表、详情、图谱及后续分页。收到 `PANEL_REVISION_MISMATCH` 时刷新后重试，收到 `PANEL_VIEW_BUSY` 时可稍后重试。引用到某张卡的会话链接也可携带绑定和发布版本，切库或版本更新后需要重新查询。Agent 需要与面板读取同一发布版本时，可将 `panel search` 返回的版本传给 `panel read`。
 
-普通 `knowledge search` 可按需更新检索派生表，面板刷新只读取上次发布视图。若 CI 在另一检出目录发布，将正式卡和来源登记同步到实际绑定目录，在那里运行 `knowledge maintain reindex --knowledge-root <知识根> --json` 后再刷新面板。若 P5 已在绑定目录成功发布，直接刷新即可。
+普通 `knowledge search` 可按需更新检索派生表。若 CI 在另一检出目录发布，将正式卡和来源登记同步到实际绑定目录，再点击页头「刷新」。OpenFlow 在绑定目录调用 `knowledge maintain reindex`，显示重建状态，成功后按返回的发布版本重新加载概览、知识卡和图谱。重建失败时保留当前视图并显示原因，可以再次点击「刷新」重试。普通浏览读取已有的发布视图。
 
 ## 5. 节点详细职责
 

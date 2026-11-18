@@ -1,6 +1,6 @@
 # HiMate 知识库架构设计
 
-实现基线为 HiMate 工具包 `0.23.2` 和 OpenFlow F176。日常操作见[使用指南](HiMate知识库使用指南.md)，节点契约和页面交互分别见[详细设计](HiMate知识库详细设计.md)与 [OpenFlow F176](https://github.com/xmkid/OpenFlow/pull/29)。
+实现基线为 HiMate 工具包 `0.24.1` 和 OpenFlow F176。日常操作见[使用指南](HiMate知识库使用指南.md)，节点契约和页面交互分别见[详细设计](HiMate知识库详细设计.md)与 [OpenFlow F176](https://github.com/xmkid/OpenFlow/pull/29)。
 
 ## 1. 系统目标
 
@@ -79,7 +79,7 @@ flowchart TD
     P5 -.->|执行失败，按原批重试| P5
 ```
 
-每批围绕一个来源。PDF 可分批评估物理页，P5 成功后登记本批覆盖，覆盖全篇才更新整文成功版本。已完整评估且无需改卡的批次经独立审阅后也可登记处理进度。见[完整流程与节点判断](知识库详细设计.md#21-完整流程与节点判断)。
+每批围绕一个来源。PDF 可分批评估物理页，P5 成功后登记本批覆盖，覆盖全篇才更新整文成功版本。已完整评估且无需改卡的批次经独立审阅后也可登记处理进度。见[完整流程与节点判断](HiMate知识库详细设计.md#21-完整流程与节点判断)。
 
 ### 4.2 消费流程
 
@@ -94,7 +94,7 @@ flowchart TD
     C --> F["形成结论，说明适用条件与证据缺口"]
 ```
 
-普通 Agent 检索按需维护检索索引。OpenFlow 浏览使用 P5 或显式重建生成的发布视图，视图版本变化时重新取数。证据按引用版本回源，精确版本不可用时提示用户。见[消费流程与检索规则](知识库详细设计.md#4-消费流程从问题到证据回答)和[OpenFlow 正式知识视图](知识库详细设计.md#41-openflow-正式知识视图)。
+普通 Agent 检索按需维护检索索引。OpenFlow 浏览使用 P5 或显式重建生成的发布视图，视图版本变化时重新取数。证据按引用版本回源，精确版本不可用时提示用户。见[消费流程与检索规则](HiMate知识库详细设计.md#4-消费流程从问题到证据回答)和[OpenFlow 正式知识视图](HiMate知识库详细设计.md#41-openflow-正式知识视图)。
 
 ### 4.3 治理流程
 
@@ -110,7 +110,7 @@ flowchart TD
     L2 -->|无待办| L4
 ```
 
-巡检批次成功后回 L2，由巡检重新选择待办来源。L3 只维护派生索引，L4 报告剩余进度和阻塞。Git 提交、推送和 CI 合入由业务仓流程负责。见[lint 的检查流程](知识库详细设计.md#31-lint-的检查流程)和[Git 提交与可选 CI 检查](知识库详细设计.md#32-git-提交与可选-ci-检查)。
+巡检批次成功后回 L2，由巡检重新选择待办来源。L3 只维护派生索引，L4 报告剩余进度和阻塞。Git 提交、推送和 CI 合入由业务仓流程负责。见[lint 的检查流程](HiMate知识库详细设计.md#31-lint-的检查流程)和[Git 提交与可选 CI 检查](HiMate知识库详细设计.md#32-git-提交与可选-ci-检查)。
 
 ## 5. 工作区与数据组织
 
@@ -130,9 +130,9 @@ flowchart TD
 
 工具包提供安装入口、运行依赖、共用规则、CLI 和离线模型。能力包提供自带参考与模板的 Skill，以及引用 Skill ID 的 Workflow。Agent 在节点加载对应 Skill，结合任务输入查阅随包材料并调用已安装的 CLI。
 
-部署使用 Python 3.10–3.12。工具包和能力包可分开存放。Windows 的 `deploy.ps1` 与 Linux 的 `deploy.sh` 共用 Python 后端，默认从同级 `himate-skills/` 安装，也可显式指定能力包及宿主安装目录。默认将 Skill 安装到 `~/.openflow/config/skills` 和 `~/.cac/skills`，将 Workflow 安装到 `~/.openflow/config/workflow-templates`。该部署入口同时处理锁定依赖，传入知识根时准备 `artifacts/models/docling-cpu/`，准备成功后替换同名能力包。 [部署说明](../../himate-tools/docs/DEPLOY.md)
+用户通过 npm 安装 CLI 和模型包，用 `knowledge --version` 检查入口，再运行 `knowledge setup` 安装运行环境。Windows 的 `deploy.ps1` 与 Linux 的 `deploy.sh` 共用 Python 标准库后端，负责安装能力包。脚本默认读取同级 `himate-skills/`，也可显式指定能力包及宿主安装目录。默认将 Skill 安装到 `~/.openflow/config/skills` 和 `~/.cac/skills`，将 Workflow 安装到 `~/.openflow/config/workflow-templates`，更新时替换同名能力包。 [部署说明](../../himate-tools/docs/DEPLOY.md)
 
-终端、自动化、Agent 和 OpenFlow 统一使用 `knowledge`。工作台用 `doctor --environment-only --json` 检查宿主环境，用 `setup --jsonl` 安装环境。CLI 用选定的 Python 运行 pip，在该解释器的安装位置补齐锁定依赖，并用同一解释器复查。环境检查和安装可以在绑定前执行，能力包和 OCR 模型由部署脚本单独准备。
+终端、自动化、Agent 和 OpenFlow 统一使用 `knowledge`。工作台用 `doctor --environment-only --json` 检查宿主环境，用 `setup --jsonl` 安装环境。CLI 用选定的 Python 运行 pip，在该解释器的安装位置补齐锁定依赖，并用同一解释器复查。环境检查和安装可以在绑定前执行。模型 npm 包在执行账户的工具目录准备完整模型，standard OCR 默认从该位置读取，显式配置的知识库内模型继续可用。
 
 npm 在全局命令目录注册 `knowledge`，`setup` 会复用该启动器。宿主须继承包含 npm 命令目录的 PATH。手动部署时，Windows 在 `%LOCALAPPDATA%\HiMate\bin` 生成 `knowledge.cmd` 并更新执行账户的 PATH，Linux 默认在 `~/.local/bin` 生成 `knowledge`。旧源码部署可显式配置 `OPENFLOW_KNOWLEDGE_TOOLKIT_ROOT`，宿主的 `OPENFLOW_KNOWLEDGE_PYTHON` 是可选的解释器覆盖项。
 
@@ -222,4 +222,4 @@ PDF 本批范围或非 PDF 全文已完整评估但没有知识增量，也可�
 
 不同群组分别管理知识根、可引用代码范围及执行环境，并通过实际存储权限和运行账户控制访问。原件、卡片、数据库、缓存和记录应处于一致的访问边界；标签与检索条件用于选择内容范围。
 
-原件格式、引用位置和版本恢复规则见[详细设计](知识库详细设计.md#57-来源恢复与定位)。
+原件格式、引用位置和版本恢复规则见[详细设计](HiMate知识库详细设计.md#57-来源恢复与定位)。

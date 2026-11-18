@@ -24,8 +24,7 @@ def recorder(path):
 
 
 @pytest.mark.parametrize("selection", ["default", "environment", "flag", "equals"])
-@pytest.mark.parametrize("download_models", [False, True])
-def test_posix_selects_python_and_forwards_paths_from_another_directory(tmp_path, selection, download_models):
+def test_posix_selects_python_and_forwards_paths_from_another_directory(tmp_path, selection):
     distribution = tmp_path / "distribution with spaces"
     distribution.mkdir()
     wrapper = distribution / "deploy.sh"
@@ -43,6 +42,7 @@ def test_posix_selects_python_and_forwards_paths_from_another_directory(tmp_path
                  "--skills-root", str(tmp_path / "skills root"),
                  "--cac-skills-root", str(tmp_path / "cac skill root"),
                  "--workflows-root", str(tmp_path / "workflow root")]
+    forwarded = list(arguments)
     if selection == "environment":
         environment["HIMATE_KNOWLEDGE_PYTHON"] = str(selected)
     elif selection == "flag":
@@ -52,9 +52,6 @@ def test_posix_selects_python_and_forwards_paths_from_another_directory(tmp_path
         arguments += ["--python=" + str(selected)]
     else:
         selected = default
-    if download_models:
-        arguments += ["--knowledge-root", str(tmp_path / "data root"), "--download-models"]
-
     result = subprocess.run(["sh", str(wrapper), *arguments], cwd=working, env=environment,
                             capture_output=True, timeout=30)
 
@@ -62,7 +59,7 @@ def test_posix_selects_python_and_forwards_paths_from_another_directory(tmp_path
     recorded = capture.read_bytes().decode("utf-8").split("\0")[:-1]
     assert Path(recorded[0]) == selected
     assert Path(recorded[1]) == distribution / "distribution/source/deploy.py"
-    assert recorded[2:] == arguments
+    assert recorded[2:] == forwarded
     assert not (tmp_path / "skills root").exists()
     assert not (tmp_path / "workflow root").exists()
 
@@ -99,15 +96,16 @@ def test_posix_help_reaches_shared_backend_without_deployment(tmp_path):
     assert result.returncode == 0, result.stderr.decode("utf-8", "replace")
     assert b"--skills-root" in result.stdout and b"--workflows-root" in result.stdout
     assert b"--capabilities-root" in result.stdout
-    assert b"--skip-ocr" not in result.stdout
-    assert b"--knowledge-root" in result.stdout and b"--download-models" in result.stdout
+    for option in (b"--skip-ocr", b"--knowledge-root", b"--download-models"):
+        assert option not in result.stdout
     assert not (tmp_path / ".openflow").exists()
 
 
-def test_posix_rejects_removed_skip_option_before_deployment(tmp_path):
+@pytest.mark.parametrize("option", ["--knowledge-root", "--download-models", "--skip-ocr"])
+def test_posix_rejects_environment_options_before_deployment(tmp_path, option):
     result = subprocess.run(
-        ["sh", str(WRAPPER), "--python", sys.executable, "--skip-ocr", "--source-root", str(tmp_path)],
+        ["sh", str(WRAPPER), "--python", sys.executable, option, "--source-root", str(tmp_path)],
         cwd=tmp_path, capture_output=True, timeout=30)
     assert result.returncode == 2
-    assert b"unrecognized arguments: --skip-ocr" in result.stderr
+    assert option.encode() in result.stderr
     assert not (tmp_path / "artifacts").exists()

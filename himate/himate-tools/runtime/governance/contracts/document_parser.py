@@ -136,11 +136,11 @@ def _profile(options, suffix, root):
         except metadata.PackageNotFoundError:
             continue
     models = []
-    if options["pipeline"] == "standard" and suffix in ({".pdf"} | IMAGE_FORMATS) and options["models_path"]:
-        directory = safe_path(root, options["models_path"], ["artifacts/models"])
+    if options["pipeline"] == "standard" and suffix in ({".pdf"} | IMAGE_FORMATS):
+        directory = _model_directory(root, options)
         for path in sorted(directory.rglob("*")):
             if path.is_file() and ".cache" not in path.parts and path.suffix in {".json", ".safetensors", ".onnx", ".bin", ".pth", ".txt", ".yaml"}:
-                safe_path(root, path.relative_to(root).as_posix(), [options["models_path"]])
+                safe_path(directory, path.relative_to(directory).as_posix())
                 digest = hashlib.sha256()
                 with path.open("rb") as stream:
                     for chunk in iter(lambda: stream.read(1024 * 1024), b""):
@@ -400,12 +400,18 @@ def _native_text(data):
     return text
 
 
+def _model_directory(root, options):
+    if options["models_path"] is not None:
+        return safe_path(root, options["models_path"], ["artifacts/models"])
+    directory = Path.home() / ".himate/knowledge/tools/deploy/models/docling-cpu"
+    _workspace_no_links(directory)
+    return directory
+
+
 def _models(root, options):
-    if options["models_path"] is None:
-        raise ContractError("PARSER_MODELS_REQUIRED", "standard OCR requires preinstalled artifacts/models assets")
-    directory = safe_path(root, options["models_path"], ["artifacts/models"])
+    directory = _model_directory(root, options)
     if not directory.is_dir():
-        raise ContractError("PARSER_MODELS_REQUIRED", "The configured local model directory is unavailable")
+        raise ContractError("PARSER_MODELS_REQUIRED", "OCR models are unavailable. Install @himate/knowledge-models with npm.")
     for reference in OCR_MODEL_FILES:
         path = safe_path(directory, reference)
         if not path.is_file() or not path.stat().st_size:

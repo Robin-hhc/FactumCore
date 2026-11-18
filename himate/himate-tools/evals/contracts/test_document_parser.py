@@ -14,6 +14,20 @@ parser = module("document_parser")
 ContractError = module("validation").ContractError
 
 
+@pytest.fixture(autouse=True)
+def isolated_model_home(tmp_path, monkeypatch):
+    profile = tmp_path / "profile"
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: profile))
+    return profile
+
+
+def write_models(directory):
+    for reference in parser.OCR_MODEL_FILES:
+        target = directory / reference
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(reference.encode("utf-8"))
+
+
 def png_bytes():
     from PIL import Image
     stream = BytesIO()
@@ -356,6 +370,51 @@ def test_empty_model_directory_is_not_a_download_permission(tmp_path, monkeypatc
     descriptor, _ = parse_bytes(tmp_path, ".pdf", options={"pipeline": "standard", "models_path": "artifacts/models/empty"})
     assert descriptor["parse_status"] == "partial"
     assert descriptor["gaps"][0]["code"] == "PARSER_MODELS_REQUIRED"
+
+
+def test_standard_uses_npm_models_without_writing_them_into_knowledge(tmp_path, isolated_model_home):
+    models = isolated_model_home / ".himate/knowledge/tools/deploy/models/docling-cpu"
+    write_models(models)
+    options = parser._options(tmp_path, {"pipeline": "standard"})
+
+    assert parser._models(tmp_path, options) == models
+    profile = parser._profile(options, ".pdf", tmp_path)
+    assert {row["ref"] for row in profile["model_files"]} == set(parser.OCR_MODEL_FILES)
+    assert profile["options"]["models_path"] is None
+    assert not (tmp_path / "artifacts/models").exists()
+
+    before = parser.sha256_bytes(parser.canonical_bytes(profile))
+    (models / parser.OCR_MODEL_FILES[0]).write_bytes(b"updated model")
+    after = parser.sha256_bytes(parser.canonical_bytes(parser._profile(options, ".pdf", tmp_path)))
+    assert before != after
+
+
+def test_explicit_model_directory_keeps_priority_over_npm_models(tmp_path, isolated_model_home):
+    write_models(isolated_model_home / ".himate/knowledge/tools/deploy/models/docling-cpu")
+    explicit = tmp_path / "artifacts/models/custom"
+    explicit.mkdir(parents=True)
+    options = parser._options(tmp_path, {"pipeline": "standard", "models_path": "artifacts/models/custom"})
+
+    with pytest.raises(ContractError, match="PARSER_MODELS_REQUIRED"):
+        parser._models(tmp_path, options)
+    write_models(explicit)
+    assert parser._models(tmp_path, options) == explicit
+
+
+def test_npm_models_cannot_follow_a_link_outside_the_installed_bundle(tmp_path, isolated_model_home):
+    models = isolated_model_home / ".himate/knowledge/tools/deploy/models/docling-cpu"
+    write_models(models)
+    model = models / parser.OCR_MODEL_FILES[0]
+    outside = tmp_path / "outside-model"
+    model.rename(outside)
+    try:
+        model.symlink_to(outside)
+    except OSError:
+        pytest.skip("The host does not allow synthetic symlinks")
+
+    options = parser._options(tmp_path, {"pipeline": "standard"})
+    with pytest.raises(ContractError, match="WORKSPACE_LINKED_PATH|PATH_ESCAPE"):
+        parser._models(tmp_path, options)
 
 
 def test_external_html_images_are_not_fetched_or_implicitly_read(tmp_path, monkeypatch):

@@ -1,22 +1,22 @@
 # npm 发布与安装
 
-两个包，分别发布：
+CLI 和模型使用两个独立 npm 包。
 
-| 包 | 目录 | 体积 |
+| 包 | 目录 | 内容 |
 |---|---|---|
-| `@himate/knowledge-cli` | 仓库根目录 | 约 1.5MB |
-| `@himate/knowledge-models` | `distribution/models/` | 约 397MB |
+| `@himate/knowledge-cli` | 仓库根目录 | 全局命令和运行代码 |
+| `@himate/knowledge-models` | `distribution/models/` | 本机 OCR 模型 |
 
 ## 1. Verdaccio 准备
 
-大包需要放开请求体上限，否则模型包会返回 413：
+模型包需要较大的请求体上限。Verdaccio 配置如下。
 
 ```yaml
 # config.yaml
 max_body_size: 1gb
 ```
 
-首次发布前登录：
+首次发布前登录。
 
 ```bash
 npm adduser --registry http://10.143.57.12:4873
@@ -39,22 +39,24 @@ npm publish --registry http://10.143.57.12:4873
 Windows 和 Linux 使用相同的命令。npm 11 默认执行安装脚本，可以直接安装。
 
 ```bash
-npm i -g @himate/knowledge-cli --registry http://10.143.57.12:4873
-knowledge setup
-# 需要离线 OCR 模型包时
 npm i -g @himate/knowledge-models --registry http://10.143.57.12:4873
+npm i -g @himate/knowledge-cli --registry http://10.143.57.12:4873
+knowledge --version
+knowledge setup
 ```
 
 npm 12 默认拦截未授权的安装脚本。全局安装时为各包授权执行其安装脚本。
 
 ```bash
-npm i -g @himate/knowledge-cli --registry http://10.143.57.12:4873 --allow-scripts=@himate/knowledge-cli
-knowledge setup
-# 需要离线 OCR 模型包时
 npm i -g @himate/knowledge-models --registry http://10.143.57.12:4873 --allow-scripts=@himate/knowledge-models
+npm i -g @himate/knowledge-cli --registry http://10.143.57.12:4873 --allow-scripts=@himate/knowledge-cli
+knowledge --version
+knowledge setup
 ```
 
-安装后内容落在：
+模型包准备完整本机模型，CLI 包注册 `knowledge`。`knowledge --version` 检查命令能否启动，`knowledge setup` 安装并复查 Python 依赖。随后从团队交付的工具目录运行 deploy 脚本安装 Skills 和 Workflows，再启动 OpenFlow。 [能力安装步骤](DEPLOY.md#安装-skills-与-workflows)
+
+安装后的内容位于当前账户的工具目录。
 
 ```
 ~/.himate/knowledge/
@@ -63,17 +65,18 @@ npm i -g @himate/knowledge-models --registry http://10.143.57.12:4873 --allow-sc
 ├── runtime/             CLI、依赖锁和 governance/
 ├── distribution/source/
 ├── docs/DEPLOY.md
-└── tools/deploy/models/  安装独立模型包时生成
+└── tools/deploy/models/  模型包校验并合并的完整本机模型
 ```
 
-平台差异由包内脚本自动处理：
+包内脚本处理命令和模型的安装。
 
 - npm 只注册 `knowledge` 命令。Windows 的 `knowledge.cmd`、`knowledge.ps1` 和 Linux 的 `knowledge` 软链由 npm 生成，位于 npm 的全局命令目录。
-- `postinstall` 用 `process.platform` 区分路径分隔符与可执行权限
+- CLI 的 `postinstall` 用 `process.platform` 区分路径分隔符与可执行权限。
+- 模型包的 `postinstall` 校验完整清单与分片，合并并校验最终文件，再安装到本机模型目录。standard OCR 默认读取该目录。
 - 启动器从系统查找 Python 3.10–3.12。`knowledge setup` 用选定的解释器执行 `python -m pip install -r`，在其安装位置补齐工具包锁定的依赖。
-- OpenFlow 默认从它启动时的 PATH 找 `knowledge`。安装后用宿主账户验证 `knowledge --version`，随后启动或重启 OpenFlow。 [宿主环境配置](DEPLOY.md#检查或安装宿主运行环境)
+- OpenFlow 默认从它启动时的 PATH 找 `knowledge`。安装后用宿主账户验证 `knowledge --version`，随后启动或重启 OpenFlow。 [启动 OpenFlow](DEPLOY.md#启动-openflow)
 
-Linux 全局安装若提示权限不足，可把 npm 全局目录指到当前用户目录。运行 npm 安装与使用 `knowledge` 采用同一账户：
+Linux 全局安装若提示权限不足，可把 npm 全局目录指到当前用户目录。运行 npm 安装与使用 `knowledge` 采用同一账户。
 
 ```bash
 npm config set prefix ~/.npm-global
@@ -118,7 +121,7 @@ CLI 安装脚本保留 `logs/` 和 `tools/deploy/models/`。需要继续使用�
 - 部分 npm 11 版本会提醒用户检查安装脚本。内网另有脚本策略时，按该策略和客户端支持的参数选择命令
 - 模型包安装时会按 `manifest.json` 校验每个分片的字节数与 SHA-256，校验失败会中止安装
 - 两个包的安装顺序不限：先装 CLI 或先装模型都可以
-- 本机需要可用的 Node.js 和 Python 3.10–3.12。补装依赖时，选定的 Python 需要可用的 pip，且 pip 的安装位置需要允许写入。系统发行版管理 Python 时，按该发行版的策略选择允许安装依赖的解释器。 [宿主环境配置](DEPLOY.md#检查或安装宿主运行环境)
+- 本机需要可用的 Node.js 和 Python 3.10–3.12。补装依赖时，选定的 Python 需要可用的 pip，且 pip 的安装位置需要允许写入。系统发行版管理 Python 时，按该发行版的策略选择允许安装依赖的解释器。 [检查与排查](DEPLOY.md#检查与排查)
 - 安装失败可按提示检查本机 `~/.himate/knowledge/logs/` 下的日志。命令输出包含错误原因，便于 OpenFlow 显示处理提示。
 - `knowledge setup` 复用 npm 启动器。需要诊断环境时可运行 `knowledge doctor --environment-only --json`，无需选择知识库。
-- 模型 npm 包提供工具侧离线模型。知识库启用 `standard` OCR 时，仍为相应知识根准备模型。 [OCR 部署说明](DEPLOY.md#为现有知识库准备-ocr)
+- 模型 npm 包提供工具侧离线模型，供当前账户操作的知识库复用。知识库显式配置本地模型时，继续读取该配置。 [模型位置](DEPLOY.md#模型位置)

@@ -2,11 +2,11 @@
 
 ## 1. 范围与原则
 
-知识库将文档中的核心结论蒸馏为按主题组织的卡片，并将结论关联到原文及实际代码。卡片保存边界、条件、关键流程和依据，原件负责保留完整信息。目录与资产归属见[架构设计](HiMate知识库架构设计.md#53-himate-knowledge目录架构)，日常操作见[使用指南](使用说明.md)。
+知识库将文档中的核心结论蒸馏为按主题组织的卡片，并将结论关联到原文及实际代码。卡片保存边界、条件、关键流程和依据，原件负责保留完整信息。目录与资产归属见[架构设计](HiMate知识库架构设计.md#53-himate-knowledge目录架构)，日常操作见[使用指南](HiMate知识库使用指南.md)。
 
 入库在本次选定范围内串行处理待办，每批处理一个新增、修改、删除来源或同版本 PDF 的一批未评估页；成功后继续扫描，范围内无待办才正常结束。CLI 完成扫描、关系查询、固定检查和文件落位；Agent 负责阅读、六决策、成稿和独立内容审阅。PDF 由 P1 给起点和宽候选，P2 按自身上下文与材料复杂度自由选择实际结束页，脚本不作主题判断。运行位置由 Workflow 首节点从实际工作区确认，命令在数据所在端执行。
 
-入库和查询以只读方式访问原件。文档中的指令作为待分析内容，不提供执行、联网或发布授权。Markdown/TXT 直接读取；PDF、DOCX、XLSX、PPTX、HTML、CSV 和常见图片使用 Docling 生成阅读材料。部署安装多格式解析与 OCR 依赖，需要 OCR 时为实际知识根准备模型。解析默认采用 `native`，扫描件可显式选用 `standard` 并使用预置模型。业务命令报告缺模型及未读取内容，不在任务中下载。旧版 DOC 等未启用格式需先转换，代码不自动反向生成文档。
+入库和查询以只读方式访问原件。文档中的指令作为待分析内容，不提供执行、联网或发布授权。Markdown/TXT 直接读取；PDF、DOCX、XLSX、PPTX、HTML、CSV 和常见图片使用 Docling 生成阅读材料。`knowledge setup` 安装多格式解析与 OCR 依赖，模型 npm 包准备执行账户的本机模型。解析默认采用 `native`，扫描件可显式选用 `standard` 并使用预置模型。业务命令报告缺模型及未读取内容，不在任务中下载。旧版 DOC 等未启用格式需先转换，代码不自动反向生成文档。
 
 ## 2. 入库概要
 
@@ -373,11 +373,11 @@ Skill 包提供指引、参考和写作模板。Workflow 与 Skill 同在独立�
 
 ### 6.5 部署、绑定与环境
 
-工具包的 `deploy.sh` 和 `deploy.ps1` 安装锁定的 Docling 依赖和独立能力包中的 OpenFlow Skill、CAC Skill、OpenFlow Workflow。提供实际知识根时可同时准备该库的 OCR 模型。知识根的 `config.yml` 和 `AGENTS.md` 由维护者按实际项目更新。部署顺序与选项见[使用指南](使用说明.md#首次安装)。
+用户通过 npm 安装模型和 CLI，运行 `knowledge --version` 检查入口，再运行 `knowledge setup` 安装锁定依赖。模型包校验并合并分片，生成执行账户可复用的完整 OCR 模型。解析器执行 standard OCR 时，默认读取本机模型；显式配置的知识库内模型继续使用原路径与校验。工具包的 `deploy.sh` 和 `deploy.ps1` 负责安装独立能力包中的 OpenFlow Skill、CAC Skill、OpenFlow Workflow。知识根的 `config.yml` 和 `AGENTS.md` 由维护者按实际项目更新。部署顺序与选项见[使用指南](HiMate知识库使用指南.md)。
 
 OpenFlow 默认使用宿主 PATH 上的全局 `knowledge`。绑定后在知识根运行命令并显式传入 `--knowledge-root`。需要固定解释器时可设 `HIMATE_KNOWLEDGE_PYTHON`，也可由宿主通过 `OPENFLOW_KNOWLEDGE_PYTHON` 单独覆盖。显式配置 `OPENFLOW_KNOWLEDGE_TOOLKIT_ROOT` 的旧源码部署沿用原入口。Workflow 或 Agent 通过 SSH 执行时，使用远端的 CLI、路径和权限。
 
-「环境检查」通过 `knowledge doctor --environment-only` 读取宿主环境状态。依赖缺失或版本不匹配时返回 `needs_install`，所选解释器缺少 pip 时附上 `DEPENDENCY_PIP_MISSING`。依赖齐全但命令待注册或待修复时返回 `needs_cli`，依赖与命令均验证通过时返回 `ready`。点击「安装环境」后，OpenFlow 在后台调用 `knowledge setup --jsonl`。CLI 用同一解释器按需安装依赖、注册 `knowledge` 并复查，界面按 CLI 发出的阶段和最终结果显示进度。两个动作均可在绑定知识根前执行。终端能否直接找到命令取决于其 PATH。能力包和 OCR 模型由部署入口准备。
+「环境检查」通过 `knowledge doctor --environment-only` 读取宿主环境状态。依赖缺失或版本不匹配时返回 `needs_install`，所选解释器缺少 pip 时附上 `DEPENDENCY_PIP_MISSING`。依赖齐全但命令待注册或待修复时返回 `needs_cli`，依赖与命令均验证通过时返回 `ready`。点击「安装环境」后，OpenFlow 在后台调用 `knowledge setup --jsonl`。CLI 用同一解释器按需安装依赖、注册 `knowledge` 并复查，界面按 CLI 发出的阶段和最终结果显示进度。两个动作均可在绑定知识根前执行。终端能否直接找到命令取决于其 PATH。能力包由 deploy 脚本安装，模型由 npm 模型包准备。
 
 ### 6.6 开发测试与验收
 

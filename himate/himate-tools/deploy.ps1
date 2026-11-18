@@ -1,7 +1,7 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-Install the HiMate knowledge toolkit and optionally prepare a knowledge root for OCR.
+Install HiMate Skills and Workflow templates for OpenFlow and CAC.
 .EXAMPLE
 .\deploy.ps1 -SkillsRoot SKILLS_ROOT -WorkflowsRoot WORKFLOWS_ROOT -Python PATH_TO_PYTHON -NonInteractive
 #>
@@ -13,24 +13,18 @@ param(
     [string]$Python = 'python',
     [string]$SourceRoot,
     [string]$CapabilitiesRoot,
-    [string]$KnowledgeRoot,
-    [switch]$NonInteractive,
-    [switch]$DownloadModels
+    [switch]$NonInteractive
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$deployArguments = @((Join-Path $PSScriptRoot 'distribution\source\deploy.py'),
-                     '--python', $Python)
+$deployArguments = @((Join-Path $PSScriptRoot 'distribution\source\deploy.py'))
 if (-not [string]::IsNullOrWhiteSpace($SourceRoot)) {
     $deployArguments += @('--source-root', $SourceRoot)
 }
 if (-not [string]::IsNullOrWhiteSpace($CapabilitiesRoot)) {
     $deployArguments += @('--capabilities-root', $CapabilitiesRoot)
-}
-if (-not [string]::IsNullOrWhiteSpace($KnowledgeRoot)) {
-    $deployArguments += @('--knowledge-root', $KnowledgeRoot)
 }
 if (-not [string]::IsNullOrWhiteSpace($SkillsRoot)) {
     $deployArguments += @('--skills-root', $SkillsRoot)
@@ -42,7 +36,6 @@ if (-not [string]::IsNullOrWhiteSpace($WorkflowsRoot)) {
     $deployArguments += @('--workflows-root', $WorkflowsRoot)
 }
 if ($NonInteractive) { $deployArguments += '--non-interactive' }
-if ($DownloadModels) { $deployArguments += '--download-models' }
 
 & $Python @deployArguments
 exit $LASTEXITCODE

@@ -506,3 +506,18 @@ def test_setup_blocks_pip_config_that_overrides_install_location(environment, ru
 def test_pip_config_allows_index_settings_and_user_install(environment):
     configuration = "global.index-url='https://mirror.test/simple'\ninstall.user='true'\n"
     assert not environment._has_pip_location_override(configuration)
+
+
+def test_ocr_dependencies_accept_standard_mirror_distributions():
+    runtime = TOOL_ROOT / "runtime"
+    lock = runtime / "requirements.lock.txt"
+    pins = {}
+    for line in lock.read_text(encoding="utf-8").splitlines():
+        if line.startswith(("torch==", "torchvision==")):
+            name, version = line.split("==", 1)
+            pins[name] = version.split(";", 1)[0].strip()
+    assert set(pins) == {"torch", "torchvision"}
+    assert all("+" not in version for version in pins.values())
+    lines = [line.strip() for line in lock.read_text(encoding="utf-8").splitlines()
+             if line.strip() and not line.lstrip().startswith("#")]
+    assert all("://" not in line for line in lines)

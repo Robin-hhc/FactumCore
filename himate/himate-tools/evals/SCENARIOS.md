@@ -31,8 +31,8 @@
 | 来源稍后再变 | P5 保存 P1 记录的 hash，后续扫描仍能发现新的版本 | `ingest/` |
 | 数据库重建 | 由正式卡和来源登记恢复双向关系及无卡成功事实 | `catalog/` |
 | 工作区和诊断 | doctor 选择确切配置，拒绝无效或歧义映射；错误不创建目标仓 | `cli/`、`contracts/test_workspace_mapping.py` |
-| Skill 与 Workflow 模板安装 | 使用 Python 标准库安装独立能力包，替换本次同名包；校验源码和目标目录，保留其他包；安装能力时保持工具运行环境、模型和知识仓原样 | [deploy/test_install_skills.py](deploy/test_install_skills.py) |
-| Linux / PowerShell 部署入口 | Linux/PowerShell 入口选择解释器并保留含空格参数；Linux 入口传递失败退出码，并在空解释器参数时拒绝调用后端 | [deploy/test_posix_deploy.py](deploy/test_posix_deploy.py)、[deploy/test_install_skills.py](deploy/test_install_skills.py) |
+| Skill 与 Workflow 模板安装 | 能力仓使用 Python 标准库复制本仓包，替换同名包、校验目标目录并保留其他包 | [能力安装测试](../../himate-skills/evals/deploy/test_install_skills.py) |
+| Linux / PowerShell 部署入口 | 能力仓的两端入口选择解释器并保留含空格参数，传递失败退出码 | [Linux 入口测试](../../himate-skills/evals/deploy/test_posix_deploy.py)、[能力安装测试](../../himate-skills/evals/deploy/test_install_skills.py) |
 
 六决策的语义效果需要作者和独立 reviewer 在实际材料上核验；仅通过脚本不能证明自动知识蒸馏质量。Workflow 静态测试也不代表实际宿主执行过。
 

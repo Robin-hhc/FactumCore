@@ -1,6 +1,6 @@
 # 知识库开发验证
 
-业务、共用算法与部署工具测试统一在本目录，部署测试位于 `deploy/`。测试使用隔离合成资料，不读取受限 gold 或真实业务原件。
+业务、共用算法、npm 安装和宿主环境测试在本目录。能力安装器测试随 `himate-skills/evals/deploy/` 维护。测试使用隔离合成资料，不读取受限 gold 或真实业务原件。
 
 ## 按职责组织
 
@@ -13,7 +13,7 @@
 | `cli/` | doctor、命令错误与目标目录边界 |
 | `workflows/` | 五节点顺序、作者与独立审阅职责、返工目标、能力包归属 |
 | `integration/` | 工具包 CLI 对独立知识根的调用和跨功能闭环 |
-| `deploy/` | 能力包替换与目录保护、Linux/PowerShell 参数和退出码、CLI npm 升级，以及模型 npm 包的完整性与分片合并 |
+| `deploy/` | 宿主环境检查与安装、CLI npm 升级、模型 npm 包的完整性与分片合并 |
 | `tooling/` | 测试发现、超时及 JUnit/汇总报告 |
 | `support/` | 公共开发夹具和规则装载助手，不含业务测试 |
 
@@ -38,13 +38,13 @@ python -m pytest himate/himate-tools/evals/ingest -q
 
 Workflow 和跨节点 CLI 验证默认从工具包旁的 `himate-skills/` 读取能力源码。能力源码另存时，验收入口与 `evals/validate_design.py` 都支持 `--capabilities-root <能力源码目录>`。直接运行这组 pytest 时也可通过测试环境变量 `HIMATE_TEST_CAPABILITIES_ROOT` 提供该目录。报告中的测试路径相对工具根。仅有独立工具包时，实际检查组合工作区 Git 忽略规则的用例标记为跳过。
 
-quick 仅选每个职责目录排序后的首个测试文件，是明确的局部冒烟。`--groups` 同样是局部范围；验证按实际修改范围选择，不把每次局部工作都扩成全量测试。`knowledge setup` 沿用 pip 配置安装锁定的依赖，模型 npm 包校验并准备本机模型，deploy 脚本替换本次同名 Skill 和 Workflow 包目录，由宿主加载。具体操作见[部署说明](../docs/DEPLOY.md)。
+quick 仅选每个职责目录排序后的首个测试文件，是明确的局部冒烟。`--groups` 同样是局部范围；验证按实际修改范围选择，不把每次局部工作都扩成全量测试。`knowledge setup` 沿用 pip 配置安装锁定的依赖，模型 npm 包校验并准备本机模型。工具安装见[部署说明](../docs/DEPLOY.md)，能力安装及其测试见[能力仓说明](../../himate-skills/README.md)。
 
 输出目录必须全新。运行器保留每组 JUnit、stdout/stderr、实际选择和 `summary.json`；超时、收集失败、空测试组和无效报告不能算通过。`--jobs` 控制测试组并行，不表示生产 ingest/lint 支持并发写入。性能统计只作观察，不设速度门禁；`--baseline` 仅在环境和选择一致时比较。
 
 ## 验证边界
 
-独立算法检查、隔离 CLI 测试和公司实际环境分别记录。[deploy/test_install_skills.py](deploy/test_install_skills.py) 与 [deploy/test_posix_deploy.py](deploy/test_posix_deploy.py) 使用临时目录和解释器记录器，验证纯能力包安装、同名包完整替换、其他包与源码保留，以及 Linux/PowerShell 的解释器选择、参数与退出码传递。依赖安装和模型包分别由环境测试、npm 测试覆盖。真实 OCR 结果按实际执行端记录，模拟测试通过不代表实际宿主或业务知识验收通过。
+独立算法检查、隔离 CLI 测试和公司实际环境分别记录。依赖安装和模型包分别由本仓的环境测试、npm 测试覆盖。能力仓的安装测试使用临时目录和解释器记录器验证包复制、更新、路径保护及两端入口。真实 OCR 结果按实际执行端记录，模拟测试通过不代表实际宿主或业务知识验收通过。
 
 P2、P3 由作者执行，P4 由独立 reviewer 读计划、旧卡、新稿和依据。合成脚本测试可以验证角色与返工配置，不能替代真实内容审阅质量。真实 Linux、公司文档、代码实现和权限效果由实际试用单列验收。
 

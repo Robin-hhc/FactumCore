@@ -11,7 +11,7 @@ param(
     [string]$CacSkillsRoot,
     [string]$WorkflowsRoot,
     [string]$Python = 'python',
-    [string]$SourceRoot,
+    [Alias('SourceRoot')]
     [string]$CapabilitiesRoot,
     [switch]$NonInteractive
 )
@@ -19,10 +19,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$deployArguments = @((Join-Path $PSScriptRoot 'distribution\source\deploy.py'))
-if (-not [string]::IsNullOrWhiteSpace($SourceRoot)) {
-    $deployArguments += @('--source-root', $SourceRoot)
-}
+$deployArguments = @((Join-Path $PSScriptRoot 'scripts\deploy.py'))
 if (-not [string]::IsNullOrWhiteSpace($CapabilitiesRoot)) {
     $deployArguments += @('--capabilities-root', $CapabilitiesRoot)
 }

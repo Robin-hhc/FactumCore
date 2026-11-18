@@ -42,26 +42,22 @@ def installation_directory(value, default, label, non_interactive):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source-root", type=Path, default=Path(__file__).resolve().parents[2],
-                        help="Base directory used to locate the adjacent himate-skills package")
-    parser.add_argument("--capabilities-root", type=Path,
-                        help="Capability package containing skills and workflows (default: adjacent himate-skills)")
+    parser.add_argument("--capabilities-root", "--source-root", type=Path,
+                        default=Path(__file__).resolve().parents[1],
+                        help="Capability package containing skills and workflows (default: this package)")
     parser.add_argument("--skills-root", type=Path, help="OpenFlow Skill installation directory")
     parser.add_argument("--cac-skills-root", type=Path, help="CAC Skill installation directory")
     parser.add_argument("--workflows-root", type=Path, help="OpenFlow Workflow template installation directory")
     parser.add_argument("--non-interactive", action="store_true",
                         help="Use default installation directories without prompting")
     args = parser.parse_args(argv)
-    source = args.source_root.expanduser().resolve()
     try:
-        adjacent = source.parent / "himate-skills"
-        capabilities = args.capabilities_root or (adjacent if adjacent.exists() else source)
-        capabilities = capabilities.expanduser().resolve()
+        capabilities = args.capabilities_root.expanduser().resolve()
         skills, workflows = capabilities / "skills", capabilities / "workflows"
         if not skills.is_dir() or not workflows.is_dir():
             raise ValueError(f"Skills and workflows are missing at {capabilities}. "
-                             "Place himate-skills beside the tool package or specify --capabilities-root.")
-        source_roots = [source, capabilities]
+                             "Specify the package with --capabilities-root.")
+        source_roots = [Path(__file__).resolve().parents[1], capabilities]
         targets = (
             ("OpenFlow Skills", skills, installation_directory(
                 args.skills_root, Path.home() / ".openflow/config/skills", "OpenFlow Skill directory",

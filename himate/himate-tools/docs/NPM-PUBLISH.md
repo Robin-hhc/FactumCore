@@ -54,7 +54,7 @@ knowledge --version
 knowledge setup
 ```
 
-模型包准备完整本机模型，CLI 包注册 `knowledge`。`knowledge --version` 检查命令能否启动，`knowledge setup` 安装并复查 Python 依赖。随后从团队交付的工具目录运行 deploy 脚本安装 Skills 和 Workflows，再启动 OpenFlow。 [能力安装步骤](DEPLOY.md#安装-skills-与-workflows)
+模型包准备完整本机模型，CLI 包注册 `knowledge`。`knowledge --version` 检查命令能否启动，`knowledge setup` 安装并复查 Python 依赖。随后从 `himate-skills` 目录运行 deploy 脚本安装 Skills 和 Workflows，再启动 OpenFlow。 [能力安装步骤](../../himate-skills/README.md)
 
 安装后的内容位于当前账户的工具目录。
 

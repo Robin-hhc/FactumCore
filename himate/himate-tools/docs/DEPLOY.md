@@ -19,49 +19,9 @@ npm 注册全局 `knowledge` 命令。模型包校验并准备本机 OCR 模型�
 
 ## 安装 Skills 与 Workflows
 
-将 `himate-tools` 和 `himate-skills` 放在同一级目录，从 `himate-tools` 运行脚本。脚本通过 Python 标准库安装能力包，只处理 Skill 和 Workflow 目录。
+能力安装器由 `himate-skills` 维护。进入该目录，Windows 运行 `.\deploy.ps1`，Linux 运行 `sh ./deploy.sh`，按提示选择宿主的能力目录。脚本从自身的 `skills/` 和 `workflows/` 安装包，安装完成后输出各目标的数量。
 
-### Windows PowerShell
-
-```powershell
-.\deploy.ps1
-```
-
-### Linux
-
-```sh
-sh ./deploy.sh
-```
-
-交互模式逐项询问安装目录，直接回车使用默认值。脚本按 `SKILL.md` 和 `workflow.yaml` 识别包，完整替换目标内本次发行的同名包，并保留其他包。完成时输出各目标的安装数量。
-
-| 安装内容 | 默认目录 | Linux 参数 | PowerShell 参数 |
-|---|---|---|---|
-| OpenFlow Skills | `~/.openflow/config/skills` | `--skills-root` | `-SkillsRoot` |
-| CAC Skills | `~/.cac/skills` | `--cac-skills-root` | `-CacSkillsRoot` |
-| OpenFlow Workflows | `~/.openflow/config/workflow-templates` | `--workflows-root` | `-WorkflowsRoot` |
-
-以下示例使用默认目标目录并跳过询问。
-
-```powershell
-.\deploy.ps1 -NonInteractive
-```
-
-```sh
-sh ./deploy.sh --non-interactive
-```
-
-能力包位置不同，使用 `-CapabilitiesRoot` 或 `--capabilities-root` 指向包含 `skills/` 和 `workflows/` 的目录。OpenFlow 使用自定义配置目录时，同时指定实际的 Skill 和 Workflow 目标。
-
-```powershell
-.\deploy.ps1 -CapabilitiesRoot 'D:\能力包\himate-skills' -NonInteractive
-```
-
-```sh
-sh ./deploy.sh --capabilities-root '/srv/himate-skills' --non-interactive
-```
-
-Linux 默认用 `python3` 执行复制脚本，也可用 `--python` 或 `HIMATE_KNOWLEDGE_PYTHON` 指定。PowerShell 默认使用 `python`，也可用 `-Python` 指定。自动化调用可通过 `--source-root` / `-SourceRoot` 指定查找相邻能力包时所用的工具目录。
+自定义目标目录、无人值守安装和安装测试见[能力仓安装说明](../../himate-skills/README.md)。
 
 ## 启动 OpenFlow
 

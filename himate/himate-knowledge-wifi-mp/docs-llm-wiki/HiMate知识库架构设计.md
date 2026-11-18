@@ -130,7 +130,7 @@ flowchart TD
 
 工具包提供安装入口、运行依赖、共用规则、CLI 和离线模型。能力包提供自带参考与模板的 Skill，以及引用 Skill ID 的 Workflow。Agent 在节点加载对应 Skill，结合任务输入查阅随包材料并调用已安装的 CLI。
 
-用户通过 npm 安装 CLI 和模型包，用 `knowledge --version` 检查入口，再运行 `knowledge setup` 安装运行环境。Windows 的 `deploy.ps1` 与 Linux 的 `deploy.sh` 共用 Python 标准库后端，负责安装能力包。脚本默认读取同级 `himate-skills/`，也可显式指定能力包及宿主安装目录。默认将 Skill 安装到 `~/.openflow/config/skills` 和 `~/.cac/skills`，将 Workflow 安装到 `~/.openflow/config/workflow-templates`，更新时替换同名能力包。 [部署说明](../../himate-tools/docs/DEPLOY.md)
+用户通过 npm 安装 CLI 和模型包，用 `knowledge --version` 检查入口，再运行 `knowledge setup` 安装运行环境。能力仓 `himate-skills` 的 `deploy.ps1` 与 `deploy.sh` 共用 Python 标准库后端，默认读取本仓的 `skills/` 和 `workflows/`。默认将 Skill 安装到 `~/.openflow/config/skills` 和 `~/.cac/skills`，将 Workflow 安装到 `~/.openflow/config/workflow-templates`，更新时替换同名能力包。 [能力安装说明](../../himate-skills/README.md)
 
 终端、自动化、Agent 和 OpenFlow 统一使用 `knowledge`。工作台用 `doctor --environment-only --json` 检查宿主环境，用 `setup --jsonl` 安装环境。CLI 用选定的 Python 运行 pip，在该解释器的安装位置补齐锁定依赖，并用同一解释器复查。环境检查和安装可以在绑定前执行。模型 npm 包在执行账户的工具目录准备完整模型，standard OCR 默认从该位置读取，显式配置的知识库内模型继续可用。
 
@@ -151,15 +151,18 @@ repo/                                      业务 manifest 工作区示例
     │   ├── .build/                        本批材料、计划与候选
     │   └── artifacts/                     索引、回执、解析缓存、引用证据与运行模型
     ├── himate-skills/                      独立能力包
+    │   ├── README.md                       能力安装和校验说明
+    │   ├── deploy.ps1 / deploy.sh           Windows / Linux 能力安装入口
+    │   ├── scripts/deploy.py                能力包复制后端
+    │   ├── evals/deploy/                    能力安装验证
     │   ├── skills/                         步骤指引、参考与写作模板
     │   └── workflows/                      节点、角色、交接、出口与画布
     └── himate-tools/                       独立工具包
         ├── README.md / AGENTS.md           用户入口与维护指引
         ├── package.json / knowledge.py     npm 元数据与源码入口
-        ├── deploy.ps1 / deploy.sh          Windows / Linux 部署入口
         ├── docs/                          安装、发布和面板接口说明
         ├── runtime/                       CLI、规则、发行清单与依赖锁
-        ├── distribution/                  npm、源码部署和独立 OCR 模型包
+        ├── distribution/                  npm、宿主环境入口和独立 OCR 模型包
         └── evals/                         开发测试和验收
 ```
 

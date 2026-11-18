@@ -37,8 +37,7 @@ def test_posix_selects_python_and_forwards_paths_from_another_directory(tmp_path
     environment = dict(os.environ, FACTUM_DEPLOY_TEST_CAPTURE=str(capture),
                        PATH=str(default.parent) + os.pathsep + os.environ.get("PATH", ""))
     environment.pop("HIMATE_KNOWLEDGE_PYTHON", None)
-    arguments = ["--source-root", str(tmp_path / "source root"),
-                 "--capabilities-root", str(tmp_path / "capabilities root"),
+    arguments = ["--capabilities-root", str(tmp_path / "capabilities root"),
                  "--skills-root", str(tmp_path / "skills root"),
                  "--cac-skills-root", str(tmp_path / "cac skill root"),
                  "--workflows-root", str(tmp_path / "workflow root")]
@@ -58,7 +57,7 @@ def test_posix_selects_python_and_forwards_paths_from_another_directory(tmp_path
     assert result.returncode == 0, result.stderr.decode("utf-8", "replace")
     recorded = capture.read_bytes().decode("utf-8").split("\0")[:-1]
     assert Path(recorded[0]) == selected
-    assert Path(recorded[1]) == distribution / "distribution/source/deploy.py"
+    assert Path(recorded[1]) == distribution / "scripts/deploy.py"
     assert recorded[2:] == forwarded
     assert not (tmp_path / "skills root").exists()
     assert not (tmp_path / "workflow root").exists()

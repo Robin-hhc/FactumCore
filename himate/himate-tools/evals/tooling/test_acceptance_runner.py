@@ -18,7 +18,7 @@ def test_development_layout_anchors_the_package_and_manifest_roots():
     from support.contracts import CAPABILITIES_ROOT, KNOWLEDGE_ROOT, ROOT, TOOL_ROOT
     assert TOOL_ROOT == EVALS.parent
     assert ROOT == TOOL_ROOT.parent.parent
-    assert (TOOL_ROOT / "deploy.ps1").is_file()
+    assert (TOOL_ROOT / "knowledge.py").is_file()
     assert (CAPABILITIES_ROOT / "skills/hs-knowledge-source/SKILL.md").is_file()
     assert (CAPABILITIES_ROOT / "workflows/hs-knowledge-ingest/workflow.yaml").is_file()
     assert not (TOOL_ROOT / "skills").exists()

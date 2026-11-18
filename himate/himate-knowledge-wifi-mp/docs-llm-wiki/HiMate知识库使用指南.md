@@ -8,7 +8,7 @@
 
 取得项目知识仓和 `himate-skills` 能力包。知识仓内的 `config.yml` 由项目负责人配置，普通使用者使用项目提供的版本。
 
-以下能力安装命令在团队提供的 `himate-tools` 目录执行。默认将 `himate-tools` 和 `himate-skills` 放在同一级目录。
+以下能力安装命令在 `himate-skills` 目录执行，该目录同时包含安装脚本、`skills/` 和 `workflows/`。
 
 ## 2. 安装模型和 CLI
 
@@ -38,7 +38,7 @@ knowledge doctor --environment-only
 
 ## 4. 安装 Skills 和 Workflows
 
-进入 `himate-tools` 目录，按操作系统执行对应脚本。
+进入 `himate-skills` 目录，按操作系统执行对应脚本。
 
 Windows PowerShell。
 
@@ -60,7 +60,7 @@ sh ./deploy.sh
 | CAC Skills | `~/.cac/skills` |
 | OpenFlow Workflows | `~/.openflow/config/workflow-templates` |
 
-使用其他目录时，按实际位置填写。能力包位置不同或需要无人值守安装时，参数见工具包的[部署说明](../../himate-tools/docs/DEPLOY.md)。
+使用其他目录时，按实际位置填写。能力包位置不同或需要无人值守安装时，参数见能力仓的[安装说明](../../himate-skills/README.md)。
 
 ## 5. 打开 OpenFlow 并连接知识库
 

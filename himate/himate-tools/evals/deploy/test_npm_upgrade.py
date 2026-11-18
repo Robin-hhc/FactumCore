@@ -25,6 +25,7 @@ def test_npm_postinstall_preserves_managed_environment_and_logs(tmp_path):
     install_log = installed / "logs/setup.log"
     previously_installed_model = installed / "tools/deploy/models/docling-cpu/saved-model"
     stale_wrapper = installed / "knowledge.sh"
+    retired_deployment = installed / "distribution/source/deploy.py"
     customized_wrapper = installed / "knowledge.cmd"
     old_wrapper = b"legacy wrapper\n"
     customized = b"user-modified wrapper\n"
@@ -34,6 +35,7 @@ def test_npm_postinstall_preserves_managed_environment_and_logs(tmp_path):
         (install_log, b"previous setup diagnostics"),
         (previously_installed_model, b"independently installed model"),
         (stale_wrapper, old_wrapper),
+        (retired_deployment, b"previous capability installer"),
         (customized_wrapper, customized),
     ):
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -65,6 +67,7 @@ def test_npm_postinstall_preserves_managed_environment_and_logs(tmp_path):
     assert json.loads(marker.read_text(encoding="utf-8"))["version"] == package_version
     assert not previous_runtime.exists()
     assert not stale_wrapper.exists()
+    assert not retired_deployment.exists()
     assert customized_wrapper.read_bytes() == customized
     assert environment_config.read_bytes() == b"previous virtual environment"
     assert install_log.read_bytes() == b"previous setup diagnostics"

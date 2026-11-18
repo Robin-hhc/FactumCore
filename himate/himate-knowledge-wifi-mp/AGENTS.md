@@ -8,7 +8,7 @@
 
 入库P1选一个变化文件、P2决策、P3写卡、P4独立审阅、P5入库。Skill按单步职责提供指引，CLI负责机械步骤及预先配置的本地文档/OCR解析，不自主调用生成式模型；看图与知识判断由宿主Agent完成。流程见[详细设计](docs-llm-wiki/HiMate知识库详细设计.md)。
 
-在数据所在端运行已安装的知识 CLI，显式传 `--knowledge-root` 和本知识根。使用该执行端已注册的 `knowledge` 命令或宿主提供的入口，SSH 执行时使用远端入口。先用 `doctor --json` 核对工具版本、知识根和实际配置。同一轮沿用该工具版本。通过 npm 安装 CLI 和 OCR 模型，运行 `knowledge setup` 准备依赖，通过 deploy 脚本安装 Skill 和 Workflow。
+在数据所在端运行已安装的知识 CLI，显式传 `--knowledge-root` 和本知识根。使用该执行端已注册的 `knowledge` 命令或宿主提供的入口，SSH 执行时使用远端入口。先用 `doctor --json` 核对工具版本、知识根和实际配置。同一轮沿用该工具版本。通过 npm 安装 CLI 和 OCR 模型，运行 `knowledge setup` 准备依赖，通过能力仓 `himate-skills` 的 deploy 脚本安装 Skill 和 Workflow。
 
 .build只保存本批暂存，P1/P5清理保留根README。PDF从最早未评估页按字量准备宽候选，默认不设页数帽；P2按自身上下文和材料复杂度选实际source_pages，无须一次读完候选，P4评估该范围全部内容，P5成功后才登记覆盖。本批完成不等于全文完成，按回执source_complete交付剩余范围。累计进度在正式sources.lock.yaml的processing中，PDF解析缓存位于artifacts/ingest/parsed，可删重建；非PDF仍按整文件处理。P5 确认尚未写入正式库且候选需要修改时回 P3，再经 P4 审阅。执行失败时保留同批暂存，修复后重试 P5，不先回 P1。数据库在artifacts/knowledge.sqlite，入库回执在artifacts/ingest/latest.json，独立搜索报告在artifacts/query，巡检汇总在artifacts/patrol。query可与写流程共存；lint与ingest串行运行，运行环境和正式记录在.build以外。artifacts含独立模型与本机材料，不整目录清空。
 

@@ -373,11 +373,11 @@ Skill 包提供指引、参考和写作模板。Workflow 与 Skill 同在独立�
 
 ### 6.5 部署、绑定与环境
 
-用户通过 npm 安装模型和 CLI，运行 `knowledge --version` 检查入口，再运行 `knowledge setup` 安装锁定依赖。模型包校验并合并分片，生成执行账户可复用的完整 OCR 模型。解析器执行 standard OCR 时，默认读取本机模型；显式配置的知识库内模型继续使用原路径与校验。工具包的 `deploy.sh` 和 `deploy.ps1` 负责安装独立能力包中的 OpenFlow Skill、CAC Skill、OpenFlow Workflow。知识根的 `config.yml` 和 `AGENTS.md` 由维护者按实际项目更新。部署顺序与选项见[使用指南](HiMate知识库使用指南.md)。
+用户通过 npm 安装模型和 CLI，运行 `knowledge --version` 检查入口，再运行 `knowledge setup` 安装锁定依赖。模型包校验并合并分片，生成执行账户可复用的完整 OCR 模型。解析器执行 standard OCR 时，默认读取本机模型；显式配置的知识库内模型继续使用原路径与校验。能力仓 `himate-skills` 的 `deploy.sh` 和 `deploy.ps1` 从本仓安装 OpenFlow Skill、CAC Skill、OpenFlow Workflow。知识根的 `config.yml` 和 `AGENTS.md` 由维护者按实际项目更新。部署顺序与选项见[使用指南](HiMate知识库使用指南.md)。
 
 OpenFlow 默认使用宿主 PATH 上的全局 `knowledge`。绑定后在知识根运行命令并显式传入 `--knowledge-root`。需要固定解释器时可设 `HIMATE_KNOWLEDGE_PYTHON`，也可由宿主通过 `OPENFLOW_KNOWLEDGE_PYTHON` 单独覆盖。显式配置 `OPENFLOW_KNOWLEDGE_TOOLKIT_ROOT` 的旧源码部署沿用原入口。Workflow 或 Agent 通过 SSH 执行时，使用远端的 CLI、路径和权限。
 
-「环境检查」通过 `knowledge doctor --environment-only` 读取宿主环境状态。依赖缺失或版本不匹配时返回 `needs_install`，所选解释器缺少 pip 时附上 `DEPENDENCY_PIP_MISSING`。依赖齐全但命令待注册或待修复时返回 `needs_cli`，依赖与命令均验证通过时返回 `ready`。点击「安装环境」后，OpenFlow 在后台调用 `knowledge setup --jsonl`。CLI 用同一解释器按需安装依赖、注册 `knowledge` 并复查，界面按 CLI 发出的阶段和最终结果显示进度。两个动作均可在绑定知识根前执行。终端能否直接找到命令取决于其 PATH。能力包由 deploy 脚本安装，模型由 npm 模型包准备。
+「环境检查」通过 `knowledge doctor --environment-only` 读取宿主环境状态。依赖缺失或版本不匹配时返回 `needs_install`，所选解释器缺少 pip 时附上 `DEPENDENCY_PIP_MISSING`。依赖齐全但命令待注册或待修复时返回 `needs_cli`，依赖与命令均验证通过时返回 `ready`。点击「安装环境」后，OpenFlow 在后台调用 `knowledge setup --jsonl`。CLI 用同一解释器按需安装依赖、注册 `knowledge` 并复查，界面按 CLI 发出的阶段和最终结果显示进度。两个动作均可在绑定知识根前执行。终端能否直接找到命令取决于其 PATH。能力包由 `himate-skills` 仓内的 deploy 脚本安装，模型由 npm 模型包准备。
 
 ### 6.6 开发测试与验收
 

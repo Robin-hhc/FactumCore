@@ -11,30 +11,15 @@ import sys
 import pytest
 
 
-TOOL_ROOT = Path(__file__).resolve().parents[2]
-
-
-def test_ocr_dependencies_accept_standard_mirror_distributions():
-    runtime = TOOL_ROOT / "runtime"
-    lock = runtime / "requirements.lock.txt"
-    pins = {}
-    for line in lock.read_text(encoding="utf-8").splitlines():
-        if line.startswith(("torch==", "torchvision==")):
-            name, version = line.split("==", 1)
-            pins[name] = version.split(";", 1)[0].strip()
-    assert set(pins) == {"torch", "torchvision"}
-    assert all("+" not in version for version in pins.values())
-    lines = [line.strip() for line in lock.read_text(encoding="utf-8").splitlines()
-             if line.strip() and not line.lstrip().startswith("#")]
-    assert all("://" not in line for line in lines)
+CAPABILITIES_ROOT = Path(__file__).resolve().parents[2]
 
 
 @pytest.fixture
 def distribution(tmp_path):
-    spec = importlib.util.spec_from_file_location("skill_deploy", TOOL_ROOT / "distribution/source/deploy.py")
+    spec = importlib.util.spec_from_file_location("skill_deploy", CAPABILITIES_ROOT / "scripts/deploy.py")
     backend = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(backend)
-    source = tmp_path / "tools with spaces" / "custom" / "nested" / "tool-root"
+    source = tmp_path / "capabilities with spaces" / "custom" / "nested" / "package-root"
     package = source / "skills/hs-knowledge-example"
     (package / "references").mkdir(parents=True)
     (package / "SKILL.md").write_text("current instructions", encoding="utf-8")
@@ -100,16 +85,15 @@ def test_copy_all_destinations_without_environment_setup(distribution, tmp_path,
                for name in ("config.yml", "AGENTS.md", "artifacts", "runtime", "knowledge.py"))
 
 
-@pytest.mark.parametrize("explicit", [False, True], ids=["adjacent", "separate"])
-def test_install_reads_capabilities_from_split_package(distribution, tmp_path, explicit):
+@pytest.mark.parametrize("option", ["--capabilities-root", "--source-root"])
+def test_install_reads_explicit_capability_package(distribution, tmp_path, option):
     backend, source, package, _ = distribution
-    capabilities = tmp_path / "shared capabilities" if explicit else source.parent / "himate-skills"
+    capabilities = tmp_path / "shared capabilities"
     capabilities.mkdir()
     for name in ("skills", "workflows"):
         (source / name).rename(capabilities / name)
     options = arguments(source, tmp_path)
-    if explicit:
-        options += ["--capabilities-root", str(capabilities)]
+    options[:2] = [option, str(capabilities)]
 
     assert backend.main(options) == 0
     for directory in ("installed skills", "cac skills"):
@@ -120,16 +104,18 @@ def test_install_reads_capabilities_from_split_package(distribution, tmp_path, e
     assert installed.read_bytes() == (capabilities / "workflows" / workflow).read_bytes()
 
 
-def test_split_install_preserves_capability_sources(distribution, tmp_path):
+def test_explicit_install_preserves_capability_sources(distribution, tmp_path):
     backend, source, package, _ = distribution
-    capabilities = source.parent / "himate-skills"
+    capabilities = tmp_path / "shared capabilities"
     capabilities.mkdir()
     for name in ("skills", "workflows"):
         (source / name).rename(capabilities / name)
     skill = capabilities / "skills" / package.name / "SKILL.md"
     before = skill.read_bytes()
+    options = arguments(source, tmp_path)
+    options[:2] = ["--capabilities-root", str(capabilities)]
 
-    assert backend.main([*arguments(source, tmp_path), "--skills-root", str(skill.parent.parent)]) == 1
+    assert backend.main([*options, "--skills-root", str(skill.parent.parent)]) == 1
     assert skill.read_bytes() == before
 
 
@@ -253,8 +239,8 @@ def test_replacement_rejects_linked_package_target(distribution, tmp_path, kind)
 
 
 @pytest.mark.skipif(os.name != "nt", reason="PowerShell wrapper targets Windows")
-@pytest.mark.parametrize("explicit_roots", [False, True], ids=["backend-defaults", "explicit"])
-def test_powershell_forwards_options_without_its_own_prompts(tmp_path, explicit_roots):
+@pytest.mark.parametrize("source_flag", [None, "-CapabilitiesRoot", "-SourceRoot"])
+def test_powershell_forwards_options_without_its_own_prompts(tmp_path, source_flag):
     powershell = shutil.which("pwsh") or shutil.which("powershell")
     if powershell is None:
         pytest.skip("PowerShell is unavailable")
@@ -265,9 +251,9 @@ def test_powershell_forwards_options_without_its_own_prompts(tmp_path, explicit_
         "(ConvertTo-Json -InputObject @($args) -Compress))\nexit 0\n", encoding="utf-8")
     source = tmp_path / "source root"
     command = [powershell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
-               str(TOOL_ROOT / "deploy.ps1"), "-NonInteractive", "-Python", str(recorder)]
-    if explicit_roots:
-        command += ["-SourceRoot", str(source), "-CapabilitiesRoot", str(tmp_path / "capabilities root")]
+               str(CAPABILITIES_ROOT / "deploy.ps1"), "-NonInteractive", "-Python", str(recorder)]
+    if source_flag:
+        command += [source_flag, str(source)]
         for flag, name in (("-SkillsRoot", "skills"), ("-CacSkillsRoot", "cac"),
                            ("-WorkflowsRoot", "workflows")):
             command += [flag, str(tmp_path / name)]
@@ -275,18 +261,16 @@ def test_powershell_forwards_options_without_its_own_prompts(tmp_path, explicit_
                             env={**os.environ, "FACTUM_DEPLOY_TEST_CAPTURE": str(capture)})
     assert result.returncode == 0, result.stderr.decode("utf-8", "replace")
     received = json.loads(capture.read_text(encoding="utf-8"))
-    assert Path(received[0]) == TOOL_ROOT / "distribution/source/deploy.py"
-    if explicit_roots:
-        assert received[received.index("--source-root") + 1] == str(source)
-        assert received[received.index("--capabilities-root") + 1] == str(tmp_path / "capabilities root")
+    assert Path(received[0]) == CAPABILITIES_ROOT / "scripts/deploy.py"
+    if source_flag:
+        assert received[received.index("--capabilities-root") + 1] == str(source)
     else:
-        assert "--source-root" not in received
         assert "--capabilities-root" not in received
     assert "--python" not in received
     assert "--non-interactive" in received
     for flag, name in (("--skills-root", "skills"), ("--cac-skills-root", "cac"),
                        ("--workflows-root", "workflows")):
-        if explicit_roots:
+        if source_flag:
             assert received[received.index(flag) + 1] == str(tmp_path / name)
         else:
             assert flag not in received
@@ -305,7 +289,7 @@ def test_powershell_rejects_environment_options_without_starting_python(tmp_path
         encoding="utf-8")
     result = subprocess.run(
         [powershell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
-         str(TOOL_ROOT / "deploy.ps1"), "-NonInteractive", "-Python", str(recorder), option],
+         str(CAPABILITIES_ROOT / "deploy.ps1"), "-NonInteractive", "-Python", str(recorder), option],
         capture_output=True, timeout=30,
         env={**os.environ, "FACTUM_DEPLOY_TEST_CAPTURE": str(capture)})
     assert result.returncode != 0
@@ -323,12 +307,12 @@ def test_wrapper_installs_capabilities_with_only_the_standard_library(distributi
     project.mkdir()
     (project / "config.yml").write_text("keep project", encoding="utf-8")
     (project / "AGENTS.md").write_text("old instructions", encoding="utf-8")
-    backend = source / "distribution/source/deploy.py"
+    backend = source / "scripts/deploy.py"
     backend.parent.mkdir(parents=True)
-    shutil.copyfile(TOOL_ROOT / "distribution/source/deploy.py", backend)
+    shutil.copyfile(CAPABILITIES_ROOT / "scripts/deploy.py", backend)
     wrapper_name = "deploy.sh" if kind == "sh" else "deploy.ps1"
     wrapper = source / wrapper_name
-    shutil.copyfile(TOOL_ROOT / wrapper_name, wrapper)
+    shutil.copyfile(CAPABILITIES_ROOT / wrapper_name, wrapper)
     if kind == "sh":
         command = ["sh", str(wrapper), "--python", sys.executable]
     else:

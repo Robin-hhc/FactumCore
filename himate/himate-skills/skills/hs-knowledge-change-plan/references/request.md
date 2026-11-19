@@ -13,6 +13,8 @@
 
 `.build/plan.md` 必须以 YAML frontmatter 开始，`cards` 列出本轮完整候选的唯一 `id` 和正式 `path`；路径相对知识根，使用 `knowledge/...md`。更新沿用原路径，新卡按 `knowledge/index.md` 类型导航选目录。未改卡和仅删除的旧文件不列入 `cards`；无完整候选时仍写 `cards: []`。
 
+每张候选的 `required_code_refs` 列出本轮所需的源码位置。一项可以填 `path`、`symbol` 或两者。`path` 使用代码工作区相对路径或其按目录匹配的后缀，已知模块时优先写到模块和文件。`symbol` 可使用简单名或带 `::` 的完整名称。只有符号线索时填写 `symbol`，并在正文计划中注明适用模块和用途。`code_id` 由 P3 核实并登记文件后取得。纯文档卡填 `required_code_refs: []`，在正文写明文档依据。
+
 有 `task.document_review` 时填实际 `source_units: [[start, end]]`。`start` 等于 `start_unit`，`end` 不超过 `end_unit`。沿用旧版 CLI 的 PDF 批次继续使用 `source_pages` 和 `pdf_review`。切换 CLI 版本时，从 P1 重新准备未提交的任务。选定的连续范围须全部评估，包括经核实无增量的目录、空白和参考材料。
 
 ```markdown
@@ -20,10 +22,14 @@
 cards:
   - id: radio-flow
     path: knowledge/concepts/flows/radio-flow.md
+    required_code_refs:
+      - path: driver/radio.c
+        symbol: start_rx
+      - path: driver/rx_stats.c
 ---
 # 本轮计划
 
-- create radio-flow：沉淀本次文档的收发流程，保留其适用条件和来源；查重后无合适旧卡。
+- 新增收发流程卡并保留文档适用条件。核对 `driver/radio.c` 的接收入口和 `driver/rx_stats.c` 的成功计数逻辑，分别定位到对应段落。
 ```
 
 有 `document_review` 时在 `cards` 同级填实际单元，例如 `source_units: [[1, 8]]`。无卡时同时写 `cards: []` 和实际范围。

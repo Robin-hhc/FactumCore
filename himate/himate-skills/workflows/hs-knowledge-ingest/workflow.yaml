@@ -40,7 +40,7 @@ nodes:
   exits:
   - id: content_planned
     label: 编辑计划已明确
-    condition: 本轮 plan.md 已列明候选 id/path，并明确卡动作、结论变化、条件、依据和保留部分。
+    condition: 本轮 plan.md 已列明各候选的 id、path 和 required_code_refs，并明确卡动作、结论变化、条件、依据和保留部分。
     target: materialize_view
   - id: deferred
     label: 本文件暂缓

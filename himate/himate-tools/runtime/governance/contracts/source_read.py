@@ -220,7 +220,7 @@ def release(root, read_id):
         return {"released": True, "read_id": read_id}
 
 
-def create(root, source, data, *, options=None, page_range=None):
+def create(root, source, data, *, options=None, page_range=None, page_preview=True):
     """Convert fixed bytes once; never register sources or touch ingest state."""
     from . import document_parser
 
@@ -266,7 +266,7 @@ def create(root, source, data, *, options=None, page_range=None):
             original_ref = reference + "/source" + suffix
             _safe(root, original_ref).write_bytes(data)
             parsed = document_parser.parse(root, source, data, reference + "/parsed",
-                                           options=options, page_range=page_range)
+                                           options=options, page_range=page_range, page_preview=page_preview)
             directory = _safe(root, reference + "/parsed")
             _validate_tree(root, directory)
             total = sum(path.stat().st_size for path in directory.rglob("*") if path.is_file())

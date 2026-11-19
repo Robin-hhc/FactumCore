@@ -56,12 +56,18 @@
           },
           "processing": {
             "type": "object",
-            "required": ["source_sha256", "reviewed_pages"],
+            "required": ["source_sha256"],
+            "oneOf": [
+              {"required": ["reviewed_pages"], "not": {"required": ["reviewed_units"]}},
+              {"required": ["review_sha256", "reviewed_units"], "not": {"required": ["reviewed_pages"]}}
+            ],
             "properties": {
               "source_sha256": {
                 "type": "string",
                 "pattern": "^[0-9a-f]{64}$"
               },
+              "review_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+              "reviewed_units": {"$ref": "#/properties/resources/items/properties/processing/properties/reviewed_pages"},
               "reviewed_pages": {
                 "type": "array",
                 "items": {
@@ -86,12 +92,12 @@
               "anyOf": [
                 {
                   "required": ["path"],
-                  "properties": {"path": {"type": "string", "pattern": "\\.[pP][dD][fF]$"}}
+                  "properties": {"path": {"type": "string", "pattern": "\\.([pP][dD][fF]|[dD][oO][cC][xX]|[xX][lL][sS][xX])$"}}
                 },
                 {
                   "required": ["source_path"],
                   "not": {"required": ["path"]},
-                  "properties": {"source_path": {"type": "string", "pattern": "\\.[pP][dD][fF]$"}}
+                  "properties": {"source_path": {"type": "string", "pattern": "\\.([pP][dD][fF]|[dD][oO][cC][xX]|[xX][lL][sS][xX])$"}}
                 }
               ]
             }

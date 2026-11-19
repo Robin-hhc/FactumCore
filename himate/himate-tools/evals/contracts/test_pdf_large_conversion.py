@@ -173,3 +173,16 @@ def test_explicit_original_page_cap_is_honored_before_batch_conversion(
     assert any(gap["code"] == "PARSE_PAGE_LIMIT" for gap in descriptor["gaps"])
     assert loaded["manifest"]["pages"] == []
     assert not loaded["text"]
+
+
+@pytest.mark.parametrize("page_range,expected_pages", [(None, list(range(1, 7))), ((5, 6), [5, 6])])
+def test_implicit_pdf_limit_expands_without_losing_source_addresses(tmp_path, conversions, monkeypatch,
+                                                                 page_range, expected_pages):
+    monkeypatch.setitem(parser._DEFAULTS, "max_pages", 3)
+    descriptor, loaded = parse_pdf(tmp_path, page_range=page_range)
+
+    assert descriptor["parse_status"] == "parsed", descriptor["gaps"]
+    assert loaded["manifest"]["pages"] == expected_pages
+    assert loaded["manifest"]["profile"]["effective_max_pages"] == 6
+    element = next(row for row in loaded["locators"]["segments"] if row["locator"]["kind"] == "element")
+    assert parser.select(loaded, element["locator"]) == [element]

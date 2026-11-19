@@ -25,31 +25,6 @@ config.local.yml
 !/main/README.md
 **/.codegraph/
 
-# Raw business material stays local; publish each directory's README only.
-/himate/himate-knowledge-wifi-mp/docs-raw/agent-notes/*
-!/himate/himate-knowledge-wifi-mp/docs-raw/agent-notes/README.md
-/himate/himate-knowledge-wifi-mp/docs-raw/chips/*
-!/himate/himate-knowledge-wifi-mp/docs-raw/chips/README.md
-/himate/himate-knowledge-wifi-mp/docs-raw/conventions/*
-!/himate/himate-knowledge-wifi-mp/docs-raw/conventions/README.md
-/himate/himate-knowledge-wifi-mp/docs-raw/protocols/*
-!/himate/himate-knowledge-wifi-mp/docs-raw/protocols/README.md
-/himate/himate-knowledge-wifi-mp/docs-raw/sources/dbox.local.yml
-/himate/himate-knowledge-wifi-mp/docs-raw/sources/3ms/*
-!/himate/himate-knowledge-wifi-mp/docs-raw/sources/3ms/README.md
-/himate/himate-knowledge-wifi-mp/docs-raw/sources/dbox/*
-!/himate/himate-knowledge-wifi-mp/docs-raw/sources/dbox/README.md
-/himate/himate-knowledge-wifi-mp/docs-raw/sources/wiki/*
-!/himate/himate-knowledge-wifi-mp/docs-raw/sources/wiki/README.md
-/himate/himate-knowledge-wifi-mp/docs-raw/specs/*
-!/himate/himate-knowledge-wifi-mp/docs-raw/specs/README.md
-/himate/himate-knowledge-wifi-mp/docs-raw/stories/*
-!/himate/himate-knowledge-wifi-mp/docs-raw/stories/README.md
-/himate/himate-knowledge-wifi-mp/docs-raw/storys/*
-!/himate/himate-knowledge-wifi-mp/docs-raw/storys/README.md
-/himate/himate-knowledge-wifi-mp/docs-raw/troubleshooting/*
-!/himate/himate-knowledge-wifi-mp/docs-raw/troubleshooting/README.md
-
 # Domain runtime products: publish explanatory READMEs, never generated contents.
 /himate/himate-knowledge-wifi-mp/.build/*
 !/himate/himate-knowledge-wifi-mp/.build/README.md
@@ -69,10 +44,8 @@ config.local.yml
 # Retired independent checkout, if still present locally.
 /aiot-knowledge/
 
-# Selected real fixtures are versioned on the OpenFlow adaptation branch.
+# Versioned WiFi source fixtures for local testing on test.
 !/main/.gitattributes
 !/main/.gitignore
 !/main/hi1102_device/
 !/main/hi1105_host/
-!/himate/himate-knowledge-wifi-mp/docs-raw/protocols/ieee80211/
-!/himate/himate-knowledge-wifi-mp/docs-raw/specs/hi1105-wme-snap-static-analysis.md

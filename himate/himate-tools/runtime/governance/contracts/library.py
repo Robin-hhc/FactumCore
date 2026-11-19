@@ -218,6 +218,9 @@ def sources(root, action, request):
     if action == "extract":
         from . import source_read
 
+        unknown = set(request) - {"source_id", "doc_id", "source", "parser", "page_range", "page_start", "page_end", "page_preview"}
+        if unknown:
+            raise ContractError("INVALID_INPUT", "Unknown source extract fields: " + ", ".join(sorted(unknown)))
         identity = request.get("source_id", request.get("doc_id", request.get("source")))
         # Conversion can be expensive. Copy the registered identity, then
         # release SQLite before reading or converting the document.
@@ -227,19 +230,26 @@ def sources(root, action, request):
             raise ContractError("UNKNOWN_SOURCE_ID", str(identity))
         if source["kind"] == "code":
             raise ContractError("DOCUMENT_SOURCE_REQUIRED", "Use a registered document for source extract")
+        page_preview = request.get("page_preview", True)
+        if type(page_preview) is not bool:
+            raise ContractError("INVALID_INPUT", "page_preview must be a boolean")
         page_range = None
-        if "page_start" in request or "page_end" in request:
-            first, last = request.get("page_start"), request.get("page_end")
-            if (type(first) is not int or type(last) is not int or not 1 <= first <= last
+        legacy_bounds = "page_start" in request or "page_end" in request
+        if legacy_bounds and "page_range" in request:
+            raise ContractError("INVALID_PAGE_RANGE", "Use page_range or page_start/page_end")
+        if legacy_bounds or "page_range" in request:
+            bounds = [request.get("page_start"), request.get("page_end")] if legacy_bounds else request["page_range"]
+            if (not isinstance(bounds, (list, tuple)) or len(bounds) != 2
+                    or any(type(number) is not int for number in bounds) or not 1 <= bounds[0] <= bounds[1]
                     or Path(source["path"]).suffix.lower() != ".pdf"):
-                raise ContractError("INVALID_PAGE_RANGE", "Use positive PDF page_start/page_end")
-            page_range = first, last
+                raise ContractError("INVALID_PAGE_RANGE", "Use PDF page_range: [start, end] with inclusive positive page numbers")
+            page_range = tuple(bounds)
         try:
             data = ingest.source_path(root, source).read_bytes()
         except FileNotFoundError as error:
             raise ContractError("SOURCE_MISSING", source["path"]) from error
         return source_read.create(root, source, data, options=request.get("parser"),
-                                  page_range=page_range), "extracted"
+                                  page_range=page_range, page_preview=page_preview), "extracted"
     with Catalog(root) as catalog:
         if action == "register":
             kind = request.get("kind", "raw")

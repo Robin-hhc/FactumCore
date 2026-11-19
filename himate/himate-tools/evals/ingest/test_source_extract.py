@@ -88,6 +88,10 @@ def test_extract_converts_without_blocking_a_simultaneous_search(tmp_path, monke
     {"source_id": "missing"}, {"source_id": "doc-design", "page_start": 1},
     {"source_id": "doc-design", "page_start": True, "page_end": 2},
     {"source_id": "doc-design", "page_start": 1, "page_end": 2},
+    {"source_id": "doc-design", "page_range": [1, 2]},
+    {"source_id": "doc-design", "page_range": None},
+    {"source_id": "doc-design", "page_preview": "false"},
+    {"source_id": "doc-design", "options": {"parser": {"max_pages": 6000}}},
 ])
 def test_extract_requires_a_registered_document_and_valid_pdf_range(tmp_path, payload):
     root, _, _ = library(tmp_path)
@@ -100,7 +104,11 @@ def test_extract_requires_a_registered_document_and_valid_pdf_range(tmp_path, pa
     assert not (root / "artifacts/source-read").exists()
 
 
-def test_pdf_page_range_keeps_original_page_numbers_and_current_source(tmp_path):
+@pytest.mark.parametrize("scope,with_preview", [
+    ({"page_start": 2, "page_end": 2}, True),
+    ({"page_range": [2, 2], "page_preview": False}, False),
+])
+def test_pdf_page_range_keeps_original_page_numbers_and_current_source(tmp_path, scope, with_preview):
     from pypdf import PdfWriter
     from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
@@ -119,13 +127,14 @@ def test_pdf_page_range_keeps_original_page_numbers_and_current_source(tmp_path)
         writer.write(stream)
     original = path.read_bytes()
     reading, phase = module("library").sources(root, "extract", {
-        "source_id": source["id"], "page_start": 2, "page_end": 2})
+        "source_id": source["id"], **scope})
     try:
         assert phase == "extracted", reading
         loaded = module("document_parser").load(root, reading["parsed"],
                                                  expected_source_id=source["id"], expected_sha256=module("ingest").sha(original))
         assert "Original page 2" in loaded["text"]
         assert "Original page 1" not in loaded["text"] and "Original page 3" not in loaded["text"]
+        assert (loaded["manifest"]["page_preview"] is not None) == with_preview
         assert module("document_parser").select(loaded, {"kind": "page", "page": 2})
         with pytest.raises(module("validation").ContractError):
             module("document_parser").select(loaded, {"kind": "page", "page": 1})

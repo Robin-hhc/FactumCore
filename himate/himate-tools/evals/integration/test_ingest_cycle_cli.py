@@ -45,6 +45,9 @@ def synthetic_plan(root, task):
     if "pdf_review" in task:
         start = task["pdf_review"]["start_page"]
         metadata["source_pages"] = [[start, start]]
+    elif "document_review" in task:
+        scope = task["document_review"]
+        metadata["source_units"] = [[scope["start_unit"], scope["end_unit"]]]
     (root / ".build/plan.md").write_text(
         "---\n" + yaml.safe_dump(metadata, sort_keys=False)
         + "---\nSynthetic fixture decision: this assessed material needs no new card.\n",
@@ -113,6 +116,48 @@ def write_text(root, relative, body):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(body, encoding="utf-8")
     return path
+
+
+@pytest.mark.parametrize("suffix", [".docx", ".xlsx"])
+def test_office_cli_does_not_mark_the_source_complete_before_the_last_range(knowledge, suffix):
+    relative = "docs-raw/specs/office" + suffix
+    target = knowledge / relative
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if suffix == ".docx":
+        from docx import Document
+
+        original = Document()
+        for row in range(120):
+            original.add_paragraph(f"Paragraph {row}: Assess all values and conditions in this source.")
+        original.save(target)
+    else:
+        from openpyxl import Workbook
+
+        original = Workbook()
+        for row in range(120):
+            original.active.append([row, f"Assess all values and conditions in this row {row}.", row + 42])
+        original.save(target)
+    request = {"source": relative, "review_text_budget": 2500}
+    batches = []
+    for _ in range(12):
+        response = scan(knowledge, request)
+        if response["phase"] == "unchanged":
+            break
+        task = response["data"]
+        scope = task["document_review"]
+        assert scope["start_unit"] == (batches[-1]["source_units"][0][1] + 1 if batches else 1)
+        batches.append(publish_selected(knowledge, task))
+    assert response["phase"] == "unchanged"
+    assert len(batches) > 1
+    assert all(not row["source_complete"] for row in batches[:-1])
+    assert batches[-1]["source_complete"]
+
+
+def test_cli_blocks_incomplete_document_without_an_eligible_task(knowledge):
+    path = write_text(knowledge, "docs-raw/specs/broken.pdf", "%PDF-1.7\ntruncated")
+    status, result = invoke(knowledge, "ingest", "scan", "--source", path.relative_to(knowledge).as_posix())
+    assert status == 1 and result["phase"] == "blocked", result
+    assert not (knowledge / ".build/task.json").exists()
 
 
 def assert_processed(root, paths):

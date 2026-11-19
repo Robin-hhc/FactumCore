@@ -19,9 +19,10 @@ import yaml
 
 from .catalog import Catalog, atomic_write, normalize_page_ranges, pdf_review_result, remaining_page_ranges
 from .cards_v3 import parse_card
+from .runtime import native_path
 from .validation import (ContractError, _workspace_no_links, canonical_bytes, load_yaml, markdown_structure,
                          safe_path, validate_id, workspace_configuration, workspace_layout)
-from . import citation_versions, document_parser, intake, source_resources
+from . import citation_versions, document_material, document_parser, document_review, intake, source_resources
 
 
 FORMATS = document_parser.SUPPORTED_FORMATS
@@ -278,9 +279,9 @@ def _clear_build(root, *, remove_empty=False):
         path.mkdir()
 
 
-def _pdf_source(source):
+def _prepared_document(source):
     return (source.get("kind") == "raw" and source.get("exists", True)
-            and PurePosixPath(source["path"]).suffix.lower() == ".pdf")
+            and PurePosixPath(source["path"]).suffix.lower() in document_material.FORMATS)
 
 
 def _task_source(catalog, task):
@@ -297,157 +298,54 @@ def _task_source(catalog, task):
             or (source["exists"] and not re.fullmatch(r"[0-9a-f]{64}", str(source.get("hash"))))
             or (not source["exists"] and (source.get("hash") is not None
                                          or any(key in source for key in ("original_ref", "parsed", "text_ref"))
-                                         or "pdf_review" in task))):
+                                         or "pdf_review" in task or "document_review" in task))):
         raise ContractError("SOURCE_IDENTITY_CHANGED", "Task existence and original-material facts disagree")
     return source
 
 
-def _text_units(text):
-    """A model-independent material scale, not a tokenizer or capacity check."""
-    return len(text) + 3 * sum(not char.isascii() for char in text)
-
-
-def _pdf_packet(loaded, start, end, *, text_budget=None):
-    by_page = {item["locator"]["page"]: item["text"] for item in loaded["locators"]["segments"]
-               if item["locator"].get("kind") == "page"}
-    images_by_page, structures_by_page = {}, {}
-    pattern_elements = set()
-    for item in loaded["manifest"]["images"]:
-        if item.get("role") == "pattern_texture":
-            pattern_elements.add(item["element_ref"])
-            continue
-        for number in {prov.get("page_no") for prov in item.get("provenance", [])}:
-            images_by_page.setdefault(number, []).append(item)
-    for kind in ("texts", "tables", "pictures"):
-        for item in loaded["document"].get(kind, []):
-            if item.get("self_ref") and item["self_ref"] not in pattern_elements:
-                for number in {prov.get("page_no") for prov in item.get("prov", [])}:
-                    structures_by_page.setdefault(number, []).append({"kind": kind, "ref": item["self_ref"]})
-    pages, text = [], ["# PDF review packet", "", "Evaluate all material within the planned physical pages.", ""]
-    units = _text_units("\n".join(text))
-    for number in range(start, end + 1):
-        images = [{**item, "provenance": [prov for prov in item.get("provenance", [])
-                                          if prov.get("page_no") == number]}
-                  for item in images_by_page.get(number, [])]
-        structures = structures_by_page.get(number, [])
-        available = number in by_page
-        block = [f"## Physical page {number}", "", by_page.get(number, "[Physical page material unavailable]"), ""]
-        if available and not by_page[number].strip():
-            block.extend(["No text was extracted. Verify the original page before treating it as blank.", ""])
-        image_refs = {}
-        for item in images:
-            reference = str(item.get("ref") or "[unavailable]")
-            image_refs[reference] = image_refs.get(reference, 0) + 1
-        for reference, count in image_refs.items():
-            occurrences = f" ({count} drawing occurrences; see page index for every location)" if count > 1 else ""
-            block.extend(["Image: " + reference + occurrences, ""])
-        page_units = 1 + _text_units("\n".join(block))
-        pages.append({"page": number, "available": available, "images": images, "structures": structures,
-                      "text_units": page_units, "image_count": len(images),
-                      "table_count": sum(item["kind"] == "tables" for item in structures)})
-        text.extend(block)
-        units += page_units
-        # Keep the whole crossing page available; P2 chooses what it can assess.
-        if text_budget is not None and units >= text_budget:
-            break
-    manifest_ref = loaded["output_ref"] + "/manifest.json"
-    index = {"source_id": loaded["manifest"]["source_id"],
-             "source_sha256": loaded["manifest"]["source_sha256"],
-             "manifest_ref": manifest_ref,
-             "document_ref": loaded["manifest"]["document_ref"],
-             "pages": pages, "text_units": units,
-             "gaps": document_parser.summarize_gaps(loaded["manifest"]["gaps"], manifest_ref),
-             "gap_details_ref": manifest_ref}
-    return "\n".join(text).encode("utf-8"), index
-
-
-def _prepare_pdf_review(root, source, data, page_budget, text_budget):
-    total = document_parser.pdf_page_count(data)
-    processing = source.get("processing") or {}
-    reviewed = (processing["reviewed_pages"] if processing.get("source_sha256") == source["hash"]
-                and source["change"] != "reprocess" else [])
-    reviewed = normalize_page_ranges(reviewed, total)
-    remaining = remaining_page_ranges(total, reviewed)
-    if not remaining:
-        raise ContractError("PDF_REVIEW_ALREADY_COMPLETE", "No unevaluated physical pages remain")
-    start = remaining[0][0]
-    end = min(remaining[0][1], start + page_budget - 1) if page_budget is not None else remaining[0][1]
-    loaded = document_parser.load(root, source["parsed"], expected_source_id=source["source_id"],
-                                  expected_sha256=source["hash"])
-    text, index = _pdf_packet(loaded, start, end, text_budget=text_budget)
-    end = index["pages"][-1]["page"]
-    packet_ref, page_index_ref = ".build/materials/pdf-review.md", ".build/materials/pdf-review.json"
-    safe_path(root, packet_ref, [".build/materials"]).write_bytes(text)
-    safe_path(root, page_index_ref, [".build/materials"]).write_bytes(canonical_bytes(index))
-    return {"total_pages": total, "reviewed_pages": reviewed, "remaining_pages": remaining,
-            "start_page": start, "end_page": end, "page_budget": page_budget,
-            "text_budget": text_budget, "text_units": index["text_units"],
-            "packet_ref": packet_ref, "page_index_ref": page_index_ref}
-
-
-def _pdf_batch(root, task):
-    """Validate batch input for check/apply without repeating content review."""
+def _review_batch(root, task, loaded=None):
     source = task["source"]
-    if not _pdf_source(source):
+    if not _prepared_document(source):
         return None
-    review = task.get("pdf_review")
-    if not isinstance(review, dict):
-        raise ContractError("PDF_REVIEW_REQUIRED", "Prepare a PDF page batch before review or apply")
-    metadata = _plan_metadata(root)
-    pages = metadata.get("source_pages")
-    if pages is None:
-        raise ContractError("PDF_REVIEW_SCOPE_REQUIRED", "Declare source_pages in the PDF plan", ".build/plan.md")
-    if (not isinstance(pages, list) or len(pages) != 1 or not isinstance(pages[0], list)
-            or len(pages[0]) != 2 or any(type(value) is not int for value in pages[0])
-            or not 1 <= pages[0][0] <= pages[0][1]):
-        raise ContractError("PDF_REVIEW_SCOPE_INVALID", "Use one inclusive physical-page interval", ".build/plan.md")
+    if not source.get("parsed") or not source.get("original_ref"):
+        raise ContractError("DOCUMENT_REVIEW_REQUIRED", "No complete P1 document material is available")
+    if loaded is None:
+        loaded = document_parser.load(root, source["parsed"], expected_source_id=source["source_id"],
+                                      expected_sha256=source["hash"])
+    if loaded["manifest"].get("material_version") != 1 or loaded["manifest"]["parse_status"] != "parsed":
+        raise ContractError("DOCUMENT_REVIEW_REQUIRED", "Run ingest scan with the current CLI to prepare complete materials")
     original = safe_path(root, source["original_ref"], [".build/materials"]).read_bytes()
     if sha(original) != source["hash"]:
         raise ContractError("SOURCE_CHANGED", "P1 source copy differs from its recorded hash")
-    total = document_parser.pdf_page_count(original)
-    budget, text_budget = review.get("page_budget"), review.get("text_budget")
-    if ("page_budget" not in review
-            or (budget is not None and (type(budget) is not int or not 1 <= budget <= 1000))
-            or type(text_budget) is not int or not 1 <= text_budget <= 4_000_000
-            or type(review.get("text_units")) is not int or review["text_units"] < 1
-            or type(review.get("total_pages")) is not int or review["total_pages"] != total):
-        raise ContractError("PDF_REVIEW_METADATA_INVALID", "P1 page count or budget differs")
-    processing = source.get("processing") or {}
-    reviewed = (processing["reviewed_pages"] if processing.get("source_sha256") == source["hash"]
-                and source["change"] != "reprocess" else [])
-    reviewed = normalize_page_ranges(reviewed, total)
-    remaining = remaining_page_ranges(total, reviewed)
-    start = remaining[0][0] if remaining else None
-    if start is None:
-        raise ContractError("PDF_REVIEW_SCOPE_INVALID", "No unevaluated physical pages remain")
-    end = min(remaining[0][1], start + budget - 1) if budget is not None else remaining[0][1]
-    loaded = document_parser.load(root, source["parsed"], expected_source_id=source["source_id"],
-                                  expected_sha256=source["hash"])
-    text, index = _pdf_packet(loaded, start, end, text_budget=text_budget)
-    end = index["pages"][-1]["page"]
-    if (review.get("reviewed_pages") != reviewed or review.get("remaining_pages") != remaining
-            or review.get("start_page") != start or review.get("end_page") != end
-            or pages[0][0] != start or pages[0][1] > end):
-        raise ContractError("PDF_REVIEW_SCOPE_INVALID", "Start at the first remaining page within the P1 material range")
-    if review["text_units"] != index["text_units"]:
-        raise ContractError("PDF_REVIEW_MATERIAL_CHANGED", "P1 material amount differs from its fixed source")
-    if (safe_path(root, review["packet_ref"], [".build/materials"]).read_bytes() != text
-            or safe_path(root, review["page_index_ref"], [".build/materials"]).read_bytes() != canonical_bytes(index)):
-        raise ContractError("PDF_REVIEW_MATERIAL_CHANGED", "P1 page packet differs from its fixed source")
-    if any(not item["available"] for item in index["pages"] if pages[0][0] <= item["page"] <= pages[0][1]):
-        raise ContractError("PDF_REVIEW_MATERIAL_UNAVAILABLE", "Some planned physical pages have no parsed material")
-    return {"pages": pages, "total_pages": total}
+    return document_review.validate(root, task, _plan_metadata(root), loaded)
+
+
+def _checked_document_digest(root, batch, drafts, deletes):
+    if batch is None:
+        return None
+    return sha(canonical_bytes({
+        "units": batch["source_units"],
+        "plan_sha256": sha(safe_path(root, ".build/plan.md").read_bytes()),
+        "drafts": {card["path"]: sha(card["raw"]) for card in drafts},
+        "deletes": sorted(deletes),
+    }))
 
 
 def scan(root, request):
     root = Path(root)
+    unknown = set(request) - {"source", "reprocess", "parser", "review_page_budget", "review_text_budget"}
+    if unknown:
+        raise ContractError("INVALID_INPUT", "Unknown scan fields: " + ", ".join(sorted(unknown))
+                            + ". Put conversion settings in the top-level parser object.")
+    if "parser" in request:
+        document_parser._options(root, request["parser"])
     reprocess = request.get("reprocess", False)
     if type(reprocess) is not bool:
         raise ContractError("INVALID_REPROCESS", "reprocess must be a boolean")
     page_budget = request.get("review_page_budget")
     if "review_page_budget" in request and (type(page_budget) is not int or not 1 <= page_budget <= 1000):
         raise ContractError("PDF_REVIEW_BUDGET", "review_page_budget must be an integer from 1 to 1000")
-    text_budget = request.get("review_text_budget", 400_000)
+    text_budget = request.get("review_text_budget", document_review.MAX_REVIEW_BYTES)
     if type(text_budget) is not int or not 1 <= text_budget <= 4_000_000:
         raise ContractError("PDF_REVIEW_BUDGET", "review_text_budget must be an integer from 1 to 4000000")
     with Catalog(root) as catalog:
@@ -478,7 +376,7 @@ def scan(root, request):
     materials = safe_path(root, ".build/materials")
     materials.mkdir()
     gaps = []
-    pdf_review = None
+    pdf_review, review = None, None
     if selected["content"] is not None:
         suffix = Path(selected["path"]).suffix.lower()
         original = materials / ("current" + suffix)
@@ -491,8 +389,8 @@ def scan(root, request):
                 text_path.write_text(text, encoding="utf-8")
                 source["text_ref"] = text_path.relative_to(root).as_posix()
             else:
-                if _pdf_source(source):
-                    parsed = document_parser.prepare_pdf(root, source, selected["content"], options=request.get("parser"))
+                if _prepared_document(source):
+                    parsed, loaded = document_parser.prepare_document(root, source, selected["content"], options=request.get("parser"))
                 else:
                     assets = (intake.package_assets(root, source["path"], expected_sha256=source["hash"])
                               if suffix == ".md" else None)
@@ -503,22 +401,27 @@ def scan(root, request):
                 # Keep the old entry usable without changing the parser's
                 # manifest-owned files or its text/locator semantics.
                 if suffix not in {".txt", ".pdf"}:
-                    (materials / "current.txt").write_bytes(safe_path(root, parsed["text_ref"]).read_bytes())
+                    text_file = Path(native_path(safe_path(root, parsed["text_ref"])))
+                    (materials / "current.txt").write_bytes(text_file.read_bytes())
                 for item in parsed.get("gaps", []):
                     message = item.get("message", str(item)) if isinstance(item, dict) else str(item)
                     if isinstance(item, dict) and "count" in item:
                         message += f" ({item['count']} occurrences; details: {item['details_ref']})"
                     gaps.append(message)
-                if _pdf_source(source):
-                    pdf_review = _prepare_pdf_review(root, source, selected["content"], page_budget, text_budget)
-        except (ValueError, UnicodeError, ImportError, ContractError) as error:
+                if _prepared_document(source) and parsed["parse_status"] == "parsed":
+                    review, pdf_review = document_review.prepare(root, source, loaded, text_budget, page_budget)
+        except (OSError, ValueError, UnicodeError, ImportError, ContractError) as error:
             gaps.append(str(error))
+    if _prepared_document(source) and review is None:
+        return {"source": source, "gaps": gaps, "pending_at_least": len(pending)}, "blocked"
     (root / ".build/cards").mkdir()
     task = {"source": source, "affected_cards": [{"id": card["id"], "path": card["path"],
                                                  "title": card["title"]} for card in cards],
             "cards_dir": ".build/cards", "plan_ref": ".build/plan.md", "gaps": gaps}
     if pdf_review is not None:
         task["pdf_review"] = pdf_review
+    if review is not None:
+        task["document_review"] = review
     write_json(root / ".build/task.json", task)
     return {**task, "task_ref": ".build/task.json", "pending_at_least": len(pending)}, "prepared"
 
@@ -780,6 +683,7 @@ def check(root, request, rules=None):
             staged_sources = {}
             checked_references = []
             task_bytes = None
+            document_batch = None
             context = {"formal": formal, "loaded": {}, "legacy": {}, "data": {}, "descriptors": {}}
             task_path = safe_path(root, ".build/task.json")
             if not formal and task_path.is_file():
@@ -787,7 +691,6 @@ def check(root, request, rules=None):
                 task = read_json(task_path, raw=task_bytes)
                 source = _task_source(catalog, task)
                 task["source"] = source
-                _pdf_batch(root, task)
                 context["primary_id"] = source["source_id"]
                 if source.get("original_ref"):
                     staged_sources[source["source_id"]] = safe_path(
@@ -799,6 +702,7 @@ def check(root, request, rules=None):
                     loaded = document_parser.load(root, source["parsed"], expected_source_id=source["source_id"],
                                                   expected_sha256=source["hash"])
                     context["loaded"][(source["source_id"], source["hash"])] = loaded
+                document_batch = _review_batch(root, task, context["loaded"].get((source["source_id"], source["hash"])))
         except (ValueError, OSError, ContractError, yaml.YAMLError) as error:
             return {"findings": [_finding(error)]}, "failed"
         if planned is not None:
@@ -882,7 +786,8 @@ def check(root, request, rules=None):
                     findings.append({"code": "BROKEN_CARD_ANCHOR", "path": card["path"], "message": target})
     if not findings and task_bytes is not None:
         try:
-            citation_versions.stage(root, checked_references, task_bytes)
+            citation_versions.stage(root, checked_references, task_bytes,
+                                    review_digest=_checked_document_digest(root, document_batch, drafts, deletes))
         except (ValueError, OSError, ContractError) as error:
             findings.append(_finding(error))
     return {"findings": findings, "card_ids": [card["id"] for card in drafts],
@@ -893,7 +798,7 @@ def check(root, request, rules=None):
 def commit(root, request):
     """Copy the reviewed drafts and refresh metadata; retry the same workspace.
 
-    PDF inputs are checked against their fixed P1 copy and planned page batch.
+    Documents are checked against their fixed P1 copy and planned reading range.
     The five-node workflow owns independent content review and its order.
     """
     task_path = safe_path(root, ".build/task.json")
@@ -911,10 +816,12 @@ def commit(root, request):
         deletes = _deletes(root)
         if request.get("defer"):
             return {"source_id": source["source_id"], "reason": request.get("reason", "Materials are incomplete")}, "deferred"
-        pdf_batch = _pdf_batch(root, task)
+        document_batch = _review_batch(root, task)
+        pdf_batch = document_batch["pdf_batch"] if document_batch is not None else None
         if not drafts and not request.get("reason"):
             raise ContractError("NO_CHANGE_REASON_REQUIRED", "Explain the reviewed no-card result")
-        registry_changed = citation_versions.persist(root, catalog, drafts, task_bytes)
+        registry_changed = citation_versions.persist(root, catalog, drafts, task_bytes,
+                                                     review_digest=_checked_document_digest(root, document_batch, drafts, deletes))
         for card in drafts:
             destination = safe_path(root, card["path"], ["knowledge"])
             destination.parent.mkdir(parents=True, exist_ok=True)
@@ -925,8 +832,24 @@ def commit(root, request):
         from .library import build_search
 
         current = catalog.get_file(source["source_id"])
+        review_identity = document_batch["review_sha256"] if document_batch is not None else None
         processing = (pdf_review_result(current, source["hash"], pdf_batch["pages"], pdf_batch["total_pages"],
-                                        restart=source["change"] == "reprocess") if pdf_batch is not None else None)
+                                        restart=source["change"] == "reprocess", review_sha256=review_identity)
+                      if pdf_batch is not None else None)
+        remaining_units = []
+        if document_batch is not None and pdf_batch is None:
+            previous = current.get("processing", {})
+            reviewed = document_batch["reviewed_units"]
+            if (source["change"] != "reprocess" and previous.get("source_sha256") == source["hash"]
+                    and previous.get("review_sha256") == document_batch["review_sha256"]):
+                reviewed = normalize_page_ranges([*reviewed, *previous["reviewed_units"]], document_batch["total_units"])
+            already_complete = (not previous and source["change"] != "reprocess"
+                                and current.get("processed_hash") == source["hash"] and current["processed_exists"] is True)
+            if not already_complete:
+                remaining_units = remaining_page_ranges(document_batch["total_units"], reviewed)
+            if remaining_units:
+                processing = {"source_sha256": source["hash"], "review_sha256": document_batch["review_sha256"],
+                              "reviewed_units": reviewed}
         result = {"source_id": source["source_id"],
                   "processed_hash": current.get("processed_hash") if processing is not None else source["hash"],
                   "card_ids": [card["id"] for card in drafts], "deleted": deletes,
@@ -934,8 +857,13 @@ def commit(root, request):
                   "reason": request.get("reason", "Reviewed card changes published")}
         if processing is not None:
             result["processing"] = processing
-            result["remaining_pages"] = remaining_page_ranges(
-                pdf_batch["total_pages"], processing["reviewed_pages"])
+            if pdf_batch is not None:
+                result["remaining_pages"] = remaining_page_ranges(
+                    pdf_batch["total_pages"], processing["reviewed_pages"])
+            else:
+                result["remaining_units"] = remaining_units
+        if document_batch is not None:
+            result["source_units"] = document_batch["source_units"]
         # Publish the matching read view before updating the authoritative lock.
         # A failure rolls back the entire SQLite transaction and leaves P5 retryable.
         projected_source = {"processing": processing}
@@ -947,7 +875,10 @@ def commit(root, request):
             catalog.record_pdf_review(
                 source["source_id"], source["hash"], pdf_batch["pages"], pdf_batch["total_pages"],
                 source_commit=source.get("source_commit"), restart=source["change"] == "reprocess",
-                registry_changed=registry_changed)
+                registry_changed=registry_changed, review_sha256=review_identity)
+        elif document_batch is not None:
+            catalog.record_document_review(source["source_id"], source["hash"], processing,
+                                           source_commit=source.get("source_commit"))
         else:
             catalog.mark_processed(source["source_id"], source["hash"], source["exists"],
                                    source_commit=source.get("source_commit"))

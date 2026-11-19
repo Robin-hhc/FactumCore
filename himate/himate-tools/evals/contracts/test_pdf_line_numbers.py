@@ -108,11 +108,16 @@ def test_hidden_margin_numbers_remain_available_by_public_element_locator(parsed
 
 
 def test_ingest_packet_uses_cleaned_page_text_with_numeric_controls_intact(parsed_draft):
-    _root, _data, _descriptor, loaded = parsed_draft
-    packet, index = module("ingest")._pdf_packet(loaded, 1, 4)
+    root, data, descriptor, _loaded = parsed_draft
+    source = {"id": descriptor["source_id"], "hash": descriptor["source_sha256"],
+              "path": "docs-raw/specs/draft.pdf", "change": "added"}
+    prepared, loaded = parser.prepare_document(root, source, data)
+    assert prepared["parse_status"] == "parsed"
+    review = module("document_review")
+    _, index, packet, _ = review.material(source, loaded, review.MAX_REVIEW_BYTES, None)
     text = packet.decode("utf-8")
     assert len(numeric_lines(text)) == 130
-    assert [row["page"] for row in index["pages"]] == [1, 2, 3, 4]
+    assert [row["page"] for row in index["units"]] == [1, 2, 3, 4]
     assert "6.5.7.3.3 When generated" in text
     assert "Clause 65. Requirement stays measurable; value 65 is preserved." in text
 

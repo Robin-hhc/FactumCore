@@ -42,6 +42,10 @@ quick 仅选每个职责目录排序后的首个测试文件，是明确的局�
 
 输出目录必须全新。运行器保留每组 JUnit、stdout/stderr、实际选择和 `summary.json`；超时、收集失败、空测试组和无效报告不能算通过。`--jobs` 控制测试组并行，不表示生产 ingest/lint 支持并发写入。性能统计只作观察，不设速度门禁；`--baseline` 仅在环境和选择一致时比较。
 
+## 文档转换样本
+
+运行 `python himate/himate-tools/evals/build_document_corpus.py <新输出目录>` 生成有确定页码、图片文字和表格位置的 PDF、DOCX、XLSX。`--pdf-pages 5201` 可生成跨过历史默认页数边界的压力样本。`expected.json` 记录已知原件定位。常规 `ingest` 与 `integration` 回归验证完整转换的交付条件、阅读上限和分轮登记。真实 OCR 的 CLI 回归使用本机安装的模型。模型另存时，用 `HIMATE_TEST_DOCLING_MODELS` 指向含 `RapidOcr` 的模型根目录。未提供模型的环境会跳过该用例。
+
 ## 验证边界
 
 独立算法检查、隔离 CLI 测试和公司实际环境分别记录。依赖安装和模型包分别由本仓的环境测试、npm 测试覆盖。能力仓的安装测试使用临时目录和解释器记录器验证包复制、更新、路径保护及两端入口。真实 OCR 结果按实际执行端记录，模拟测试通过不代表实际宿主或业务知识验收通过。

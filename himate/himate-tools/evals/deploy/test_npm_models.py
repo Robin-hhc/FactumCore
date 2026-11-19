@@ -9,6 +9,8 @@ import subprocess
 
 import pytest
 
+from support.contracts import module
+
 
 TOOL_ROOT = Path(__file__).resolve().parents[2]
 
@@ -63,6 +65,9 @@ def model_root(home):
 def test_model_install_joins_parts_and_keeps_cli_and_logs(model_package, tmp_path):
     package, manifest, contents = model_package
     home = tmp_path / "user profile"
+    if os.name == "nt":
+        longest_path = max(len(str(model_root(home) / "docling-cpu" / ref)) for ref in contents)
+        home = home.with_name(home.name + "x" * max(0, 264 - longest_path))
     installed = home / ".himate/knowledge"
     for relative in ("runtime/manifest.json", "logs/setup.log"):
         target = installed / relative
@@ -75,9 +80,10 @@ def test_model_install_joins_parts_and_keeps_cli_and_logs(model_package, tmp_pat
     result = install(package, home, tmp_path)
 
     assert result.returncode == 0, result.stderr
+    models = Path(module("runtime").native_path(model_root(home)))
     for reference, data in contents.items():
-        assert (model_root(home) / "docling-cpu" / reference).read_bytes() == data
-    assert not list((model_root(home) / "docling-cpu").rglob("*.part*"))
+        assert (models / "docling-cpu" / reference).read_bytes() == data
+    assert not list((models / "docling-cpu").rglob("*.part*"))
     assert not previous.exists()
     assert json.loads((model_root(home) / "manifest.json").read_text()) == manifest
     assert (installed / "runtime/manifest.json").read_bytes() == b"existing CLI state"

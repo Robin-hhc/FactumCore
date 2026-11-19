@@ -14,6 +14,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "support"))
 from contracts import module
 
 
+def marked_pages(contents):
+    return "\n\n".join(f"<!-- physical-page:{page} -->\n{text}"
+                       for page, text in enumerate(contents, 1)) + "\n"
+
+
 def pdf_bytes(pages):
     from pypdf import PdfWriter
 
@@ -38,7 +43,7 @@ def library(tmp_path, monkeypatch):
 
         pages = list(range(1, len(PdfReader(BytesIO(data)).pages) + 1))
         text = "\n\n".join(f"Physical page {page}: a synthetic requirement." for page in pages)
-        (output / "document.md").write_text(text, encoding="utf-8")
+        (output / "document.md").write_text(marked_pages(text.split("\n\n")), encoding="utf-8")
         (output / "document.json").write_text(json.dumps({"pictures": []}), encoding="utf-8")
         return text, [{"locator": {"kind": "page", "page": page},
                        "text": f"Physical page {page}: a synthetic requirement."} for page in pages], [], [], pages
@@ -61,20 +66,27 @@ def text_pages(root, monkeypatch, contents, *, illustrated=False):
     def convert(_root, _source, _data, output, _options, _range, _source_hash, _profile_hash):
         pages = list(range(1, len(contents) + 1))
         text = "\n\n".join(contents)
-        (output / "document.md").write_text(text, encoding="utf-8")
+        markdown = list(contents)
         document = {"pictures": [], "tables": []}
         images = []
         if illustrated:
-            asset = output / "image.png"
-            asset.write_bytes(b"Synthetic image asset; image decoding is outside this test.")
+            from PIL import Image
+
+            asset = output / "images/test.png"
+            asset.parent.mkdir()
+            Image.new("RGB", (12, 12)).save(asset)
+            markdown[0] += "\n\n![Image](images/test.png)"
             images.append({"ref": asset.relative_to(root).as_posix(), "provenance": [{"page_no": 1}]})
             document["tables"].append({"self_ref": "#/tables/0", "prov": [{"page_no": 1}]})
             document["pictures"].append({"self_ref": "#/pictures/0", "prov": [{"page_no": 1}]})
         (output / "document.json").write_text(json.dumps(document), encoding="utf-8")
+        (output / "document.md").write_text(marked_pages(markdown), encoding="utf-8")
         return text, [{"locator": {"kind": "page", "page": page}, "text": body}
                       for page, body in zip(pages, contents)], images, [], pages
 
     monkeypatch.setattr(module("document_parser"), "_docling", convert)
+    if illustrated:
+        monkeypatch.setattr(module("document_material"), "image_reader", lambda *args: lambda path: "")
 
 
 def plan(root, pages, *, card=None):
@@ -150,8 +162,9 @@ def test_pdf_plan_must_explicitly_cover_the_bounded_batch_before_check_or_apply(
     plan(library, pages)
     result, phase = module("ingest").check(library, {})
     assert phase == "failed", result
-    assert any(item["code"].startswith("PDF_REVIEW_") for item in result["findings"])
-    with pytest.raises(ValueError, match="PDF_REVIEW_"):
+    code = "PDF_REVIEW_SCOPE_REQUIRED" if pages is None else "DOCUMENT_REVIEW_SCOPE"
+    assert any(item["code"] == code for item in result["findings"])
+    with pytest.raises(ValueError, match=code):
         module("ingest").commit(library, {"reason": "No card is needed."})
     with module("catalog").Catalog(library) as catalog:
         assert catalog.list_files()[0].get("processing") is None
@@ -162,6 +175,7 @@ def test_defer_and_failed_pdf_publish_do_not_advance_evaluated_pages(library, mo
     result, phase = module("ingest").commit(library, {"defer": True, "reason": "Missing evidence."})
     assert phase == "deferred", result
     plan(library, [[1, 2]])
+    assert module("ingest").check(library, {})[1] == "passed"
     catalog_type = module("catalog").Catalog
 
     def fail(_self):
@@ -182,6 +196,7 @@ def test_defer_and_failed_pdf_publish_do_not_advance_evaluated_pages(library, mo
 def test_pdf_changed_version_never_inherits_old_page_coverage(library):
     task = prepare(library)
     plan(library, [[1, 2]])
+    assert module("ingest").check(library, {})[1] == "passed"
     module("ingest").commit(library, {"reason": "Assessed; no increment."})
     (library / "docs-raw/protocol.pdf").write_bytes(pdf_bytes(6))
     task = prepare(library)
@@ -202,11 +217,13 @@ def test_invalid_pdf_budget_keeps_existing_staging(library, budget):
 def test_same_hash_reprocess_partial_stays_pending_for_scan_and_patrol(library):
     task = prepare(library, review_page_budget=20)
     plan(library, [[1, 5]])
+    assert module("ingest").check(library, {})[1] == "passed"
     module("ingest").commit(library, {"reason": "All pages assessed, no increment."})
     full_hash = task["source"]["hash"]
     repeated = prepare(library, reprocess=True)
     assert repeated["pdf_review"]["start_page"] == 1
     plan(library, [[1, 2]])
+    assert module("ingest").check(library, {})[1] == "passed"
     result, _ = module("ingest").commit(library, {"reason": "First batch of explicit reassessment."})
     assert result["processed_hash"] == full_hash and result["source_complete"] is False
     pending, phase = module("library").patrol(library, "plan", {})
@@ -220,6 +237,7 @@ def test_same_hash_reprocess_partial_stays_pending_for_scan_and_patrol(library):
 def test_receipt_write_failure_preserves_exact_committed_coverage(library, monkeypatch, complete):
     task = prepare(library, review_page_budget=20 if complete else 2)
     plan(library, [[1, 5 if complete else 2]])
+    assert module("ingest").check(library, {})[1] == "passed"
     ingest = module("ingest")
     receipt = library / "artifacts/ingest/latest.json"
     original = ingest.atomic_write
@@ -245,7 +263,8 @@ def test_receipt_write_failure_preserves_exact_committed_coverage(library, monke
         assert ingest.scan(library, {}) == ({"pending": 0}, "unchanged")
     else:
         assert result["processed_hash"] is None and source["processed_hash"] is None
-        expected = {"source_sha256": digest, "reviewed_pages": [[1, 2]]}
+        expected = {"source_sha256": digest, "reviewed_pages": [[1, 2]],
+                    "review_sha256": task["document_review"]["review_sha256"]}
         assert result["processing"] == source["processing"] == expected
         assert result["remaining_pages"] == [[3, 5]]
         resumed = prepare(library)
@@ -260,8 +279,8 @@ def test_modified_review_packet_cannot_be_applied(library, material):
     plan(library, [[1, 2]])
     (library / task["pdf_review"][material]).write_bytes(b"Unreviewed replacement material")
     result, phase = module("ingest").check(library, {})
-    assert phase == "failed" and result["findings"][0]["code"] == "PDF_REVIEW_MATERIAL_CHANGED"
-    with pytest.raises(ValueError, match="PDF_REVIEW_MATERIAL_CHANGED"):
+    assert phase == "failed" and result["findings"][0]["code"] == "DOCUMENT_REVIEW_MATERIAL_CHANGED"
+    with pytest.raises(ValueError, match="DOCUMENT_REVIEW_MATERIAL_CHANGED"):
         module("ingest").commit(library, {"reason": "Assessed; no increment."})
 
 
@@ -274,17 +293,12 @@ def test_missing_conversion_pages_never_shrink_the_original_pdf_universe(library
         return text, [item for item in segments if item["locator"]["page"] <= 2], images, gaps, pages[:2]
 
     monkeypatch.setattr(parser, "_docling", partial)
-    task = prepare(library)
-    assert task["pdf_review"]["total_pages"] == 5
+    task, phase = module("ingest").scan(library, {"source": "docs-raw/protocol.pdf"})
+    assert phase == "blocked"
     assert task["source"]["parsed"]["statistics"]["page_count"] == 2
-    plan(library, [[1, 2]])
-    result, _ = module("ingest").commit(library, {"reason": "Only first batch assessed."})
-    assert result["source_complete"] is False and result["remaining_pages"] == [[3, 5]]
-    prepare(library)
-    plan(library, [[3, 4]])
-    checked, phase = module("ingest").check(library, {})
-    assert phase == "failed" and checked["findings"][0]["code"] == "PDF_REVIEW_MATERIAL_UNAVAILABLE"
-    with pytest.raises(ValueError, match="PDF_REVIEW_MATERIAL_UNAVAILABLE"):
+    assert task["source"]["parsed"]["gaps"][0]["code"] == "DOCUMENT_PAGE_COVERAGE"
+    assert not (library / ".build/task.json").exists()
+    with pytest.raises(ValueError, match="TASK_REQUIRED"):
         module("ingest").commit(library, {"reason": "Cannot treat missing pages as blank."})
 
 
@@ -297,6 +311,7 @@ def test_thousand_page_pdf_only_hands_off_one_bounded_packet(library):
     packet = (library / batch["packet_ref"]).read_text(encoding="utf-8")
     assert "Physical page 20:" in packet and "Physical page 21:" not in packet
     plan(library, [[1, 20]])
+    assert module("ingest").check(library, {})[1] == "passed"
     result, _ = module("ingest").commit(library, {"reason": "First twenty pages assessed."})
     assert result["remaining_pages"] == [[21, 1001]] and result["source_complete"] is False
     following = prepare(library)
@@ -309,7 +324,7 @@ def test_default_text_budget_has_no_implicit_page_cap(library):
     assert phase == "prepared", task
     batch = task["pdf_review"]
     assert batch["page_budget"] is None
-    assert batch["text_budget"] == 400000
+    assert batch["text_budget"] == 76000
     assert (batch["start_page"], batch["end_page"]) == (1, 1001)
     packet = (library / batch["packet_ref"]).read_text(encoding="utf-8")
     assert "Physical page 1001:" in packet
@@ -325,7 +340,19 @@ def test_invalid_pdf_text_budget_keeps_existing_staging(library, budget):
     assert marker.read_bytes() == b'{"unfinished":true}'
 
 
-def test_text_threshold_includes_the_whole_page_that_crosses_it(library, monkeypatch):
+@pytest.mark.parametrize("request_fields,code", [
+    ({"options": {"parser": {"max_pages": 5000}}}, "INVALID_INPUT"),
+    ({"parser": {"maximum_pages": 5000}}, "PARSE_OPTIONS_INVALID"),
+])
+def test_misplaced_parser_options_fail_before_replacing_staging(library, request_fields, code):
+    marker = library / ".build/task.json"
+    marker.write_bytes(b'{"unfinished":true}')
+    with pytest.raises(ValueError, match=code):
+        prepare(library, **request_fields)
+    assert marker.read_bytes() == b'{"unfinished":true}'
+
+
+def test_candidate_stops_before_a_second_page_crosses_its_budget(library, monkeypatch):
     first, second = "FIRST_PAGE_" + "a" * 100, "SECOND_PAGE_" + "b" * 1000
     text_pages(library, monkeypatch, [first, second, "THIRD_PAGE_MUST_WAIT"])
     task, phase = module("ingest").scan(library, {
@@ -333,11 +360,11 @@ def test_text_threshold_includes_the_whole_page_that_crosses_it(library, monkeyp
     })
     assert phase == "prepared", task
     batch = task["pdf_review"]
-    assert (batch["start_page"], batch["end_page"]) == (1, 2)
+    assert (batch["start_page"], batch["end_page"]) == (1, 1)
     packet = (library / batch["packet_ref"]).read_text(encoding="utf-8")
-    assert first in packet and second in packet
+    assert first in packet and second not in packet
     assert "THIRD_PAGE_MUST_WAIT" not in packet
-    assert batch["text_units"] == len(packet) > 300
+    assert batch["text_units"] == len(packet) <= 300
 
 
 def test_exact_text_threshold_stops_after_that_whole_page(library, monkeypatch):
@@ -361,36 +388,35 @@ def test_text_budget_inclusive_limits_are_valid(library, budget, expected_end):
     assert task["pdf_review"]["end_page"] == expected_end
 
 
-def test_one_oversized_page_is_neither_rejected_nor_truncated(library, monkeypatch):
+def test_oversized_page_stays_complete_in_markdown_and_reads_in_parts(library, monkeypatch):
     huge = "GIANT_BEGIN_" + "a" * 450000 + "_GIANT_END"
     text_pages(library, monkeypatch, [huge, "NEXT_PAGE_MUST_WAIT"])
     task, phase = module("ingest").scan(library, {"source": "docs-raw/protocol.pdf"})
     assert phase == "prepared", task
-    batch = task["pdf_review"]
-    assert (batch["start_page"], batch["end_page"]) == (1, 1)
-    packet = (library / batch["packet_ref"]).read_text(encoding="utf-8")
-    assert huge in packet and "NEXT_PAGE_MUST_WAIT" not in packet
-    assert batch["text_units"] == len(packet) > 400000
-    plan(library, [[1, 1]])
+    batch = task["document_review"]
+    assert (batch["start_unit"], batch["end_unit"]) == (1, 1)
+    packet = (library / batch["packet_ref"]).read_bytes()
+    assert b"GIANT_BEGIN_" in packet and b"_GIANT_END" not in packet
+    assert huge in (library / batch["markdown_ref"]).read_text(encoding="utf-8")
+    assert batch["text_bytes"] == len(packet) <= 76000
+    (library / ".build/plan.md").write_text("---\ncards: []\nsource_units: [[1, 1]]\n---\n", encoding="utf-8")
     assert module("ingest").check(library, {})[1] == "passed"
-    result, _ = module("ingest").commit(library, {"reason": "The complete oversized page was evaluated."})
-    assert result["processing"]["reviewed_pages"] == [[1, 1]]
+    result, _ = module("ingest").commit(library, {"reason": "This part of the oversized page was evaluated."})
+    assert result["processing"]["reviewed_units"] == [[1, 1]]
+    assert result["source_complete"] is False
 
 
-def test_text_units_weight_all_non_ascii_characters_and_include_structure_entries(library, monkeypatch):
+def test_utf8_budget_counts_markdown_text_table_and_inline_image(library, monkeypatch):
     text_pages(library, monkeypatch, ["A中é😀\n\n| Cell |\n| --- |\n| TABLE |"], illustrated=True)
     task, phase = module("ingest").scan(library, {"source": "docs-raw/protocol.pdf"})
     assert phase == "prepared", task
     batch = task["pdf_review"]
     packet = (library / batch["packet_ref"]).read_text(encoding="utf-8")
-    # Exactly three non-ASCII characters each add three units over their Python character length.
-    assert batch["text_units"] == len(packet) + 9
-    assert "| TABLE |" in packet and "Image: " in packet
+    assert batch["text_units"] == len(packet.encode("utf-8"))
+    assert "| TABLE |" in packet and "![Image](images/test.png)" in packet
     index = json.loads((library / batch["page_index_ref"]).read_text(encoding="utf-8"))
-    assert index["text_units"] == batch["text_units"]
-    page = index["pages"][0]
-    assert type(page["text_units"]) is int and page["text_units"] > 13
-    assert page["image_count"] == 1 and page["table_count"] == 1
+    assert index["scope"]["text_bytes"] == batch["text_units"]
+    assert index["units"] == [{"unit": 1, "start": 0, "end": batch["text_units"], "page": 1}]
 
 
 def test_pdf_handoff_summarizes_repeated_whole_book_diagnostics(library, monkeypatch):
@@ -408,21 +434,19 @@ def test_pdf_handoff_summarizes_repeated_whole_book_diagnostics(library, monkeyp
         return text, segments, images, gaps, pages
 
     monkeypatch.setattr(parser, "_docling", noisy)
-    task = prepare(library)
-    assert (library / ".build/task.json").stat().st_size < 12000
+    task, phase = module("ingest").scan(library, {"source": "docs-raw/protocol.pdf"})
+    assert phase == "blocked"
+    assert not (library / ".build/task.json").exists()
+    assert len(module("document_parser").canonical_bytes(task)) < 12000
     assert task["source"]["parsed"]["parse_status"] == "partial"
     assert len(task["gaps"]) == 1 and "3000" in task["gaps"][0]
-    index_path = library / task["pdf_review"]["page_index_ref"]
-    assert index_path.stat().st_size < 12000
-    index = json.loads(index_path.read_bytes())
-    assert len(index["gaps"]) == 1 and index["gaps"][0]["count"] == 3000
-    assert index["gap_details_ref"] == task["source"]["parsed"]["manifest_ref"]
-    manifest = json.loads((library / index["gap_details_ref"]).read_bytes())
+    descriptor = task["source"]["parsed"]
+    manifest = json.loads((library / descriptor["manifest_ref"]).read_bytes())
     assert len(manifest["gaps"]) == len(manifest["images"]) == 3000
-    assert index["gaps"][0]["details_ref"] == index["gap_details_ref"]
+    assert descriptor["gaps"][0]["details_ref"] == descriptor["manifest_ref"]
 
 
-def test_page_index_keeps_shared_image_provenance_local_without_changing_manifest(library, monkeypatch):
+def test_shared_original_image_provenance_survives_review(library, monkeypatch):
     text_pages(library, monkeypatch, ["First physical page", "Second physical page"], illustrated=True)
     parser = module("document_parser")
     convert = parser._docling
@@ -435,9 +459,7 @@ def test_page_index_keeps_shared_image_provenance_local_without_changing_manifes
     monkeypatch.setattr(parser, "_docling", shared)
     task = prepare(library)
     index = json.loads((library / task["pdf_review"]["page_index_ref"]).read_bytes())
-    for page in index["pages"]:
-        assert page["image_count"] == 1
-        assert page["images"][0]["provenance"] == [{"page_no": page["page"]}]
+    assert [entry["page"] for entry in index["units"]] == [1, 2]
     manifest_path = library / task["source"]["parsed"]["manifest_ref"]
     original = manifest_path.read_bytes()
     assert json.loads(original)["images"][0]["provenance"] == [{"page_no": 1}, {"page_no": 2}]
@@ -459,16 +481,12 @@ def test_repeated_bitmap_draws_do_not_fill_the_reading_packet_with_identical_pat
     monkeypatch.setattr(parser, "_docling", repeated_draws)
     task = prepare(library, review_text_budget=5000)
     packet = (library / task["pdf_review"]["packet_ref"]).read_text(encoding="utf-8")
-    index = json.loads((library / task["pdf_review"]["page_index_ref"]).read_bytes())
     manifest = json.loads((library / task["source"]["parsed"]["manifest_ref"]).read_bytes())
-    reference = manifest["images"][0]["ref"]
 
     assert task["pdf_review"]["end_page"] == 2
     assert task["pdf_review"]["text_units"] < 5000
-    assert packet.count("Image: " + reference) == 1
-    assert "2000 drawing occurrences" in packet
-    assert index["pages"][0]["image_count"] == len(index["pages"][0]["images"]) == 2000
-    assert len({row["element_ref"] for row in index["pages"][0]["images"]}) == 2000
+    assert packet.count("![Image](images/test.png)") == 1
+    assert len({row["element_ref"] for row in manifest["images"]}) == 2000
     assert len(manifest["images"]) == 2000
 
 
@@ -533,8 +551,8 @@ def test_modified_text_budget_metadata_cannot_be_applied(library, field, value):
     registry = (library / "governance/sources.lock.yaml").read_bytes()
     result, phase = module("ingest").check(library, {})
     assert phase == "failed", result
-    assert result["findings"][0]["code"].startswith("PDF_REVIEW_")
-    with pytest.raises(ValueError, match="PDF_REVIEW_"):
+    assert result["findings"][0]["code"].startswith("DOCUMENT_REVIEW_")
+    with pytest.raises(ValueError, match="DOCUMENT_REVIEW_"):
         module("ingest").commit(library, {"reason": "Cannot publish modified budget metadata."})
     assert (library / "governance/sources.lock.yaml").read_bytes() == registry
 

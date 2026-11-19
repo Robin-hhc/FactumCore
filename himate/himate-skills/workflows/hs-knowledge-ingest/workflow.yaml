@@ -1,7 +1,7 @@
 version: 1
 id: hs-knowledge-ingest
 name: 知识入库
-description: 在本次选定范围内逐批处理来源或PDF页段；P5成功回P1继续扫描，P1确认无待办才正常结束。
+description: 在本次选定范围内逐批处理来源和文档阅读单元；P5成功回P1继续扫描。
 kind: custom
 source: user_created
 entry:
@@ -16,7 +16,7 @@ nodes:
   prompt: |-
     首次进入时，复用宿主绑定或本次已确认的知识根与执行端，读取该根的 AGENTS.md 和 config.yml。知识根或执行端仍不明确时询问用户。使用该执行端已注册的 knowledge 命令或宿主提供的已安装 CLI 入口，以知识根为工作目录，显式传入 --knowledge-root，运行 doctor --json。回执的知识根正确且 phase 为 ready 后才继续；环境阻塞时报告实际缺口。交接执行端、知识根、CLI 调用入口和 data.runtime_version，后续节点沿用同一入口、版本和目标。
 
-    保留任务原始范围和解析、预算配置，后续各批沿用。使用 hs-knowledge-source。prepared 时交接本批 task 与材料入口，unchanged 时汇总原始范围内各批实际处理的来源、页段和卡片变动。
+    保留任务原始范围与解析配置。使用 hs-knowledge-source。prepared 时交接本批 task，blocked 时报告 P1 转换缺口和已完成范围，unchanged 时汇总原范围处理结果。
   exits:
   - id: prepared
     label: 本轮材料已准备
@@ -25,6 +25,10 @@ nodes:
   - id: unchanged
     label: 没有待办
     condition: 本次任务原始范围扫描成功且没有待办，已汇总各批实际结果。
+    target: __end__
+  - id: blocked
+    label: 文档准备受阻
+    condition: P1 返回实际转换错误和缺口，当前来源仍待处理。
     target: __end__
 - id: plan_change
   title: P2 阅读并制定编辑计划

@@ -152,15 +152,14 @@ def test_pattern_reuses_explicit_preview_for_original_page(tmp_path):
     assert warnings[0]["preview_ref"] == previews[0]["ref"]
 
 
-def test_oversized_explicit_request_keeps_existing_preview_bound(tmp_path):
+def test_explicit_request_over_eight_pages_reuses_the_pattern_preview(tmp_path):
     data = pattern_pdf(pages=9, unpatterned=range(2, 10))
     descriptor, loaded = parse_pattern(tmp_path, data, page_range=(1, 9))
 
-    assert descriptor["parse_status"] == "partial"
+    assert descriptor["parse_status"] == "parsed", descriptor["gaps"]
     assert loaded["manifest"]["page_preview"]["requested_range"] == [1, 9]
-    assert not page_previews(descriptor)
-    codes = {gap["code"] for gap in descriptor["gaps"]}
-    assert {"PAGE_PREVIEW_PAGE_LIMIT", "PDF_PATTERN_PREVIEW_UNAVAILABLE"}.issubset(codes)
+    assert [image["locator"]["page"] for image in page_previews(descriptor)] == list(range(1, 10))
+    assert any(gap["code"] == "PDF_PATTERN_PAGE_PREVIEW" for gap in descriptor["gaps"])
 
 
 def test_unrendered_pattern_preview_keeps_review_gap(tmp_path, monkeypatch):

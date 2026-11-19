@@ -6,18 +6,37 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 
 import pytest
 
 
 TOOL_ROOT = Path(__file__).resolve().parents[2]
+NPM_SCRIPTS = TOOL_ROOT / "distribution/npm"
 
 
-def test_npm_postinstall_preserves_managed_environment_and_logs(tmp_path):
+def run_postinstall(tmp_path, profile, *, fault="", **settings):
     node = shutil.which("node")
     if not node:
         pytest.skip("Node.js is required for the npm postinstall test")
+    preload = tmp_path / "isolated-profile.cjs"
+    preload.write_text(
+        "require('node:os').homedir = () => process.env.HIMATE_TEST_INSTALL_HOME;\n",
+        encoding="utf-8",
+    )
+    command = [node, "--require", str(preload)]
+    if fault:
+        injected = tmp_path / "postinstall-fault.cjs"
+        injected.write_text(fault, encoding="utf-8")
+        command.extend(("--require", str(injected)))
+    env = {**os.environ, "HIMATE_TEST_INSTALL_HOME": str(profile), **settings}
+    return subprocess.run(
+        [*command, str(NPM_SCRIPTS / "install.js")],
+        env=env, capture_output=True, text=True, encoding="utf-8", timeout=30,
+    )
 
+
+def test_npm_postinstall_preserves_managed_environment_and_logs(tmp_path):
     home = tmp_path / "profile with spaces"
     installed = home / ".himate/knowledge"
     previous_runtime = installed / "runtime/obsolete.py"
@@ -50,18 +69,8 @@ def test_npm_postinstall_preserves_managed_environment_and_logs(tmp_path):
         },
     }
     (installed / "runtime/manifest.json").write_text(json.dumps(previous_manifest), encoding="utf-8")
-    profile = tmp_path / "isolated-profile.cjs"
-    profile.write_text(
-        "require('node:os').homedir = () => process.env.HIMATE_TEST_INSTALL_HOME;\n",
-        encoding="utf-8",
-    )
-    subprocess.run(
-        [node, "--require", str(profile), str(TOOL_ROOT / "distribution/npm/install.js")],
-        check=True,
-        env={**os.environ, "HIMATE_TEST_INSTALL_HOME": str(home)},
-        capture_output=True,
-        timeout=30,
-    )
+    result = run_postinstall(tmp_path, home)
+    assert result.returncode == 0, result.stderr
 
     package_version = json.loads((TOOL_ROOT / "package.json").read_text(encoding="utf-8"))["version"]
     assert json.loads(marker.read_text(encoding="utf-8"))["version"] == package_version
@@ -75,6 +84,113 @@ def test_npm_postinstall_preserves_managed_environment_and_logs(tmp_path):
     assert not (installed / "distribution/release").exists()
     assert (installed / "runtime/governance/framework.lock.yaml").is_file()
     assert (installed / "runtime/manifest.json").read_bytes() == (TOOL_ROOT / "runtime/manifest.json").read_bytes()
+
+
+@pytest.mark.parametrize(("item", "transient"), [
+    ("runtime", False),
+    (".install.json", False),
+    pytest.param("runtime", True, marks=pytest.mark.skipif(os.name != "nt", reason="Windows rename retries")),
+])
+def test_npm_postinstall_recovers_from_blocked_rename(tmp_path, item, transient):
+    home = tmp_path / "profile & tools !"
+    installed = home / ".himate/knowledge"
+    old_version = "0.22.5"
+    old_wrapper = b"old wrapper\n"
+    previous = {
+        ".install.json": json.dumps({"package": "@himate/knowledge-cli", "version": old_version}).encode(),
+        "knowledge.py": b'from pathlib import Path\nprint((Path(__file__).parent / "runtime/version.txt").read_text())\n',
+        "runtime/version.txt": old_version.encode(),
+        "runtime/manifest.json": json.dumps({
+            "version": old_version, "entrypoints": {"knowledge.sh": {"sha256": sha256(old_wrapper).hexdigest()}},
+        }).encode(),
+        "distribution/source/obsolete.py": b"old runtime helper",
+        "docs/DEPLOY.md": b"old instructions",
+        "knowledge.sh": old_wrapper,
+    }
+    for reference, data in previous.items():
+        target = installed / reference
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+
+    result = run_postinstall(tmp_path, home, HIMATE_TEST_BLOCKED_ITEM=item,
+                             HIMATE_TEST_TRANSIENT=str(int(transient)), HIMATE_TEST_OLD_VERSION=old_version, fault="""
+const fs = require('node:fs');
+const path = require('node:path');
+const item = process.env.HIMATE_TEST_BLOCKED_ITEM;
+const dest = path.join(process.env.HIMATE_TEST_INSTALL_HOME, '.himate', 'knowledge', item);
+const rename = fs.renameSync;
+let blocked = false;
+fs.renameSync = (source, target) => {
+  if (target === dest && (process.env.HIMATE_TEST_TRANSIENT === '0' || !blocked)) {
+    const old = item === 'runtime'
+      ? fs.existsSync(path.join(source, 'version.txt'))
+      : JSON.parse(fs.readFileSync(source, 'utf8')).version === process.env.HIMATE_TEST_OLD_VERSION;
+    if (!old) {
+      blocked = true;
+      throw Object.assign(new Error('injected rename failure: ' + item), { code: 'EPERM' });
+    }
+  }
+  return rename(source, target);
+};
+""")
+
+    marker = installed / ".install.json"
+    if transient:
+        assert result.returncode == 0, result.stderr
+        expected = json.loads((TOOL_ROOT / "package.json").read_text(encoding="utf-8"))["version"]
+        assert json.loads(marker.read_text(encoding="utf-8"))["version"] == expected
+        return
+
+    assert result.returncode != 0
+    assert f"injected rename failure: {item}" in result.stderr
+    for reference, data in previous.items():
+        assert (installed / reference).read_bytes() == data, reference
+    assert sorted(path.name for path in (installed / "runtime").iterdir()) == ["manifest.json", "version.txt"]
+    launcher = subprocess.run(
+        [shutil.which("node"), "--require", str(tmp_path / "isolated-profile.cjs"),
+         str(NPM_SCRIPTS / "knowledge.js"), "--version"],
+        env={**os.environ, "HIMATE_TEST_INSTALL_HOME": str(home), "HIMATE_KNOWLEDGE_PYTHON": sys.executable},
+        capture_output=True, text=True, encoding="utf-8", timeout=30,
+    )
+    assert launcher.returncode == 0, launcher.stderr
+    assert launcher.stdout.strip() == old_version
+
+    retry = run_postinstall(tmp_path, home)
+    assert retry.returncode == 0, retry.stderr
+
+
+def test_npm_postinstall_rejects_incomplete_manifest_before_switching(tmp_path):
+    home = tmp_path / "profile"
+    installed = home / ".himate/knowledge"
+    installed.mkdir(parents=True)
+    previous = installed / "knowledge.py"
+    previous.write_bytes(b"previous entrypoint")
+
+    result = run_postinstall(tmp_path, home, fault="""
+const fs = require('node:fs');
+const path = require('node:path');
+const copy = fs.cpSync;
+fs.cpSync = (source, target, options) => {
+  copy(source, target, options);
+  if (path.basename(source) === 'runtime') {
+    fs.writeFileSync(path.join(target, 'manifest.json'), '{}');
+  }
+};
+""")
+
+    assert result.returncode != 0
+    assert "Invalid staged runtime manifest" in result.stderr
+    assert previous.read_bytes() == b"previous entrypoint"
+    assert not (installed / "runtime").exists()
+
+
+def test_npm_postinstall_can_retry_after_process_stops_at_switch(tmp_path):
+    home = tmp_path / "profile"
+    result = run_postinstall(tmp_path, home, fault="require('node:fs').renameSync = () => process.exit(67);\n")
+
+    assert result.returncode == 67, result.stderr
+    retry = run_postinstall(tmp_path, home)
+    assert retry.returncode == 0, retry.stderr
 
 
 def test_npm_pack_excludes_caches_without_removing_source_files(tmp_path):

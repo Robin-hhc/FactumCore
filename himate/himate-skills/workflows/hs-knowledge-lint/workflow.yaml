@@ -53,7 +53,7 @@ nodes:
   owner: coder
   skill: hs-knowledge-source
   prompt: |-
-    使用 hs-knowledge-source，处理 L2 本次选定的 source_id，沿用本轮解析和预算配置。prepared 时交接本批 task 与材料入口。unchanged 时回 L2 选择下一来源。
+    使用 hs-knowledge-source，处理 L2 本次选定的 source_id。prepared 时交接本批 task，blocked 时向 L4 报告转换缺口，unchanged 时回 L2。
   exits:
   - id: prepared
     label: 本轮材料已准备
@@ -63,6 +63,10 @@ nodes:
     label: 没有待办
     condition: L2 本次选定来源扫描成功且没有待办，需由 L2 重新判断其余来源。
     target: plan_patrol
+  - id: blocked
+    label: 文档准备受阻
+    condition: P1 报告转换错误或缺口，当前来源仍待处理。
+    target: complete_patrol
 - id: plan_change
   title: P2 阅读并制定编辑计划
   type: skill

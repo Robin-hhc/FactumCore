@@ -13,7 +13,7 @@
 
 `.build/plan.md` 必须以 YAML frontmatter 开始，`cards` 列出本轮完整候选的唯一 `id` 和正式 `path`；路径相对知识根，使用 `knowledge/...md`。更新沿用原路径，新卡按 `knowledge/index.md` 类型导航选目录。未改卡和仅删除的旧文件不列入 `cards`；无完整候选时仍写 `cards: []`。
 
-存在的 raw PDF 必填实际 `source_pages: [[start, end]]`，每轮一个连续的原件物理页闭区间。start 等于 `task.pdf_review.start_page`，end 不超过候选上限 `task.pdf_review.end_page`。P2 按上下文、图表、条款和产卡量自由缩短结束位置；候选字量不是必读量，80k token 只是软目标。不能跳过起点，选定范围须全部评估，包括经核实无增量的目录、空白或参考页；不要用产卡证据页段替代。非 PDF 和已删除来源不要求该字段。
+有 `task.document_review` 时填实际 `source_units: [[start, end]]`。`start` 等于 `start_unit`，`end` 不超过 `end_unit`。沿用旧版 CLI 的 PDF 批次继续使用 `source_pages` 和 `pdf_review`。切换 CLI 版本时，从 P1 重新准备未提交的任务。选定的连续范围须全部评估，包括经核实无增量的目录、空白和参考材料。
 
 ```markdown
 ---
@@ -26,7 +26,7 @@ cards:
 - create radio-flow：沉淀本次文档的收发流程，保留其适用条件和来源；查重后无合适旧卡。
 ```
 
-PDF 示例可在上述 frontmatter 的 cards 同级添加 `source_pages: [[1, 8]]`，实际页码须符合本轮 task；不要原样套用。小 PDF 也须声明实际物理页段，无卡时同时写 `cards: []` 和实际范围。
+有 `document_review` 时在 `cards` 同级填实际单元，例如 `source_units: [[1, 8]]`。无卡时同时写 `cards: []` 和实际范围。
 
 frontmatter 后说明本轮评估范围、必要补读及逐卡“动作、改哪些结论、条件和依据、保留什么”。同一文件可产生多个动作。本批范围完整评估后无增量写简短理由即可，不逐条重复未变结论。计划 ID/路径与候选须一一对应，P4/P5 还机械核对 PDF 版本及候选边界。卡片 doc_ref 可引用补读前文、跨章或其它来源，不据此增加已评估页。
 

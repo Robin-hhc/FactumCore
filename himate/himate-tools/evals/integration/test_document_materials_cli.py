@@ -5,15 +5,31 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 
 from docx import Document
 from PIL import Image
+import pytest
 import yaml
 
 
 SOURCE = Path(__file__).resolve().parents[2]
+
+
+@pytest.fixture
+def rapid_ocr_models(monkeypatch):
+    pytest.importorskip("docling.document_converter")
+    installed = os.environ.get("HIMATE_TEST_DOCLING_MODELS")
+    models = Path(installed) if installed else Path.home() / ".himate/knowledge/tools/deploy/models/docling-cpu"
+    rapid = models / "RapidOcr"
+    if installed is None and not rapid.is_dir():
+        pytest.skip("Install the local OCR models or set HIMATE_TEST_DOCLING_MODELS")
+    assert rapid.is_dir(), f"Local RapidOcr models are missing from {models}"
+    monkeypatch.setenv("HF_HUB_OFFLINE", "1")
+    monkeypatch.setenv("TRANSFORMERS_OFFLINE", "1")
+    return rapid
 
 
 def invoke(root, *arguments):
@@ -27,7 +43,7 @@ def invoke(root, *arguments):
     return json.loads(result.stdout)
 
 
-def test_office_figures_p5_cleanup_query_and_independent_source_release(tmp_path):
+def test_office_figures_p5_cleanup_query_and_independent_source_release(tmp_path, rapid_ocr_models):
     project = tmp_path / "project"
     root = project / "himate/synthetic"
     root.mkdir(parents=True)
@@ -49,12 +65,23 @@ def test_office_figures_p5_cleanup_query_and_independent_source_release(tmp_path
     document.save(original)
     original_hash = hashlib.sha256(original.read_bytes()).hexdigest()
 
-    scanned = invoke(root, "ingest", "scan", "--source", "docs-raw/design.docx")["data"]
+    models_ref = "artifacts/models/local"
+    shutil.copytree(rapid_ocr_models, root / models_ref / "RapidOcr")
+    request = root / "artifacts/scan.json"
+    request.write_text(json.dumps({"source": "docs-raw/design.docx", "parser": {"models_path": models_ref}}),
+                       encoding="utf-8")
+    scanned = invoke(root, "ingest", "scan", "--input", str(request))["data"]
     source_id = scanned["source"]["source_id"]
     parsed = scanned["source"]["parsed"]
     assert parsed["parse_status"] == "parsed", parsed
-    assert parsed["images"] and all((root / item["ref"]).is_file() for item in parsed["images"])
-    assert "three retry" in (root / parsed["markdown_ref"]).read_text(encoding="utf-8")
+    manifest = json.loads((root / parsed["manifest_ref"]).read_bytes())
+    markdown = (root / parsed["markdown_ref"]).read_text(encoding="utf-8")
+    assert manifest["images"] and "three retry" in markdown
+    for item in manifest["images"]:
+        asset = root / item["ref"]
+        if os.name == "nt":
+            asset = Path("\\\\?\\" + str(asset))
+        assert asset.is_file() and f"images/{asset.name}" in markdown
     metadata = {"id": "retry-design", "doc_ref": [
         {"doc_id": source_id, "locator": {"kind": "paragraph", "paragraph": 1}},
     ], "code_ref": []}

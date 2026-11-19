@@ -8,4 +8,4 @@ P1 若发现 L2 选定的来源已无待办，返回 L2 重新选择；单一来
 
 仅索引问题进入 L3；L2 确认无待办进入 L4。L4 统计剩余事项，不另建全库水位。同步仅执行配置的 argv/cwd；内部 MM 只适配同步，子仓历史使用原生 Git。
 
-没有嵌套 Workflow，也不并发运行另一个 ingest。WiFi 巡检细节见知识根的 `docs-llm-wiki/知识库详细设计.md` 第 3.1 节。
+没有嵌套 Workflow，也不并发运行另一个 ingest。WiFi 巡检细节见知识根的 `docs-llm-wiki/HiMate知识库详细设计.md` 第 3.1 节。

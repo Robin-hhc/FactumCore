@@ -10,13 +10,10 @@ __pycache__/
 .ruff_cache/
 *.pyc
 config.local.yml
-# Manifest-root instructions are maintained by the project.
-# This checkout keeps its manifest-root instructions locally.
-/AGENTS.md
 # Machine-owned environment files stay private.
 *.env
 
-# Project development artifacts stay local; shared design and usage remain versioned.
+# Legacy local development paths.
 /himate/himate-tools/docs/sdd/
 /himate/himate-tools/docs/task.md
 

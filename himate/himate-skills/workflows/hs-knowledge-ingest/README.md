@@ -16,4 +16,4 @@ P4 是独立 reviewer，其余为 coder。普通更新保留原生命周期，�
 
 每批按真实回执简要交接来源、实际范围和结果，最后汇总本次范围的处理情况。解析缓存可删重建，累计覆盖在正式来源登记中保留；P1/P5 清理保留 .build 根 README。Git 提交和推送另行授权。
 
-实际节点和转移由 workflow.yaml 维护；layouts.yaml 只维护画布。操作细节由各 Skill 提供，WiFi 领域设计见知识根的 `docs-llm-wiki/知识库详细设计.md`。
+实际节点和转移由 workflow.yaml 维护；layouts.yaml 只维护画布。操作细节由各 Skill 提供，WiFi 领域设计见知识根的 `docs-llm-wiki/HiMate知识库详细设计.md`。

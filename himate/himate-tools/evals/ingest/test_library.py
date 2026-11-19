@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 from pathlib import Path
+import sqlite3
 import subprocess
 import sys
 
@@ -135,7 +137,7 @@ def test_query_indexes_formal_cards_only_and_rebuilds_after_database_removal(tmp
 
 
 @pytest.mark.parametrize("deleted", [False, True])
-def test_source_resolve_recovers_processed_git_version_without_modifying_current_source(tmp_path, deleted):
+def test_source_resolve_explicit_hash_recovers_processed_git_version_without_modifying_current_source(tmp_path, deleted):
     project = tmp_path / "repository"
     root = root_at(project / "himate/library")
     original = document(root, text="# Design\n\nOriginal requirement.\n")
@@ -157,14 +159,15 @@ def test_source_resolve_recovers_processed_git_version_without_modifying_current
     else:
         original.write_text("# Design\n\nUncommitted local requirement.\n", encoding="utf-8")
         current = original.read_bytes()
-    resolved, status = module("library").sources(root, "resolve", {"source_id": source["id"]})
+    resolved, status = module("library").sources(root, "resolve", {
+        "source_id": source["id"], "hash": hashlib.sha256(old_bytes).hexdigest()})
     assert status == "resolved"
     assert resolved["commit"] == old_commit
     assert (root / resolved["original_ref"]).read_bytes() == old_bytes
     assert (original.read_bytes() if original.exists() else None) == current
 
 
-def test_source_resolve_reports_missing_uncommitted_history(tmp_path):
+def test_source_resolve_explicit_hash_reports_missing_uncommitted_history(tmp_path):
     project = tmp_path / "repository"
     root = root_at(project / "himate/library")
     original = document(root)
@@ -173,9 +176,110 @@ def test_source_resolve_reports_missing_uncommitted_history(tmp_path):
     source = register(root)
     with module("catalog").Catalog(root) as catalog:
         catalog.mark_processed(source["id"], hashlib.sha256(original.read_bytes()).hexdigest())
+    original_hash = hashlib.sha256(original.read_bytes()).hexdigest()
     original.write_text("# Design\n\nReplaced before its first commit.\n")
-    with pytest.raises(ValueError, match="OLD_SOURCE_UNAVAILABLE"):
+    with pytest.raises(ValueError, match="SOURCE_HASH_MISMATCH"):
+        module("library").sources(root, "resolve", {"source_id": source["id"], "hash": original_hash})
+
+
+@pytest.mark.parametrize("name", ["design.md", "agent-notes/design.md", "custom/design.md"])
+def test_source_resolve_without_version_reads_current_registered_document(tmp_path, name):
+    root = root_at(tmp_path / "library")
+    original = root / "docs-raw" / name
+    original.parent.mkdir(parents=True, exist_ok=True)
+    original.write_bytes(b"# Design\n\nOriginal requirement.\n")
+    source = register(root, name)
+    with module("catalog").Catalog(root) as catalog:
+        catalog.mark_processed(source["id"], hashlib.sha256(original.read_bytes()).hexdigest())
+    current = b"# Design\n\nCurrent requirement.\n"
+    original.write_bytes(current)
+
+    resolved, status = module("library").sources(root, "resolve", {"source_id": source["id"]})
+
+    assert status == "resolved"
+    assert resolved["commit"] is None
+    assert resolved["hash"] == hashlib.sha256(current).hexdigest()
+    assert (root / resolved["original_ref"]).read_bytes() == current
+    assert original.read_bytes() == current
+    assert not (root / "artifacts/evidence").exists()
+
+
+def test_source_resolve_without_version_reports_a_missing_registered_document(tmp_path):
+    root = root_at(tmp_path / "library")
+    original = document(root)
+    source = register(root)
+    original.unlink()
+
+    with pytest.raises(ValueError, match="SOURCE_MISSING"):
         module("library").sources(root, "resolve", {"source_id": source["id"]})
+
+
+def test_current_source_read_rebuilds_its_catalog_from_formal_registration(tmp_path):
+    root = root_at(tmp_path / "library")
+    original = document(root)
+    source = register(root)
+    registry = (root / "governance/sources.lock.yaml").read_bytes()
+    (root / "artifacts/knowledge.sqlite").unlink()
+
+    resolved, status = module("library").sources(root, "resolve", {"source_id": source["id"]})
+
+    assert status == "resolved"
+    assert (root / resolved["original_ref"]).read_bytes() == original.read_bytes()
+    assert (root / "governance/sources.lock.yaml").read_bytes() == registry
+    assert not (root / ".build").exists()
+    assert not (root / "artifacts/evidence").exists()
+
+
+@pytest.mark.parametrize("encoding", ["utf-8", "gb18030"])
+def test_source_resolve_without_version_reads_current_configured_code(tmp_path, encoding):
+    project = tmp_path / "repository"
+    root = root_at(project / "himate/library")
+    code = project / "code/wifi/packet.c"
+    code.parent.mkdir(parents=True)
+    code.write_text("int original;\n", encoding=encoding)
+    (root / "config.yml").write_text(yaml.safe_dump({
+        "schema_version": "2.0", "workspace_id": "synthetic",
+        "code_root": "../../code", "modules": [{"path": "wifi"}],
+    }), encoding="utf-8")
+    registered, _ = module("library").sources(root, "register", {
+        "kind": "code", "path": "code/wifi/packet.c", "source_id": "packet-code", "encoding": encoding})
+    current = "int current; /* 当前字段 */\n".encode(encoding)
+    code.write_bytes(current)
+
+    resolved, status = module("library").sources(root, "resolve", {"source_id": registered["source"]["id"]})
+
+    assert status == "resolved"
+    assert resolved["commit"] is None
+    assert (root / resolved["original_ref"]).read_bytes() == current
+    assert "当前字段" in (root / resolved["text_ref"]).read_text(encoding="utf-8")
+    assert code.read_bytes() == current
+    assert not (root / "artifacts/evidence").exists()
+
+
+def test_reindex_replaces_the_implicit_snapshot_panel_format_with_current_references(tmp_path):
+    root = root_at(tmp_path / "library")
+    document(root)
+    source = register(root)
+    card(root, "waiting", source["id"], "Read the current registered requirement.")
+    module("library").patrol(root, "reindex", {})
+    overview, _ = module("panel").run(root, "overview", {})
+    detail = module("panel").read_card(root, "waiting", overview["view_revision"])
+    assert detail["doc_ref"][0]["source_version"] == "current"
+    legacy = {**detail, "doc_ref": [{**detail["doc_ref"][0], "source_version": "bound",
+                                    "snapshot_id": "obsolete-local-copy"}]}
+    with sqlite3.connect(root / "artifacts/knowledge.sqlite") as database:
+        database.execute("UPDATE panel_state SET version=2")
+        database.execute("UPDATE panel_cards SET detail=? WHERE id='waiting'", (json.dumps(legacy),))
+
+    with pytest.raises(ValueError, match="PANEL_VIEW_UNAVAILABLE"):
+        module("panel").read_card(root, "waiting", overview["view_revision"])
+
+    module("library").patrol(root, "reindex", {})
+    refreshed, _ = module("panel").run(root, "overview", {})
+    current = module("panel").read_card(root, "waiting", refreshed["view_revision"])["doc_ref"][0]
+    assert current["source_version"] == "current"
+    assert "snapshot_id" not in current
+    assert "source_sha256" not in current
 
 
 def test_dbox_configured_directory_is_registered_and_scanned_by_logical_path(tmp_path):

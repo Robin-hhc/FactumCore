@@ -10,7 +10,7 @@
 
 在数据所在端运行已安装的知识 CLI，显式传 `--knowledge-root` 和本知识根。使用该执行端已注册的 `knowledge` 命令或宿主提供的入口，SSH 执行时使用远端入口。先用 `doctor --json` 核对工具版本、知识根和实际配置。同一轮沿用该工具版本。通过 npm 安装 CLI 和 OCR 模型，运行 `knowledge setup` 准备依赖，通过能力仓 `himate-skills` 的 deploy 脚本安装 Skill 和 Workflow。
 
-`.build` 只保存本批暂存，P1/P5 清理时保留根 README。P1 为 PDF、DOCX、XLSX 准备完整 Markdown、对应图片和 OCR，并从最早未审阅单元准备最多 76,000 UTF-8 字节的候选正文。P2 声明连续的 `source_units`，P4 复核该范围，P5 成功后登记覆盖。回执 `source_complete` 决定是否继续剩余范围。累计进度在 `governance/sources.lock.yaml` 的 `processing` 中，全文转换缓存在 `artifacts/ingest/parsed/`，可删除重建。P5 确认尚未写入正式库且候选需要修改时回 P3，再经 P4 审阅。执行失败时保留同批暂存，修复后重试 P5。数据库在 `artifacts/knowledge.sqlite`，入库回执在 `artifacts/ingest/latest.json`，独立搜索报告在 `artifacts/query`，巡检汇总在 `artifacts/patrol`。query 可与写流程共存。lint 与 ingest 串行运行，运行环境和正式记录在 `.build` 以外。`artifacts` 含独立模型与本机材料，不整目录清空。
+`.build` 只保存本批暂存，P1/P5 清理时保留根 README。P1 为 PDF、DOCX、XLSX 准备完整 Markdown、对应图片和 OCR，并从最早未审阅单元准备最多 76,000 UTF-8 字节的候选正文。P2 声明连续的 `source_units`，P4 复核该范围，P5 成功后登记覆盖。回执 `source_complete` 决定是否继续剩余范围。累计进度在 `governance/sources.lock.yaml` 的 `processing` 中，全文转换缓存在 `artifacts/ingest/parsed/`，可删除重建。P5 确认尚未写入正式库且候选需要修改时回 P3，再经 P4 审阅。执行失败时保留同批暂存，修复后重试 P5。数据库在 `artifacts/knowledge.sqlite`，入库回执在 `artifacts/ingest/latest.json`，独立搜索报告在 `artifacts/query`，巡检汇总在 `artifacts/patrol`。query 可与写流程共存。lint 与 ingest 串行运行，运行环境和正式记录在 `.build` 以外。`artifacts` 存放本机可再生索引、回执、解析缓存及阅读产物，按需清理后由命令重新生成。
 
 来源与卡头使用真实 ID 和定位。新卡按本节点加载的 Skill 及其随包参考撰写，成稿模板见 `hs-knowledge-view-materialize`。条件、依据和缺口放正文，旧知识正常更新时完整保留。搜索返回整卡相关候选，精读后核对适用性；代码引用不证明已实现。日常 scan 直接比较 SHA-256，Git 按需回看旧版。未知构建、宏和适用条件不补造。配置只描述真实工作区与模块。
 

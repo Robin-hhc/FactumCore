@@ -535,7 +535,7 @@ class Catalog:
         return self.get_file(file_id)
 
     def record_pdf_review(self, file_id, source_hash, pages, total_pages, *, source_commit=None, restart=False,
-                          registry_changed=False, review_sha256=None):
+                          review_sha256=None):
         """Record a successfully published batch without prematurely completing its PDF."""
         with self.transaction():
             resource = next((item for item in self.registry["resources"] if item["source_id"] == file_id), None)
@@ -545,8 +545,6 @@ class Catalog:
                                            review_sha256=review_sha256)
             if (not restart and "processing" not in resource and resource.get("processed_hash") == source_hash
                     and resource.get("processed_exists") is True):
-                if registry_changed:
-                    self._save_registry()
                 return self.get_file(file_id)
             if processing is None:
                 resource.pop("processing", None)

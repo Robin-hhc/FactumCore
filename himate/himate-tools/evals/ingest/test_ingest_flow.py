@@ -119,7 +119,6 @@ def test_reviewed_no_card_result_is_remembered_and_scan_does_not_repeat_it(tmp_p
 def test_p5_uses_p1_hash_without_reading_the_changed_source_again(tmp_path, monkeypatch):
     root = library_root(tmp_path)
     original = put_doc(root)
-    p1_bytes = original.read_bytes()
     task = scan(root)
     p1_hash = task["source"]["hash"]
     draft(root, "waiting", [task["source"]["doc_id"]])
@@ -141,15 +140,14 @@ def test_p5_uses_p1_hash_without_reading_the_changed_source_again(tmp_path, monk
     assert status == "completed", result
     with module("catalog").Catalog(root) as catalog:
         assert catalog.get_file(task["source"]["doc_id"])["processed_hash"] == p1_hash
-        snapshot, = catalog.registry["snapshots"]
-    expected = f"artifacts/evidence/objects/{p1_hash}.bin"
-    assert snapshot["recovery"] == {"method": "evidence_object", "path": expected}
-    assert (root / expected).read_bytes() == p1_bytes
+        assert catalog.registry["snapshots"] == []
+    assert not (root / "artifacts/evidence").exists()
+    assert not (root / ".build").exists()
     assert not (root / "logs").exists()
     resolved, status = module("library").sources(root, "resolve", {
-        "source_id": task["source"]["doc_id"], "snapshot_id": snapshot["snapshot_id"]})
+        "source_id": task["source"]["doc_id"]})
     assert status == "resolved", resolved
-    assert (root / resolved["original_ref"]).read_bytes() == p1_bytes
+    assert (root / resolved["original_ref"]).read_bytes() == original.read_bytes()
     next_task = scan(root)
     assert next_task["source"]["hash"] == new_hash
     assert next_task["source"]["change"] == "modified"

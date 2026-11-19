@@ -250,8 +250,8 @@ def test_panel_global_graph_and_bidirectional_expansion_use_published_edges(know
     assert status != 0 and report["diagnostics"][0]["code"] == "PANEL_REVISION_MISMATCH"
 
 
-@pytest.mark.parametrize("category", ["specs", "stories", "storys"])
-def test_checked_source_binding_survives_reindex_clone_and_recheck(knowledge, tmp_path, category):
+@pytest.mark.parametrize("category", ["specs", "agent-notes", "custom-category"])
+def test_current_source_reference_survives_reindex_clone_and_cache_cleanup(knowledge, tmp_path, category):
     if not shutil.which("git"):
         pytest.skip("Git is required to exercise clean-checkout recovery")
     project = knowledge.parents[1]
@@ -259,8 +259,8 @@ def test_checked_source_binding_survives_reindex_clone_and_recheck(knowledge, tm
     source_path = f"docs-raw/{category}/a.md"
     raw = knowledge / source_path
     raw.parent.mkdir(parents=True, exist_ok=True)
-    older = b"# Original\nExact evidence from the first review.\n"
-    newer = b"# Updated\nEvidence checked during the second review.\n"
+    older = b"# Original\nEvidence used during the first review.\n"
+    newer = b"# Updated\nThe source changed after P1.\n"
     raw.write_bytes(older)
 
     def git(*args):
@@ -274,13 +274,13 @@ def test_checked_source_binding_survives_reindex_clone_and_recheck(knowledge, tm
     status, scanned = invoke(knowledge, "ingest", "scan", "--source", source_path)
     assert status == 0, scanned
     source_id = scanned["data"]["source"]["doc_id"]
-    header = {"id": "fixed", "doc_ref": [{"doc_id": source_id, "line_start": 1, "line_end": 2}], "code_ref": []}
-    markdown = ("---\n" + yaml.safe_dump(header) + "---\n# Fixed\n\nA checked citation.\n").encode()
+    header = {"id": "current", "doc_ref": [{"doc_id": source_id, "line_start": 1, "line_end": 2}], "code_ref": []}
+    markdown = ("---\n" + yaml.safe_dump(header) + "---\n# Current\n\nA source reference.\n").encode()
 
     def check_and_publish():
-        (knowledge / ".build/cards/fixed.md").write_bytes(markdown)
+        (knowledge / ".build/cards/current.md").write_bytes(markdown)
         (knowledge / ".build/plan.md").write_text(
-            "---\ncards:\n- id: fixed\n  path: knowledge/fixed.md\n---\nReview the fixed reference.\n",
+            "---\ncards:\n- id: current\n  path: knowledge/current.md\n---\nReview the source reference.\n",
             encoding="utf-8")
         status, checked = invoke(knowledge, "ingest", "check")
         assert status == 0, checked
@@ -289,39 +289,43 @@ def test_checked_source_binding_survives_reindex_clone_and_recheck(knowledge, tm
 
     raw.write_bytes(newer)
     check_and_publish()
-    formal = knowledge / "knowledge/fixed.md"
+    formal = knowledge / "knowledge/current.md"
     assert formal.read_bytes() == markdown
-    original_ref = _panel(knowledge, "read", {"card_id": "fixed"})["doc_ref"][0]
-    old_hash = hashlib.sha256(older).hexdigest()
-    assert original_ref["source_version"] == "bound" and original_ref["source_sha256"] == old_hash
+    current_ref = _panel(knowledge, "read", {"card_id": "current"})["doc_ref"][0]
+    assert current_ref == {**header["doc_ref"][0], "source_version": "current"}
     registry = knowledge / "governance/sources.lock.yaml"
-    snapshot = next(item for item in yaml.safe_load(registry.read_bytes())["snapshots"]
-                    if item["snapshot_id"] == original_ref["snapshot_id"])
-    assert snapshot["recovery"]["method"] == "git"
-    assert snapshot["recovery"]["path"] == raw.relative_to(project).as_posix()
+    assert yaml.safe_load(registry.read_bytes())["snapshots"] == []
+    assert not (knowledge / ".build").exists()
+    assert not (knowledge / "artifacts/evidence").exists()
+    status, resolved = invoke(knowledge, "source", "resolve", request={"source_id": source_id})
+    assert status == 0, resolved
+    assert (knowledge / resolved["data"]["original_ref"]).read_bytes() == newer
     git("add", raw.relative_to(project).as_posix(), formal.relative_to(project).as_posix(),
         registry.relative_to(project).as_posix())
-    git("commit", "-qm", "Publish reference and advance live source")
+    git("commit", "-qm", "Publish card and current original")
 
     clone = tmp_path / "fresh"
     git("clone", "--no-local", str(project), str(clone))
     fresh = clone / relative_root
-    assert not (fresh / "knowledge.py").exists()
-    (fresh / "knowledge/fixed.md").write_bytes(markdown.replace(b"\n", b"\r\n"))
+    assert not (fresh / ".build").exists() and not (fresh / "artifacts").exists()
     assert invoke(fresh, "maintain", "reindex")[0] == 0
-    cloned_ref = _panel(fresh, "read", {"card_id": "fixed"})["doc_ref"][0]
-    assert cloned_ref == original_ref
-    status, resolved = invoke(fresh, "source", "resolve",
-                              request={"source_id": source_id, "snapshot_id": cloned_ref["snapshot_id"], "hash": old_hash})
+    assert _panel(fresh, "read", {"card_id": "current"})["doc_ref"][0] == current_ref
+    status, resolved = invoke(fresh, "source", "resolve", request={"source_id": source_id})
     assert status == 0, resolved
-    assert resolved["data"]["commit"] == snapshot["recovery"]["commit"]
-    assert (fresh / resolved["data"]["original_ref"]).read_bytes() == older
+    current_clone = (fresh / source_path).read_bytes()
+    assert current_clone.replace(b"\r\n", b"\n") == newer
+    assert (fresh / resolved["data"]["original_ref"]).read_bytes() == current_clone
+    artifacts = fresh / "artifacts"
+    assert artifacts.resolve().parent == fresh.resolve()
+    shutil.rmtree(artifacts)
+    assert invoke(fresh, "maintain", "reindex")[0] == 0
+    assert _panel(fresh, "read", {"card_id": "current"})["doc_ref"][0] == current_ref
+    assert not (fresh / "artifacts/evidence").exists()
 
     assert invoke(knowledge, "ingest", "scan", "--source", source_path)[0] == 0
     check_and_publish()
-    rebound = _panel(knowledge, "read", {"card_id": "fixed"})["doc_ref"][0]
-    assert rebound["source_version"] == "bound" and rebound["source_sha256"] == hashlib.sha256(newer).hexdigest()
-    assert rebound["snapshot_id"] != original_ref["snapshot_id"]
+    assert yaml.safe_load(registry.read_bytes())["snapshots"] == []
+    assert _panel(knowledge, "read", {"card_id": "current"})["doc_ref"][0] == current_ref
 
 
 def test_panel_raw_saves_once_and_lists_without_registering(knowledge, tmp_path):

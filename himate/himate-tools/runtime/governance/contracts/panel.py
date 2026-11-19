@@ -19,7 +19,7 @@ CARD_TYPES = {
     "rules": "rule", "commands": "command", "runbooks": "runbook", "glossaries": "glossary",
 }
 KINDS = {"card", "document", "code"}
-VERSION = 2
+VERSION = 3
 GRAPH_MAX_NODES = 4000
 GRAPH_MAX_EDGES = 15000
 GRAPH_MAX_BYTES = 4 * 1024 * 1024

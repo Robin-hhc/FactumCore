@@ -156,6 +156,12 @@ def _resolve_source(root, source, request):
         if snapshot is None:
             raise ContractError("SOURCE_SNAPSHOT_MISMATCH", str(snapshot_id))
         data, commit = ingest.recover_bound_source(root, source, snapshot)
+    elif expected is None and request.get("commit") is None:
+        try:
+            data = ingest.source_path(root, source).read_bytes()
+        except FileNotFoundError as error:
+            raise ContractError("SOURCE_MISSING", source["path"]) from error
+        commit = None
     else:
         try:
             data, commit = ingest.old_source(root, source, commit=request.get("commit"), expected_hash=expected)

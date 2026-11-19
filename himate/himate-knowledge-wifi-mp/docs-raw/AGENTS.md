@@ -2,6 +2,8 @@
 
 本目录保存仓内原件，按 conventions、chips、stories、specs、protocols、troubleshooting 组织。已登记的 `storys/` 原件沿用原路径。外部资料由 `sources/dbox.local.yml` 映射执行端实际目录。原件只读。`index.md`、`README.md`、`AGENTS.md`、模板及本机配置不作为来源正文；目录不可读不能当作无变化或删除，不跟随原生链接或 junction。
 
+`main` 保留迁移用的目录骨架和说明。用于本地测试的原件及随文附件按[分支约定](index.md#分支约定)提交到 `test`。
+
 `agent-notes/` 保存 `hs-knowledge-capture` 产出的分析稿。上库后的 Markdown 由定时治理按普通来源处理，正式卡回查时沿用分析稿原路径。
 
 日常使用 `hs-knowledge-ingest` Workflow。P1 的 `knowledge ingest scan` 清理本批 `.build` 并保留根 README，以内容 SHA-256 和正式进度找一个新增、修改、删除或待续办文件，交接同次读取的副本、来源 ID 和关联卡；PDF 另交接最早未评估页、宽候选和页索引，默认不设页数帽。P2 按上下文及材料复杂度自主选实际本批范围，无须读完候选，再作六决策；P3 写完整候选，P4 先脚本检查再独立审阅实际范围内全部内容，P5 入库、刷新引用及检索索引后登记本批覆盖；仅全文完成才保存触发文件的成功 hash。P5 失败保留材料，直接重试，不先回 P1。

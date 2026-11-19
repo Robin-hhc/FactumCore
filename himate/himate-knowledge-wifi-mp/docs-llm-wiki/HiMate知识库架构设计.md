@@ -1,6 +1,6 @@
 # HiMate 知识库架构设计
 
-实现基线为 HiMate 工具包 `0.24.1` 和 OpenFlow F176。日常操作见[使用指南](HiMate知识库使用指南.md)，节点契约和页面交互分别见[详细设计](HiMate知识库详细设计.md)与 [OpenFlow F176](https://github.com/xmkid/OpenFlow/pull/29)。
+实现基线为 HiMate 工具包 `0.24.5` 和 OpenFlow F176。日常操作见[使用指南](HiMate知识库使用指南.md)，节点契约和页面交互分别见[详细设计](HiMate知识库详细设计.md)与 [OpenFlow F176](https://github.com/xmkid/OpenFlow/pull/29)。
 
 ## 1. 系统目标
 
@@ -90,11 +90,11 @@ flowchart TD
     S -->|零命中| N["说明本次查询未找到依据"]
     B["用户打开 OpenFlow 知识库"] --> V["按同一 view_revision 浏览<br/>概览、知识列表、详情与图谱"]
     V -->|选择知识卡| R
-    R --> C["按引用版本与定位核对证据<br/>原文页码、行段或代码符号"]
+    R --> C["按来源登记和定位核对原件<br/>原文页码、行段或代码符号"]
     C --> F["形成结论，说明适用条件与证据缺口"]
 ```
 
-普通 Agent 检索按需维护检索索引。OpenFlow 浏览使用 P5 或显式重建生成的发布视图，视图版本变化时重新取数。证据按引用版本回源，精确版本不可用时提示用户。见[消费流程与检索规则](HiMate知识库详细设计.md#4-消费流程从问题到证据回答)和[OpenFlow 正式知识视图](HiMate知识库详细设计.md#41-openflow-正式知识视图)。
+普通 Agent 检索按需维护检索索引。OpenFlow 浏览使用 P5 或显式重建生成的发布视图，视图版本变化时重新取数。普通引用按来源登记打开当前原件，原件变化后通过入库或治理更新卡片。见[消费流程与检索规则](HiMate知识库详细设计.md#4-消费流程从问题到证据回答)和[OpenFlow 正式知识视图](HiMate知识库详细设计.md#41-openflow-正式知识视图)。
 
 ### 4.3 治理流程
 
@@ -149,7 +149,7 @@ repo/                                      业务 manifest 工作区示例
     │   ├── knowledge/                      正式卡与导航
     │   ├── governance/sources.lock.yaml    来源身份、版本及处理进度
     │   ├── .build/                        本批材料、计划与候选
-    │   └── artifacts/                     索引、回执、解析缓存、引用证据与运行模型
+    │   └── artifacts/                     本机可再生索引、回执、解析缓存与阅读产物
     ├── himate-skills/                      独立能力包
     │   ├── README.md                       能力安装和校验说明
     │   ├── deploy.ps1 / deploy.sh           Windows / Linux 能力安装入口
@@ -176,8 +176,7 @@ repo/                                      业务 manifest 工作区示例
 | `.build/` | 当前批次原件副本、阅读候选及索引、计划和候选卡。P1 初始化，P5 成功后清理并保留根 README。P5 失败时可用同批暂存重试 |
 | `artifacts/knowledge.sqlite` | 可从来源登记和正式卡重建的派生索引 |
 | `artifacts/ingest/parsed/` | PDF、DOCX 和 XLSX 的全文转换缓存，按版本与配置校验复用。固定材料丢失时从原件重新准备并审阅，正式进度保存在来源登记 |
-| `artifacts/ingest/latest.json`、`query/`、`patrol/`、`sources/` | 运行回执、检索和巡检报告、按需恢复副本；按实际使用情况清理 |
-| `artifacts/evidence/objects/` | 按 SHA-256 保存已发布引用所需的原文版本。随引用保留，本机备份 |
+| `artifacts/ingest/latest.json`、`query/`、`patrol/`、`sources/` | 运行回执、检索和巡检报告、当前原件预览副本；按实际使用情况清理 |
 | `artifacts/source-read/` | 临时文档阅读使用独立 ID，消费后释放并有界回收过期产物 |
 | `distribution/models/` | 随 Git 提交的模型清单和权重；8 个必需模型约 416.18 MB，大权重分片保存，部署自动校验并合并 |
 | `artifacts/models/` | 部署从内附模型安装、复用或显式下载后独立维护的运行模型，入库和阅读清理均保留 |
@@ -187,7 +186,7 @@ repo/                                      业务 manifest 工作区示例
 
 独立回源使用 `source extract`，在 `artifacts/source-read/<read_id>/` 生成材料，可限制 PDF 页范围；它不清理 `.build`，不推进处理 hash。读取结束使用 `source release` 释放指定 ID，长时间阅读可 `source renew`，`source cleanup` 只回收过期且不在转换中的任务。不同读取目录、入库暂存、检索报告和模型目录互不清理。新执行端从原件重新转换；原件缺失时不把缓存视为永久归档。
 
-新任务的运行回执和需要本机保留的引用原文统一写入 `artifacts/`。入库校验和引用预览都按来源登记的字节数和摘要恢复原文。项目已有的记录、备份及引用路径继续有效，仍被引用的 `logs/evidence/` 旧对象按原路径保留。
+新任务将运行回执、索引和解析缓存写入 `artifacts/`，本批审阅材料放在 `.build/`。P5 发布知识卡并更新来源登记和索引，成功后清理本批暂存。普通引用使用来源 ID 和登记路径读取当前原件，摘要用于发现原件变化。历史卡显式声明快照时，按已登记的旧版本读取，无法恢复时给出提示。
 
 ### 5.5 框架更新与目录清理
 
@@ -205,7 +204,7 @@ repo/                                      业务 manifest 工作区示例
 | `distribution/models/` | 清单与匹配权重一同更新和交付，二进制按离线分发方式补齐 |
 | 已安装的同名 Skill、Workflow 包 | 从能力包由部署脚本完整替换，其他包保留 |
 
-空闲时可清理已消费报告、可重建数据库和 Python/测试工具缓存。`artifacts/` 可能同时存放模型、环境和本机材料，不整目录删除；临时原件阅读使用专用释放与过期回收命令。已有备份和历史证据按项目保留规则单独管理。
+空闲时可清理 `artifacts/` 中的报告、索引和解析缓存，后续从正式卡、来源登记及原件重新生成。正在执行的任务先完成或停止，再清理其暂存和缓存。临时原件阅读也可使用专用释放与过期回收命令。
 
 ## 6. 运行一致性
 

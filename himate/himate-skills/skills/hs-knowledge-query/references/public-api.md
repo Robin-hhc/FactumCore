@@ -27,7 +27,7 @@
 
 当前来源直接按 `read` 返回的 `sources[].path` 读取：普通文档相对知识根，外部目录来源沿用本机已有映射；代码未指定仓库时相对代码工作区基准（默认布局的 manifest 根），指定仓库时相对对应的已配置仓库。读取当前文本不需要 Git，也不调用历史恢复。
 
-只有需要已处理的旧版本时才用 `knowledge source resolve --input FILE.json --json`；JSON 至少包含实际的 `source_id`，例如 `{"source_id":"doc-example"}`，不能把 ID 当位置参数。历史缺失时保留诊断，不能把当前文本冒充旧版。当前代码位置与历史证据分清；章节、PDF 页和文本行号不混用。
+通过 CLI 获取当前原件时使用 `knowledge source resolve --input FILE.json --json`，请求为实际的来源 ID，例如 `{"source_id":"doc-example"}`。只有显式提供 `hash`、`commit` 或 `snapshot_id` 时才读取对应历史版本，历史缺失时保留诊断。章节、PDF 页和文本行号按卡片实际定位核对。
 
 ## 文档与图片回源
 

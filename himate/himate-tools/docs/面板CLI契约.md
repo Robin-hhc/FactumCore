@@ -70,11 +70,11 @@ OpenFlow 的绑定响应使用 `ETag` 标识所选知识库。浏览器后续以
 
 Agent 可用 `library search` 获取候选与版本，将该版本传给 `library read` 读取同一发布版本。`read --input - --json` 同样接受 `{card_id,view_revision}`。已有无版本的 `read`、`search` 与 `source list` 保持各自的查询语义。版本化详情通过 `card_links: [{target,card_id,anchor?}]` 给出可生成深链的相对链接。 `target` 含正文中的原始片段，`anchor` 是已核对的解码后锚点。导航、原件、外部链接、图片、代码示例和不存在的锚点不进入这个映射。`heading_anchors: [{anchor,line}]` 提供治理解析器支持的正文标题锚点，行号从 `body` 的第一行起算。客户端应按源行设置这些锚点。旧投影可在下一次发布或重建后补出这些字段。
 
-P4 检查在本批暂存记录实际核对过的来源字节。P5 将这些引用和精确来源版本关联到现有来源登记，正式卡保持审阅时的字节。卡片关联摘要统一 CRLF/LF，原件 SHA-256 按原始字节计算。重建只使用已持久化的绑定。对同样的卡片和引用重新核对并发布时，关联更新为这次核对的版本，历史快照仍可按 ID 查询。
+P4 校验本批固定材料、计划和候选，P5 核对审阅范围后发布正式卡，并更新来源登记、处理摘要和索引。成功后清理 `.build/`。普通引用返回 `source_version: current`，按来源登记读取当前原件，原件 SHA-256 用于发现变化。
 
-版本化引用的 `source_version` 为 `bound` 时提供 `snapshot_id` 和 `source_sha256`，客户端可用 `source resolve` 发送 `{source_id,snapshot_id,hash?}` 取得精确原件。OpenFlow 文件接口接受快照 ID、SHA-256 或完整 Git 提交对象 ID 作为版本参数。宿主核对返回的来源 ID，确认制品位于绑定库的 `artifacts/sources/` 下，发给浏览器之前复算字节的 SHA-256。固定字节可通过已登记 Git 对象、同 SHA-256 的原件或本机证据对象恢复。本机证据对象留在 Git 忽略的目录。干净检出保留绑定，缺少对应字节时返回来源不可用。
+客户端打开普通引用时，通过 `source resolve` 发送 `{source_id}`。CLI 读取该来源登记路径下的当前原件，返回实际摘要及 `artifacts/sources/` 下可再生的预览副本。宿主核对来源 ID、路径和实际字节摘要后交给浏览器。每次读取都从原件重新取得内容。
 
-引用没有固定版本时，OpenFlow 标注「引用版本未记录」。来源登记有 `processed_hash` 时按该摘要读取。没有摘要且路径位于 `docs-raw/` 时，打开当前原件。预览沿用引用定位。文本显示可定位的原始行号与高亮范围，PDF 打开定位页。显式快照缺失或关联不明确时显示 `unavailable`，预览提示该版本不可用。
+已有卡片显式声明 `snapshot_id` 时，`source_version` 为 `bound` 或 `unavailable`。客户端可发送 `{source_id,snapshot_id,hash?}` 读取指定旧版本，显式 hash 或 commit 请求也沿用历史读取及摘要校验。普通引用标注「当前原件」，预览沿用卡片中的定位，文本显示原始行号和高亮，PDF 打开定位页。来源或显式旧版本缺失时给出对应错误。
 
 ## 实时原件
 

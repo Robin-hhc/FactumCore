@@ -1,6 +1,6 @@
 schema_version: '2.0'
 contract_family: aiot-wifi
-tool_version: 0.24.4
+tool_version: 0.24.5
 files:
   contracts/__init__.py:
     path: runtime/governance/contracts/__init__.py
@@ -10,10 +10,10 @@ files:
     sha256: 18d9e86b87abb6c5b3bf961def171b140315eb8d8304e2d9e5c246534faa6596
   contracts/catalog.py:
     path: runtime/governance/contracts/catalog.py
-    sha256: 038eb3e8ccd05bd535c1978ba8e72f9d1f1c0119d04d7e8d9ad8c6c2a6b47dad
+    sha256: b90f3f0b035912cb81a9bf9f210b30a4d7b96cd29018ab4d7ea996ef7d893d39
   contracts/citation_versions.py:
     path: runtime/governance/contracts/citation_versions.py
-    sha256: 99ff10342f3e1b53695f21a615c4922195f434cc4265d872d160dc4816dcbef3
+    sha256: a7b0e17d565a1bf85b8bbe26417f41e0765c3371dec17545e761f3e322bba764
   contracts/code_symbols.py:
     path: runtime/governance/contracts/code_symbols.py
     sha256: e2bf86d6656cb098eeae991bb02e1519dd379ae3d2a29d76d97faa620df50202
@@ -22,16 +22,16 @@ files:
     sha256: e86d2fae148cbdbdd3fb98d819c93597b8f68bb3ef46ef174c74f583b486927d
   contracts/ingest.py:
     path: runtime/governance/contracts/ingest.py
-    sha256: fa933a08f5413fdd4314711820cf243034779f1f46e2816a05a7e8750d6e964f
+    sha256: 7c2f776d01af4e3df2be0d821b0c697675667c3f158cbe23d2dca104aa02160a
   contracts/knowledge.py:
     path: runtime/governance/contracts/knowledge.py
     sha256: 2b165355fa1548c9c5e58bc9fe3e0c0802d0e02bdbc61c498b37424785faebe9
   contracts/library.py:
     path: runtime/governance/contracts/library.py
-    sha256: c4c40bd36f4c53e62d7c434e106dc92af6eb04fb11c5d5c2308782e1b1ac9656
+    sha256: deddc2f1ebe29ee42c78133a33ab94eb06c0d4fe5b471a6a990a4c6f428f6bf1
   contracts/panel.py:
     path: runtime/governance/contracts/panel.py
-    sha256: eb595d830a402c86ab5acd980e0b4c1d9c9d35d9f3c8c8d684f808889cf55e5d
+    sha256: ad1109bf0f3aa98bf5c9be5ac942081615eacb24b5fae773887753153c845419
   contracts/raw_materials.py:
     path: runtime/governance/contracts/raw_materials.py
     sha256: 85697d5486c7fff5fcdd0ec149e53ab224a520542040fee0b1d4aa03354cc8fc
@@ -73,7 +73,7 @@ files:
     sha256: 7ba64999733b1e8bc4b2e98fff159afcfed3a4690339998dc94bd717d0013da9
   specs/cards.md:
     path: runtime/governance/specs/cards.md
-    sha256: a099db3ae8cbfa092bf1ba05bc43897ab9ba88ec164d1c2e610b4b9c3a3e26e1
+    sha256: 5fdec493d676605d055a54ec28e6ab82b75837fe600cd2ff511905c444294179
   specs/lifecycle.md:
     path: runtime/governance/specs/lifecycle.md
     sha256: 295aab347c0b08480c447f81c6e74db3f198d2e2a07f7e28b77f4af231895a53
@@ -82,7 +82,7 @@ files:
     sha256: 241e05b7a7b359ba01257873cafc1acd6303ff45894940156d2ae3d44ddd5641
   specs/sources.md:
     path: runtime/governance/specs/sources.md
-    sha256: 7a250283cad27ded668142036ce2fafaddb751397c6ab02942fb68253a0c251f
+    sha256: 19e018d7768e072f676dcfb5530f8d5f5d90f30529aa7ffc1fe3ef93d461b6bb
   specs/ci-runner.md:
     path: runtime/governance/specs/ci-runner.md
     sha256: fc6d518c32ac6eed3e803ad04c621c5413125f14253109dc8724a1c466028c81

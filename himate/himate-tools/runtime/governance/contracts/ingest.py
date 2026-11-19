@@ -27,6 +27,7 @@ from . import citation_versions, document_material, document_parser, document_re
 
 FORMATS = document_parser.SUPPORTED_FORMATS
 IGNORED = {"AGENTS.md", "index.md", "README.md", ".gitkeep", "dbox.local.yml", "dbox.local.yml.example"}
+DOCUMENT_CHECK = ".build/document-review-check.json"
 
 
 def sha(data):
@@ -664,7 +665,7 @@ def check(root, request, rules=None):
     formal = bool(request.get("formal"))
     try:
         if not formal:
-            citation_versions.invalidate(root)
+            safe_path(root, DOCUMENT_CHECK, [".build"]).unlink(missing_ok=True)
         planned = None if formal else _planned_cards(root)
         catalog = Catalog(root)
     except (ValueError, OSError, ContractError, yaml.YAMLError) as error:
@@ -681,7 +682,6 @@ def check(root, request, rules=None):
             if overlap:
                 raise ContractError("WRITE_DELETE_CONFLICT", "A candidate cannot also be deleted", ", ".join(sorted(overlap)))
             staged_sources = {}
-            checked_references = []
             task_bytes = None
             document_batch = None
             context = {"formal": formal, "loaded": {}, "legacy": {}, "data": {}, "descriptors": {}}
@@ -747,9 +747,6 @@ def check(root, request, rules=None):
                     extractor = (code_extractor(source, snapshot if snapshot.get("source_id") == identity else None)
                                  if kind == "code" else None)
                     _reference_check(root, source, reference, staged_sources.get(identity), extractor=extractor, context=context)
-                    if task_bytes is not None and not reference.get("snapshot_id"):
-                        data = staged_sources[identity] if identity in staged_sources else context["data"][identity]
-                        checked_references.append((card, reference, source, data, extractor))
                 except (ValueError, OSError, ContractError, subprocess.TimeoutExpired) as error:
                     findings.append({"code": getattr(error, "code", "SOURCE_UNAVAILABLE"),
                                      "path": card["path"], "message": str(error)})
@@ -784,10 +781,11 @@ def check(root, request, rules=None):
                     findings.append({"code": "BROKEN_CARD_LINK", "path": card["path"], "message": target})
                 elif parsed.fragment and unquote(parsed.fragment) not in structures[normalized]["anchors"]:
                     findings.append({"code": "BROKEN_CARD_ANCHOR", "path": card["path"], "message": target})
-    if not findings and task_bytes is not None:
+    if not findings and document_batch is not None:
         try:
-            citation_versions.stage(root, checked_references, task_bytes,
-                                    review_digest=_checked_document_digest(root, document_batch, drafts, deletes))
+            checked = {"task_sha256": sha(task_bytes),
+                       "document_review_sha256": _checked_document_digest(root, document_batch, drafts, deletes)}
+            atomic_write(safe_path(root, DOCUMENT_CHECK, [".build"]), canonical_bytes(checked))
         except (ValueError, OSError, ContractError) as error:
             findings.append(_finding(error))
     return {"findings": findings, "card_ids": [card["id"] for card in drafts],
@@ -820,8 +818,12 @@ def commit(root, request):
         pdf_batch = document_batch["pdf_batch"] if document_batch is not None else None
         if not drafts and not request.get("reason"):
             raise ContractError("NO_CHANGE_REASON_REQUIRED", "Explain the reviewed no-card result")
-        registry_changed = citation_versions.persist(root, catalog, drafts, task_bytes,
-                                                     review_digest=_checked_document_digest(root, document_batch, drafts, deletes))
+        if document_batch is not None:
+            checked_path = safe_path(root, DOCUMENT_CHECK, [".build"])
+            checked = read_json(checked_path) if checked_path.is_file() else {}
+            if (checked.get("task_sha256") != sha(task_bytes)
+                    or checked.get("document_review_sha256") != _checked_document_digest(root, document_batch, drafts, deletes)):
+                raise ContractError("DOCUMENT_REVIEW_NOT_CHECKED", "Run P4 again for the current document range, plan and candidates")
         for card in drafts:
             destination = safe_path(root, card["path"], ["knowledge"])
             destination.parent.mkdir(parents=True, exist_ok=True)
@@ -875,7 +877,7 @@ def commit(root, request):
             catalog.record_pdf_review(
                 source["source_id"], source["hash"], pdf_batch["pages"], pdf_batch["total_pages"],
                 source_commit=source.get("source_commit"), restart=source["change"] == "reprocess",
-                registry_changed=registry_changed, review_sha256=review_identity)
+                review_sha256=review_identity)
         elif document_batch is not None:
             catalog.record_document_review(source["source_id"], source["hash"], processing,
                                            source_commit=source.get("source_commit"))

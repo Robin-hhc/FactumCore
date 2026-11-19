@@ -250,7 +250,7 @@ def test_panel_global_graph_and_bidirectional_expansion_use_published_edges(know
     assert status != 0 and report["diagnostics"][0]["code"] == "PANEL_REVISION_MISMATCH"
 
 
-@pytest.mark.parametrize("category", ["specs", "agent-notes", "custom-category"])
+@pytest.mark.parametrize("category", ["specs", "stories", "agent-notes", "custom-category"])
 def test_current_source_reference_survives_reindex_clone_and_cache_cleanup(knowledge, tmp_path, category):
     if not shutil.which("git"):
         pytest.skip("Git is required to exercise clean-checkout recovery")

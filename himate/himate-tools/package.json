@@ -1,6 +1,6 @@
 {
   "name": "@himate/knowledge-cli",
-  "version": "0.24.5",
+  "version": "0.24.6",
   "description": "HiMate Knowledge CLI launcher",
   "license": "UNLICENSED",
   "bin": {

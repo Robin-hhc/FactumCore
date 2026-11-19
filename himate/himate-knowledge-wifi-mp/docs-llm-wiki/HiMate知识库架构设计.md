@@ -1,6 +1,6 @@
 # HiMate 知识库架构设计
 
-实现基线为 HiMate 工具包 `0.24.5` 和 OpenFlow 知识库工作台。日常操作、入库节点和页面接口见[使用指南](HiMate知识库使用指南.md)、[详细设计](HiMate知识库详细设计.md)和[面板 CLI 契约](../../himate-tools/docs/面板CLI契约.md)。
+实现基线为 HiMate 工具包 `0.24.6` 和 OpenFlow 知识库工作台。日常操作、入库节点和页面接口见[使用指南](HiMate知识库使用指南.md)、[详细设计](HiMate知识库详细设计.md)和[面板 CLI 契约](../../himate-tools/docs/面板CLI契约.md)。
 
 ## 1. 系统目标
 

@@ -20,7 +20,6 @@ allowed_raw_roots:
 - docs-raw/conventions
 - docs-raw/chips
 - docs-raw/stories
-- docs-raw/storys
 - docs-raw/specs
 - docs-raw/protocols
 - docs-raw/troubleshooting

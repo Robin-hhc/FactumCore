@@ -6,7 +6,7 @@
 |---|---|
 | conventions/ | 规则与约定原件 |
 | chips/ | 芯片资料原件 |
-| stories/ | 需求与场景原件，已登记的 `storys/` 原件沿用原路径 |
+| stories/ | 需求与场景原件 |
 | specs/ | 设计与规格原件 |
 | protocols/ | 协议资料原件 |
 | troubleshooting/ | 问题定位与排查经验原件 |

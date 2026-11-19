@@ -22,6 +22,7 @@ from .cards_v3 import parse_card
 from .runtime import native_path
 from .validation import (ContractError, _workspace_no_links, canonical_bytes, load_yaml, markdown_structure,
                          safe_path, validate_id, workspace_configuration, workspace_layout)
+from .workspace_config import relative_path
 from . import citation_versions, document_material, document_parser, document_review, intake, source_resources
 
 
@@ -63,6 +64,11 @@ def source_path(root, source):
         if source_resources.is_dbox_path(source["path"]):
             return source_resources.dbox_path(root, source["path"])["actual_path"]
         return safe_path(root, source["path"], ["docs-raw"])
+    return _code_source_location(root, source)[0]
+
+
+def _code_source_location(root, source):
+    """Return the checked physical path and its workspace-relative name."""
     config_path, _, config = workspace_configuration(root)
     layout = workspace_layout(config, config_path.parent)
     project = Path(layout["workspace_root"])
@@ -78,7 +84,7 @@ def source_path(root, source):
         allowed = [project / item["workspace_path"] for item in layout["modules"]]
         if not any(path.is_relative_to(directory) for directory in allowed):
             raise ContractError("CODE_SCOPE_REQUIRED", "Register a file inside a configured module", relative)
-    return path
+    return path, relative
 
 
 def git_read(directory, arguments):
@@ -465,8 +471,22 @@ def _plan_metadata(root):
         raise ContractError("INVALID_PLAN", str(error), ".build/plan.md") from error
 
 
+def _required_code_refs(item):
+    required = item.get("required_code_refs", [])
+    if not isinstance(required, list):
+        raise ValueError("required_code_refs must be a list")
+    for entry in required:
+        if (not isinstance(entry, dict) or not entry or set(entry) - {"path", "symbol"}
+                or any(not isinstance(value, str) or not value.strip() or value != value.strip()
+                       for value in entry.values())):
+            raise ValueError("Each required code reference needs a path, a symbol, or both")
+        if "path" in entry and relative_path(entry["path"]) == ".":
+            raise ValueError("A required code reference path must identify a file")
+    return required
+
+
 def _planned_cards(root):
-    """Read P2's target list; prose remains the author's editable plan."""
+    """Read P2's targets and required code locations."""
     metadata = _plan_metadata(root)
     try:
         targets, paths = {}, set()
@@ -480,11 +500,17 @@ def _planned_cards(root):
                 raise ValueError("Planned paths must name knowledge Markdown files")
             if identity in targets or reference.casefold() in paths:
                 raise ValueError("Planned card IDs and paths must be unique")
-            targets[identity] = reference
+            targets[identity] = {"path": reference, "required_code_refs": _required_code_refs(item)}
             paths.add(reference.casefold())
         return targets
     except (OSError, UnicodeError, ValueError, yaml.YAMLError) as error:
         raise ContractError("INVALID_PLAN", str(error), ".build/plan.md") from error
+
+
+def _matches_required_code_ref(required, path, symbols):
+    planned_path = required.get("path")
+    return ((planned_path is None or path == planned_path or path.endswith("/" + planned_path))
+            and ("symbol" not in required or required["symbol"] in symbols))
 
 
 def _deletes(root):
@@ -708,7 +734,7 @@ def check(root, request, rules=None):
         if planned is not None:
             actual = {card["id"]: card["path"] for card in drafts}
             for identity in sorted(planned.keys() | actual.keys()):
-                expected_path, actual_path = planned.get(identity), actual.get(identity)
+                expected_path, actual_path = planned.get(identity, {}).get("path"), actual.get(identity)
                 if expected_path != actual_path:
                     findings.append({"code": "PLAN_CARD_MISMATCH", "card_id": identity,
                                      "path": actual_path or expected_path,
@@ -728,7 +754,10 @@ def check(root, request, rules=None):
         source_lookup = {row["source_id"]: row for row in catalog.list_files()}
         registry = catalog.registry
         snapshots = {row["snapshot_id"]: row for row in catalog.registry.get("snapshots", [])}
+    code_paths = {}
     for card in drafts:
+        required = (planned or {}).get(card["id"], {}).get("required_code_refs", [])
+        checked_code_refs = []
         for kind in ("doc", "code"):
             for reference in card[kind + "_ref"]:
                 identity = reference[kind + "_id"]
@@ -746,10 +775,26 @@ def check(root, request, rules=None):
                         continue
                     extractor = (code_extractor(source, snapshot if snapshot.get("source_id") == identity else None)
                                  if kind == "code" else None)
-                    _reference_check(root, source, reference, staged_sources.get(identity), extractor=extractor, context=context)
+                    resolved = _reference_check(root, source, reference, staged_sources.get(identity),
+                                                extractor=extractor, context=context)
+                    if kind == "code" and required:
+                        if identity not in code_paths:
+                            code_paths[identity] = (_code_source_location(root, source)[1]
+                                                    if source.get("repo", source.get("repo_id"))
+                                                    else source["path"])
+                        symbols = ()
+                        if resolved:
+                            match = resolved["matches"][0]
+                            symbols = (match["name"], "::".join([*match["scope"], match["name"]]))
+                        checked_code_refs.append((code_paths[identity], symbols))
                 except (ValueError, OSError, ContractError, subprocess.TimeoutExpired) as error:
                     findings.append({"code": getattr(error, "code", "SOURCE_UNAVAILABLE"),
                                      "path": card["path"], "message": str(error)})
+        for location in required:
+            if not any(_matches_required_code_ref(location, *ref) for ref in checked_code_refs):
+                findings.append({"code": "PLANNED_CODE_REF_MISSING", "card_id": card["id"], "path": card["path"],
+                                 "required_code_ref": location,
+                                 "message": "Add the planned code reference in P3, or revisit the evidence in P2."})
     structures = {card["path"]: markdown_structure(card["raw"]) for card in candidates.values()}
     # Check final relationships, including retained cards that link to a
     # removed card. Their source material does not need to be re-read.

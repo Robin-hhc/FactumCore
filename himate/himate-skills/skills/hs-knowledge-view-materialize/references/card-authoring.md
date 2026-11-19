@@ -12,7 +12,7 @@
 | 排障和验证步骤 | [操作手册](templates/runbook.md) |
 | 术语及含义 | [术语](templates/glossary.md) |
 
-新卡头的必填字段为 `id`、`doc_ref`、`code_ref`。沿用计划 ID，普通更新不分配新 ID。`doc_ref` 至少一项，每项填已登记的 `doc_id` 和真实定位。`code_ref` 允许 `[]`，每项填 `code_id`、`line_start`、`line_end`，必要时加已验证的 `symbol`。可选字段 `tags` 是非空且不重复的字符串组成的数组，也可为空数组。数字和布尔形式的标签请加引号。`lifecycle` 可填 `stable` 或 `deprecated`，缺省按未退役处理，具体状态按 P2 决定。
+新卡头的必填字段为 `id`、`doc_ref`、`code_ref`。沿用计划 ID，普通更新不分配新 ID。`doc_ref` 至少一项，每项填已登记的 `doc_id` 和真实定位。`code_ref` 覆盖计划中的 `required_code_refs`，纯文档卡可填 `[]`。每项填 `code_id`、`line_start`、`line_end`，函数可加已验证的 `symbol`，宏或结构体使用对应类型的 `selector`。可选字段 `tags` 是非空且不重复的字符串组成的数组，也可为空数组。数字和布尔形式的标签请加引号。`lifecycle` 可填 `stable` 或 `deprecated`，缺省按未退役处理，具体状态按 P2 决定。
 
 文档定位使用实际文本行段 `line_start/line_end`、原件物理页 `page_start/page_end`、`section` 或支持的原生 `locator`。例如 DOCX 的 `locator: {kind: paragraph, paragraph: 2}`，PPTX 的 `locator: {kind: slide, slide: 2}`，以及 XLSX 的 `locator: {kind: cell_range, sheet: Sheet1, range: 'A1:D20'}`。PDF 也支持 `page/pages`，DOCX 也支持 `paragraphs/table_row`。已登记文件的不同章节或代码范围可使用多个引用项。
 

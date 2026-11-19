@@ -400,6 +400,83 @@ def test_ingest_scan_returns_one_document_without_legacy_operation_request(knowl
     assert not list((knowledge / "knowledge").rglob("*.md"))
 
 
+def test_ingest_requires_each_planned_code_ref_before_publishing(knowledge):
+    fixture = SOURCE / "evals/ingest/fixtures/code_ref_flow"
+    workspace = knowledge.parents[1]
+    originals = knowledge / "docs-raw/specs/design.md"
+    shutil.copyfile(fixture / "design.md", originals)
+    for relative in ("jobs/submit.c", "storage/journal.c", "archive/submit.c"):
+        destination = workspace / "main" / relative
+        destination.parent.mkdir(parents=True)
+        original = "jobs/submit.c" if relative == "archive/submit.c" else relative
+        shutil.copyfile(fixture / original, destination)
+    config_path = knowledge / "config.yml"
+    config = yaml.safe_load(config_path.read_bytes())
+    config["modules"] = [{"path": name} for name in ("jobs", "storage", "archive")]
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    status, scanned = invoke(knowledge, "ingest", "scan")
+    assert status == 0 and scanned["phase"] == "prepared", scanned
+    assert scanned["data"]["source"]["kind"] == "raw"
+    status, listed = invoke(knowledge, "source", "list", request={"kind": "code"})
+    assert status == 0 and listed["data"]["files"] == [], listed
+
+    requirements = [
+        {"path": "jobs/submit.c", "symbol": "submit_job"},
+        {"path": "jobs/submit.c", "symbol": "validate_job"},
+        {"path": "storage/journal.c"},
+    ]
+    plan = {"cards": [{"id": "job-flow", "path": "knowledge/job-flow.md", "required_code_refs": requirements}]}
+    (knowledge / ".build/plan.md").write_text(
+        "---\n" + yaml.safe_dump(plan, sort_keys=False) + "---\nVerify the entry, rejection and journal update.\n",
+        encoding="utf-8",
+    )
+    candidate = knowledge / ".build/cards/job-flow.md"
+
+    def write_candidate(refs):
+        header = {"id": "job-flow", "doc_ref": [{
+            "doc_id": scanned["data"]["source"]["doc_id"], "line_start": 1,
+            "line_end": len(originals.read_text(encoding="utf-8").splitlines()),
+        }], "code_ref": refs}
+        candidate.write_text("---\n" + yaml.safe_dump(header) + "---\n" + originals.read_text(encoding="utf-8"),
+                             encoding="utf-8")
+
+    def expect_missing(expected):
+        status, checked = invoke(knowledge, "ingest", "check")
+        assert status != 0 and checked["phase"] == "failed", checked
+        assert [finding["required_code_ref"] for finding in checked["data"]["findings"]
+                if finding["code"] == "PLANNED_CODE_REF_MISSING"] == expected, checked
+
+    write_candidate([])
+    expect_missing(requirements)
+
+    registered = {}
+    for module in ("jobs", "storage", "archive"):
+        if module == "storage":
+            request = {"kind": "code", "path": "main/storage/journal.c"}
+        else:
+            repo_id = "repo-" + hashlib.sha256(f"main/{module}".encode()).hexdigest()[:16]
+            request = {"kind": "code", "repo_id": repo_id, "path": "submit.c"}
+        status, result = invoke(knowledge, "source", "register", request=request)
+        assert status == 0 and result["phase"] == "registered", result
+        registered[module] = result["data"]["source"]["id"]
+    submit = {"code_id": registered["jobs"], "line_start": 8, "line_end": 13, "symbol": "submit_job"}
+    validate = {"code_id": submit["code_id"], "line_start": 3, "line_end": 6, "symbol": "validate_job"}
+    journal = {"code_id": registered["storage"], "line_start": 3, "line_end": 7}
+
+    write_candidate([submit, {**validate, "code_id": registered["archive"]}])
+    expect_missing(requirements[1:])
+
+    write_candidate([submit, validate, journal])
+    status, checked = invoke(knowledge, "ingest", "check")
+    assert status == 0 and checked["phase"] == "passed", checked
+    status, committed = invoke(knowledge, "ingest", "commit")
+    assert status == 0 and committed["data"]["card_ids"] == ["job-flow"], committed
+    status, listed = invoke(knowledge, "source", "list", request={"kind": "code", "referenced": True})
+    assert status == 0, listed
+    assert {row["id"] for row in listed["data"]["files"]} == {registered["jobs"], registered["storage"]}
+
+
 def test_local_configuration_is_used_outside_git_without_reading_ancestor_config(knowledge):
     workspace = knowledge.parents[1]
     config = knowledge / "config.yml"

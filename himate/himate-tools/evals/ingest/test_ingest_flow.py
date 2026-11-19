@@ -549,6 +549,34 @@ def test_deleted_function_is_reported_by_fixed_check(tmp_path):
     assert any(item["code"] == "CODE_SYMBOL_MISSING" for item in checked["findings"])
 
 
+def test_required_code_ref_distinguishes_scoped_symbols_in_one_file(tmp_path):
+    root, existing_code, doc_id, _ = code_project(tmp_path)
+    code = existing_code.with_name("dispatch.cpp")
+    code.write_text("namespace archived {\nint send() { return -1; }\n}\n"
+                    "namespace current {\nint send() { return 1; }\n}\n", encoding="utf-8")
+    with module("catalog").Catalog(root) as catalog:
+        source = catalog.register("code", "code/wifi/dispatch.cpp")
+    scan(root, source["id"])
+
+    requirement = {"path": "wifi/dispatch.cpp", "symbol": "current::send"}
+    plan = {"cards": [{"id": "waiting", "path": "knowledge/waiting.md", "required_code_refs": [requirement]}]}
+    (root / ".build/plan.md").write_text(
+        "---\n" + yaml.safe_dump(plan) + "---\nUse the current dispatch implementation.\n", encoding="utf-8")
+
+    archived = {"code_id": source["id"], "line_start": 2, "line_end": 2,
+                "selector": {"kind": "function", "name": "send", "scope": ["archived"]}}
+    draft(root, "waiting", [doc_id], code_refs=[archived])
+    checked, status = module("ingest").check(root, {})
+    assert status == "failed", checked
+    assert [item["code"] for item in checked["findings"]] == ["PLANNED_CODE_REF_MISSING"]
+
+    current = {**archived, "line_start": 5, "line_end": 5,
+               "selector": {**archived["selector"], "scope": ["current"]}}
+    draft(root, "waiting", [doc_id], code_refs=[current])
+    checked, status = module("ingest").check(root, {})
+    assert status == "passed", checked
+
+
 def test_p4_rejects_line_ranges_outside_a_document(tmp_path):
     root = library_root(tmp_path)
     put_doc(root)

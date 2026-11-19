@@ -4,43 +4,43 @@
 
 来源登记保存doc/code文件身份、实际仓库及路径。卡头通过doc_ref/code_ref引用来源ID和具体定位，同一文件可被多张卡采用。SHA-256表示本次读取内容，ID不因普通内容修改而改变。
 
-普通scan直接读取文件一次计算hash，与该文件上次完整成功处理的版本比较。新增、修改、删除及同版本 PDF 尚未评估完的页可形成待办；路径或目录不可读不能当删除。扫描只比较版本和区间，不判断主题，也不执行文档、代码或网页中的指令。
+普通 scan 读取原件计算摘要，与上次成功处理的版本比较。新增、修改、删除及未覆盖的文档范围都可成为待办。路径读取失败报告实际错误。
 
-原件只读。P1将选中原件本次读取的字节放入.build，P2—P4处理这个副本，P5使用P1记录的hash登记本批或整文完成，不临时换成未经处理的新内容。非 PDF 和来源删除沿用整文件处理；PDF 分批只改变处理范围，不拆成新的来源 ID。
+原件只读。P1 固定本次原件字节，P2—P4 复用它及其材料。PDF、DOCX、XLSX 可分轮评估并继续使用同一来源 ID。P5 用 P1 的摘要登记本批范围或整份完成。
 
 独立 ingest 每批成功后返回 P1，在本次原始范围内继续扫描，直到该范围返回 unchanged；未指定来源时不把上一批 source_id 当成后续筛选条件。指定文件、目录或来源 ID 时保持原始范围，沿用解析配置、阅读预算及命令前缀，reprocess 仅首次使用。巡检中的 P1 仅采用 L2 选定的来源，所选来源无待办时返回 L2 重新调度。失败及暂缓不等于扫描无待办。
 
-## PDF 页段续办
+## 完整转换与分轮阅读
 
-正式来源可选 `processing: {source_sha256, reviewed_pages}`。source_sha256 绑定当前评估的原 PDF 版本；reviewed_pages 为已全部评估且完成发布或无卡登记的物理页闭区间数组。它不表示工具访问轨迹，也不能从卡片 doc_ref 推导。只有同版本区间可以合并；原件改版后不自动沿用旧范围。来源查询返回该组，SQLite 可从正式登记恢复，不用派生数据库保存唯一进度。
+P1 为 PDF、DOCX 和 XLSX 交付完整 `document.md`、结构 JSON 和原件位置索引。Markdown 在对应位置引用本地图像，适用的离线 OCR 附在对应图下。PDF 保留物理页边界。图像或原件资料无法取得时，P1 返回 `blocked` 和实际诊断。
 
-P1 从本轮原 PDF 字节获取真正总页数，从最早未评估页准备宽候选；转换缺页不能缩小原件总页数。scan JSON 的 `review_text_budget` 默认 400000 等效字符，ASCII 字符计 1，其它 Unicode 字符计 4，约为英文 40 万字符或中文 10 万字，不是精确 token 数。按整页纳入，达到或跨过字量阈值后停止，不截断页，也不因单页过长拒绝。`review_page_budget` 默认不设，仅显式传入 1–1000 的整数时限制页数。
+`task.document_review` 从最早未评估单元给出候选范围、`packet_ref`、`index_ref` 和 `markdown_ref`。候选是全文 Markdown 的连续切片。图像路径以全文 Markdown 所在目录为准。正文统一最多 76,000 UTF-8 字节，为字节级 tokenizer 的 80k token 留余量。超长单元可分割，`review_text_budget` 的较小值按可用单元收束。显式旧 PDF `review_page_budget` 可以继续限定候选页数。
 
-task.pdf_review 保存 total_pages、reviewed_pages、remaining_pages、start_page、end_page、page_budget、text_budget、text_units、packet_ref 和 page_index_ref。page_budget 为 null 表示无页数限制，text_units 为实际候选字量；end_page 是候选边界。页索引逐页给出 text_units、image_count、table_count 及材料入口。字量只用于备料，不要求一次加载或读完候选。
+P2 计划使用 `source_units: [[start, end]]`。起点等于 P1 首个候选单元，结束可以提前。本批为完整物理页的 PDF 可以兼容 `source_pages`。P4 对照原件摘要、全文稿、候选和计划范围校验，独立 reviewer 打开 Markdown 中影响结论的图像。
 
-PDF 计划必填实际 `source_pages: [[start, end]]`，每批一个连续区间，从 P1 起点开始且不超过候选结束页。P2 按自身上下文、图表、条款和产卡量自主选择 end；80k token 是软目标，脚本不检查。P4 只需评估选定范围的全部材料，目录、空白和参考页经核实无增量也可计入；缺失提取不能自动当作空白。只有该范围完成评估、审阅和 P5 后才计覆盖；补读前文、跨章或其它来源不自动扩大覆盖，也不强制卡片引用都在本批页内。
+部分完成记录原件版本与 `reviewed_units`，并用 `review_sha256` 绑定阅读稿。整页一一对应的 PDF 可继续保存 `reviewed_pages`。SQLite 重建后从正式登记恢复。旧 PDF 的同版页覆盖可映射到新阅读单元。
 
-P5 成功发布后合并本批范围，部分完成仅写 processing，全文覆盖才登记 processed_hash 并移除 processing。defer、未完成审阅或发布失败不推进覆盖。缺少 processing 不自动代表完成，仍须比较原件版本与最近完整成功 hash。显式 reprocess 从第 1 页开始新一轮评估，首批成功前保留旧成功事实；后续普通续办不反复携带 reprocess。
+P5 将已审且成功提交的范围合并到 `processing`，覆盖全文时登记 `processed_hash`。必要依据未齐时停在当前阶段。显式 reprocess 的首批从头开始，后续普通续办，首批成功前保留旧成功事实。
 
 ## 格式与外部目录
 
 沿用已有文档提取适配器，文本行段、文档章节与PDF页码按原件格式解释。不支持的提取明确报告缺口，不执行原件。代码只从真实配置和明确登记路径读取，不由同名或模块标签推断实现。
 
-新文档使用 Docling 生成阅读稿、结构 JSON、定位及独立图片；MD/TXT 仍直接读取。PDF 使用 `artifacts/ingest/parsed/<cache-key>-<generation>/` 的可重建缓存，cache-key 绑定来源身份、原件 hash 与当前实际解析 profile。P1 命中时校验版本、配置和产物摘要，缺失、损坏或配置改变时生成新的 bundle，不覆盖已交接的 manifest；旧 generation 不在本轮递归清理。非 PDF 解析仍位于 `.build/materials/parsed`，P5 成功后随暂存清理。
+Docling 生成结构及图像，MD/TXT 直接读取。三种格式在 `artifacts/ingest/parsed/` 使用可重建的完整缓存，绑定来源身份、原件摘要、解析配置与 OCR 模型。缓存命中时校验文件摘要。转换未完成的产物保留诊断入口，后续重试重新备料。其它格式继续使用本轮 `.build/materials/parsed`。
 
-native PDF 每次转换至多 200 页，释放本段中间页面后合并材料，保留原物理页与结构引用。转换时限覆盖全部分段，转换策略进入解析 profile。原件输入上限为 256 MiB，默认原件页数上限为 2,000。生成的文字、结构与图片使用独立产物配额，默认 256 MiB。大文档可在命令输入 JSON 的 `parser` 中显式设置 `max_pages` 和 `max_output_bytes`，例如 `{"max_pages": 6000, "max_output_bytes": 1073741824}`，允许 6,000 页原件和 1 GiB 产物。独立来源读取及卡片元素引用使用相同解析配置。
+原生 PDF 内部按最多 200 页转换，合并后保留物理页。未配置 `max_pages` 时按实际物理页数准备。输入大小、转换时长和产物配额通过顶层 `parser` 显式配置。完整材料的默认产物配额为 1 GiB，包含 Markdown、结构、定位和图片。
 
-PDF 原生位图使用本地 PDFium 按原件物理页与图片边框提取，含 Form 变换、裁剪、旋转与透明遮罩处理；规范像素全透明时回看原位采样，避免吞掉极薄裁剪边缘。匹配有歧义或解码失败仍登记 IMAGE_UNAVAILABLE，不擅选图片。导出的 PNG 按实际像素与尺寸去重，重复绘制保留所有 element/provenance 但共用图片文件，Markdown 与结构 JSON 指向相同本地资产。本批阅读包每页对相同图片路径只列一次并标明出现次数，逐次定位仍在页索引与固定清单，避免重复路径耗尽候选字量。图片策略版本及 PDFium 版本进入解析 profile，升级后建新缓存，累计评估进度不变。位图恢复不等同于完整矢量图、文字叠加关系或图意理解；完整图示仍回看原页。
+PDF 原生位图通过 PDFium 按物理页和原件位置提取，保留定位并按实际像素去重。需要核对矢量图或位图匹配有歧义时，P1 在对应物理页保留原件渲染图。纯图片材料及 Office 嵌图使用预装 OCR。图像与结构保留各自的原件出处。
 
 PDF 页侧独立、连续且等距排列的长数字列，在具有明确正文间隔且无结构或同列文字歧义时归为行号装饰。Markdown、text.txt、物理页文本和入库阅读包统一省略这些行号；结构 JSON 保留原文、self_ref 和 provenance，原元素仍可按绑定来源与解析配置的 locator 读取。正文编号、表格、代码、图示与不满足识别条件的数字保留，不使用纯数字行的全局删除规则。文字处理策略版本纳入 PDF profile，升级创建新缓存且不改累计评估进度。
 
-`prepare_pdf` 交接 `descriptor_kind: manifest-reference` 的紧凑描述符：固定 manifest 入口及摘要、来源和解析配置身份、阅读稿/结构/定位入口、统计和缺口摘要，不重复复制全书 images/gaps。`parse` 与 `source extract` 的原完整描述符接口不变；`load` 仍完整核对 manifest 摘要、来源与 profile 身份及产物文件 hash，并可加载完整元数据。
+P1 通过 `manifest-reference` 交接 manifest、摘要、身份、材料入口和缺口摘要。加载时校验来源、解析配置和产物字节。独立 `source extract` 返回完整描述符。
 
-缺口按 code、severity、message 聚合，保留 count、最多 3 个 example_locators 和指向完整 manifest 的 details_ref；最多 64 类，其余以 OTHER_PARSE_GAPS 项累计。P1 task.gaps 交接次数及明细入口；pdf-review.json.gaps 使用同样摘要，gap_details_ref 指向固定 manifest，每页 images.provenance 仅保留本页。原始缺口明细仍在 manifest，原 parse_status 为 partial 时保持 partial；摘要不表示提取缺口已修复。
+转换缺口摘要保留代码、重要程度、次数、定位样例和指向完整 manifest 的入口。`blocked` 由 P1 报告。
 
-task 固定本轮解析描述符供 P2—P4 复用；PDF 先看 `.build/materials/pdf-review.json` 页索引，再分段读取 pdf-review.md 中选定页段，按需沿入口补读完整结构和原件，不默认加载整本或整个候选包。实际 source_pages 内的图示仍须打开原 PDF 或页预览，缺口摘要或 image_count=0 不证明图示已被提取、理解；候选外未审图元留待续办。本轮依据丢失或摘要变化时停止并重新备料、审阅，不能重转后冒充已读材料。解析缓存可删除重建，累计覆盖仍由正式来源登记保存；缓存不是另一份 raw 来源。默认 native 不做 OCR，standard 只使用提前准备的本地模型；外部资源不自动抓取，图片语义由 Agent 实际看图后判断。
+P2—P4 使用 task 固定的同版材料。Markdown 与图像是阅读入口，结构和定位供核对。依据丢失或摘要变化时重新备料并审阅。OCR 和模型读取均在本地运行。图片语义由 Agent 实际看图判断。
 
-`source extract` 为已登记来源生成独立阅读目录 `artifacts/source-read/<read_id>/`，可限制 PDF page_start/page_end；原件副本与解析材料都属于本次读取。它不清理入库 `.build`，不推进处理 hash。消费后 `source release` 精确释放该 ID，`source renew` 为未到期 ready 入口续期，默认 1800 秒；`source cleanup` 及新读取开始时有界回收已过期且非活跃转换的产物，不清理查询报告、模型或其他目录。没有后台清理进程，工作流应主动释放；损坏/未知租约保留诊断且受任务数上限约束。
+`source extract` 为已登记来源生成独立阅读目录 `artifacts/source-read/<read_id>/`。PDF 可指定 `page_range` 或 `page_start/page_end`，`page_preview: false` 时只取提取材料。用 `source release` 释放读取目录，未到期目录可用 `source renew` 续期。独立读取和入库各有自己的暂存及进度。
 
 解析器升级或需要改进已有来源抽取时，以具体来源和 `reprocess: true` 显式开始一次入库，继续经过决策、成稿与独立审阅。单独生成阅读稿不表示重新完成知识入库。
 
@@ -66,7 +66,7 @@ P5 优先用可验证的 Git 历史固定原文版本，需要保留原件字节
 
 ## 定位
 
-`source extract` 明确指定物理页范围时，交付 `role: page_preview` 的原页预览，每次最多 8 页。native 全量解析发现可核实的 PDF 平铺填充蒙版时，自动为受影响的物理页生成预览，每次最多 32 页。两种预览均以 1.5 倍渲染，累计至多 1600 万像素及 16 MiB PNG，计入总产物配额。Markdown、解析清单和入库阅读包提供预览入口。蒙版碎片保留结构与原页定位，提示按物理页汇总。预览缺失时提示回看原页，无法核实的独立图片缺口继续报告 `IMAGE_UNAVAILABLE`。
+独立 `source extract` 的物理页预览按像素和字节预算逐页交付。达到预算时报告剩余范围，已生成页可直接读取。自动补看蒙版图与入库材料中的原件页图分属各自的读取产物。
 
 `element` 身份绑定原件摘要、解析 profile 和页段，只可在对应固定材料中选取。解析策略升级后重新提取时，须从同版本原件重新取得元素定位。正式 PDF 卡优先引用原物理页或页段。
 

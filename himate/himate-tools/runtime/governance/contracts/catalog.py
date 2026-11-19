@@ -83,19 +83,29 @@ def _processing(source):
     if "processing" not in source:
         return None
     value = source["processing"]
+    if isinstance(value, dict) and set(value) == {"source_sha256", "review_sha256", "reviewed_units"}:
+        path = source.get("path", source.get("source_path"))
+        if (source.get("kind") == "raw" and isinstance(path, str)
+                and PurePosixPath(path).suffix.lower() in {".pdf", ".docx", ".xlsx"}
+                and all(isinstance(value[key], str) and re.fullmatch(r"[0-9a-f]{64}", value[key])
+                        for key in ("source_sha256", "review_sha256"))):
+            return {**value, "reviewed_units": normalize_page_ranges(value["reviewed_units"])}
+        raise ContractError("INVALID_DOCUMENT_PROCESSING", "Review progress needs a source and reading material hash")
     if (not _raw_pdf(source) or not isinstance(value, dict)
-            or set(value) != {"source_sha256", "reviewed_pages"}
+            or set(value) - {"review_sha256"} != {"source_sha256", "reviewed_pages"}
             or not isinstance(value.get("source_sha256"), str)
-            or not re.fullmatch(r"[0-9a-f]{64}", value["source_sha256"])):
+            or not re.fullmatch(r"[0-9a-f]{64}", value["source_sha256"])
+            or "review_sha256" in value and (not isinstance(value["review_sha256"], str)
+                                             or not re.fullmatch(r"[0-9a-f]{64}", value["review_sha256"]))):
         raise ContractError("INVALID_PDF_PROCESSING", "Use source_sha256 and reviewed_pages for a raw PDF", source.get("source_id", ""))
     try:
         reviewed = normalize_page_ranges(value["reviewed_pages"])
     except ContractError as error:
         raise ContractError("INVALID_PDF_PROCESSING", error.message, source.get("source_id", "")) from error
-    return {"source_sha256": value["source_sha256"], "reviewed_pages": reviewed}
+    return {**value, "reviewed_pages": reviewed}
 
 
-def pdf_review_result(source, source_hash, pages, total_pages, *, restart=False):
+def pdf_review_result(source, source_hash, pages, total_pages, *, restart=False, review_sha256=None):
     """Project confirmed coverage without writing; None means complete coverage."""
     identity = source.get("source_id", source.get("id", "")) if isinstance(source, dict) else ""
     if not isinstance(source_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", source_hash):
@@ -111,11 +121,15 @@ def pdf_review_result(source, source_hash, pages, total_pages, *, restart=False)
     if (not restart and previous is None and source.get("processed_hash") == source_hash
             and source.get("processed_exists") is True):
         return None
-    if not restart and previous is not None and previous["source_sha256"] == source_hash:
+    if (not restart and previous is not None and previous["source_sha256"] == source_hash
+            and "reviewed_pages" in previous and previous.get("review_sha256", review_sha256) == review_sha256):
         reviewed = normalize_page_ranges(previous["reviewed_pages"] + reviewed, total_pages)
     if not remaining_page_ranges(total_pages, reviewed):
         return None
-    return {"source_sha256": source_hash, "reviewed_pages": reviewed}
+    processing = {"source_sha256": source_hash, "reviewed_pages": reviewed}
+    if review_sha256 is not None:
+        processing["review_sha256"] = review_sha256
+    return processing
 
 
 def atomic_write(path, data):
@@ -521,13 +535,14 @@ class Catalog:
         return self.get_file(file_id)
 
     def record_pdf_review(self, file_id, source_hash, pages, total_pages, *, source_commit=None, restart=False,
-                          registry_changed=False):
+                          registry_changed=False, review_sha256=None):
         """Record a successfully published batch without prematurely completing its PDF."""
         with self.transaction():
             resource = next((item for item in self.registry["resources"] if item["source_id"] == file_id), None)
             if resource is None:
                 raise ContractError("UNKNOWN_SOURCE_ID", file_id)
-            processing = pdf_review_result(resource, source_hash, pages, total_pages, restart=restart)
+            processing = pdf_review_result(resource, source_hash, pages, total_pages, restart=restart,
+                                           review_sha256=review_sha256)
             if (not restart and "processing" not in resource and resource.get("processed_hash") == source_hash
                     and resource.get("processed_exists") is True):
                 if registry_changed:
@@ -536,6 +551,18 @@ class Catalog:
             if processing is None:
                 resource.pop("processing", None)
                 return self.mark_processed(file_id, source_hash, source_commit=source_commit)
+            resource["processing"] = processing
+            self._sync_resources()
+            self._save_registry()
+            return self.get_file(file_id)
+
+    def record_document_review(self, file_id, source_hash, processing, *, source_commit=None):
+        with self.transaction():
+            resource = self._resources_by_id[file_id]
+            if processing is None:
+                resource.pop("processing", None)
+                return self.mark_processed(file_id, source_hash, source_commit=source_commit)
+            _processing({**resource, "processing": processing})
             resource["processing"] = processing
             self._sync_resources()
             self._save_registry()

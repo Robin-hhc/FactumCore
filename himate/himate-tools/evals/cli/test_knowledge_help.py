@@ -47,6 +47,13 @@ def test_command_help_describes_its_actions(tmp_path, arguments, command, action
     assert result.stderr == ""
 
 
+def test_source_extract_help_documents_pdf_range_and_preview(tmp_path):
+    result = run_knowledge(tmp_path, "source", "extract", "--help")
+    assert result.returncode == 0, result.stderr or result.stdout
+    assert "knowledge source extract" in result.stdout
+    assert all(field in result.stdout for field in ("page_range", "page_start", "page_end", "page_preview", "parser"))
+
+
 def test_version_matches_the_runtime_manifest(tmp_path):
     version = json.loads((TOOL_ROOT / "runtime/manifest.json").read_text(encoding="utf-8"))["version"]
     result = run_knowledge(tmp_path, "--version")

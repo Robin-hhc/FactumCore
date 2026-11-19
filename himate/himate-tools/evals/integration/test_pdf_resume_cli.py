@@ -87,9 +87,9 @@ def test_pdf_batches_publish_partial_cards_then_resume_after_cache_and_database_
         review = task["pdf_review"]
         end = page if page_budget is not None else 3
         assert (review["total_pages"], review["start_page"], review["end_page"]) == (3, page, end)
-        assert review["page_budget"] == page_budget and review["text_budget"] == 400000
+        assert review["page_budget"] == page_budget and review["text_budget"] == 76000
         assert review["reviewed_pages"] == ([] if page == 1 else [[1, page - 1]])
-        packet = (knowledge / review["packet_ref"]).read_text(encoding="utf-8")
+        packet = (knowledge / review["packet_ref"]).read_text(encoding="utf-8").replace(r"\_", "_")
         assert all((f"SYNTHETIC_RESUME_PAGE_{other}" in packet) == (page <= other <= end)
                    for other in range(1, 4))
 
@@ -127,7 +127,8 @@ def test_pdf_batches_publish_partial_cards_then_resume_after_cache_and_database_
         assert original.read_bytes() == original_bytes
 
         if page < 3:
-            expected_processing = {"source_sha256": expected_hash, "reviewed_pages": [[1, page]]}
+            expected_processing = {"source_sha256": expected_hash, "reviewed_pages": [[1, page]],
+                                   "review_sha256": task["document_review"]["review_sha256"]}
             assert result["source_complete"] is False
             assert result["processed_hash"] is None
             assert result["processing"] == expected_processing

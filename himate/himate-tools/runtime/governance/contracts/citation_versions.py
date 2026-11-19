@@ -51,7 +51,7 @@ def _write_retained(root, digest, data):
     return reference
 
 
-def stage(root, checked, task_bytes):
+def stage(root, checked, task_bytes, *, review_digest=None):
     """Record only references that passed the mechanical check in this task."""
     rows, written = [], set()
     for card, reference, source, data, extractor in checked:
@@ -62,8 +62,10 @@ def stage(root, checked, task_bytes):
             written.add(digest)
         rows.append({**_binding(card, reference), "source_id": source["source_id"],
                      "sha256": digest, "bytes": len(data), "extractor": extractor})
-    atomic_write(_path(root, RECEIPT, ".build"),
-                 canonical_bytes({"task_sha256": sha256_bytes(task_bytes), "references": rows}))
+    receipt = {"task_sha256": sha256_bytes(task_bytes), "references": rows}
+    if review_digest is not None:
+        receipt["document_review_sha256"] = review_digest
+    atomic_write(_path(root, RECEIPT, ".build"), canonical_bytes(receipt))
 
 
 def _snapshot(root, source, digest, data, extractor):
@@ -79,13 +81,14 @@ def _snapshot(root, source, digest, data, extractor):
     return snapshot
 
 
-def persist(root, catalog, drafts, task_bytes):
+def persist(root, catalog, drafts, task_bytes, *, review_digest=None):
     """Attach exact proof to registry snapshots while the P5 writer is held."""
     receipt = _path(root, RECEIPT, ".build")
-    if not receipt.is_file():
-        return False
-    value = json.loads(receipt.read_bytes())
-    if value["task_sha256"] != sha256_bytes(task_bytes):
+    value = json.loads(receipt.read_bytes()) if receipt.is_file() else {}
+    same_task = value.get("task_sha256") == sha256_bytes(task_bytes)
+    if review_digest is not None and (not same_task or value.get("document_review_sha256") != review_digest):
+        raise ContractError("DOCUMENT_REVIEW_NOT_CHECKED", "Run P4 again for the current document range, plan and candidates")
+    if not same_task:
         return False
     expected = {_key(_binding(card, ref)): ref[kind + "_id"]
                 for card in drafts for kind in ("doc", "code") for ref in card[kind + "_ref"]

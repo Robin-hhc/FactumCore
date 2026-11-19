@@ -37,7 +37,7 @@ WORKFLOW_ENTRIES = {
 }
 EDGES = {
     "hs-knowledge-ingest": {
-        "prepare_sources": {"prepared": "plan_change", "unchanged": "__end__"},
+        "prepare_sources": {"prepared": "plan_change", "unchanged": "__end__", "blocked": "__end__"},
         "plan_change": {"content_planned": "materialize_view", "deferred": "__end__"},
         "materialize_view": {"ready": "lint_view", "needs_plan": "plan_change"},
         "lint_view": {"passed": "apply_view", "needs_plan": "plan_change", "needs_revision": "materialize_view"},
@@ -46,7 +46,7 @@ EDGES = {
     "hs-knowledge-lint": {
         "sync_workspace": {"synced": "plan_patrol", "skipped": "plan_patrol"},
         "plan_patrol": {"needs_ingest": "prepare_sources", "needs_reindex": "refresh_index", "unchanged": "complete_patrol"},
-        "prepare_sources": {"prepared": "plan_change", "unchanged": "plan_patrol"},
+        "prepare_sources": {"prepared": "plan_change", "unchanged": "plan_patrol", "blocked": "complete_patrol"},
         "plan_change": {"content_planned": "materialize_view", "deferred": "complete_patrol"},
         "materialize_view": {"ready": "lint_view", "needs_plan": "plan_change"},
         "lint_view": {"passed": "apply_view", "needs_plan": "plan_change", "needs_revision": "materialize_view"},

@@ -241,13 +241,23 @@ def test_failed_page_preview_keeps_text_and_native_locations(tmp_path, monkeypat
     assert loaded["manifest"]["page_preview"]["rendered_pages"] == []
 
 
-@pytest.mark.parametrize("pages,size,expected", [(9, None, "PAGE_PREVIEW_PAGE_LIMIT"), (1, (50000, 50000), "PAGE_PREVIEW_PIXEL_LIMIT")])
-def test_page_preview_page_and_pixel_budgets_reject_before_render(tmp_path, monkeypatch, pages, size, expected):
+def test_page_preview_rejects_a_single_over_budget_page_before_render(tmp_path, monkeypatch):
     import pypdfium2 as pdfium
     monkeypatch.setattr(pdfium.PdfPage, "render", lambda *a, **k: pytest.fail("An over-budget page was rendered"))
-    descriptor, loaded = parse_bytes(tmp_path, ".pdf", data=vector_pdf_bytes(pages, size), page_range=(1, pages))
-    assert any(g["code"] == expected for g in descriptor["gaps"])
+    descriptor, loaded = parse_bytes(tmp_path, ".pdf", data=vector_pdf_bytes(1, (50000, 50000)), page_range=(1, 1))
+    assert any(g["code"] == "PAGE_PREVIEW_PIXEL_LIMIT" for g in descriptor["gaps"])
     assert loaded["manifest"]["page_preview"]["rendered_pages"] == []
+
+
+def test_preview_returns_pages_that_fit_and_identifies_the_unrendered_range(tmp_path, monkeypatch):
+    pixels_per_page = 450 * 270
+    monkeypatch.setitem(parser._PREVIEW_LIMITS, "max_pixels", pixels_per_page * 2)
+    descriptor, loaded = parse_bytes(tmp_path, ".pdf", data=vector_pdf_bytes(4), page_range=(1, 4))
+
+    assert loaded["manifest"]["pages"] == [1, 2, 3, 4]
+    assert loaded["manifest"]["page_preview"]["rendered_pages"] == [1, 2]
+    gap = next(gap for gap in descriptor["gaps"] if gap["code"] == "PAGE_PREVIEW_PIXEL_LIMIT")
+    assert gap["locator"] == {"kind": "pages", "start": 3, "end": 4}
 
 
 def test_page_preview_png_budget_does_not_save_the_oversized_image(tmp_path, monkeypatch):

@@ -71,6 +71,14 @@ COMMAND_HELP = {
               "Use --json for the final result or --jsonl for progress events and the final result."),
     "install-command": ("[--bin-dir DIR] [--add-path]", "Install the knowledge command launcher."),
 }
+EXTRACT_HELP = (
+    "--input FILE.json",
+    "Convert a registered document into local reading materials.\n\n"
+    'JSON example: {"source_id":"doc-example","page_range":[10,15],"page_preview":false}\n'
+    "PDF page_range uses inclusive physical pages. Use page_start and page_end as an alternative.\n"
+    "Use page_preview=false for text and document images without rendered page views.\n"
+    'Optional parser settings belong in the top-level parser object, for example {"pipeline":"standard"}.',
+)
 
 
 class CommandParser(argparse.ArgumentParser):
@@ -121,6 +129,9 @@ def show_help(arguments, command_parser):
         if command not in COMMAND_HELP or HELP_FLAGS.isdisjoint(arguments[1:end_of_options]):
             return False
     syntax, details = COMMAND_HELP[command]
+    if command == "source" and arguments[:2] == ["source", "extract"]:
+        command = "source extract"
+        syntax, details = EXTRACT_HELP
     usage = " ".join(filter(None, ("%(prog)s", syntax, "[options]")))
     argparse.ArgumentParser(
         prog=f"knowledge {command}", usage=usage, description=details,
@@ -295,7 +306,7 @@ def execute(args, root, tool_root, manifest_digest):
             raise CommandError("INVALID_ACTION", "Use maintain audit, lint or reindex")
     else:
         raise CommandError("INVALID_COMMAND", command)
-    code = 1 if phase == "failed" else 0
+    code = 1 if phase == "failed" or command == "ingest" and phase == "blocked" else 0
     return envelope("failed" if code else "ok", phase, data), code
 
 

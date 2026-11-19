@@ -886,14 +886,24 @@ def _docling(root, source, data, output, options, page_range, source_hash, profi
         _write_json(output / "document.json", exported)
     else:
         document.save_as_markdown(output / "document.md", artifacts_dir=Path("images"), image_mode=ImageRefMode.REFERENCED, traverse_pictures=True, mark_meta=True)
-        document.save_as_json(output / "document.json", artifacts_dir=Path("images"), image_mode=ImageRefMode.REFERENCED, ensure_ascii=False)
+        document_path = output / "document.json"
+        document.save_as_json(document_path, artifacts_dir=Path("images"), image_mode=ImageRefMode.REFERENCED, ensure_ascii=False)
+        exported = read_json(document_path)
+        if sys.platform == "win32":
+            changed = False
+            for picture in exported.get("pictures", []):
+                image = picture.get("image") or {}
+                uri = image.get("uri")
+                if isinstance(uri, str) and uri.startswith("images\\"):
+                    image["uri"] = uri.replace("\\", "/")
+                    changed = True
+            if changed:
+                _write_json(document_path, exported)
     segments = _document_segments(document, suffix, source_hash, profile_hash,
                                   hidden_text_refs=hidden_text_refs)
     text = "\n\n".join(segment["text"] for segment in segments
                        if segment["locator"]["kind"] == "element" and segment["text"]
                        and segment["locator"]["ref"] not in hidden_text_refs)
-    if suffix != ".pdf":
-        exported = read_json(output / "document.json")
     images, image_refs, image_directories = [], {}, {}
     image_pages = set()
     for picture in exported.get("pictures", []):

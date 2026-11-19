@@ -1,6 +1,6 @@
 # FactumCore 测试分支样本
 
-`test` 同步 `main` 的开发版本，随分支保存本地验收所需的文档原件、正式知识卡和对应来源登记。这里的 `main/` 是测试源码目录。参见[分支约定](../himate/himate-knowledge-wifi-mp/docs-raw/index.md#分支约定)。
+这里的 `main/` 保存配套测试源码。验收同时使用样本文档、正式知识卡和对应来源登记。参见[分支约定](../AGENTS.md#分支约定)。
 
 ## 样本范围
 
@@ -23,7 +23,7 @@ cd FactumCore-test
 
 安装本分支对应的工具包和能力包。在 OpenFlow 绑定本检出的 `himate/himate-knowledge-wifi-mp/`，执行环境检查和刷新，即可查看样本卡片及图谱。`config.yml` 的 `code_root: ../../main` 指向本目录。[使用指南](../himate/himate-knowledge-wifi-mp/docs-llm-wiki/HiMate知识库使用指南.md)
 
-维护者把 `main` 的开发更新同步到 `test`。本地测试检出通过 `git pull --ff-only origin test` 更新。也可在检出根目录用已安装的 CLI 检查样本。
+在检出根目录用已安装的 CLI 检查样本。本地检出更新步骤见[开发与验收流程](../AGENTS.md#开发与验收流程)。
 
 ```sh
 knowledge --knowledge-root himate/himate-knowledge-wifi-mp maintain reindex --json
@@ -32,6 +32,6 @@ knowledge --knowledge-root himate/himate-knowledge-wifi-mp search "mac_set_snap"
 knowledge --knowledge-root himate/himate-knowledge-wifi-mp read wifi-snap-encapsulation-static --json
 ```
 
-`mac_set_snap` 能找到静态封装分析卡。新增或更新的测试原件、知识卡和来源登记提交到 `test`。索引和查询报告留在本地测试检出。
+`mac_set_snap` 能找到静态封装分析卡。索引和查询报告留在本地测试检出。
 
 面板方案、现有数据与拟议接口见[OpenFlow 面板与知识图谱适配建议](../himate/himate-knowledge-wifi-mp/docs-llm-wiki/OpenFlow面板与知识图谱适配建议.md)。知识内容、代码定位、机械检查和宿主 UI 验收分别判断；本样本不将它们等同。

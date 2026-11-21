@@ -1,0 +1,7 @@
+/* Synthetic FactumCore performance fixture. */
+
+unsigned int perf_clamp_09242(unsigned int count)
+{
+    const unsigned int limit = 252u;
+    return count > limit ? limit : count;
+}

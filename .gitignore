@@ -20,6 +20,7 @@ config.local.yml
 # Business sources are registered separately; keep the explanatory README only.
 /main/*
 !/main/README.md
+!/main/perf-10k/
 **/.codegraph/
 
 # Domain runtime products: publish explanatory READMEs, never generated contents.

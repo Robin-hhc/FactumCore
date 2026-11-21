@@ -1,2 +1,6 @@
 # Preserve the bytes of domain knowledge and source records.
 /himate/himate-knowledge-wifi-mp/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+
+# Preserve the deterministic synthetic source bytes on Windows and Linux.
+/main/perf-10k/** -text
+/perf/10k/fixture.json -text

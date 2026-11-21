@@ -1,0 +1,11 @@
+{
+  "fixture": "perf-10k-v1",
+  "raw_documents": 1000,
+  "knowledge_cards": 10000,
+  "code_sources": 10000,
+  "doc_refs": 10000,
+  "code_refs": 10000,
+  "card_links": 10000,
+  "payload_bytes": 16902473,
+  "content_sha256": "0368d9defffc9c8c5331783a38931cdcf4f9adc84f4632414979cb7e2d361efb"
+}

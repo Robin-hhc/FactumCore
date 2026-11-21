@@ -74,7 +74,7 @@ def read_json(path):
         raise ContractError("INVALID_JSON", exc, path) from exc
 
 
-class _UniqueLoader(yaml.SafeLoader):
+class _UniqueLoader(getattr(yaml, "CSafeLoader", yaml.SafeLoader)):
     pass
 
 
@@ -119,8 +119,7 @@ def validate_id(value):
     return value
 
 
-def safe_path(root, relative, allowed_prefixes=None, *, _directory_entries=None):
-    root = Path(root).resolve(strict=True)
+def portable_path_parts(relative, allowed_prefixes=None):
     if (
         not isinstance(relative, str)
         or not relative
@@ -152,6 +151,12 @@ def safe_path(root, relative, allowed_prefixes=None, *, _directory_entries=None)
         raise ContractError(
             "PATH_OUTSIDE_ALLOWED_ROOT", "Not an allowed asset", relative
         )
+    return parts
+
+
+def safe_path(root, relative, allowed_prefixes=None, *, _directory_entries=None):
+    root = Path(root).resolve(strict=True)
+    parts = portable_path_parts(relative, allowed_prefixes)
     cursor = root
     for part in parts:
         if cursor.is_dir():

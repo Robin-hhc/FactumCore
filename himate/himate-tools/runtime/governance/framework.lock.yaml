@@ -1,6 +1,6 @@
 schema_version: '2.0'
 contract_family: aiot-wifi
-tool_version: 0.24.7
+tool_version: 0.24.8
 files:
   contracts/__init__.py:
     path: runtime/governance/contracts/__init__.py
@@ -10,7 +10,7 @@ files:
     sha256: 18d9e86b87abb6c5b3bf961def171b140315eb8d8304e2d9e5c246534faa6596
   contracts/catalog.py:
     path: runtime/governance/contracts/catalog.py
-    sha256: b90f3f0b035912cb81a9bf9f210b30a4d7b96cd29018ab4d7ea996ef7d893d39
+    sha256: b290fbd9fdab0d057d074b579413a4566b4c42b4ee0ea5f38078441e1944c667
   contracts/citation_versions.py:
     path: runtime/governance/contracts/citation_versions.py
     sha256: a7b0e17d565a1bf85b8bbe26417f41e0765c3371dec17545e761f3e322bba764
@@ -19,7 +19,7 @@ files:
     sha256: e2bf86d6656cb098eeae991bb02e1519dd379ae3d2a29d76d97faa620df50202
   contracts/indexing.py:
     path: runtime/governance/contracts/indexing.py
-    sha256: e86d2fae148cbdbdd3fb98d819c93597b8f68bb3ef46ef174c74f583b486927d
+    sha256: 6b3bda52445bf7f4eb99858fb63c85381a794f9e622f7d5c6ec99bafcd8f4337
   contracts/ingest.py:
     path: runtime/governance/contracts/ingest.py
     sha256: 0b480d55eaba3ea99a0287c30298c55676922dbf72e247ba9ba79b24b236cf87
@@ -28,10 +28,10 @@ files:
     sha256: 2b165355fa1548c9c5e58bc9fe3e0c0802d0e02bdbc61c498b37424785faebe9
   contracts/library.py:
     path: runtime/governance/contracts/library.py
-    sha256: deddc2f1ebe29ee42c78133a33ab94eb06c0d4fe5b471a6a990a4c6f428f6bf1
+    sha256: ceedd1f952f99ba966b0a9310ade1654c360df7829688560e6e978e04089dfe6
   contracts/panel.py:
     path: runtime/governance/contracts/panel.py
-    sha256: ad1109bf0f3aa98bf5c9be5ac942081615eacb24b5fae773887753153c845419
+    sha256: 0e17672ddf1fe9ac4e9ed5b75aa0e55881d248374b7d1054c8733294b0b3c2f9
   contracts/raw_materials.py:
     path: runtime/governance/contracts/raw_materials.py
     sha256: 85697d5486c7fff5fcdd0ec149e53ab224a520542040fee0b1d4aa03354cc8fc
@@ -46,7 +46,7 @@ files:
     sha256: e2235ba9569c0d5a22d3c276d125770a5a6adea4a33d030de0ad7c9676f85e97
   contracts/validation.py:
     path: runtime/governance/contracts/validation.py
-    sha256: 80c45683520879b3d782eac871cd8e11378bc6c2f02a78a70815ab938da7e03e
+    sha256: 860a70e8c1cb67ca7a70b3cc4ca0d4182a362b620226d48cbc81f26e539da39c
   contracts/workspace_config.py:
     path: runtime/governance/contracts/workspace_config.py
     sha256: 4da363c4390053b01d0199a3991363bf931b558ce956df581457b57f3bbf354d

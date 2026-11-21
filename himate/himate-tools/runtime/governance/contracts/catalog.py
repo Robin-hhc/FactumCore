@@ -7,8 +7,10 @@ metadata; it does not introduce workflow phases or recovery journals.
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from fnmatch import fnmatch
 import hashlib
 import json
 import os
@@ -22,7 +24,7 @@ from uuid import uuid4
 import yaml
 
 from .cards_v3 import parse_card
-from .validation import ContractError, load_yaml, safe_path, validate_id
+from .validation import ContractError, load_yaml, portable_path_parts, safe_path, validate_id
 
 
 def _json(value):
@@ -149,7 +151,12 @@ def atomic_write(path, data):
 class Catalog:
     """Public file/card relation queries and latest processed file versions."""
 
-    def __init__(self, root, *, refresh=True, rollback_registry=False):
+    @classmethod
+    def open(cls, root, *, refresh=True, rollback_registry=False):
+        """Open as a context manager and load inputs under its write lock."""
+        return cls(root, refresh=refresh, rollback_registry=rollback_registry, _load_on_enter=True)
+
+    def __init__(self, root, *, refresh=True, rollback_registry=False, _load_on_enter=False):
         self.root = Path(root).resolve(strict=True)
         self.registry_path = safe_path(self.root, "governance/sources.lock.yaml")
         self.path = safe_path(self.root, "artifacts/knowledge.sqlite")
@@ -177,6 +184,7 @@ class Catalog:
                 sha256 TEXT NOT NULL, metadata TEXT NOT NULL, body TEXT NOT NULL, raw BLOB NOT NULL,
                 size INTEGER NOT NULL, mtime_ns INTEGER NOT NULL
             );
+            CREATE INDEX IF NOT EXISTS cards_file_inputs ON cards(path,id,size,mtime_ns,sha256);
             CREATE TABLE IF NOT EXISTS card_files (
                 card_id TEXT NOT NULL, file_id TEXT NOT NULL, reference TEXT NOT NULL,
                 PRIMARY KEY(card_id,file_id,reference)
@@ -186,10 +194,11 @@ class Catalog:
             with self.transaction():
                 if "encoding" not in {row["name"] for row in self.connection.execute("PRAGMA table_info(files)")}:
                     self.connection.execute("ALTER TABLE files ADD COLUMN encoding TEXT")
-                self._load_registry()
-                self._sync_resources()
-                if self._refresh_on_open:
-                    self.refresh()
+                if not _load_on_enter:
+                    self._load_registry()
+                    self._sync_resources()
+                    if self._refresh_on_open:
+                        self.refresh()
         except Exception:
             self.connection.close()
             raise
@@ -252,8 +261,10 @@ class Catalog:
             raise
 
     def _load_registry(self):
-        self.registry = (load_yaml(self.registry_path.read_bytes()) if self.registry_path.exists()
-                         else {"schema_version": "2.0", "resources": [], "snapshots": []})
+        data = self._registry_bytes()
+        self.registry_digest = hashlib.sha256(data or b"").hexdigest()
+        self.registry = (load_yaml(data) if data is not None else
+                         {"schema_version": "2.0", "resources": [], "snapshots": []})
         if not isinstance(self.registry, dict) or not isinstance(self.registry.get("resources"), list):
             raise ContractError("INVALID_SOURCE_REGISTRY", "Expected resources", self.registry_path)
         self._validate_processing()
@@ -264,32 +275,40 @@ class Catalog:
                 _processing(source)
 
     def _sync_resources(self):
-        identities = set()
         resources = {}
+        desired = {}
+        columns = ("id", "kind", "path", "repo", "encoding", "processed_hash",
+                   "processed_exists", "processed_at", "source_commit")
         with self.transaction():
             for source in self.registry["resources"]:
                 identity = validate_id(source.get("source_id"))
-                if identity in identities:
+                if identity in resources:
                     raise ContractError("DUPLICATE_SOURCE_ID", identity)
-                identities.add(identity)
                 resources[identity] = source
                 path = source.get("path", source.get("source_path"))
                 if path is None:
-                    continue  # Historical version-only resources remain untouched.
-                self.connection.execute("""
-                    INSERT INTO files(id,kind,path,repo,encoding,processed_hash,processed_exists,processed_at,source_commit)
-                    VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
-                    kind=excluded.kind,path=excluded.path,repo=excluded.repo,
-                    encoding=excluded.encoding,
-                    processed_hash=excluded.processed_hash,processed_exists=excluded.processed_exists,
-                    processed_at=excluded.processed_at,source_commit=excluded.source_commit
-                """, (identity, source["kind"], _relative(path), source.get("repo_id", source.get("repo", "")),
-                      source.get("encoding"),
-                      source.get("processed_hash"), source.get("processed_exists"), source.get("processed_at"),
-                      source.get("source_commit")))
-            for row in self.connection.execute("SELECT id FROM files").fetchall():
-                if row["id"] not in identities:
-                    self.connection.execute("DELETE FROM files WHERE id=?", (row["id"],))
+                    continue  # Historical version-only resources have no current file.
+                desired[identity] = (identity, source["kind"], _relative(path),
+                                     source.get("repo_id", source.get("repo", "")), source.get("encoding"),
+                                     source.get("processed_hash"), source.get("processed_exists"),
+                                     source.get("processed_at"), source.get("source_commit"))
+            existing = {row["id"]: tuple(row) for row in self.connection.execute(
+                "SELECT " + ",".join(columns) + ",last_attempt FROM files")}
+            # Free old paths before inserting updates so ledger renames can
+            # exchange paths or transfer a path to a different identity.
+            self.connection.executemany("DELETE FROM files WHERE id=?", (
+                (identity,) for identity, old in existing.items()
+                if identity not in desired or old[1:4] != desired[identity][1:4]
+            ))
+            self.connection.executemany("""
+                INSERT INTO files(id,kind,path,repo,encoding,processed_hash,processed_exists,processed_at,source_commit,last_attempt)
+                VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
+                encoding=excluded.encoding,processed_hash=excluded.processed_hash,
+                processed_exists=excluded.processed_exists,processed_at=excluded.processed_at,
+                source_commit=excluded.source_commit
+            """, ((*row, existing[identity][-1] if identity in existing else None)
+                  for identity, row in desired.items()
+                  if identity not in existing or existing[identity][:-1] != row))
         self._resources_by_id = resources
 
     def _registry_bytes(self):
@@ -419,15 +438,14 @@ class Catalog:
         return value
 
     def get_card(self, card_id):
-        row = self.connection.execute("SELECT * FROM cards WHERE id=?", (card_id,)).fetchone()
+        row = self.connection.execute("SELECT path,raw FROM cards WHERE id=?", (card_id,)).fetchone()
         if row is None:
             return None
-        return parse_card(row["raw"], row["path"], source_lookup={item["id"]: item for item in self.list_files()})
+        return parse_card(row["raw"], row["path"], source_lookup=self._resources_by_id)
 
     def all_cards(self):
-        lookup = {item["id"]: item for item in self.list_files()}
-        return [parse_card(row["raw"], row["path"], source_lookup=lookup)
-                for row in self.connection.execute("SELECT * FROM cards ORDER BY id")]
+        return [parse_card(row["raw"], row["path"], source_lookup=self._resources_by_id)
+                for row in self.connection.execute("SELECT path,raw FROM cards ORDER BY id")]
 
     def cards_for(self, file_id):
         return [self._card(row) for row in self.connection.execute("""
@@ -442,7 +460,7 @@ class Catalog:
         """, (card_id,))
         return [self._file(row) for row in rows]
 
-    def refresh_cards(self, cards):
+    def refresh_cards(self, cards, *, _scanned_stats=None):
         cards = list(cards.values()) if isinstance(cards, dict) else list(cards)
         if len({card["id"] for card in cards}) != len(cards):
             raise ContractError("DUPLICATE_CARD_ID", "Card IDs must be unique")
@@ -456,16 +474,19 @@ class Catalog:
                         raise ContractError("UNKNOWN_SOURCE_ID", identity, card["path"])
                     if (("code_id" in reference) != (source["kind"] == "code")):
                         raise ContractError("SOURCE_KIND_MISMATCH", identity, card["path"])
-                target = safe_path(self.root, card["path"], ["knowledge"])
-                stat = target.stat() if target.is_file() else None
+                if _scanned_stats is None:
+                    target = safe_path(self.root, card["path"], ["knowledge"])
+                    info = target.stat() if target.is_file() else None
+                else:
+                    info = _scanned_stats[card["path"]]
                 self.connection.execute("""
                     INSERT INTO cards(id,path,title,sha256,metadata,body,raw,size,mtime_ns)
                     VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET path=excluded.path,
                     title=excluded.title,sha256=excluded.sha256,metadata=excluded.metadata,
                     body=excluded.body,raw=excluded.raw,size=excluded.size,mtime_ns=excluded.mtime_ns
                 """, (card["id"], card["path"], card["title"], card["sha256"], _json(card["metadata"]),
-                      card["body"], card["raw"], stat.st_size if stat else len(card["raw"]),
-                      stat.st_mtime_ns if stat else -1))
+                       card["body"], card["raw"], info.st_size if info else len(card["raw"]),
+                       info.st_mtime_ns if info else -1))
                 self.connection.execute("DELETE FROM card_files WHERE card_id=?", (card["id"],))
                 self.connection.executemany("INSERT INTO card_files(card_id,file_id,reference) VALUES(?,?,?)",
                                             [(card["id"], identity, _json(reference)) for identity, reference in references])
@@ -483,30 +504,75 @@ class Catalog:
 
     def _refresh(self):
         known = {row["path"]: row for row in self.connection.execute("SELECT id,path,size,mtime_ns FROM cards")}
-        present, changed = set(), []
-        lookup = {item["id"]: item for item in self.list_files()}
-        directory = self.root / "knowledge"
-        for target in sorted(directory.rglob("*.md")) if directory.is_dir() else []:
-            if target.name in {"AGENTS.md", "index.md", "README.md"}:
-                continue
-            relative = target.relative_to(self.root).as_posix()
-            target = safe_path(self.root, relative, ["knowledge"])
-            present.add(relative)
-            stat = target.stat()
+        present, changed, scanned_stats = {}, [], {}
+        for target, relative, info in self._scan_cards():
             old = known.get(relative)
-            if old is None or (stat.st_size, stat.st_mtime_ns) != (old["size"], old["mtime_ns"]):
-                changed.append(parse_card(target.read_bytes(), relative, source_lookup=lookup))
-        ids = [card["id"] for card in changed]
-        if len(ids) != len(set(ids)):
+            # The same SMB directory can be indexed from Linux and from
+            # Windows, where file times have 100 ns resolution.
+            if (old is None or info.st_size != old["size"]
+                    or info.st_mtime_ns // 100 != old["mtime_ns"] // 100):
+                card = parse_card(target.read_bytes(), relative, source_lookup=self._resources_by_id)
+                changed.append(card)
+                scanned_stats[relative] = info
+                present[relative] = card["id"]
+            else:
+                present[relative] = old["id"]
+        if len(set(present.values())) != len(present):
             raise ContractError("DUPLICATE_CARD_ID", "Two formal paths contain the same card ID")
-        for card in changed:
-            old = self.connection.execute("SELECT path FROM cards WHERE id=?", (card["id"],)).fetchone()
-            if old and old["path"] != card["path"] and old["path"] in present:
-                raise ContractError("DUPLICATE_CARD_ID", card["id"])
-        changed_ids = {card["path"]: card["id"] for card in changed}
         self.remove_cards([row["id"] for path, row in known.items()
-                           if path not in present or path in changed_ids and row["id"] != changed_ids[path]])
-        self.refresh_cards(changed)
+                           if present.get(path) != row["id"]])
+        self.refresh_cards(changed, _scanned_stats=scanned_stats)
+
+    def _scan_cards(self):
+        directory = safe_path(self.root, "knowledge")
+        if not directory.is_dir():
+            return
+        pending = [(directory, "knowledge", {directory.resolve()})]
+        drive = directory.drive.lower()
+        network = drive.startswith("\\\\") and (not drive.startswith("\\\\?\\") or drive.startswith("\\\\?\\unc\\"))
+        if os.name == "nt" and network:
+            # Independent directory queries can overlap SMB round trips. The
+            # caller still parses cards and writes SQLite on its own thread.
+            with ThreadPoolExecutor(max_workers=16) as pool:
+                while pending:
+                    next_level = []
+                    for children, cards in pool.map(self._scan_directory, pending):
+                        next_level.extend(children)
+                        yield from cards
+                    pending = next_level
+            return
+        while pending:
+            children, cards = self._scan_directory(pending.pop())
+            pending.extend(children)
+            yield from cards
+
+    def _scan_directory(self, location):
+        parent, prefix, ancestors = location
+        directories, cards = [], []
+        # DirEntry carries file metadata on Windows, including mapped SMB
+        # directories. Validate links on both platforms before following them.
+        with os.scandir(parent) as entries:
+            for entry in entries:
+                relative = prefix + "/" + entry.name
+                is_directory = entry.is_dir(follow_symlinks=False)
+                if not is_directory and (entry.name in {"AGENTS.md", "index.md", "README.md"}
+                                         or not fnmatch(entry.name, "*.md")):
+                    continue
+                portable_path_parts(relative)
+                path = Path(entry.path)
+                info = entry.stat(follow_symlinks=False)
+                linked = stat.S_ISLNK(info.st_mode) or getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
+                if linked:
+                    path = safe_path(self.root, relative, ["knowledge"])
+                    info = path.stat()
+                if is_directory:
+                    resolved = path.resolve() if linked else parent / entry.name
+                    if resolved in ancestors:
+                        raise ContractError("PATH_ESCAPE", "Linked directory points to an ancestor", relative)
+                    directories.append((path, relative, ancestors | {resolved}))
+                elif stat.S_ISREG(info.st_mode):
+                    cards.append((path, relative, info))
+        return directories, cards
 
     def rebuild(self):
         with self.transaction():
@@ -515,7 +581,8 @@ class Catalog:
             self.connection.execute("DELETE FROM files")
             self._sync_resources()
             self.refresh()
-            return {"files": len(self.list_files()), "cards": len(self.all_cards())}
+            return {"files": self.connection.execute("SELECT COUNT(*) FROM files").fetchone()[0],
+                    "cards": self.connection.execute("SELECT COUNT(*) FROM cards").fetchone()[0]}
 
     def mark_processed(self, file_id, hash_or_none, exists=True, *, source_commit=None):
         if exists and (not isinstance(hash_or_none, str) or not re.fullmatch(r"[0-9a-f]{64}", hash_or_none)):

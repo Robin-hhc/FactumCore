@@ -68,6 +68,88 @@ def _panel_card(root, identity, references, body):
     return target
 
 
+def test_reindex_keeps_the_published_revision_with_unchanged_inputs(knowledge):
+    status, report = invoke(knowledge, "maintain", "reindex")
+    assert status == 0 and report["data"]["mode"] == "full", report
+    first = _panel(knowledge, "overview")
+
+    status, report = invoke(knowledge, "maintain", "reindex")
+    assert status == 0 and report["data"]["mode"] == "unchanged", report
+    assert _panel(knowledge, "overview") == first
+    status, report = invoke(knowledge, "maintain", "reindex", "--full")
+    assert status == 0 and report["data"]["mode"] == "full", report
+    assert _panel(knowledge, "overview")["view_revision"] != first["view_revision"]
+
+
+def test_incremental_reindex_updates_incoming_links_and_removes_old_terms(knowledge):
+    raw = knowledge / "docs-raw/specs/original.md"
+    raw.write_text("# Original\n", encoding="utf-8")
+    assert invoke(knowledge, "source", "register",
+                  request={"path": "docs-raw/specs/original.md", "source_id": "doc-a"})[0] == 0
+    refs = [{"doc_id": "doc-a", "line_start": 1, "line_end": 1}]
+    _panel_card(knowledge, "a", refs, "# A\n\n[Old](b.md#oldanchor), [New](renamed.md#newanchor).\n")
+    changed = _panel_card(knowledge, "b", refs, "# Peer\n\n## Oldanchor\n\nFormerkeyword.\n")
+    _panel_card(knowledge, "c", refs, "# Unrelated\n\nIndependent.\n")
+    assert invoke(knowledge, "maintain", "reindex")[0] == 0
+    assert _panel(knowledge, "read", {"card_id": "a"})["card_links"] == [
+        {"target": "b.md#oldanchor", "card_id": "b", "anchor": "oldanchor"},
+    ]
+
+    _panel_card(knowledge, "b", refs, "# Updated peer\n\n## Newanchor\n\nCurrentkeyword.\n")
+    renamed = changed.rename(changed.with_name("renamed.md"))
+    status, agent = invoke(knowledge, "search", "currentkeyword")
+    assert status == 0 and agent["data"]["matches"][0]["card_id"] == "b", agent
+    status, report = invoke(knowledge, "maintain", "reindex")
+    assert status == 0 and report["data"]["mode"] == "incremental", report
+    assert report["data"]["updated_cards"] == 2
+    assert _panel(knowledge, "read", {"card_id": "a"})["card_links"] == [
+        {"target": "renamed.md#newanchor", "card_id": "b", "anchor": "newanchor"},
+    ]
+    assert _panel(knowledge, "graph", {"card_id": "a", "kinds": ["card"]})["nodes"][-1]["title"] == "Updated peer"
+    assert _panel(knowledge, "search", {"query": "formerkeyword"})["matches"] == []
+    assert _panel(knowledge, "search", {"query": "currentkeyword"})["matches"][0]["card_id"] == "b"
+
+    renamed.unlink()
+    status, report = invoke(knowledge, "maintain", "reindex")
+    assert status == 0 and report["data"]["updated_cards"] == 2, report
+    assert _panel(knowledge, "read", {"card_id": "a"})["card_links"] == []
+    assert _panel(knowledge, "graph", {"scope": "global"})["node_count"] == 3
+    assert _panel(knowledge, "search", {"query": "currentkeyword"})["matches"] == []
+
+
+def test_incremental_reindex_propagates_source_registry_changes(knowledge):
+    ledger = knowledge / "governance/sources.lock.yaml"
+    resources = [
+        {"source_id": "doc-a", "kind": "raw", "path": "docs-raw/specs/old.md"},
+        {"source_id": "doc-b", "kind": "raw", "path": "docs-raw/specs/other.md"},
+    ]
+
+    def write_ledger(items):
+        ledger.write_text(yaml.safe_dump({"schema_version": "2.0", "resources": items, "snapshots": []}),
+                          encoding="utf-8")
+
+    write_ledger(resources)
+    for identity in ("a", "b"):
+        refs = [{"doc_id": "doc-" + identity, "line_start": 1, "line_end": 1}]
+        _panel_card(knowledge, identity, refs, "# A rule\n")
+    assert invoke(knowledge, "maintain", "reindex")[0] == 0
+
+    resources[0]["path"] = "docs-raw/specs/new.md"
+    write_ledger(resources)
+    status, report = invoke(knowledge, "maintain", "reindex")
+    assert status == 0 and report["data"]["mode"] == "incremental", report
+    assert report["data"]["updated_cards"] == 1
+    read = _panel(knowledge, "read", {"card_id": "a"})
+    assert read["sources"][0]["path"] == "docs-raw/specs/new.md"
+    graph = _panel(knowledge, "graph", {"scope": "neighbors", "node_id": "document/doc-a"})
+    assert graph["nodes"][0]["title"] == "new.md"
+
+    write_ledger(resources[1:])
+    status, report = invoke(knowledge, "maintain", "reindex")
+    assert status == 2 and report["diagnostics"][0]["code"] == "UNKNOWN_SOURCE_ID", report
+    assert _panel(knowledge, "read", {"card_id": "a"}) == read
+
+
 def test_panel_reports_busy_until_published_view_can_be_read(knowledge):
     assert invoke(knowledge, "maintain", "reindex")[0] == 0
     overview = _panel(knowledge, "overview")
@@ -79,6 +161,28 @@ def test_panel_reports_busy_until_published_view_can_be_read(knowledge):
         assert status == 2 and report["diagnostics"][0]["code"] == "PANEL_VIEW_BUSY", report
     finally:
         writer.close()
+    assert _panel(knowledge, "overview", {"view_revision": overview["view_revision"]}) == overview
+
+
+def test_panel_recovers_the_published_revision_after_an_interrupted_writer(knowledge):
+    assert invoke(knowledge, "maintain", "reindex")[0] == 0
+    overview = _panel(knowledge, "overview")
+    database = knowledge / "artifacts/knowledge.sqlite"
+    with sqlite3.connect(database) as connection:
+        connection.execute("CREATE TABLE spill(payload BLOB)")
+        connection.executemany("INSERT INTO spill VALUES (zeroblob(4096))", [()] * 64)
+    program = """
+import os
+import sqlite3
+import sys
+db = sqlite3.connect(sys.argv[1])
+db.execute("PRAGMA cache_size=2")
+db.execute("BEGIN IMMEDIATE")
+db.execute("UPDATE panel_state SET overview='uncommitted'")
+db.execute("UPDATE spill SET payload=randomblob(4096)")
+os._exit(0)
+"""
+    subprocess.run([sys.executable, "-c", program, str(database)], check=True, timeout=10)
     assert _panel(knowledge, "overview", {"view_revision": overview["view_revision"]}) == overview
 
 

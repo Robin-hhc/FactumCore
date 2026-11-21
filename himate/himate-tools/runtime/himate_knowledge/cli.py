@@ -48,7 +48,7 @@ COMMAND_HELP = {
     "maintain": ("[{audit,lint,reindex}]", "Maintain the knowledge base.\n\n"
                  "  audit    Audit source references. This is the default.\n"
                  "  lint     Validate the formal knowledge cards.\n"
-                 "  reindex  Rebuild the published view."),
+                 "  reindex  Update the published index. Use --full to rebuild it from scratch."),
     "library": ("{" + ",".join(LIBRARY_ACTIONS) + "}", "Browse and read the published knowledge view.\n\n"
                 "Pass view_revision in the JSON input to pin the published snapshot."),
     "raw": ("ACTION", "Manage files in the raw materials directory.\n\n"
@@ -112,6 +112,7 @@ def parser(version):
     result.add_argument("--dependencies-only", action="store_true", help="skip launcher checks and registration")
     result.add_argument("--add-path", action="store_true")
     result.add_argument("--include-deprecated", action="store_true", default=None)
+    result.add_argument("--full", action="store_true", default=None, help="rebuild the index from scratch with reindex")
     return result
 
 
@@ -159,7 +160,7 @@ def _request(args):
             raise CommandError("INVALID_INPUT", "The request must be a JSON object")
     else:
         value = {}
-    for name in ("source", "path", "top_k", "include_deprecated"):
+    for name in ("source", "path", "top_k", "include_deprecated", "full"):
         item = getattr(args, name)
         if item is not None:
             if name in value and value[name] != item:
@@ -329,6 +330,10 @@ def main(argv=None, *, tool_root, manifest):
         if show_help(arguments, command_parser):
             return 0
         args = command_parser.parse_intermixed_args(arguments)
+        if args.full:
+            action = args.action or next(iter(args.arguments), None)
+            if args.command not in {"maintain", "patrol"} or action != "reindex":
+                raise CommandError("INVALID_ARGUMENT", "--full is for maintain reindex or patrol reindex")
         if args.environment_only and args.command != "doctor":
             raise CommandError("INVALID_ARGUMENT", "--environment-only is for doctor")
         if args.jsonl and args.command != "setup":

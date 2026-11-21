@@ -22,8 +22,8 @@ def lexical(text):
     return sorted(set().union(*term_groups(text))) if text else []
 
 
-def sqlite_readonly_uri(path, *, immutable=True):
-    """Open an absolute read-only path without a SQLite URI authority.
+def _sqlite_file_uri(path):
+    """Encode an absolute path without a SQLite URI authority.
 
     SQLite normally rejects file://server/share; a UNC name belongs in the
     URI path (file:////server/share). Extended Windows namespaces also stay
@@ -49,4 +49,13 @@ def sqlite_readonly_uri(path, *, immutable=True):
     else:
         normalized = path if isinstance(path, PurePosixPath) else Path(path)
         uri = normalized.as_uri()
-    return uri + ("?mode=ro&immutable=1" if immutable else "?mode=ro")
+    return uri
+
+
+def sqlite_readonly_uri(path, *, immutable=True):
+    return _sqlite_file_uri(path) + ("?mode=ro&immutable=1" if immutable else "?mode=ro")
+
+
+def sqlite_recovery_uri(path):
+    """Open the existing database so SQLite can recover an interrupted commit."""
+    return _sqlite_file_uri(path) + "?mode=rw"

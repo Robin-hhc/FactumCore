@@ -26,11 +26,25 @@ def _signature(catalog):
 
 
 def search_stale(catalog):
-    catalog.connection.execute("CREATE TABLE IF NOT EXISTS search_state(key TEXT PRIMARY KEY,value TEXT)")
-    state = dict(catalog.connection.execute("SELECT key,value FROM search_state"))
-    columns = [(row["name"], row["pk"]) for row in catalog.connection.execute("PRAGMA table_info(search_terms)")]
-    return (state.get("format") != SEARCH_VERSION or columns != SEARCH_COLUMNS
-            or state.get("cards") != _signature(catalog))
+    db = catalog.connection
+    return not _search_ready(db) or bool(_search_changes(db))
+
+
+def _search_ready(db):
+    objects = {row[0] for row in db.execute("SELECT name FROM sqlite_master")}
+    if not {"search_state", "search_terms", "search_card_inputs", "search_terms_card"}.issubset(objects):
+        return False
+    state = db.execute("SELECT value FROM search_state WHERE key='format'").fetchone()
+    columns = [(row["name"], row["pk"]) for row in db.execute("PRAGMA table_info(search_terms)")]
+    return state is not None and state[0] == SEARCH_VERSION and columns == SEARCH_COLUMNS
+
+
+def _search_changes(db):
+    return {row[0] for row in db.execute("""
+        SELECT c.id FROM cards c LEFT JOIN search_card_inputs i ON c.id=i.id WHERE i.sha256 IS NOT c.sha256
+        UNION ALL
+        SELECT i.id FROM search_card_inputs i WHERE NOT EXISTS (SELECT 1 FROM cards c WHERE c.id=i.id)
+    """)}
 
 
 def _search_fields(card):
@@ -46,26 +60,38 @@ def _search_fields(card):
     return {"title": card["title"], "tags": " ".join(metadata.get("tags", [])), "body": "\n".join(body)}
 
 
-def build_search(catalog, *, panel_sources=None):
-    """Rebuild only derived search tables, atomically, including old formats."""
-    cards = catalog.all_cards()
+def build_search(catalog, *, panel_sources=None, full=False):
+    """Bring the search and optional published view up to date in one transaction."""
+    db = catalog.connection
     with catalog.transaction():
-        catalog.connection.execute("CREATE TABLE IF NOT EXISTS search_state(key TEXT PRIMARY KEY,value TEXT)")
-        catalog.connection.execute("DROP TABLE IF EXISTS search_terms")
-        catalog.connection.execute("""CREATE TABLE search_terms(
-            token TEXT,card_id TEXT,field TEXT,
-            PRIMARY KEY(token,card_id,field))""")
-        catalog.connection.execute("CREATE INDEX search_token ON search_terms(token)")
-        rows = []
+        reset_search = full or not _search_ready(db)
+        if reset_search:
+            db.execute("CREATE TABLE IF NOT EXISTS search_state(key TEXT PRIMARY KEY,value TEXT)")
+            db.execute("DROP TABLE IF EXISTS search_terms")
+            db.execute("DROP TABLE IF EXISTS search_card_inputs")
+            db.execute("""CREATE TABLE search_terms(
+                token TEXT,card_id TEXT,field TEXT,PRIMARY KEY(token,card_id,field))""")
+            db.execute("CREATE INDEX search_terms_card ON search_terms(card_id)")
+            db.execute("CREATE TABLE search_card_inputs(id TEXT PRIMARY KEY, sha256 TEXT, terms INTEGER)")
+            cards = catalog.all_cards()
+        else:
+            changed = sorted(_search_changes(db))
+            db.executemany("DELETE FROM search_terms WHERE card_id=?", ((identity,) for identity in changed))
+            db.executemany("DELETE FROM search_card_inputs WHERE id=?", ((identity,) for identity in changed))
+            cards = [card for identity in changed if (card := catalog.get_card(identity)) is not None]
         for card in cards:
-            for field, text in _search_fields(card).items():
-                rows.extend((term, card["id"], field) for term in indexing.lexical(text))
-        catalog.connection.executemany("INSERT INTO search_terms VALUES(?,?,?)", rows)
-        catalog.connection.execute("INSERT OR REPLACE INTO search_state VALUES('cards',?)", (_signature(catalog),))
-        catalog.connection.execute("INSERT OR REPLACE INTO search_state VALUES('format',?)", (SEARCH_VERSION,))
+            rows = [(term, card["id"], field) for field, text in _search_fields(card).items()
+                    for term in indexing.lexical(text)]
+            db.executemany("INSERT INTO search_terms VALUES(?,?,?)", rows)
+            db.execute("INSERT INTO search_card_inputs VALUES(?,?,?)", (card["id"], card["sha256"], len(rows)))
+        if reset_search or cards or changed:
+            db.executemany("INSERT OR REPLACE INTO search_state VALUES(?,?)",
+                           (("format", SEARCH_VERSION), ("cards", _signature(catalog))))
+        result = dict(db.execute("SELECT COUNT(*) AS cards,COALESCE(SUM(terms),0) AS terms FROM search_card_inputs").fetchone())
         if panel_sources is not None:
-            panel.publish(catalog, cards, panel_sources, SEARCH_WEIGHTS)
-    return {"cards": len(cards), "terms": len(rows)}
+            result.update(panel.publish(catalog, {card["id"]: card for card in cards},
+                                        panel_sources, SEARCH_WEIGHTS, full))
+    return result
 
 
 def _query_options(request, *, read):
@@ -96,7 +122,7 @@ def query(root, request, *, read=False):
     _query_options(request, read=read)
     if read and "view_revision" in request:
         return panel.read_card(root, request["card_id"], request["view_revision"]), "read"
-    with Catalog(root) as catalog:
+    with Catalog.open(root) as catalog:
         if read:
             card = catalog.get_card(request.get("card_id"))
             if card is None:
@@ -216,7 +242,7 @@ def sources(root, action, request):
         return source_read.cleanup(root), "cleaned"
     if action in {"resolve", "resolve-source"}:
         identity = request.get("source_id", request.get("doc_id", request.get("code_id")))
-        with Catalog(root, refresh=False) as catalog:
+        with Catalog.open(root, refresh=False) as catalog:
             source = catalog.get_file(identity)
         if source is None:
             raise ContractError("UNKNOWN_SOURCE_ID", str(identity))
@@ -230,7 +256,7 @@ def sources(root, action, request):
         identity = request.get("source_id", request.get("doc_id", request.get("source")))
         # Conversion can be expensive. Copy the registered identity, then
         # release SQLite before reading or converting the document.
-        with Catalog(root, refresh=False) as catalog:
+        with Catalog.open(root, refresh=False) as catalog:
             source = catalog.get_file(identity)
         if source is None:
             raise ContractError("UNKNOWN_SOURCE_ID", str(identity))
@@ -300,19 +326,26 @@ def patrol(root, action, request):
             if result.returncode:
                 raise ContractError("SYNC_FAILED", result.stderr or result.stdout)
         return {"synchronized": bool(sync)}, "synced"
-    with Catalog(root) as catalog:
+    if action == "reindex":
+        full = request.get("full", False)
+        if set(request) - {"full"} or type(full) is not bool:
+            raise ContractError("INVALID_REINDEX_REQUEST", "Use an optional Boolean full field")
+        with Catalog.open(root, refresh=False) as catalog:
+            if full:
+                catalog.rebuild()
+            else:
+                catalog.refresh()
+            return build_search(catalog, panel_sources={}, full=full), "reindexed"
+    with Catalog.open(root) as catalog:
         if action == "plan":
             pending = ingest.observe(root, catalog, include_code=True, first=True)
             if pending:
                 selected = pending[0]
                 return {"next_file": {"source_id": selected["id"], "kind": selected["kind"], "path": selected["path"]},
                         "pending_at_least": len(pending)}, "needs_ingest"
-            if search_stale(catalog):
+            if search_stale(catalog) or panel.stale(catalog):
                 return {"pending": 0}, "needs_reindex"
             return {"pending": 0}, "unchanged"
-        if action == "reindex":
-            catalog.rebuild()
-            return build_search(catalog, panel_sources={}), "reindexed"
         if action == "complete":
             pending = ingest.observe(root, catalog, include_code=True)
             result = {"remaining": len(pending), "completed_at": datetime.now(timezone.utc).isoformat()}

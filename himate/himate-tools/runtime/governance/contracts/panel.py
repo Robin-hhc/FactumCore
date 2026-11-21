@@ -1,8 +1,8 @@
 """Published knowledge views and live raw operations for the local host."""
 
 import base64
-from collections import Counter
-from contextlib import closing, contextmanager
+from collections import defaultdict
+from contextlib import ExitStack, closing, contextmanager
 import json
 from pathlib import PurePosixPath
 import posixpath
@@ -49,9 +49,8 @@ def _references(card):
     yield from ((item["code_id"], "code", "code_ref") for item in card["code_ref"])
 
 
-def _card_links(path, structures, card_ids):
-    results = {}
-    for link in structures[path]["links"]:
+def _link_targets(path, structure):
+    for link in structure["links"]:
         target = link["target"]
         if not target or link.get("image"):
             continue
@@ -63,119 +62,297 @@ def _card_links(path, structures, card_ids):
         if parsed.scheme or parsed.netloc or parsed.query or relative.startswith("/") or "\\" in relative:
             continue
         resolved = posixpath.normpath(posixpath.join(posixpath.dirname(path), relative)) if relative else path
-        if resolved not in card_ids:
-            continue
-        anchor = unquote(parsed.fragment)
-        if anchor and anchor not in structures[resolved]["anchors"]:
-            continue
-        result = {"target": target, "card_id": card_ids[resolved]}
-        if anchor:
-            result["anchor"] = anchor
-        results[target] = result
-    return list(results.values())
+        yield target, resolved, unquote(parsed.fragment)
 
 
-def _publish_graph(db, summaries, card_ids, files, referenced, edges):
-    db.execute("""CREATE TABLE panel_graph_nodes(
-        id TEXT PRIMARY KEY, kind TEXT NOT NULL, ref_id TEXT NOT NULL, title TEXT NOT NULL,
-        path TEXT NOT NULL) WITHOUT ROWID""")
-    db.execute("""CREATE TABLE panel_graph_edges(
-        source TEXT NOT NULL, target TEXT NOT NULL, kind TEXT NOT NULL,
-        PRIMARY KEY(source,target,kind)) WITHOUT ROWID""")
-    db.execute("CREATE INDEX panel_graph_incoming ON panel_graph_edges(target,source,kind)")
-    db.executemany("INSERT INTO panel_graph_nodes VALUES(?,?,?,?,?)", (
-        ("card/" + identity, "card", identity, summaries[identity]["title"], path)
-        for path, identity in card_ids.items()
-    ))
-    db.executemany("INSERT INTO panel_graph_nodes VALUES(?,?,?,?,?)", (
-        (kind + "/" + identity, kind, identity, PurePosixPath(files[identity]["path"]).name[:160],
-         files[identity]["path"])
-        for kind, identities in referenced.items() for identity in identities
-    ))
-    # Legacy card neighbors are stored under both cards. Keep exactly the row
-    # indexed under the actual source, with globally stable typed endpoints.
-    db.executemany("INSERT INTO panel_graph_edges VALUES(?,?,?)", (
-        ("card/" + source, kind + "/" + target.rsplit("/", 1)[-1], edge_kind)
-        for root_id, kind, _, _, source, target, edge_kind in edges if root_id == source
-    ))
+def _related_cards(card):
+    return {item["target_card_id"] for item in card["metadata"].get("relations", [])
+            if item.get("type") == "related_to" and item.get("target_card_id") != card["id"]}
 
 
-def publish(catalog, cards, source_changes, search_weights):
-    """Replace the read model inside the existing catalog write transaction."""
-    db = catalog.connection
-    cards = [card for card in cards if card["metadata"].get("lifecycle") != "draft"]
-    summaries = {card["id"]: _card_summary(card) for card in cards}
-    files = {item["id"]: item for item in catalog.list_files()}
-    for identity, changes in source_changes.items():
-        files[identity].update(changes)
-    versions = citation_versions.project_index(catalog.registry)
-    structures = {card["path"]: markdown_structure(card["body"], strip_frontmatter=False) for card in cards}
-    card_ids = {card["path"]: card["id"] for card in cards}
-    mtimes = dict(db.execute("SELECT id,mtime_ns FROM cards"))
-    edges = set()
-    referenced = {"document": set(), "code": set()}
-    card_rows = []
-    for card in cards:
-        identity = card["id"]
-        summary = summaries[identity]
-        sources = set()
-        for source_id, kind, edge_kind in _references(card):
-            sources.add(source_id)
-            referenced[kind].add(source_id)
-            node_id = kind + "/" + source_id if source_id in summaries else source_id
-            title = PurePosixPath(files[source_id]["path"]).name[:160]
-            edges.add((identity, kind, node_id, title, identity, node_id, edge_kind))
-        for relation in card["metadata"].get("relations", []):
-            peer = relation.get("target_card_id")
-            if relation.get("type") == "related_to" and peer in summaries and peer != identity:
-                edges.add((identity, "card", peer, summaries[peer]["title"], identity, peer, "related_to"))
-                edges.add((peer, "card", identity, summary["title"], identity, peer, "related_to"))
-        detail = card_detail(card, [files[source_id] for source_id in sorted(sources)])
-        detail["card_links"] = _card_links(card["path"], structures, card_ids)
-        detail["heading_anchors"] = structures[card["path"]]["headings"]
-        for peer in {link["card_id"] for link in detail["card_links"]} - {identity}:
-            edges.add((identity, "card", peer, summaries[peer]["title"], identity, peer, "card_link"))
-            edges.add((peer, "card", identity, summary["title"], identity, peer, "card_link"))
-        for kind in ("doc", "code"):
-            detail[kind + "_ref"] = [citation_versions.project_reference(card, kind, item, versions)
-                                    for item in detail[kind + "_ref"]]
-        card_rows.append((identity, summary["title"], summary["type"], summary["summary"],
-                          json.dumps(summary["tags"], ensure_ascii=False),
-                          card["path"], detail["lifecycle"], json.dumps(detail, ensure_ascii=False)))
-    counts = Counter(card["type"] for card in summaries.values())
-    recent = sorted(summaries, key=lambda identity: (-mtimes[identity], identity))[:10]
-    overview = {"view_revision": uuid4().hex, "card_count": len(cards),
-                "document_count": len(referenced["document"]), "code_count": len(referenced["code"]),
-                "types": [{"type": category, "count": count} for category, count in sorted(counts.items())],
-                "recent_cards": [{key: summaries[identity][key] for key in ("id", "title", "type")}
-                                 for identity in recent]}
-    with catalog.transaction():
-        for table in ("panel_state", "panel_cards", "panel_tags", "panel_terms", "panel_neighbors",
-                      "panel_graph_nodes", "panel_graph_edges"):
-            db.execute("DROP TABLE IF EXISTS " + table)
-        db.execute("CREATE TABLE panel_state(version INTEGER NOT NULL, overview TEXT NOT NULL)")
-        db.execute("""CREATE TABLE panel_cards(
+_PUBLISHED_TABLES = (
+    "panel_state", "panel_cards", "panel_tags", "panel_terms", "panel_neighbors", "panel_graph_nodes",
+    "panel_graph_edges", "panel_card_inputs", "panel_source_inputs", "panel_registry_input", "panel_dependencies",
+)
+
+
+def _index_ready(db):
+    objects = {row[0] for row in db.execute("SELECT name FROM sqlite_master")}
+    if not {*_PUBLISHED_TABLES, "panel_neighbors_source"}.issubset(objects):
+        return False
+    version = db.execute("SELECT version FROM panel_state").fetchone()
+    return version is not None and version[0] == VERSION
+
+
+def _create_index(db):
+    for table in _PUBLISHED_TABLES:
+        db.execute("DROP TABLE IF EXISTS " + table)
+    statements = (
+        "CREATE TABLE panel_state(version INTEGER NOT NULL, overview TEXT NOT NULL)",
+        """CREATE TABLE panel_cards(
             id TEXT PRIMARY KEY, title TEXT NOT NULL, type TEXT NOT NULL,
             summary TEXT NOT NULL, tags TEXT NOT NULL, path TEXT NOT NULL,
-            lifecycle TEXT NOT NULL, detail TEXT NOT NULL)""")
-        db.execute("CREATE INDEX panel_card_type ON panel_cards(type,id)")
-        db.execute("CREATE TABLE panel_tags(card_id TEXT,tag TEXT,PRIMARY KEY(card_id,tag)) WITHOUT ROWID")
-        db.execute("""CREATE TABLE panel_terms(
-            card_id TEXT, token TEXT, score INTEGER NOT NULL, PRIMARY KEY(card_id,token)) WITHOUT ROWID""")
-        db.execute("CREATE INDEX panel_token ON panel_terms(token,card_id)")
-        db.execute("""CREATE TABLE panel_neighbors(
+            lifecycle TEXT NOT NULL, detail TEXT NOT NULL)""",
+        "CREATE INDEX panel_card_type ON panel_cards(type,id)",
+        "CREATE TABLE panel_tags(card_id TEXT,tag TEXT,PRIMARY KEY(card_id,tag)) WITHOUT ROWID",
+        """CREATE TABLE panel_terms(
+            card_id TEXT, token TEXT, score INTEGER NOT NULL, PRIMARY KEY(card_id,token)) WITHOUT ROWID""",
+        "CREATE INDEX panel_token ON panel_terms(token,card_id)",
+        """CREATE TABLE panel_neighbors(
             root_id TEXT, kind TEXT, id TEXT, title TEXT, source TEXT, target TEXT, edge_kind TEXT,
-            PRIMARY KEY(root_id,kind,id,edge_kind,source,target)) WITHOUT ROWID""")
-        db.executemany("INSERT INTO panel_cards VALUES(?,?,?,?,?,?,?,?)", card_rows)
-        db.executemany("INSERT OR IGNORE INTO panel_tags VALUES(?,?)",
-                       ((card["id"], tag) for card in cards for tag in card["metadata"].get("tags", [])))
-        db.execute("""INSERT INTO panel_terms
-            SELECT s.card_id,s.token,SUM(CASE s.field WHEN 'title' THEN ? WHEN 'tags' THEN ? ELSE ? END)
-            FROM search_terms s JOIN panel_cards c ON c.id=s.card_id GROUP BY s.card_id,s.token
-        """, (search_weights["title"], search_weights["tags"], search_weights["body"]))
-        db.executemany("INSERT INTO panel_neighbors VALUES(?,?,?,?,?,?,?)", edges)
-        _publish_graph(db, summaries, card_ids, files, referenced, edges)
-        db.execute("INSERT INTO panel_state VALUES(?,?)", (VERSION, json.dumps(overview, ensure_ascii=False)))
+            PRIMARY KEY(root_id,kind,id,edge_kind,source,target)) WITHOUT ROWID""",
+        "CREATE INDEX panel_neighbors_source ON panel_neighbors(source)",
+        """CREATE TABLE panel_graph_nodes(
+            id TEXT PRIMARY KEY, kind TEXT NOT NULL, ref_id TEXT NOT NULL, title TEXT NOT NULL,
+            path TEXT NOT NULL) WITHOUT ROWID""",
+        """CREATE TABLE panel_graph_edges(
+            source TEXT NOT NULL, target TEXT NOT NULL, kind TEXT NOT NULL,
+            PRIMARY KEY(source,target,kind)) WITHOUT ROWID""",
+        "CREATE INDEX panel_graph_incoming ON panel_graph_edges(target,source,kind)",
+        """CREATE TABLE panel_card_inputs(
+            id TEXT PRIMARY KEY, path TEXT UNIQUE NOT NULL, sha256 TEXT NOT NULL, mtime_ns INTEGER NOT NULL,
+            title TEXT NOT NULL, visible INTEGER NOT NULL, anchors TEXT NOT NULL)""",
+        "CREATE INDEX panel_recent_cards ON panel_card_inputs(visible,mtime_ns DESC,id)",
+        "CREATE TABLE panel_source_inputs(id TEXT PRIMARY KEY, sha256 TEXT NOT NULL)",
+        "CREATE TABLE panel_registry_input(digest TEXT NOT NULL)",
+        """CREATE TABLE panel_dependencies(
+            kind TEXT, target TEXT, card_id TEXT, PRIMARY KEY(kind,target,card_id)) WITHOUT ROWID""",
+        "CREATE INDEX panel_dependency_card ON panel_dependencies(card_id)",
+    )
+    for statement in statements:
+        db.execute(statement)
+
+
+def _card_changes(db):
+    return {row["id"]: row for row in db.execute("""
+        SELECT c.id,c.path,c.sha256,c.mtime_ns,i.path AS previous_path
+        FROM cards c LEFT JOIN panel_card_inputs i ON c.id=i.id
+        WHERE i.path IS NOT c.path OR i.sha256 IS NOT c.sha256 OR i.mtime_ns IS NOT c.mtime_ns
+        UNION ALL
+        SELECT i.id,NULL,NULL,NULL,i.path FROM panel_card_inputs i
+        WHERE NOT EXISTS (SELECT 1 FROM cards c WHERE c.id=i.id)
+    """)}
+
+
+def _registry_digest(db):
+    row = db.execute("SELECT digest FROM panel_registry_input").fetchone()
+    return row[0] if row else None
+
+
+def stale(catalog):
+    db = catalog.connection
+    return (not _index_ready(db) or _registry_digest(db) != catalog.registry_digest or bool(_card_changes(db)))
+
+
+def _source_changes(catalog, overrides):
+    db = catalog.connection
+    if not overrides and _registry_digest(db) == catalog.registry_digest:
+        return set(), {}
+    files = {file["id"]: file for file in catalog.list_files()}
+    for identity, values in overrides.items():
+        files[identity].update(values)
+    snapshots = defaultdict(list)
+    for snapshot in catalog.registry.get("snapshots", []):
+        snapshots[snapshot["source_id"]].append(snapshot)
+    inputs = {identity: sha256_bytes(canonical_bytes([file, snapshots[identity]]))
+              for identity, file in files.items()}
+    indexed = dict(db.execute("SELECT id,sha256 FROM panel_source_inputs"))
+    changed = {identity for identity in inputs.keys() | indexed.keys() if inputs.get(identity) != indexed.get(identity)}
+    db.executemany("DELETE FROM panel_source_inputs WHERE id=?", ((identity,) for identity in changed - inputs.keys()))
+    db.executemany("INSERT OR REPLACE INTO panel_source_inputs VALUES(?,?)",
+                   ((identity, inputs[identity]) for identity in changed & inputs.keys()))
+    db.execute("DELETE FROM panel_registry_input")
+    if not overrides:
+        db.execute("INSERT INTO panel_registry_input VALUES(?)", (catalog.registry_digest,))
+    return changed, files
+
+
+def _matching(db, statement, values):
+    values = sorted(values)
+    # Keep batches below the SQLite variable limit on every supported Python.
+    for offset in range(0, len(values), 400):
+        batch = values[offset:offset + 400]
+        yield from db.execute(statement.format(",".join("?" for _ in batch)), batch)
+
+
+def _dependents(db, changes, sources):
+    paths = {row[column] for row in changes.values() for column in ("path", "previous_path") if row[column]}
+    related = {row[0] for row in _matching(db, """
+        SELECT card_id FROM panel_dependencies WHERE kind='path' AND target IN ({})
+    """, paths)}
+    related.update(row[0] for row in _matching(db, """
+        SELECT card_id FROM panel_dependencies WHERE kind='relation' AND target IN ({})
+    """, changes))
+    # Legacy graph IDs are disambiguated when a source ID is also a card ID.
+    related.update(row[0] for row in _matching(db, "SELECT card_id FROM card_files WHERE file_id IN ({})",
+                                               sources | changes.keys()))
+    return related
+
+
+def _visible(card):
+    return card is not None and card["metadata"].get("lifecycle") != "draft"
+
+
+def _link_index(db, paths, identities, full):
+    columns = "SELECT id,path,title,anchors FROM panel_card_inputs WHERE visible=1"
+    rows = (db.execute(columns) if full else [
+        *_matching(db, columns + " AND path IN ({})", paths),
+        *_matching(db, columns + " AND id IN ({})", identities),
+    ])
+    by_path, titles = {}, {}
+    for row in rows:
+        by_path[row["path"]] = (row["id"], set(json.loads(row["anchors"])))
+        titles[row["id"]] = row["title"]
+    return by_path, titles
+
+
+def _forget_card(db, identity):
+    typed = "card/" + identity
+    old_targets = {row[0] for row in db.execute("""
+        SELECT target FROM panel_graph_edges WHERE source=? AND kind IN ('doc_ref','code_ref')
+    """, (typed,))}
+    db.execute("DELETE FROM panel_graph_edges WHERE source=?", (typed,))
+    db.execute("DELETE FROM panel_graph_nodes WHERE id=?", (typed,))
+    db.execute("DELETE FROM panel_neighbors WHERE source=?", (identity,))
+    db.execute("DELETE FROM panel_dependencies WHERE card_id=?", (identity,))
+    db.execute("DELETE FROM panel_cards WHERE id=?", (identity,))
+    return old_targets
+
+
+def _write_card(db, card, structure, links, graph_targets, files, versions):
+    identity, path = card["id"], card["path"]
+    summary = _card_summary(card)
+    sources = {source_id for source_id, _, _ in _references(card)}
+    detail = card_detail(card, [files[source_id] for source_id in sorted(sources)])
+    by_path, titles = graph_targets
+    resolved = {}
+    for target, destination, anchor in links:
+        found = by_path.get(destination)
+        if found and (not anchor or anchor in found[1]):
+            resolved[target] = {"target": target, "card_id": found[0]}
+            if anchor:
+                resolved[target]["anchor"] = anchor
+    detail["card_links"] = list(resolved.values())
+    detail["heading_anchors"] = structure["headings"]
+    for kind in ("doc", "code"):
+        detail[kind + "_ref"] = [citation_versions.project_reference(card, kind, item, versions)
+                                for item in detail[kind + "_ref"]]
+    db.execute("INSERT INTO panel_cards VALUES(?,?,?,?,?,?,?,?)",
+               (identity, summary["title"], summary["type"], summary["summary"],
+                json.dumps(summary["tags"], ensure_ascii=False), path, detail["lifecycle"],
+                json.dumps(detail, ensure_ascii=False)))
+    db.execute("INSERT INTO panel_graph_nodes VALUES(?,?,?,?,?)",
+               ("card/" + identity, "card", identity, summary["title"], path))
+    relations = _related_cards(card)
+    dependencies = {("path", destination, identity) for _, destination, _ in links}
+    dependencies.update(("relation", peer, identity) for peer in relations)
+    db.executemany("INSERT INTO panel_dependencies VALUES(?,?,?)", dependencies)
+    neighbors, edges = set(), set()
+    for source_id, kind, edge in _references(card):
+        source_path = files[source_id]["path"]
+        title = PurePosixPath(source_path).name[:160]
+        typed = kind + "/" + source_id
+        legacy = typed if source_id in titles else source_id
+        neighbors.add((identity, kind, legacy, title, identity, legacy, edge))
+        edges.add(("card/" + identity, typed, edge))
+        db.execute("""
+            INSERT INTO panel_graph_nodes VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
+            title=excluded.title,path=excluded.path WHERE title IS NOT excluded.title OR path IS NOT excluded.path
+        """, (typed, kind, source_id, title, source_path))
+    card_links = {link["card_id"] for link in resolved.values()} - {identity}
+    for peers, edge in ((relations & titles.keys(), "related_to"), (card_links, "card_link")):
+        for peer in peers:
+            neighbors.add((identity, "card", peer, titles[peer], identity, peer, edge))
+            neighbors.add((peer, "card", identity, summary["title"], identity, peer, edge))
+            edges.add(("card/" + identity, "card/" + peer, edge))
+    db.executemany("INSERT INTO panel_neighbors VALUES(?,?,?,?,?,?,?)", neighbors)
+    db.executemany("INSERT INTO panel_graph_edges VALUES(?,?,?)", edges)
+
+
+def _write_terms(db, card, weights):
+    identity = card["id"]
+    db.executemany("INSERT OR IGNORE INTO panel_tags VALUES(?,?)",
+                   ((identity, tag) for tag in card["metadata"].get("tags", [])))
+    db.execute("""
+        INSERT INTO panel_terms
+        SELECT card_id,token,SUM(CASE field WHEN 'title' THEN ? WHEN 'tags' THEN ? ELSE ? END)
+        FROM search_terms WHERE card_id=? GROUP BY card_id,token
+    """, (weights["title"], weights["tags"], weights["body"], identity))
+
+
+def _publish_overview(db):
+    types = [dict(row) for row in db.execute("SELECT type,COUNT(*) AS count FROM panel_cards GROUP BY type ORDER BY type")]
+    sources = dict(db.execute("SELECT kind,COUNT(*) FROM panel_graph_nodes WHERE kind!='card' GROUP BY kind"))
+    recent = [dict(row) for row in db.execute("""
+        SELECT c.id,c.title,c.type FROM panel_card_inputs i JOIN panel_cards c ON i.id=c.id
+        WHERE i.visible=1 ORDER BY i.mtime_ns DESC,i.id LIMIT 10
+    """)]
+    overview = {"view_revision": uuid4().hex, "card_count": sum(item["count"] for item in types),
+                "document_count": sources.get("document", 0), "code_count": sources.get("code", 0),
+                "types": types, "recent_cards": recent}
+    db.execute("DELETE FROM panel_state")
+    db.execute("INSERT INTO panel_state VALUES(?,?)", (VERSION, json.dumps(overview, ensure_ascii=False)))
+
+
+def publish(catalog, parsed, source_overrides, search_weights, full=False):
+    """Update one published revision inside the catalog transaction."""
+    db = catalog.connection
+    full = full or not _index_ready(db)
+    if full:
+        _create_index(db)
+    changes = _card_changes(db)
+    sources, files = _source_changes(catalog, source_overrides)
+    affected = set(changes)
+    if not full:
+        affected.update(_dependents(db, changes, sources))
+    if not full and not affected:
+        return {"mode": "unchanged", "updated_cards": 0}
+
+    cards, structures, links = {}, {}, {}
+    for identity in sorted(affected):
+        card = parsed.get(identity) or catalog.get_card(identity)
+        if card is None:
+            continue
+        cards[identity] = card
+        for source_id, kind, _ in _references(card):
+            if source_id not in files:
+                files[source_id] = catalog.get_file(source_id)
+            if files[source_id] is None:
+                raise ContractError("UNKNOWN_SOURCE_ID", source_id, card["path"])
+            if (kind == "code") != (files[source_id]["kind"] == "code"):
+                raise ContractError("SOURCE_KIND_MISMATCH", source_id, card["path"])
+        if _visible(card):
+            structure = markdown_structure(card["body"], strip_frontmatter=False)
+            structures[identity] = structure
+            links[identity] = list(_link_targets(card["path"], structure))
+
+    db.executemany("DELETE FROM panel_card_inputs WHERE id=?", ((identity,) for identity in changes))
+    db.executemany("INSERT INTO panel_card_inputs VALUES(?,?,?,?,?,?,?)", (
+        (identity, row["path"], row["sha256"], row["mtime_ns"], cards[identity]["title"][:160],
+         identity in structures, json.dumps(sorted(structures[identity]["anchors"]) if identity in structures else []))
+        for identity, row in changes.items() if identity in cards
+    ))
+    target_paths = {path for entries in links.values() for _, path, _ in entries}
+    target_ids = set().union(*(_related_cards(cards[identity]) for identity in structures))
+    target_ids.update(source_id for identity in structures for source_id, _, _ in _references(cards[identity]))
+    graph_targets = _link_index(db, target_paths, target_ids, full)
+    versions = citation_versions.project_index(catalog.registry)
+    old_targets = set()
+    if not full:
+        for identity in sorted(affected):
+            old_targets.update(_forget_card(db, identity))
+        for table in ("panel_terms", "panel_tags"):
+            db.executemany("DELETE FROM " + table + " WHERE card_id=?", ((identity,) for identity in changes))
+    for identity, structure in structures.items():
+        _write_card(db, cards[identity], structure, links[identity], graph_targets, files, versions)
+        if identity in changes:
+            _write_terms(db, cards[identity], search_weights)
+    db.executemany("""
+        DELETE FROM panel_graph_nodes WHERE id=?
+        AND NOT EXISTS (SELECT 1 FROM panel_graph_edges WHERE target=panel_graph_nodes.id)
+    """, ((target,) for target in sorted(old_targets)))
+    _publish_overview(db)
+    return {"mode": "full" if full else "incremental", "updated_cards": len(affected)}
 
 
 def _is_sqlite_contention(error):
@@ -190,14 +367,37 @@ def _is_sqlite_contention(error):
     ))
 
 
+def _read_overview(db):
+    db.row_factory = sqlite3.Row
+    db.execute("BEGIN")
+    return db.execute("SELECT version,overview FROM panel_state").fetchone()
+
+
+def _needs_rollback(error, path):
+    code = getattr(error, "sqlite_errorcode", None)
+    if code is not None:
+        return code == sqlite3.SQLITE_READONLY_ROLLBACK
+    return (str(error) == "attempt to write a readonly database"
+            and path.with_name(path.name + "-journal").is_file())
+
+
 @contextmanager
 def _published(root, expected=None):
     path = safe_path(root, "artifacts/knowledge.sqlite", ["artifacts"])
     try:
-        with closing(sqlite3.connect(indexing.sqlite_readonly_uri(path, immutable=False), uri=True)) as db:
-            db.row_factory = sqlite3.Row
-            db.execute("BEGIN")
-            state = db.execute("SELECT version,overview FROM panel_state").fetchone()
+        with ExitStack() as connections:
+            db = connections.enter_context(closing(
+                sqlite3.connect(indexing.sqlite_readonly_uri(path, immutable=False), uri=True)))
+            try:
+                state = _read_overview(db)
+            except sqlite3.OperationalError as error:
+                if not _needs_rollback(error, path):
+                    raise
+                # The SQLite pager acquires the required locks and rolls back
+                # the interrupted write before serving the last published view.
+                db.close()
+                db = connections.enter_context(closing(sqlite3.connect(indexing.sqlite_recovery_uri(path), uri=True)))
+                state = _read_overview(db)
             if state is None or state["version"] != VERSION:
                 raise ContractError("PANEL_VIEW_UNAVAILABLE", "Build the panel view with maintain reindex")
             overview = json.loads(state["overview"])

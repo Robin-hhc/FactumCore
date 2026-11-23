@@ -1,7 +1,7 @@
 version: 1
 id: hs-knowledge-lint
 name: 知识治理巡检
-description: 串行同步与发现raw/code变化及PDF续办，逐批复用P1-P5处理，最后报告剩余事项。
+description: 同步工作区，入库新建或变更的文档，复核代码影响的已有卡片，并报告剩余事项。
 kind: custom
 source: user_created
 entry:
@@ -31,13 +31,13 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-patrol-plan
-  prompt: '使用 hs-knowledge-patrol-plan 取得一个待办；本步不创建 .build。
-
-    needs_ingest 将 data.next_file.source_id 交 P1；仅索引问题交 L3；无待办交 L4。失败保留真实错误。'
+  prompt: |-
+    使用 hs-knowledge-patrol-plan 取得一个待办。needs_ingest 将 data.next_file 中的 source_id、kind、path、change 原样交 P1。
+    raw 待办按文档入库处理，code 待办复核受影响的已有卡。仅索引问题交 L3，无待办交 L4。失败保留真实错误。
   exits:
   - id: needs_ingest
     label: 处理来源待办
-    condition: 返回真实 next_file，包含来源 ID、kind 和路径。
+    condition: 返回真实 next_file，包含 source_id、kind、path 和 change。
     target: prepare_sources
   - id: needs_reindex
     label: 刷新索引
@@ -53,7 +53,8 @@ nodes:
   owner: coder
   skill: hs-knowledge-source
   prompt: |-
-    使用 hs-knowledge-source，处理 L2 本次选定的 source_id。prepared 时交接本批 task，blocked 时向 L4 报告转换缺口，unchanged 时回 L2。
+    使用 hs-knowledge-source，处理 L2 本次选定的 source_id。raw 用指定来源的普通扫描。code 用 ingest scan --input FILE.json --json，请求为 {"source":"<source_id>","code_review":true}。
+    prepared 时交接本批 task 和材料入口。code 的回执还须包含 task.code_review 和 affected_cards。blocked 时向 L4 报告材料缺口，unchanged 时回 L2。
   exits:
   - id: prepared
     label: 本轮材料已准备
@@ -64,8 +65,8 @@ nodes:
     condition: L2 本次选定来源扫描成功且没有待办，需由 L2 重新判断其余来源。
     target: plan_patrol
   - id: blocked
-    label: 文档准备受阻
-    condition: P1 报告转换错误或缺口，当前来源仍待处理。
+    label: 来源准备受阻
+    condition: P1 报告来源准备的具体错误或缺口，当前来源仍待处理。
     target: complete_patrol
 - id: plan_change
   title: P2 阅读并制定编辑计划
@@ -73,7 +74,8 @@ nodes:
   owner: coder
   skill: hs-knowledge-change-plan
   prompt: |-
-    使用 hs-knowledge-change-plan，接收本批 task 和材料。content_planned 时向 P3 交接 .build/plan.md 与材料入口；deferred 时向 L4 交接缺口、已完成批次和当前未完成来源。
+    使用 hs-knowledge-change-plan，接收本批 task 和材料。task.code_review 生效时，仅保留或修订 affected_cards 中的已有卡，沿用原 ID 和路径。发现独立的新主题时记录给 L4。
+    content_planned 时向 P3 交接 .build/plan.md 与材料入口。deferred 时向 L4 交接缺口、已完成批次和当前未完成来源。
   exits:
   - id: content_planned
     label: 编辑计划已明确
@@ -89,7 +91,8 @@ nodes:
   owner: coder
   skill: hs-knowledge-view-materialize
   prompt: |-
-    使用 hs-knowledge-view-materialize，接收当前计划、材料及返工意见。ready 时交接候选与删除清单（如有）；needs_plan 时交接需重判的问题。
+    使用 hs-knowledge-view-materialize，接收当前计划、材料及返工意见。task.code_review 生效时，在 affected_cards 的原 ID 和路径下修订，保持删除清单为空。
+    ready 时交接候选与适用的删除清单。needs_plan 时交接需重判的问题。
   exits:
   - id: ready
     label: 完整候选稿已保存
@@ -105,7 +108,8 @@ nodes:
   owner: reviewer
   skill: hs-knowledge-review
   prompt: |-
-    由独立 reviewer 使用 hs-knowledge-review 审阅本批。passed 时将审阅通过结果交给 P5；needs_plan 或 needs_revision 时交接具体问题及依据。修订稿仍经过本节点。
+    由独立 reviewer 使用 hs-knowledge-review 审阅本批。task.code_review 生效时，核对 affected_cards 的原 ID 和路径。cards: [] 仍须逐卡独立复核并给出无改动理由。
+    passed 时将审阅结果和需要 L4 汇报的新主题交给 P5。needs_plan 或 needs_revision 时交接具体问题及依据。修订稿仍经过本节点。
   exits:
   - id: passed
     label: 检查与内容审阅通过
@@ -120,18 +124,18 @@ nodes:
     condition: 决定可保留，但表达、格式、定位、落位拼写或组稿需要修订。
     target: materialize_view
 - id: apply_view
-  title: P5 入库并更新索引
+  title: P5 发布结果并更新索引
   type: skill
   owner: coder
   skill: hs-knowledge-apply
   prompt: |-
     收到 P4 审阅通过后才使用 hs-knowledge-apply。执行失败时保留暂存，按原批次重试 P5 或报告失败。若候选需要修改且确认本批尚未写入正式库，将问题交 needs_revision。
 
-    completed 时交接实际 commit 回执，回 L2 选择下一来源。
+    completed 时交接实际 commit 回执及 P2/P4 已记录的待报告主题，回 L2 选择下一来源。
   exits:
   - id: completed
-    label: 本批已入库
-    condition: 本轮卡片和索引更新成功，已保存本批处理事实，并按 source_complete 区分部分或全文完成。
+    label: 本批处理完成
+    condition: 本轮卡片和索引更新成功，已保存本批处理事实。文档按 source_complete 区分部分或全文完成，代码按关联卡复核结果登记。
     target: plan_patrol
   - id: needs_revision
     label: 修订稿件
@@ -153,9 +157,9 @@ nodes:
   type: skill
   owner: coder
   skill: hs-knowledge-patrol-complete
-  prompt: '使用 hs-knowledge-patrol-complete 汇总本轮实际结果及剩余待办。
-
-    文件完成由各次 P5 登记，本步不另建全库成功水位；仍有欠账时据实说明。'
+  prompt: |-
+    使用 hs-knowledge-patrol-complete 汇总本轮文档入库、代码关联卡复核、索引刷新和剩余待办。
+    汇报巡检中发现的独立新主题，注明未立卡。实际结果以各次 P5 及本步统计回执为准。
   exits:
   - id: completed
     label: 本轮统计完成

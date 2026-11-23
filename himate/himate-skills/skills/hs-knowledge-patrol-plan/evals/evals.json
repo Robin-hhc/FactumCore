@@ -3,10 +3,10 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "先跑一下已绑定验收库的 L2。演练回执给出 needs_ingest，next_file 是 {\"source_id\":\"doc-delay\",\"kind\":\"raw\",\"path\":\"docs-raw/specs/delay.md\"}。把本轮要处理哪一份交接清楚。",
+      "prompt": "先跑一下已绑定验收库的 L2。演练回执给出 needs_ingest，next_file 是 {\"source_id\":\"doc-delay\",\"kind\":\"raw\",\"path\":\"docs-raw/specs/delay.md\",\"change\":\"added\"}。把本轮要处理哪一份交接清楚。",
       "expected_output": "交接回执所选的一份原件，由 P1 按确切的来源 ID 准备材料。",
       "expectations": [
-        "交接保留 doc-delay、raw 和 docs-raw/specs/delay.md 三个回执字段。",
+        "交接保留 doc-delay、raw、docs-raw/specs/delay.md 和 added 四个回执字段。",
         "后续步骤指向 P1，L2 运行期间不创建 .build 暂存。"
       ]
     },

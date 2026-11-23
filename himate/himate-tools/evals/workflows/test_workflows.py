@@ -77,6 +77,17 @@ def test_patrol_reselects_after_completed_or_already_completed_selected_source()
     assert edges["plan_change"]["deferred"] == "complete_patrol"
 
 
+def test_patrol_hands_off_change_and_selects_scoped_code_review():
+    graph = yaml.safe_load((CAPABILITIES_ROOT / "workflows/hs-knowledge-lint/workflow.yaml").read_bytes())
+    prompts = {node["id"]: node["prompt"] for node in graph["nodes"]}
+    assert all(field in prompts["plan_patrol"] for field in ("data.next_file", "source_id", "kind", "path", "change"))
+    assert '"code_review":true' in prompts["prepare_sources"]
+    for node in ("plan_change", "materialize_view", "lint_view"):
+        assert "task.code_review" in prompts[node]
+        assert "affected_cards" in prompts[node]
+    assert "cards: []" in prompts["lint_view"]
+
+
 @pytest.mark.parametrize("workflow,node_id,exit_id,wrong_target", [
     ("hs-knowledge-ingest", "apply_view", "completed", "__end__"),
     ("hs-knowledge-ingest", "apply_view", "needs_revision", "prepare_sources"),

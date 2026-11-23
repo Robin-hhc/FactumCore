@@ -1,6 +1,6 @@
 ---
 name: hs-knowledge-patrol-plan
-description: 发现一个待处理raw或被正式卡引用的已登记代码文件，并判断是否仅需重建索引；用于L2。
+description: 选择一项文档入库或代码关联卡复核待办，并判断索引状态。用于巡检 L2。
 ---
 
 # 选择巡检待办
@@ -9,10 +9,12 @@ description: 发现一个待处理raw或被正式卡引用的已登记代码文�
 
 ## 执行
 
-运行 `knowledge patrol plan --json`，让脚本比较来源内容 hash 和各文件的成功处理版本。
+使用支持代码复核的 knowledge CLI（0.25.0 及以后版本）。执行端版本较旧或待办回执缺少 `change` 时，报告需要在该执行端升级 CLI。
 
-- `needs_ingest`：交接 `data.next_file` 的真实 `source_id/kind/path`，进入 P1，用该来源 ID 准备本轮材料。
+运行 `knowledge patrol plan --json`，采用脚本返回的待办和变化类型。
+
+- `needs_ingest`：原样交接 `data.next_file` 的 `source_id`、`kind`、`path` 和 `change`，进入 P1。 `kind: raw` 按文档入库处理。 `kind: code` 复核已有引用卡，`baseline_missing` 表示缺少复核基线，`modified` 和 `deleted` 表示源码变更与缺失，`reference_invalid` 表示发现已有引用问题。
 - `needs_reindex`：无内容待办且索引需刷新，进入 L3。
 - `unchanged`：进入 L4 报告剩余事项。
 
-本步不创建 `.build`，不让 Agent 阅读全库处置表。代码只追踪已登记且被正式卡引用的文件；不扩大到未登记的间接依赖。失败说明具体缺口。
+本步仅选择待办。代码范围为已登记且被正式卡直接引用的文件。失败说明具体缺口。

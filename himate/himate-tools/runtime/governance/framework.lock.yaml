@@ -1,6 +1,6 @@
 schema_version: '2.0'
 contract_family: aiot-wifi
-tool_version: 0.24.8
+tool_version: 0.25.0
 files:
   contracts/__init__.py:
     path: runtime/governance/contracts/__init__.py
@@ -10,7 +10,7 @@ files:
     sha256: 18d9e86b87abb6c5b3bf961def171b140315eb8d8304e2d9e5c246534faa6596
   contracts/catalog.py:
     path: runtime/governance/contracts/catalog.py
-    sha256: b290fbd9fdab0d057d074b579413a4566b4c42b4ee0ea5f38078441e1944c667
+    sha256: 632e8d162bfd142d035fd64ae3238efe96cccbab80f89f6c350bb09f829c8d20
   contracts/citation_versions.py:
     path: runtime/governance/contracts/citation_versions.py
     sha256: a7b0e17d565a1bf85b8bbe26417f41e0765c3371dec17545e761f3e322bba764
@@ -22,13 +22,13 @@ files:
     sha256: 6b3bda52445bf7f4eb99858fb63c85381a794f9e622f7d5c6ec99bafcd8f4337
   contracts/ingest.py:
     path: runtime/governance/contracts/ingest.py
-    sha256: 0b480d55eaba3ea99a0287c30298c55676922dbf72e247ba9ba79b24b236cf87
+    sha256: f4c188fea13b65407aec67d1ee523b7d19f290e8669d401af9bf69734f4308aa
   contracts/knowledge.py:
     path: runtime/governance/contracts/knowledge.py
     sha256: 2b165355fa1548c9c5e58bc9fe3e0c0802d0e02bdbc61c498b37424785faebe9
   contracts/library.py:
     path: runtime/governance/contracts/library.py
-    sha256: ceedd1f952f99ba966b0a9310ade1654c360df7829688560e6e978e04089dfe6
+    sha256: bfa67fde07f7654b19ad46d62f17e36b30f282e443a8eacbdc62b999b3262920
   contracts/panel.py:
     path: runtime/governance/contracts/panel.py
     sha256: 0e17672ddf1fe9ac4e9ed5b75aa0e55881d248374b7d1054c8733294b0b3c2f9
@@ -82,7 +82,7 @@ files:
     sha256: 241e05b7a7b359ba01257873cafc1acd6303ff45894940156d2ae3d44ddd5641
   specs/sources.md:
     path: runtime/governance/specs/sources.md
-    sha256: 19e018d7768e072f676dcfb5530f8d5f5d90f30529aa7ffc1fe3ef93d461b6bb
+    sha256: 81a91cd2c95b23592be0d2dd83bfb7695277174ccadcb75ae9fc5ee451560cb4
   specs/ci-runner.md:
     path: runtime/governance/specs/ci-runner.md
     sha256: fc6d518c32ac6eed3e803ad04c621c5413125f14253109dc8724a1c466028c81

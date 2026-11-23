@@ -341,7 +341,8 @@ def patrol(root, action, request):
             pending = ingest.observe(root, catalog, include_code=True, first=True)
             if pending:
                 selected = pending[0]
-                return {"next_file": {"source_id": selected["id"], "kind": selected["kind"], "path": selected["path"]},
+                return {"next_file": {"source_id": selected["id"], "kind": selected["kind"], "path": selected["path"],
+                                      "change": selected["change"]},
                         "pending_at_least": len(pending)}, "needs_ingest"
             if search_stale(catalog) or panel.stale(catalog):
                 return {"pending": 0}, "needs_reindex"

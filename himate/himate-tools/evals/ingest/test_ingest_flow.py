@@ -549,6 +549,63 @@ def test_deleted_function_is_reported_by_fixed_check(tmp_path):
     assert any(item["code"] == "CODE_SYMBOL_MISSING" for item in checked["findings"])
 
 
+def test_code_review_cannot_finish_against_an_outdated_source(tmp_path):
+    root, code, doc_id, code_id = code_project(tmp_path)
+    ingest = module("ingest")
+    catalog_type = module("catalog").Catalog
+    with catalog_type(root) as catalog:
+        baseline = catalog.get_file(code_id)["processed_hash"]
+    code.write_text("int wait_reply(void) {\n    return 6;\n}\n", encoding="utf-8")
+    task, phase = ingest.scan(root, {"source": code_id, "code_review": True})
+    assert phase == "prepared" and task["source"]["change"] == "modified"
+    write_plan(root, [])
+    assert ingest.check(root, {})[1] == "passed"
+
+    code.write_text("int wait_reply(void) {\n    return 8;\n}\n", encoding="utf-8")
+    with pytest.raises(ingest.ContractError, match="SOURCE_CHANGED"):
+        ingest.commit(root, {"reason": "No change to the design requirement."})
+    with catalog_type(root) as catalog:
+        assert catalog.get_file(code_id)["processed_hash"] == baseline
+        assert catalog.get_card("waiting")["doc_ref"][0]["doc_id"] == doc_id
+    refreshed, phase = ingest.scan(root, {"source": code_id, "code_review": True})
+    assert phase == "prepared" and refreshed["source"]["hash"] != task["source"]["hash"]
+
+
+def test_code_review_detects_a_deleted_source_and_its_return(tmp_path):
+    root, code, _, code_id = code_project(tmp_path)
+    ingest, library = module("ingest"), module("library")
+    original = code.read_bytes()
+    code.unlink()
+    plan, phase = library.patrol(root, "plan", {})
+    assert phase == "needs_ingest" and plan["next_file"]["change"] == "deleted"
+    task, phase = ingest.scan(root, {"source": code_id, "code_review": True})
+    assert phase == "prepared" and task["source"]["exists"] is False
+    assert [card["id"] for card in task["affected_cards"]] == ["waiting"]
+    write_plan(root, [])
+    assert ingest.check(root, {})[1] == "passed"
+    assert ingest.commit(root, {"reason": "Retain the documented requirement and past source reference."})[1] == "completed"
+    assert library.patrol(root, "plan", {})[0]["pending"] == 0
+
+    code.write_bytes(original)
+    plan, phase = library.patrol(root, "plan", {})
+    assert phase == "needs_ingest" and plan["next_file"]["change"] == "modified"
+
+
+def test_code_review_rechecks_card_membership_before_publishing(tmp_path):
+    root, code, doc_id, code_id = code_project(tmp_path)
+    ingest = module("ingest")
+    code.write_text("int wait_reply(void) {\n    return 6;\n}\n", encoding="utf-8")
+    assert ingest.scan(root, {"source": code_id, "code_review": True})[1] == "prepared"
+    draft(root, "waiting", [doc_id], body="Proposed change from code review.")
+    write_plan(root, [("waiting", "knowledge/waiting.md")])
+    assert ingest.check(root, {})[1] == "passed"
+
+    formal(root, "waiting", [doc_id], body="Updated separately with no code reference.")
+    with pytest.raises(ingest.ContractError, match="CODE_REVIEW_SCOPE"):
+        ingest.commit(root, {})
+    assert "Updated separately" in (root / "knowledge/waiting.md").read_text(encoding="utf-8")
+
+
 def test_required_code_ref_distinguishes_scoped_symbols_in_one_file(tmp_path):
     root, existing_code, doc_id, _ = code_project(tmp_path)
     code = existing_code.with_name("dispatch.cpp")

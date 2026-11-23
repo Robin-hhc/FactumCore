@@ -19,7 +19,7 @@ knowledge ingest commit --json
 
 失败时保留 `.build`、已审稿和错误，修正执行问题后直接重试同一个 P5，重复覆盖及数据库更新由命令处理。只有确认本批尚未写入正式库、确实需要修改候选时才交 `needs_revision`，带具体问题回 P3 再经 P4。已写入或无法确认写入状态时，先用同一已审稿完成或报告本批失败，保留可重试现场。
 
-本批无需产卡时，计划保留实际阅读范围，并将 `{"reason":"实际不改卡理由"}` 写入 `.build/commit.json`，运行 `knowledge ingest commit --input .build/commit.json --json`。已审且无增量的范围也可登记。
+本批无需产卡时，从 P4 取实际阅读范围、复核结果及不改卡理由，将 `{"reason":"实际不改卡理由"}` 写入 `.build/commit.json`，运行 `knowledge ingest commit --input .build/commit.json --json`。代码关联卡复核通过且无需更新时也用该方式登记。
 
 成功后交接来源、实际范围、卡片变动和剩余范围。`completed` 指本批发布完成，`source_complete: true` 才表示整份来源入库完成。
 

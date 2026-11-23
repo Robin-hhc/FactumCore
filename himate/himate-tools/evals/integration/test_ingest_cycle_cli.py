@@ -218,6 +218,43 @@ def test_ingest_cycle_keeps_original_directory_or_file_scope(knowledge, scope):
     assert pending["data"]["source"]["path"] in {*selected, outside}
 
 
+def test_upload_workflow_returns_to_each_scoped_source_before_advancing(knowledge):
+    paths = ["docs-raw/specs/z-uploaded.md", "docs-raw/specs/a-uploaded.md"]
+    outside = "docs-raw/specs/0-unrelated.md"
+    for path in [*paths, outside]:
+        write_text(knowledge, path, "# Uploaded material\n\nSynthetic fixture assessment.\n")
+    manifest = [
+        {"path": path, "sha256": hashlib.sha256((knowledge / path).read_bytes()).hexdigest()}
+        for path in paths
+    ]
+    graph = edges()
+    node = "prepare_sources"
+    for index, source in enumerate(manifest):
+        assert node == "prepare_sources"
+        status, checked_path = invoke(knowledge, "raw", "path", "--path",
+                                      source["path"].removeprefix("docs-raw/"))
+        assert status == 0 and checked_path["data"]["kind"] == "file", checked_path
+        request = {"source": source["path"]}
+        prepared = scan(knowledge, request)
+        assert prepared["phase"] == "prepared"
+        actual = prepared["data"]["source"]
+        assert actual["path"] == source["path"] and actual["hash"] == source["sha256"]
+        node = graph[node][prepared["phase"]]
+        assert node == "plan_change"
+        assert publish_selected(knowledge, prepared["data"])["source_complete"] is True
+        node = graph["apply_view"]["completed"]
+        assert node == "prepare_sources"
+        assert scan(knowledge, request)["phase"] == "unchanged"
+        exit_id = "next_upload_source" if index + 1 < len(manifest) else "unchanged"
+        node = graph[node][exit_id]
+
+    assert node == "__end__"
+    assert_processed(knowledge, paths)
+    remaining = scan(knowledge, {})
+    assert remaining["phase"] == "prepared"
+    assert remaining["data"]["source"]["path"] == outside
+
+
 def test_reprocess_request_is_consumed_once_then_normal_scan_can_terminate(knowledge):
     path = "docs-raw/specs/reviewed.md"
     write_text(knowledge, path, "# Reviewed\n\nA synthetic conclusion.\n")

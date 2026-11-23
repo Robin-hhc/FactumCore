@@ -14,21 +14,25 @@ nodes:
   owner: coder
   skill: hs-knowledge-source
   prompt: |-
-    首次进入时，复用宿主绑定或本次已确认的知识根与执行端，读取该根的 AGENTS.md 和 config.yml。知识根或执行端仍不明确时询问用户。使用该执行端已注册的 knowledge 命令或宿主提供的已安装 CLI 入口，以知识根为工作目录，显式传入 --knowledge-root，运行 doctor --json。回执的知识根正确且 phase 为 ready 后才继续；环境阻塞时报告实际缺口。交接执行端、知识根、CLI 调用入口和 data.runtime_version，后续节点沿用同一入口、版本和目标。
+    首次进入时，有 OpenFlow 提供的 upload_ingest 清单则以其中的 execution 确定执行端与知识根。否则复用宿主绑定或本次已确认的知识根与执行端，仍不明确时询问用户。读取该根的 AGENTS.md 和 config.yml。使用该执行端已注册的 knowledge 命令或宿主提供的已安装 CLI 入口，以知识根为工作目录，显式传入 --knowledge-root，运行 doctor --json。回执的知识根正确且 phase 为 ready 后才继续；环境阻塞时报告实际缺口。交接执行端、知识根、CLI 调用入口和 data.runtime_version，后续节点沿用同一入口、版本和目标。
 
-    保留任务原始范围与解析配置。使用 hs-knowledge-source。prepared 时交接本批 task，blocked 时报告 P1 转换缺口和已完成范围，unchanged 时汇总原范围处理结果。
+    保留任务原始范围与解析配置。使用 hs-knowledge-source。有 OpenFlow 提供的 upload_ingest 清单时，按 Skill 的上传批次约定验证并扫描当前文件，通过 progressNote 交接 upload_ingest_position。当前文件无待办且清单还有后续文件时走 next_upload_source。prepared 时交接本批 task，blocked 时报告准备缺口和已完成范围，unchanged 时汇总原范围处理结果。
   exits:
   - id: prepared
     label: 本轮材料已准备
     condition: 本次文件、来源 ID、hash 和关联卡入口已由脚本保存。
     target: plan_change
+  - id: next_upload_source
+    label: 检查下一份上传文件
+    condition: 当前上传文件核对通过且指定文件扫描返回 unchanged，清单还有下一份文件，已交接下一份的位置。
+    target: prepare_sources
   - id: unchanged
     label: 没有待办
-    condition: 本次任务原始范围扫描成功且没有待办，已汇总各批实际结果。
+    condition: 本次任务原始范围扫描成功且没有待办。若任务来自上传批次，清单中的每份文件均已核对并确认无待办。已汇总各批实际结果。
     target: __end__
   - id: blocked
     label: 文档准备受阻
-    condition: P1 返回实际转换错误和缺口，当前来源仍待处理。
+    condition: 知识根、上传清单、原件或文档准备存在已核实的缺口，当前来源仍待处理。
     target: __end__
 - id: plan_change
   title: P2 阅读并制定编辑计划
@@ -37,6 +41,8 @@ nodes:
   skill: hs-knowledge-change-plan
   prompt: |-
     使用 hs-knowledge-change-plan，接收本批 task 和材料。content_planned 时向 P3 交接 .build/plan.md 与材料入口。deferred 时报告必要缺口、已完成批次和当前未完成来源，结束本次任务。
+
+    收到上传批次位置时，把 upload_ingest_position JSON 原样放在本次 workflow_handoff 的 progressNote 首行。后续行写本节点结果。
   exits:
   - id: content_planned
     label: 编辑计划已明确
@@ -53,6 +59,8 @@ nodes:
   skill: hs-knowledge-view-materialize
   prompt: |-
     使用 hs-knowledge-view-materialize，接收当前计划、材料及返工意见。ready 时交接候选与删除清单（如有）；needs_plan 时交接需重判的问题。
+
+    收到上传批次位置时，把 upload_ingest_position JSON 原样放在本次 workflow_handoff 的 progressNote 首行。后续行写本节点结果。
   exits:
   - id: ready
     label: 完整候选稿已保存
@@ -69,6 +77,8 @@ nodes:
   skill: hs-knowledge-review
   prompt: |-
     由独立 reviewer 使用 hs-knowledge-review 审阅本批。passed 时将审阅通过结果交给 P5；needs_plan 或 needs_revision 时交接具体问题及依据。修订稿仍经过本节点。
+
+    收到上传批次位置时，把 upload_ingest_position JSON 原样放在本次 workflow_handoff 的 progressNote 首行。后续行写本节点结果。
   exits:
   - id: passed
     label: 检查与内容审阅通过
@@ -91,6 +101,8 @@ nodes:
     收到 P4 审阅通过后才使用 hs-knowledge-apply。执行失败时保留暂存，按原批次重试 P5 或报告失败。若候选需要修改且确认本批尚未写入正式库，将问题交 needs_revision。
 
     completed 时交接实际 commit 回执，回 P1 按任务原始范围继续。
+
+    收到上传批次位置时，把 upload_ingest_position JSON 原样放在本次 workflow_handoff 的 progressNote 首行。后续行写本节点结果。completed 后仍由 P1 复核同一文件，P5 不推进位置。
   exits:
   - id: completed
     label: 本批已入库

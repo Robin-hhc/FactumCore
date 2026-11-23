@@ -37,7 +37,10 @@ WORKFLOW_ENTRIES = {
 }
 EDGES = {
     "hs-knowledge-ingest": {
-        "prepare_sources": {"prepared": "plan_change", "unchanged": "__end__", "blocked": "__end__"},
+        "prepare_sources": {
+            "prepared": "plan_change", "next_upload_source": "prepare_sources",
+            "unchanged": "__end__", "blocked": "__end__",
+        },
         "plan_change": {"content_planned": "materialize_view", "deferred": "__end__"},
         "materialize_view": {"ready": "lint_view", "needs_plan": "plan_change"},
         "lint_view": {"passed": "apply_view", "needs_plan": "plan_change", "needs_revision": "materialize_view"},

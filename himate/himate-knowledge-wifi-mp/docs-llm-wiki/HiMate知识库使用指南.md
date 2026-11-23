@@ -1,44 +1,24 @@
 # HiMate 知识库使用指南
 
-首次使用按以下顺序操作。安装模型和命令行工具，检查版本，安装运行环境，安装 Skills 和 Workflows，最后打开 OpenFlow 绑定知识库。
+首次使用时，先确认知识库命令在哪台机器执行并部署能力包，再在 OpenFlow 的知识库页校验目录、补齐环境并保存绑定。
 
 ## 1. 准备
 
-在运行 OpenFlow 的电脑上准备好 Node.js 18 或更新版本、Python 3.10–3.12，以及 Python 自带的 pip。内网 npm 源使用团队提供的配置。
+先确认运行 `knowledge` 的机器和账户。
+
+| 知识库位置 | 命令执行位置 |
+|---|---|
+| Linux 宿主的本地目录，包括从 Windows 浏览器访问的反代站点 | Linux OpenFlow 启动账户 |
+| Windows 宿主的本地目录 | Windows OpenFlow 启动账户 |
+| Windows 宿主绑定 Samba 映射盘或共享路径 | OpenFlow 已配置的 SSH MCP 所连接的 Linux 账户 |
+
+在命令执行端准备 Node.js 18 或更新版本、Python 3.10–3.12 和 pip，并确认该端可访问内网 npm 源。
 
 取得项目知识仓和 `himate-skills` 能力包。知识仓内的 `config.yml` 由项目负责人配置，普通使用者使用项目提供的版本。
 
-以下能力安装命令在 `himate-skills` 目录执行，该目录同时包含安装脚本、`skills/` 和 `workflows/`。
+## 2. 安装 Skills 和 Workflows
 
-## 2. 安装模型和 CLI
-
-Windows 和 Linux 使用相同的 npm 命令。在终端执行。
-
-```sh
-npm install -g @himate/knowledge-models
-npm install -g @himate/knowledge-cli
-knowledge --version
-```
-
-最后一条命令显示 `knowledge` 和版本号，表示命令已安装并能启动。模型包提供本机解析扫描件和图片所需的 OCR 模型，安装时自动校验并准备好模型文件。
-
-## 3. 安装运行环境
-
-```sh
-knowledge setup
-```
-
-命令会安装所需的 Python 依赖并复查环境。等待显示环境就绪后继续，已有的匹配依赖会复用。安装失败时按输出提示处理，再运行同一条命令。
-
-需要单独检查时，运行以下命令。
-
-```sh
-knowledge doctor --environment-only
-```
-
-## 4. 安装 Skills 和 Workflows
-
-进入 `himate-skills` 目录，按操作系统执行对应脚本。
+在运行 OpenFlow 的机器上进入 `himate-skills` 目录，按操作系统执行对应脚本。
 
 Windows PowerShell。
 
@@ -62,18 +42,36 @@ sh ./deploy.sh
 
 使用其他目录时，按实际位置填写。能力包位置不同或需要无人值守安装时，参数见能力仓的[安装说明](../../himate-skills/README.md)。
 
-## 5. 打开 OpenFlow 并连接知识库
+## 3. 打开 OpenFlow 并连接知识库
 
-使用完成安装的同一账户启动 OpenFlow。已经打开的 OpenFlow 先重启，让它加载新命令和能力包。
+使用部署能力包的宿主账户启动 OpenFlow。已经打开的 OpenFlow 先重启，让它加载刚安装的能力。
 
-1. 点击左栏「知识库」。首次进入时，可以跟着按钮旁的气泡操作，也可以跳过，之后通过页头「使用指引」重开。
+1. 点击左栏「知识库」。首次进入可跟随气泡指向的控件操作。可以跳过，之后通过页头「使用指引」重新打开。
 2. 选择项目知识仓的根目录。该目录中应能看到 `config.yml` 和 `docs-raw/`。
-3. 点「校验目录」，通过后点「保存绑定」。
-4. 点页头「环境检查」，确认环境就绪。后续升级出现依赖缺失时，可以在这里点「安装环境」，查看进度或选择「后台继续」。后台进度显示在知识库页头，完成或需要处理时会出现提示。
+3. 点「校验目录」。如果提示缺少 CLI 或依赖，按下一节补齐后回到绑定页。如果 Windows 共享目录提示配置 SSH MCP，打开设置，启用已有的 SSH 连接并添加共享目录到 Linux 目录的路径映射，再返回校验。
+4. 校验通过后点「保存绑定」。点页头「环境检查」，确认实际执行端已就绪。
 
-## 6. 添加资料并入库
+## 4. 在页面检查和安装环境
 
-点击「添加资料」，选择一批文件，再选择保存分类。
+- 本地目录缺少 `knowledge` 时，打开绑定页的「查看 CLI 安装指引」，也可以从页头「环境检查」进入。在弹窗点「同意并安装」，OpenFlow 会尝试安装模型和 CLI。使用终端安装后可点「重新检查」。如果仍找不到命令，把 npm 全局命令目录加入启动账户的 PATH，再重启 OpenFlow。
+- 本地 CLI 已就绪但缺少 Python 依赖时，点「安装环境」。可以看进度或选「后台继续」。后台安装进度显示在知识库页头，完成或需要处理时会出现提示。
+- Windows 绑定 Samba 时，缺少 CLI、模型或 Python 依赖，由 SSH 连接使用的 Linux 账户在对端执行下一节命令。安装后确认该 SSH 账户的 PATH 能找到 `knowledge`，再回 OpenFlow 重新校验目录或重新检查环境。
+
+## 5. 在终端安装和校验
+
+在上面确定的命令执行端，用对应账户运行以下命令。模型包会校验并准备 OCR 模型。`knowledge setup` 会安装所需的 Python 依赖并复查。
+
+```sh
+npm install -g @himate/knowledge-models --registry http://10.143.57.12:4873 --allow-scripts=@himate/knowledge-models
+npm install -g @himate/knowledge-cli --registry http://10.143.57.12:4873 --allow-scripts=@himate/knowledge-cli
+knowledge --version
+knowledge setup
+knowledge doctor --environment-only
+```
+
+## 6. 文件上传与入库
+
+点击「文件上传」，选择一批文件，再选择保存分类。
 
 | 分类方式 | 操作 |
 |---|---|
@@ -84,9 +82,9 @@ sh ./deploy.sh
 
 保存成功后，在左侧「原始资料」查看文件。支持 Markdown、TXT、PDF、DOCX、XLSX、PPTX、HTML、CSV 和常见图片。上传 Markdown 时一并提供引用的本地图片。旧版 `.doc` 先转换为 `.docx`。
 
-接着在 OpenFlow 的业务工作区运行「知识入库」工作流，并确认使用刚才绑定的知识库。Agent 会读取资料、编写知识卡、独立审阅并发布。处理范围内没有待办后，会给出结果。资料较长时可能分批处理，以工作流最后的汇总为准。
+整批保存后，点完成弹窗的「开始入库」。OpenFlow 会为这一批新建会话并启动「知识入库」工作流。点「查看入库会话」查看进度，也可以从「上传记录」打开同一会话。工作流按本批清单逐份处理，完成每份原件的读取、审阅和发布后再处理下一份。长文档可能需要多轮，以会话最后的汇总为准。入库完成后，点会话输入框上方的「查看知识卡」进入知识页。
 
-项目已经配置定时入库时，按团队约定等待任务执行。页面的「刷新」用于更新已发布知识的索引和显示结果。
+如果同一个知识库已有入库任务，页面会提供「查看当前入库会话」。当前任务结束后，可回到上传记录启动这一批。处理其他范围时，可手动运行「知识入库」工作流。项目已配置定时入库时，可按团队约定使用定时任务。
 
 ## 7. 查看和查询知识
 

@@ -24,7 +24,7 @@ printf '%s' '{"limit":20}' | python -B /absolute/tool/root/knowledge.py library 
 
 `knowledge setup --jsonl` 发出 `checking`、按需的 `installing` 和 `registering`，以及 `verifying`，最后发送一条结果。`installing` 阶段用所选解释器执行 `python -m pip install -r` 安装锁定依赖。成功时最终状态为 `ready`，退出码为 0，`python` 指向通过复查的解释器。失败结果带 `phase`、`code`、`message` 和 `diagnostics` 并退出非零，可用的本机日志路径由 `log_path` 给出。只需要最终一条结果时使用 `setup --json`。重复执行会跳过已完成的安装阶段，复用 npm 启动器或按需准备手动安装的启动器。
 
-OpenFlow 用 `POST /api/knowledge/environment/check` 检查，用 `POST /api/knowledge/environment/install` 开启后台安装，两者以 JSON `{}` 提交。用 `GET /api/knowledge/environment/install` 查询当前任务。宿主同一时间执行一项安装，转发 `setup --jsonl` 的阶段进度，以退出码和最终 `ready` 报告判定成功。面板业务命令仍兼容旧 `panel` 命令。
+OpenFlow 用 `POST /api/knowledge/environment/check` 检查，用 `POST /api/knowledge/environment/install` 开启后台环境安装，两者以 JSON `{}` 提交。缺少本地 CLI 时，用户确认后以 `{"approved":true}` 请求 `POST /api/knowledge/environment/install-cli`，由宿主尝试安装 CLI 和模型。用 `GET /api/knowledge/environment/install` 查询当前任务。宿主同一时间执行一项安装。安装 Python 依赖时转发 `setup --jsonl` 的阶段进度，以退出码和最终 `ready` 报告判定成功。Windows 绑定 Samba 后通过 SSH MCP 检查对端环境，安装由 SSH 账户在 Linux 对端执行。面板业务命令仍兼容旧 `panel` 命令。
 
 ## 面板操作
 
@@ -84,7 +84,7 @@ P4 校验本批固定材料、计划和候选，P5 核对审阅范围后发布�
 
 目录项的 `category` 表示可作为归档分类的普通目录，`empty` 表示该分类物理为空。即使目录里只有隐藏文件，也不能通过 `raw-rmdir` 删除，命令返回 `RAW_DIRECTORY_NOT_EMPTY`。用 `raw-mkdir` 在根或已有分类下创建一个子目录，遇到同名或大小写冲突时返回 `RAW_TARGET_EXISTS`。特殊目录 `sources/`、资料包及其子目录不参与分类或目录变更。删除空目录不改动已有来源记录。
 
-OpenFlow 先在服务端完整接收上传，再将可信的绝对暂存文件名传给 `raw-save`。浏览器只提供业务相对路径和字节，由宿主构造 `staged_path`。CLI 流式校验并写到目标目录的临时文件，同目录原子提交完整字节。目标已存在或与同目录的名称只差大小写时，返回 `RAW_TARGET_EXISTS`。文件大小或 hash 对不上返回 `RAW_STAGE_MISMATCH`。暂存文件由宿主清理，返回文件相对路径与 SHA-256 即可确认保存。原件注册及正式知识更新由之后的 CI 完成。
+OpenFlow 先在服务端完整接收上传，再将可信的绝对暂存文件名传给 `raw-save`。浏览器只提供业务相对路径和字节，由宿主构造 `staged_path`。CLI 流式校验并写到目标目录的临时文件，同目录原子提交完整字节。目标已存在或与同目录的名称只差大小写时，返回 `RAW_TARGET_EXISTS`。文件大小或 hash 对不上返回 `RAW_STAGE_MISMATCH`。暂存文件由宿主清理，返回文件相对路径与 SHA-256 即可确认保存。上传批次全部归档后，用户可点「开始入库」。OpenFlow 使用该批次已保存的回执启动知识入库工作流，由工作流登记来源与发布正式知识。
 
 OpenFlow 批量上传使用 `intake-preflight`。CLI 从暂存文件读取有限的样本，返回当前原件目录的分类、标题和短摘录，以及每个 Markdown 本地图片的匹配结果。分类来源是绑定库中实际存在的普通目录，支持诸如 `protocols/2026` 的多级路径。分类 ID 和显示名均使用该相对路径。`intake-categories` 可单独读取最新分类。图片按文档相对路径匹配上传文件。外部图片链接显示提示，内嵌位图随 Markdown 原文保存。
 

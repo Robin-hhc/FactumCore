@@ -58,7 +58,10 @@ def test_ingest_completed_batch_returns_to_scan_before_normal_completion():
     edges = {row["id"]: {edge["id"]: edge["target"] for edge in row["exits"]}
              for row in graph["nodes"]}
     assert edges["apply_view"] == {"completed": "prepare_sources", "needs_revision": "materialize_view"}
-    assert edges["prepare_sources"] == {"prepared": "plan_change", "unchanged": "__end__", "blocked": "__end__"}
+    assert edges["prepare_sources"] == {
+        "prepared": "plan_change", "next_upload_source": "prepare_sources",
+        "unchanged": "__end__", "blocked": "__end__",
+    }
     assert edges["plan_change"]["deferred"] == "__end__"
 
 
@@ -77,6 +80,7 @@ def test_patrol_reselects_after_completed_or_already_completed_selected_source()
 @pytest.mark.parametrize("workflow,node_id,exit_id,wrong_target", [
     ("hs-knowledge-ingest", "apply_view", "completed", "__end__"),
     ("hs-knowledge-ingest", "apply_view", "needs_revision", "prepare_sources"),
+    ("hs-knowledge-ingest", "prepare_sources", "next_upload_source", "__end__"),
     ("hs-knowledge-ingest", "plan_change", "deferred", "prepare_sources"),
     ("hs-knowledge-lint", "apply_view", "completed", "prepare_sources"),
     ("hs-knowledge-lint", "apply_view", "needs_revision", "plan_patrol"),

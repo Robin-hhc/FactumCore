@@ -14,6 +14,8 @@ P4 是独立 reviewer，其余为 coder。普通更新保留原生命周期，�
 
 `completed` 表示本批发布完成，随后继续 P1。`source_complete` 为 false 时，后续扫描会继续发现该来源的剩余范围。未指定来源时保持普通扫描，指定文件、目录或来源 ID 时沿用原始范围。解析配置、阅读预算与命令前缀沿用，`reprocess` 只在首次使用。P1 返回 `blocked` 或 P2 暂缓时，交代原因和剩余范围后结束当前任务。
 
+从 OpenFlow 上传记录启动时，使用宿主提供的 `upload_ingest` 清单。P1 按顺序核对原件路径和 SHA-256，每次只把当前主文档交给 `ingest scan --source`。当前主文档扫描到 `unchanged` 后才交接下一份的位置。位置随各节点的 `progressNote` 保存，扫描和发布沿用清单的执行端与知识根。
+
 每批按真实回执简要交接来源、实际范围和结果，最后汇总本次范围的处理情况。解析缓存可删重建，累计覆盖在正式来源登记中保留；P1/P5 清理保留 .build 根 README。Git 提交和推送另行授权。
 
 实际节点和转移由 workflow.yaml 维护；layouts.yaml 只维护画布。操作细节由各 Skill 提供，WiFi 领域设计见知识根的 `docs-llm-wiki/HiMate知识库详细设计.md`。

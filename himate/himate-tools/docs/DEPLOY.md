@@ -1,21 +1,21 @@
 # 安装与部署
 
-用户首次安装按以下顺序进行。通过 npm 安装模型和 CLI，检查命令版本，运行 `knowledge setup`，再用 deploy 脚本安装 Skills 和 Workflows，最后启动 OpenFlow。领域知识仓的 `docs-llm-wiki/HiMate知识库使用指南.md` 提供页面操作说明。
+在 OpenFlow 宿主部署 Skills 和 Workflows，在实际运行 `knowledge` 的机器上安装 CLI、模型和 Python 依赖。对于本地知识库，可在终端预装，也可从 OpenFlow 页面检查和补装。[HiMate 知识库使用指南](../../himate-knowledge-wifi-mp/docs-llm-wiki/HiMate知识库使用指南.md)
 
 ## 安装模型与 CLI
 
-执行机器需要 Node.js 18 或更新版本，以及带 pip 的 Python 3.10–3.12。使用运行 OpenFlow 的同一账户，先配置团队提供的内网 npm 源，再执行以下命令。
+执行机器需要 Node.js 18 或更新版本，以及带 pip 的 Python 3.10–3.12。本地知识库使用 OpenFlow 启动账户。Windows 宿主通过 Samba 绑定共享目录时，使用现有 SSH MCP 所连接的 Linux 账户，在 Linux 对端执行以下命令。
 
 ```sh
-npm install -g @himate/knowledge-models
-npm install -g @himate/knowledge-cli
+npm install -g @himate/knowledge-models --registry http://10.143.57.12:4873 --allow-scripts=@himate/knowledge-models
+npm install -g @himate/knowledge-cli --registry http://10.143.57.12:4873 --allow-scripts=@himate/knowledge-cli
 knowledge --version
 knowledge setup
 ```
 
 npm 注册全局 `knowledge` 命令。模型包校验并准备本机 OCR 模型，CLI 包安装运行代码。`knowledge setup` 使用选定的 Python 执行 `python -m pip install -r`，安装锁定依赖并复查。该解释器应有可用的 pip，安装位置应允许写入。
 
-使用会拦截安装脚本的 npm 客户端时，按其要求授权两个包的安装脚本。内网源和 npm 脚本策略的完整示例见 [npm 发布与安装](NPM-PUBLISH.md)。
+命令包含团队内网源，并为两个包分别授权安装脚本。[npm 发布与安装](NPM-PUBLISH.md#3-安装)
 
 ## 安装 Skills 与 Workflows
 
@@ -25,11 +25,11 @@ npm 注册全局 `knowledge` 命令。模型包校验并准备本机 OCR 模型�
 
 ## 启动 OpenFlow
 
-确认终端运行 `knowledge --version` 有版本输出，随后启动或重启 OpenFlow。OpenFlow 从启动账户的 PATH 查找全局命令，在页面上绑定含 `config.yml` 和 `docs-raw/` 的知识根。非默认安装目录需与宿主实际加载的能力目录一致。
+启动或重启 OpenFlow，使其加载部署好的能力。在知识库页选择含 `config.yml` 和 `docs-raw/` 的知识根，校验通过后保存绑定。非默认能力安装目录需与宿主实际加载的目录一致。
 
-OpenFlow 页面的环境检查调用 `knowledge doctor --environment-only --json`，安装环境调用 `knowledge setup --jsonl`，根据 CLI 输出显示阶段进度和最终结果。环境操作可以在绑定前执行。
+本地执行时，OpenFlow 从启动账户的 PATH 查找 `knowledge`。绑定前可以打开「环境检查」。缺少 CLI 时，点「同意并安装」后由宿主尝试执行上面的两条 npm 命令。缺少 Python 依赖时可点「安装环境」。检查调用 `knowledge doctor --environment-only --json`，补齐依赖调用 `knowledge setup --jsonl`。页面按 CLI 输出显示进度和结果。
 
-Agent 通过 SSH 在另一台机器执行时，在那台机器安装 npm 包和依赖，并使用其本机路径。知识根的 `config.yml` 和 `AGENTS.md` 由项目负责人维护。
+Windows 上选择 Samba 映射盘或共享路径时，在现有 SSH MCP 设置中确认连接并添加 Windows 到 Linux 的路径映射。CLI、模型和依赖在 Linux 对端安装。确认 SSH 账户的 PATH 能找到 `knowledge` 后，回到 OpenFlow 重新校验。Linux 原生部署使用宿主本地路径，浏览器通过反代访问时执行端仍是 Linux 宿主。知识根的 `config.yml` 和 `AGENTS.md` 由项目负责人维护。
 
 ## 检查与排查
 

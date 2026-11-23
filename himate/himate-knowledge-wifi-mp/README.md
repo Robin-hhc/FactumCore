@@ -2,13 +2,14 @@
 
 HiMate 将设计文档、规格和代码分析蒸馏为可追溯知识卡，供 Agent 在开发和问题定位时检索使用。
 
-参照[使用指南](docs-llm-wiki/HiMate知识库使用指南.md)部署工具包 `himate-tools` 和能力包 `himate-skills`。在 OpenFlow 知识库页绑定本库并检查环境，再添加原件，运行入库流程后即可查阅正式知识。扫描文档可按需为本库准备离线 OCR 模型。
+参照使用指南部署能力包 `himate-skills`，在 OpenFlow 知识库页校验目录、检查并补齐执行端的环境，再保存绑定。文件上传后可直接启动入库，发布后即可查阅正式知识。[使用指南](docs-llm-wiki/HiMate知识库使用指南.md)
 
 | 任务 | 入口 |
 |---|---|
-| 检查 Python 依赖、补装或注册 `knowledge` 命令 | OpenFlow 知识库页的「环境检查」和「安装环境」 |
-| 将文件按分类保存到原始资料 | OpenFlow 知识库页的「添加资料」 |
-| 处理新增、修改或删除的文档 | `hs-knowledge-ingest` Workflow |
+| 检查 CLI 和 Python 依赖 | OpenFlow 知识库页的「环境检查」 |
+| 将文件按分类保存到原始资料 | OpenFlow 知识库页的「文件上传」 |
+| 入库刚上传的文件 | 完成弹窗或「上传记录」里的「开始入库」 |
+| 手动处理其他新增、修改或删除的文档 | `hs-knowledge-ingest` Workflow |
 | 巡检原件和已引用代码的变化 | `hs-knowledge-lint` Workflow |
 | 检索、精读卡片及追溯来源 | `hs-knowledge-query` Skill |
 

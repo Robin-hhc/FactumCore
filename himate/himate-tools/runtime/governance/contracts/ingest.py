@@ -208,10 +208,13 @@ def _raw_files(root, selected=None):
     return sorted(set(found))
 
 
-def observe(root, catalog, selected=None, *, include_code=False, first=False, keep_content=False, reprocess=False):
+def observe(root, catalog, selected=None, *, include_code=False, code_review=False,
+            first=False, keep_content=False, reprocess=False):
     target = catalog.get_file(selected) if selected else None
+    if code_review and (target is None or target["kind"] != "code"):
+        raise ContractError("CODE_REVIEW_SOURCE_REQUIRED", "Select one registered code source ID")
     selected_path = target["path"] if target else selected
-    paths = _raw_files(root, selected_path)
+    paths = [] if code_review else _raw_files(root, selected_path)
     selected_directory = False
     if selected_path and not target:
         if selected_path != "docs-raw" and not selected_path.startswith("docs-raw/"):
@@ -224,19 +227,20 @@ def observe(root, catalog, selected=None, *, include_code=False, first=False, ke
         {"kind": "raw", "path": path} for path in paths
         if not selected_path or path == selected_path or path.startswith(selected_path.rstrip("/") + "/")
     ])
-    candidates = catalog.list_files()
     if target:
         candidates = [target]
-    elif selected_path:
-        candidates = [row for row in candidates if row["kind"] != "code" and
-                      (row["path"] == selected_path or row["path"].startswith(selected_path.rstrip("/") + "/"))]
-        if not candidates and not selected_directory:
-            raise ContractError("SOURCE_MISSING", selected_path)
-    elif not include_code:
-        candidates = [row for row in candidates if row["kind"] != "code"]
-    elif include_code:
-        referenced = {row["id"] for row in catalog.list_files(kind="code", referenced=True)}
-        candidates = [row for row in candidates if row["kind"] != "code" or row["id"] in referenced]
+    else:
+        candidates = catalog.list_files()
+        if selected_path:
+            candidates = [row for row in candidates if row["kind"] != "code" and
+                          (row["path"] == selected_path or row["path"].startswith(selected_path.rstrip("/") + "/"))]
+            if not candidates and not selected_directory:
+                raise ContractError("SOURCE_MISSING", selected_path)
+        elif include_code:
+            referenced = {row["id"] for row in catalog.list_files(kind="code", referenced=True)}
+            candidates = [row for row in candidates if row["kind"] != "code" or row["id"] in referenced]
+        else:
+            candidates = [row for row in candidates if row["kind"] != "code"]
     # Old registries may contain directory guidance mistakenly observed as raw.
     # Keep those identities readable, but never schedule them as source content.
     candidates = [row for row in candidates
@@ -251,16 +255,23 @@ def observe(root, catalog, selected=None, *, include_code=False, first=False, ke
             data = None
         current = sha(data) if data is not None else None
         exists = data is not None
-        processing = row.get("processing") or {}
-        unfinished = exists and processing.get("source_sha256") == current
-        if reprocess or unfinished or row.get("processed_exists") is None or bool(row["processed_exists"]) != exists or row.get("processed_hash") != current:
+        if row["kind"] == "code" and (include_code or code_review):
+            change = _code_review_change(root, catalog, row, data, current)
+        else:
+            processing = row.get("processing") or {}
+            unfinished = exists and processing.get("source_sha256") == current
+            if not (reprocess or unfinished or row.get("processed_exists") is None
+                    or bool(row["processed_exists"]) != exists or row.get("processed_hash") != current):
+                continue
             change = ("deleted" if not exists else "reprocess" if reprocess else
                       "resume" if unfinished else
                       "added" if row.get("processed_exists") is None else "modified")
-            pending.append({**row, "hash": current, "exists": exists, "change": change,
-                            **({"content": data} if keep_content else {})})
-            if first:
-                break
+        if change is None:
+            continue
+        pending.append({**row, "hash": current, "exists": exists, "change": change,
+                        **({"content": data} if keep_content else {})})
+        if first:
+            break
     return pending
 
 
@@ -340,7 +351,7 @@ def _checked_document_digest(root, batch, drafts, deletes):
 
 def scan(root, request):
     root = Path(root)
-    unknown = set(request) - {"source", "reprocess", "parser", "review_page_budget", "review_text_budget"}
+    unknown = set(request) - {"source", "reprocess", "parser", "review_page_budget", "review_text_budget", "code_review"}
     if unknown:
         raise ContractError("INVALID_INPUT", "Unknown scan fields: " + ", ".join(sorted(unknown))
                             + ". Put conversion settings in the top-level parser object.")
@@ -349,6 +360,9 @@ def scan(root, request):
     reprocess = request.get("reprocess", False)
     if type(reprocess) is not bool:
         raise ContractError("INVALID_REPROCESS", "reprocess must be a boolean")
+    code_review = request.get("code_review", False)
+    if type(code_review) is not bool or (code_review and reprocess):
+        raise ContractError("INVALID_CODE_REVIEW", "code_review is a boolean and cannot be combined with reprocess")
     page_budget = request.get("review_page_budget")
     if "review_page_budget" in request and (type(page_budget) is not int or not 1 <= page_budget <= 1000):
         raise ContractError("PDF_REVIEW_BUDGET", "review_page_budget must be an integer from 1 to 1000")
@@ -365,10 +379,14 @@ def scan(root, request):
             if registered is None:
                 raise ContractError("REPROCESS_SOURCE_REQUIRED", "Select one explicitly registered source ID or exact path")
             selected_source = registered["id"]
-        _clear_build(root)
-        pending = observe(root, catalog, selected_source, first=True, keep_content=True, reprocess=reprocess)
+        if not code_review:
+            _clear_build(root)
+        pending = observe(root, catalog, selected_source, code_review=code_review, first=True,
+                          keep_content=True, reprocess=reprocess)
         if not pending:
             return {"pending": 0}, "unchanged"
+        if code_review:
+            _clear_build(root)
         selected = pending[0]
         catalog.touch_attempt(selected["id"])
         cards = catalog.cards_for(selected["id"])
@@ -425,6 +443,8 @@ def scan(root, request):
     task = {"source": source, "affected_cards": [{"id": card["id"], "path": card["path"],
                                                  "title": card["title"]} for card in cards],
             "cards_dir": ".build/cards", "plan_ref": ".build/plan.md", "gaps": gaps}
+    if code_review:
+        task["code_review"] = True
     if pdf_review is not None:
         task["pdf_review"] = pdf_review
     if review is not None:
@@ -583,14 +603,14 @@ def _reference_check(root, source, reference, staged=None, *, extractor=None, co
             data, _ = old_source(root, source)
         context["data"][identity] = data
     if source["kind"] == "code":
-        text, _ = source_resources.extract_code_text(data, extractor or "code-utf8:1")
         symbol = reference.get("symbol")
         if symbol or reference.get("selector"):
             from .code_symbols import resolve
 
             selector = reference.get("selector") or (symbol if isinstance(symbol, dict)
                                                       else {"kind": "function", "name": symbol})
-            result = resolve(data, selector, path=source["path"], extractor=extractor)
+            result = resolve(data, selector, path=source["path"], extractor=extractor,
+                             cache=context.setdefault("code_symbols", {}))
             if result["status"] != "resolved":
                 raise ContractError("CODE_SYMBOL_" + result["status"].upper(), str(symbol or selector), source["path"])
             if "line_start" in reference and (
@@ -599,6 +619,7 @@ def _reference_check(root, source, reference, staged=None, *, extractor=None, co
             ):
                 raise ContractError("CODE_RANGE_CHANGED", "Update the symbol's current line range", source["path"])
             return result
+        text, _ = source_resources.extract_code_text(data, extractor or "code-utf8:1")
         addresses = []
     else:
         suffix = path.suffix.lower()
@@ -637,6 +658,72 @@ def _reference_check(root, source, reference, staged=None, *, extractor=None, co
     if reference.get("section") and reference["section"] not in text:
         raise ContractError("SOURCE_SECTION_MISSING", reference["section"], source["path"])
     return None
+
+
+def _code_reference_findings(root, source, references, data):
+    findings = []
+    extractor = code_extractor(source)
+    context = {}
+    for card_id, reference in references:
+        if reference.get("snapshot_id"):
+            continue
+        try:
+            _reference_check(root, source, reference, data, extractor=extractor, context=context)
+        except (ValueError, OSError, ContractError, subprocess.TimeoutExpired) as error:
+            findings.append({**_finding(error, source["path"]), "card_id": card_id})
+    return findings
+
+
+def _code_review_change(root, catalog, source, data, digest):
+    references = catalog.reference_rows(source["id"])
+    if not references:
+        return None
+    if data is None:
+        return None if source["processed_exists"] is False else "deleted"
+    if source["processed_exists"] is None:
+        return "baseline_missing"
+    if not source["processed_exists"] or source.get("processed_hash") != digest:
+        return "modified"
+
+    check_input = sha(canonical_bytes([digest, source["path"], source.get("encoding"), references]))
+    if catalog.code_references_checked(source["id"], check_input):
+        return None
+    findings = _code_reference_findings(
+        root, source, ((card_id, json.loads(value)) for card_id, value in references), data)
+    if findings:
+        return "reference_invalid"
+    catalog.record_code_reference_check(source["id"], check_input)
+    return None
+
+
+def _code_review_findings(root, catalog, task, drafts, deletes, data):
+    source = task["source"]
+    approved = {card["id"]: card["path"] for card in task["affected_cards"]}
+    replacements = {card["id"]: card for card in drafts}
+    stored_references = catalog.reference_rows(source["id"])
+    current_cards = {card_id for card_id, _ in stored_references}
+    findings = []
+    for card in drafts:
+        existing = catalog.get_card(card["id"])
+        # A P5 retry may find an already copied card that removed this reference.
+        # Allow that identical write while rejecting changes to unrelated cards.
+        if (approved.get(card["id"]) != card["path"] or existing is None or existing["path"] != card["path"]
+                or (card["id"] not in current_cards and existing["raw"] != card["raw"])):
+            error = ContractError("CODE_REVIEW_SCOPE", "Update only existing affected cards at their original paths")
+            findings.append(_finding(error, card["path"]))
+    for path in sorted(deletes):
+        error = ContractError("CODE_REVIEW_SCOPE", "Code review cannot delete cards")
+        findings.append(_finding(error, path))
+    if findings or data is None:
+        return findings
+
+    # Check the effective published view as well as drafts. An empty plan must
+    # not complete a review while a live reference still points to the wrong range.
+    references = [(card_id, json.loads(value))
+                  for card_id, value in stored_references if card_id not in replacements]
+    references.extend((card["id"], reference) for card in drafts for reference in card["code_ref"]
+                      if reference["code_id"] == source["id"])
+    return _code_reference_findings(root, source, references, data)
 
 
 def _snapshot_reference_check(root, source, reference, snapshot, registry, context):
@@ -729,6 +816,9 @@ def check(root, request, rules=None):
                                                   expected_sha256=source["hash"])
                     context["loaded"][(source["source_id"], source["hash"])] = loaded
                 document_batch = _review_batch(root, task, context["loaded"].get((source["source_id"], source["hash"])))
+                if task.get("code_review"):
+                    findings.extend(_code_review_findings(
+                        root, catalog, task, drafts, deletes, staged_sources.get(source["id"])))
         except (ValueError, OSError, ContractError, yaml.YAMLError) as error:
             return {"findings": [_finding(error)]}, "failed"
         if planned is not None:
@@ -859,6 +949,19 @@ def commit(root, request):
         deletes = _deletes(root)
         if request.get("defer"):
             return {"source_id": source["source_id"], "reason": request.get("reason", "Materials are incomplete")}, "deferred"
+        if task.get("code_review"):
+            catalog.refresh()
+            try:
+                code_bytes = source_path(root, source).read_bytes()
+            except FileNotFoundError:
+                code_bytes = None
+            current_digest = sha(code_bytes) if code_bytes is not None else None
+            if current_digest != source["hash"]:
+                raise ContractError("SOURCE_CHANGED", "Run code review again for the current source version")
+            findings = _code_review_findings(root, catalog, task, drafts, deletes, code_bytes)
+            if findings:
+                first_finding = findings[0]
+                raise ContractError(first_finding["code"], first_finding["message"], first_finding["path"])
         document_batch = _review_batch(root, task)
         pdf_batch = document_batch["pdf_batch"] if document_batch is not None else None
         if not drafts and not request.get("reason"):

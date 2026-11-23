@@ -190,6 +190,9 @@ class Catalog:
                 PRIMARY KEY(card_id,file_id,reference)
             );
             CREATE INDEX IF NOT EXISTS card_files_file ON card_files(file_id,card_id);
+            CREATE TABLE IF NOT EXISTS checked_code_references (
+                file_id TEXT PRIMARY KEY, input_sha256 TEXT NOT NULL
+            );
             """)
             with self.transaction():
                 if "encoding" not in {row["name"] for row in self.connection.execute("PRAGMA table_info(files)")}:
@@ -452,6 +455,22 @@ class Catalog:
             SELECT DISTINCT c.* FROM cards c JOIN card_files r ON r.card_id=c.id
             WHERE r.file_id=? ORDER BY c.id
         """, (file_id,))]
+
+    def reference_rows(self, file_id):
+        return [tuple(row) for row in self.connection.execute("""
+            SELECT card_id,reference FROM card_files WHERE file_id=? ORDER BY card_id,reference
+        """, (file_id,))]
+
+    def code_references_checked(self, file_id, digest):
+        return self.connection.execute("""
+            SELECT 1 FROM checked_code_references WHERE file_id=? AND input_sha256=?
+        """, (file_id, digest)).fetchone() is not None
+
+    def record_code_reference_check(self, file_id, digest):
+        self.connection.execute("""
+            INSERT INTO checked_code_references VALUES(?,?)
+            ON CONFLICT(file_id) DO UPDATE SET input_sha256=excluded.input_sha256
+        """, (file_id, digest))
 
     def files_for(self, card_id):
         rows = self.connection.execute("""

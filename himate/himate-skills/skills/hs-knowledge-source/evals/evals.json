@@ -30,6 +30,16 @@
         "交接列出 packet_ref、page_index_ref、已登记来源 ID 和实际候选起止页。",
         "本批扫描的请求中省略 reprocess，保留既有处理进度。"
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "L2 交接了 code-wait，kind 是 code，change 是 baseline_missing，已有等待时序卡引用它。请准备这批代码巡检材料。",
+      "expected_output": "用代码复核请求准备已选来源，交接 CLI 返回的受影响卡片。",
+      "expectations": [
+        "使用 ingest scan --input FILE.json --json，请求 source 为 code-wait 且 code_review 为 true。",
+        "只有任务返回代码复核标记、来源身份匹配并提供 affected_cards，才交给 P2。",
+        "交接保留 baseline_missing、实际 task 和材料入口。"
+      ]
     }
   ]
 }

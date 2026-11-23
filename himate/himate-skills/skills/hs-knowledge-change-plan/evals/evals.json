@@ -30,6 +30,16 @@
         "相关旧卡保持原生命周期，处理进度保留待办。",
         "没有把有缺口的范围登记为已评估无增量。"
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "task.code_review 已启用，affected_cards 只列 knowledge/rules/scan-timing.md，ID 是 scan-timing。wait_reply 的定义下移两行，结论没变。同文件另外新增了统计功能，与老卡无关。请制定巡检计划。",
+      "expected_output": "沿用旧卡 ID 和路径修订定位，保持原有结论，统计功能作为待报告主题。",
+      "expectations": [
+        "cards 只列 scan-timing 和 knowledge/rules/scan-timing.md。",
+        "计划写明符号行段如何修正，并保留仍成立的等待时序结论。",
+        "保留统计功能的证据位置供 L4 汇报，候选和删除清单保持在代码复核允许的范围。"
+      ]
     }
   ]
 }

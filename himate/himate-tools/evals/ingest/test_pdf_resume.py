@@ -156,6 +156,33 @@ def test_partial_pdf_resumes_after_cache_and_database_rebuild_then_completes(lib
     assert (root / ".build/README.md").read_bytes() == b"Local staging only.\r\n"
 
 
+def test_restored_same_hash_pdf_restarts_once_then_continues_remaining_pages(library):
+    root = library
+    ingest = module("ingest")
+    original = (root / "docs-raw/protocol.pdf").read_bytes()
+    first = prepare(root)
+    identity = first["source"]["source_id"]
+    with module("catalog").Catalog(root) as catalog:
+        catalog.mark_processed(identity, first["source"]["hash"])
+    (root / "docs-raw/protocol.pdf").unlink()
+    assert ingest.maintenance_prepare(root, {"source": identity})[1] == "prepared"
+    plan(root, None)
+    assert ingest.maintenance_check(root, {})[1] == "passed"
+    assert ingest.maintenance_commit(root, {"reason": "Keep the processed historical source identity."})[1] == "completed"
+    (root / "docs-raw/protocol.pdf").write_bytes(original)
+    task = prepare(root)
+    assert task["pdf_review"]["start_page"] == 1
+    plan(root, [[1, 2]])
+    assert ingest.check(root, {})[1] == "passed"
+    receipt, phase = ingest.commit(root, {"reason": "Reassessed the first restored range."})
+    assert phase == "completed" and receipt["source_complete"] is False, receipt
+    task = prepare(root)
+    assert task["source"]["change"] == "resume"
+    assert task["pdf_review"]["start_page"] == 3
+    with module("catalog").Catalog(root) as catalog:
+        assert "reference_review" not in catalog.get_file(identity)
+
+
 @pytest.mark.parametrize("pages", [None, [], [[2, 2]], [[1, 3]], [[1, True]], [[1, 1], [2, 2]]])
 def test_pdf_plan_must_explicitly_cover_the_bounded_batch_before_check_or_apply(library, pages):
     prepare(library)

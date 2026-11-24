@@ -1,6 +1,6 @@
 ---
 name: hs-knowledge-patrol-reindex
-description: 从正式卡和来源登记刷新关系及检索索引，用于巡检 L3。
+description: 从正式卡和来源登记刷新关系及检索索引，用于巡检 L7。
 ---
 
 # 刷新巡检索引
@@ -9,6 +9,6 @@ description: 从正式卡和来源登记刷新关系及检索索引，用于巡�
 
 ## 执行
 
-运行 `knowledge patrol reindex --json`。已有索引时增量更新，首次生成完整索引。收到 `reindexed` 后交 L4。
+运行 `knowledge patrol reindex --json`。已有索引时增量更新，首次生成完整索引。收到 `reindexed` 后交 L2。
 
 索引刷新更新派生数据，知识结论、原件和已处理的来源版本沿用正式资料。失败报告具体问题。

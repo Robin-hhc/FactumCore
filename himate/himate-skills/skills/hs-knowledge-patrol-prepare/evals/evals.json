@@ -1,0 +1,35 @@
+{
+  "skill_name": "hs-knowledge-patrol-prepare",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "L2 选中 code-wait，change 为 baseline_missing，正式等待时序卡引用它，请准备本批维护材料。",
+      "expected_output": "采用维护入口固定已有卡任务和材料，不将代码作为文档入库。",
+      "expectations": [
+        "调用 maintain prepare，source 为 code-wait。",
+        "核对 task_type=card_maintenance、来源身份和实际 affected_cards 后交 L4。",
+        "保留 baseline_missing 的复核含义，正式卡及原件字节不变。"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "L2 选中 code-radio，但备料返回的 task 来源身份不符，关联卡列表也属于另一文件。请继续本轮。",
+      "expected_output": "报告备料身份不符并保留待办。",
+      "expectations": [
+        "未将错误任务交给 L4。",
+        "报告预期 code-radio 与实际身份的差异。",
+        "没有手工改 task 来源或扩大关联卡范围以继续。"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "文档 doc-retired 已被删除，旧提交仍能恢复其历史内容，两张正式卡引用它。L2 将其交给已有卡维护，请准备材料。",
+      "expected_output": "交接实际缺失事实、关联卡和可信历史证据入口。",
+      "expectations": [
+        "使用维护入口处理选中来源，未重新入库文档。",
+        "清楚区分当前缺失和可恢复历史版本。",
+        "未自动退役卡片或删除历史文档引用。"
+      ]
+    }
+  ]
+}

@@ -341,9 +341,11 @@ def patrol(root, action, request):
             pending = ingest.observe(root, catalog, include_code=True, first=True)
             if pending:
                 selected = pending[0]
+                maintenance = selected["kind"] == "code" or not selected["exists"]
                 return {"next_file": {"source_id": selected["id"], "kind": selected["kind"], "path": selected["path"],
-                                      "change": selected["change"]},
-                        "pending_at_least": len(pending)}, "needs_ingest"
+                                      "change": selected["change"],
+                                      "task_type": "card_maintenance" if maintenance else "document_ingest"},
+                        "pending_at_least": len(pending)}, "needs_maintenance" if maintenance else "needs_ingest"
             if search_stale(catalog) or panel.stale(catalog):
                 return {"pending": 0}, "needs_reindex"
             return {"pending": 0}, "unchanged"

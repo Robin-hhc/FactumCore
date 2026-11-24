@@ -145,7 +145,7 @@ def _profile(options, suffix, root):
     if options["pipeline"] == "standard" and suffix in ({".pdf"} | IMAGE_FORMATS):
         directory = _model_directory(root, options)
         for path in sorted(directory.rglob("*")):
-            if path.is_file() and ".cache" not in path.parts and path.suffix in {".json", ".safetensors", ".onnx", ".bin", ".pth", ".txt", ".yaml"}:
+            if path.is_file() and ".cache" not in path.relative_to(directory).parts and path.suffix in {".json", ".safetensors", ".onnx", ".bin", ".pth", ".txt", ".yaml"}:
                 safe_path(directory, path.relative_to(directory).as_posix())
                 digest = hashlib.sha256()
                 with path.open("rb") as stream:

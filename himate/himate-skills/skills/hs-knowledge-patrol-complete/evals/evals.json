@@ -3,7 +3,7 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "给已绑定的验收库做个 L4 汇总。P5 回执确认 docs-raw/specs/delay.md 已处理，L4 统计返回 completed、remaining 为 0，本轮没有错误。",
+      "prompt": "给已绑定的验收库做个 L8 汇总。P5 回执确认 docs-raw/specs/delay.md 已处理，L8 统计返回 completed、remaining 为 0，本轮没有错误。",
       "expected_output": "给出已处理文件及零剩余的统计，并指出巡检报告落点。",
       "expectations": [
         "报告列出 docs-raw/specs/delay.md 为本轮确认已处理的文件，并明确剩余来源为 0。",
@@ -12,11 +12,21 @@
     },
     {
       "id": 2,
-      "prompt": "先把这轮巡检收个尾。P5 回执显示 docs-raw/specs/scan.pdf 的第 1–3 页已发布，但 source_complete 为 false。编辑计划记录后面的页暂缓，因为插图无法确认。L4 统计返回 completed、remaining 为 1。",
+      "prompt": "先把这轮巡检收个尾。P5 回执显示 docs-raw/specs/scan.pdf 的第 1–3 页已发布，但 source_complete 为 false。编辑计划记录后面的页暂缓，因为插图无法确认。L8 统计返回 completed、remaining 为 1。",
       "expected_output": "汇报本轮已发布的页范围和暂缓原因，当前仍有一份来源待处理。",
       "expectations": [
         "报告说明 scan.pdf 仅第 1–3 页已发布，剩余来源数量为 1，并记录插图无法确认的暂缓原因。",
         "报告将 completed 解释为统计结束，未将整份 PDF 标记完成或另建全库成功水位。"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "L6 回执表明复核两张关联卡、只修改其中一张，maintenance_complete=true；L8 的真实统计仍有一份文档待办。请汇总本轮。",
+      "expected_output": "区分实际改卡和复核范围，报告剩余文档待办。",
+      "expectations": [
+        "使用本次 L6 回执区分 reviewed_card_ids 与 card_ids。",
+        "未将维护成功解释为整份代码入库，未因本批成功宣称全库无待办。",
+        "列出剩余文档及实际原因，使用 L8 真实统计。"
       ]
     }
   ]

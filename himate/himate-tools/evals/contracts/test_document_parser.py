@@ -399,6 +399,24 @@ def test_standard_uses_npm_models_without_writing_them_into_knowledge(tmp_path, 
     assert before != after
 
 
+def test_model_profile_keeps_models_below_a_cache_ancestor_and_ignores_internal_cache(tmp_path, monkeypatch):
+    home = tmp_path / ".cache/profile"
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: home))
+    models = home / ".himate/knowledge/tools/deploy/models/docling-cpu"
+    write_models(models)
+    internal_cache = models / ".cache/download.json"
+    internal_cache.parent.mkdir()
+    internal_cache.write_bytes(b"temporary download metadata")
+    options = parser._options(tmp_path, {"pipeline": "standard"})
+    before = parser._profile(options, ".pdf", tmp_path)
+    assert {row["ref"] for row in before["model_files"]} == set(parser.OCR_MODEL_FILES)
+
+    internal_cache.write_bytes(b"changed temporary metadata")
+    assert parser._profile(options, ".pdf", tmp_path) == before
+    (models / parser.OCR_MODEL_FILES[0]).write_bytes(b"updated actual model")
+    assert parser._profile(options, ".pdf", tmp_path) != before
+
+
 def test_explicit_model_directory_keeps_priority_over_npm_models(tmp_path, isolated_model_home):
     write_models(isolated_model_home / ".himate/knowledge/tools/deploy/models/docling-cpu")
     explicit = tmp_path / "artifacts/models/custom"

@@ -121,7 +121,7 @@ def test_explicit_unsupported_file_remains_an_error(library, scope):
 
 
 @pytest.mark.parametrize("directory_exists", [True, False], ids=["directory-retained", "directory-removed"])
-def test_directory_scope_still_schedules_registered_deleted_document(library, directory_exists):
+def test_directory_ingest_leaves_registered_deleted_document_to_maintenance(library, directory_exists):
     original = put(library, "selected/deleted.md")
     scope = {"source": "docs-raw/selected"}
     result, phase = module("ingest").scan(library, scope)
@@ -133,7 +133,10 @@ def test_directory_scope_still_schedules_registered_deleted_document(library, di
         original.parent.rmdir()
 
     result, phase = module("ingest").scan(library, scope)
-
+    assert phase == "unchanged", result
+    planned, phase = module("library").patrol(library, "plan", {})
+    assert phase == "needs_maintenance" and planned["next_file"]["source_id"] == identity
+    result, phase = module("ingest").maintenance_prepare(library, {"source": identity})
     assert phase == "prepared", result
     assert result["source"]["source_id"] == identity
     assert result["source"]["path"] == "docs-raw/selected/deleted.md"
@@ -143,6 +146,6 @@ def test_directory_scope_still_schedules_registered_deleted_document(library, di
     assert "original_ref" not in result["source"]
     complete_selected(library)
     with module("catalog").Catalog(library) as catalog:
-        assert catalog.get_file(identity)["processed_exists"] is False
+        assert catalog.get_file(identity)["reference_review"]["exists"] is False
     result, phase = module("ingest").scan(library, scope)
     assert phase == "unchanged" and result["pending"] == 0, result

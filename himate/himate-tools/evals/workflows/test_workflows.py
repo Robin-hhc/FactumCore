@@ -38,6 +38,20 @@ def validate_distribution(capabilities):
     return validator_module().validate(capabilities.with_name("himate-tools"))
 
 
+def workflow_nodes(workflow):
+    graph = yaml.safe_load((CAPABILITIES_ROOT / "workflows" / workflow / "workflow.yaml").read_bytes())
+    return {node["id"]: node for node in graph["nodes"]}
+
+
+def follow(nodes, start, exits):
+    current, trace = start, []
+    for exit_id in exits:
+        trace.append(current)
+        choices = {edge["id"]: edge["target"] for edge in nodes[current]["exits"]}
+        current = choices[exit_id]
+    return trace, current
+
+
 def test_current_distribution_is_structurally_valid():
     assert validator_module().validate(TOOL_ROOT, CAPABILITIES_ROOT) == []
 
@@ -57,7 +71,10 @@ def test_ingest_completed_batch_returns_to_scan_before_normal_completion():
     graph = yaml.safe_load((CAPABILITIES_ROOT / "workflows/hs-knowledge-ingest/workflow.yaml").read_bytes())
     edges = {row["id"]: {edge["id"]: edge["target"] for edge in row["exits"]}
              for row in graph["nodes"]}
-    assert edges["apply_view"] == {"completed": "prepare_sources", "needs_revision": "materialize_view"}
+    assert edges["apply_view"] == {
+        "completed": "prepare_sources", "needs_revision": "materialize_view",
+        "retry": "apply_view", "failed": "__end__",
+    }
     assert edges["prepare_sources"] == {
         "prepared": "plan_change", "next_upload_source": "prepare_sources",
         "unchanged": "__end__", "blocked": "__end__",
@@ -69,7 +86,10 @@ def test_patrol_reselects_after_completed_or_already_completed_selected_source()
     graph = yaml.safe_load((CAPABILITIES_ROOT / "workflows/hs-knowledge-lint/workflow.yaml").read_bytes())
     edges = {row["id"]: {edge["id"]: edge["target"] for edge in row["exits"]}
              for row in graph["nodes"]}
-    assert edges["apply_view"] == {"completed": "plan_patrol", "needs_revision": "materialize_view"}
+    assert edges["apply_view"] == {
+        "completed": "plan_patrol", "needs_revision": "materialize_view",
+        "retry": "apply_view", "failed": "complete_patrol",
+    }
     assert edges["prepare_sources"]["unchanged"] == "plan_patrol"
     assert edges["prepare_sources"]["blocked"] == "complete_patrol"
     assert edges["plan_patrol"]["needs_ingest"] == "prepare_sources"
@@ -77,15 +97,62 @@ def test_patrol_reselects_after_completed_or_already_completed_selected_source()
     assert edges["plan_change"]["deferred"] == "complete_patrol"
 
 
-def test_patrol_hands_off_change_and_selects_scoped_code_review():
-    graph = yaml.safe_load((CAPABILITIES_ROOT / "workflows/hs-knowledge-lint/workflow.yaml").read_bytes())
-    prompts = {node["id"]: node["prompt"] for node in graph["nodes"]}
-    assert all(field in prompts["plan_patrol"] for field in ("data.next_file", "source_id", "kind", "path", "change"))
-    assert '"code_review":true' in prompts["prepare_sources"]
-    for node in ("plan_change", "materialize_view", "lint_view"):
-        assert "task.code_review" in prompts[node]
-        assert "affected_cards" in prompts[node]
-    assert "cards: []" in prompts["lint_view"]
+def test_patrol_routes_documents_and_existing_card_maintenance_before_authoring():
+    nodes = workflow_nodes("hs-knowledge-lint")
+    decisions = {edge["id"]: edge["target"] for edge in nodes["plan_patrol"]["exits"]}
+    assert decisions == {
+        "needs_ingest": "prepare_sources", "needs_maintenance": "prepare_maintenance",
+        "needs_reindex": "refresh_index", "unchanged": "complete_patrol", "blocked": "complete_patrol",
+    }
+    document_trace, document_end = follow(nodes, "plan_patrol", [
+        "needs_ingest", "prepared", "content_planned", "ready", "passed", "completed",
+    ])
+    assert document_trace == [
+        "plan_patrol", "prepare_sources", "plan_change", "materialize_view", "lint_view", "apply_view",
+    ]
+    assert document_end == "plan_patrol"
+    maintenance_trace, maintenance_end = follow(nodes, "plan_patrol", [
+        "needs_maintenance", "prepared", "ready", "passed", "completed",
+    ])
+    assert maintenance_trace == [
+        "plan_patrol", "prepare_maintenance", "repair_cards", "review_maintenance", "apply_maintenance",
+    ]
+    assert maintenance_end == "plan_patrol"
+    assert not set(document_trace[1:]) & set(maintenance_trace[1:])
+    assert [nodes[node]["owner"] for node in maintenance_trace[1:]] == ["coder", "coder", "reviewer", "coder"]
+
+
+def test_maintenance_revisions_and_input_refresh_stay_in_the_maintenance_branch():
+    nodes = workflow_nodes("hs-knowledge-lint")
+    trace, target = follow(nodes, "review_maintenance", ["needs_revision", "ready", "passed"])
+    assert trace == ["review_maintenance", "repair_cards", "review_maintenance"]
+    assert target == "apply_maintenance"
+    for start in ("repair_cards", "review_maintenance", "apply_maintenance"):
+        trace, target = follow(nodes, start, ["needs_preparation", "prepared"])
+        assert trace == [start, "prepare_maintenance"]
+        assert target == "repair_cards"
+    trace, target = follow(nodes, "review_maintenance", ["deferred", "completed"])
+    assert trace == ["review_maintenance", "complete_patrol"]
+    assert target == "__end__"
+
+
+@pytest.mark.parametrize("workflow,publish,failed", [
+    ("hs-knowledge-ingest", "apply_view", "__end__"),
+    ("hs-knowledge-lint", "apply_view", "complete_patrol"),
+    ("hs-knowledge-lint", "apply_maintenance", "complete_patrol"),
+])
+def test_publication_retries_the_same_batch_and_unknown_state_stops(workflow, publish, failed):
+    nodes = workflow_nodes(workflow)
+    trace, target = follow(nodes, publish, ["retry", "retry", "failed"])
+    assert trace == [publish, publish, publish]
+    assert target == failed
+
+
+def test_index_refresh_returns_to_selection_before_summary():
+    nodes = workflow_nodes("hs-knowledge-lint")
+    trace, target = follow(nodes, "plan_patrol", ["needs_reindex", "reindexed", "unchanged", "completed"])
+    assert trace == ["plan_patrol", "refresh_index", "plan_patrol", "complete_patrol"]
+    assert target == "__end__"
 
 
 @pytest.mark.parametrize("workflow,node_id,exit_id,wrong_target", [
@@ -97,6 +164,14 @@ def test_patrol_hands_off_change_and_selects_scoped_code_review():
     ("hs-knowledge-lint", "apply_view", "needs_revision", "plan_patrol"),
     ("hs-knowledge-lint", "prepare_sources", "unchanged", "complete_patrol"),
     ("hs-knowledge-lint", "plan_change", "deferred", "plan_patrol"),
+    ("hs-knowledge-lint", "plan_patrol", "needs_maintenance", "prepare_sources"),
+    ("hs-knowledge-lint", "review_maintenance", "needs_revision", "materialize_view"),
+    ("hs-knowledge-lint", "review_maintenance", "deferred", "prepare_maintenance"),
+    ("hs-knowledge-lint", "apply_maintenance", "retry", "prepare_maintenance"),
+    ("hs-knowledge-lint", "apply_maintenance", "completed", "complete_patrol"),
+    ("hs-knowledge-lint", "apply_maintenance", "failed", "plan_patrol"),
+    ("hs-knowledge-ingest", "apply_view", "retry", "prepare_sources"),
+    ("hs-knowledge-ingest", "apply_view", "failed", "prepare_sources"),
 ])
 def test_loop_boundaries_cannot_terminate_early_or_repeat_blocked_sources(
         distribution, workflow, node_id, exit_id, wrong_target):
@@ -132,16 +207,23 @@ def test_authoring_template_links_resolve_within_the_skill_package(distribution)
                for error in validate_distribution(distribution))
 
 
-@pytest.mark.parametrize("workflow", ["hs-knowledge-ingest", "hs-knowledge-lint"])
-def test_review_cannot_run_as_the_author(distribution, workflow):
+@pytest.mark.parametrize("workflow,node_id", [
+    ("hs-knowledge-ingest", "lint_view"),
+    ("hs-knowledge-lint", "lint_view"),
+    ("hs-knowledge-lint", "review_maintenance"),
+])
+def test_review_cannot_run_as_the_author(distribution, workflow, node_id):
     path = distribution / "workflows" / workflow / "workflow.yaml"
     value = yaml.safe_load(path.read_bytes())
-    next(row for row in value["nodes"] if row["id"] == "lint_view")["owner"] = "coder"
+    next(row for row in value["nodes"] if row["id"] == node_id)["owner"] = "coder"
     path.write_text(yaml.safe_dump(value), encoding="utf-8")
-    assert any("lint_view: wrong Skill/owner/type" in error for error in validate_distribution(distribution))
+    assert any(node_id + ": wrong Skill/owner/type" in error for error in validate_distribution(distribution))
 
 
-@pytest.mark.parametrize("node_id", ["sync_workspace", "plan_patrol", "refresh_index", "complete_patrol"])
+@pytest.mark.parametrize("node_id", [
+    "sync_workspace", "plan_patrol", "prepare_maintenance", "repair_cards",
+    "review_maintenance", "apply_maintenance", "refresh_index", "complete_patrol",
+])
 def test_each_patrol_step_has_its_own_narrow_skill(distribution, node_id):
     path = distribution / "workflows/hs-knowledge-lint/workflow.yaml"
     value = yaml.safe_load(path.read_bytes())

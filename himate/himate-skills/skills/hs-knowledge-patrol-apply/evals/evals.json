@@ -1,0 +1,35 @@
+{
+  "skill_name": "hs-knowledge-patrol-apply",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "本维护批次已通过 L5，实际修订 rx-rule；命令将返回 completed、maintenance_complete=true、reviewed_card_ids=[rx-rule] 和当前 reviewed_hash。请发布并交接。",
+      "expected_output": "发布维护批次并报告实际卡片和复核版本。",
+      "expectations": [
+        "同一知识根调用 maintain commit，不改用 ingest commit。",
+        "交接实际 card_ids、reviewed_card_ids、reviewed_hash 与 source_exists。",
+        "没有宣称整份代码已入库或登记文档阅读覆盖。"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "L5 已逐卡确认本批代码引用和结论仍成立，cards: []。请登记本批复核结果。",
+      "expected_output": "用实际无修改理由登记维护完成。",
+      "expectations": [
+        "maintain commit 输入 reason 说明本批实际复核结果。",
+        "回执用于区分复核卡集合与空的实际改卡集合。",
+        "未生成新卡或跳过 L5。"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "维护发布失败，已审稿保留在 .build，执行端暂时无法确认正式卡是否写入。请处理。",
+      "expected_output": "保留同批现场并报告状态不明。",
+      "expectations": [
+        "没有重新备料、清理 .build 或修改已审候选。",
+        "能够核实并恢复时重试同一批，否则报告失败及未完成事项。",
+        "未按 completed 推进下一来源。"
+      ]
+    }
+  ]
+}

@@ -107,6 +107,27 @@ def _processing(source):
     return {**value, "reviewed_pages": reviewed}
 
 
+def _reference_review(source):
+    value = source.get("reference_review")
+    if value is None:
+        return None
+    if (not isinstance(value, dict)
+            or set(value) - {"last_present_sha256"} != {"source_sha256", "exists", "reviewed_at", "source_commit"}
+            or type(value["exists"]) is not bool or not isinstance(value["reviewed_at"], str)
+            or not value["reviewed_at"]
+            or value["exists"] and not re.fullmatch(r"[0-9a-f]{64}", str(value["source_sha256"]))
+            or not value["exists"] and value["source_sha256"] is not None
+            or value["source_commit"] is not None and not re.fullmatch(r"[0-9a-f]{40,64}", str(value["source_commit"]))
+            or "last_present_sha256" in value and not re.fullmatch(r"[0-9a-f]{64}", str(value["last_present_sha256"]))):
+        raise ContractError("INVALID_REFERENCE_REVIEW", "Use a reviewed source version, existence and timestamp")
+    return value
+
+
+def _clear_deleted_document_review(source):
+    if source.get("kind") == "raw" and source.get("reference_review", {}).get("exists") is False:
+        source.pop("reference_review", None)
+
+
 def pdf_review_result(source, source_hash, pages, total_pages, *, restart=False, review_sha256=None):
     """Project confirmed coverage without writing; None means complete coverage."""
     identity = source.get("source_id", source.get("id", "")) if isinstance(source, dict) else ""
@@ -193,6 +214,9 @@ class Catalog:
             CREATE TABLE IF NOT EXISTS checked_code_references (
                 file_id TEXT PRIMARY KEY, input_sha256 TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS maintenance_input (
+                singleton INTEGER PRIMARY KEY CHECK(singleton=1), payload TEXT NOT NULL
+            );
             """)
             with self.transaction():
                 if "encoding" not in {row["name"] for row in self.connection.execute("PRAGMA table_info(files)")}:
@@ -276,6 +300,7 @@ class Catalog:
         for source in self.registry["resources"]:
             if isinstance(source, dict):
                 _processing(source)
+                _reference_review(source)
 
     def _sync_resources(self):
         resources = {}
@@ -416,6 +441,9 @@ class Catalog:
         processing = _processing(self._resources_by_id[value["id"]])
         if processing is not None:
             value["processing"] = processing
+        review = _reference_review(self._resources_by_id[value["id"]])
+        if review is not None:
+            value["reference_review"] = review
         return value
 
     def get_file(self, file_id):
@@ -615,6 +643,8 @@ class Catalog:
                  "processed_at": datetime.now(timezone.utc).isoformat(), "source_commit": source_commit}
         if not exists:
             resource.pop("processing", None)
+        else:
+            _clear_deleted_document_review(resource)
         resource.update(value)
         self._sync_resources()
         self._save_registry()
@@ -636,6 +666,7 @@ class Catalog:
                 resource.pop("processing", None)
                 return self.mark_processed(file_id, source_hash, source_commit=source_commit)
             resource["processing"] = processing
+            _clear_deleted_document_review(resource)
             self._sync_resources()
             self._save_registry()
             return self.get_file(file_id)
@@ -648,6 +679,7 @@ class Catalog:
                 return self.mark_processed(file_id, source_hash, source_commit=source_commit)
             _processing({**resource, "processing": processing})
             resource["processing"] = processing
+            _clear_deleted_document_review(resource)
             self._sync_resources()
             self._save_registry()
             return self.get_file(file_id)
@@ -656,3 +688,30 @@ class Catalog:
         with self.transaction():
             self.connection.execute("UPDATE files SET last_attempt=? WHERE id=?",
                                     (datetime.now(timezone.utc).isoformat(), file_id))
+
+    def maintenance_input(self):
+        row = self.connection.execute("SELECT payload FROM maintenance_input WHERE singleton=1").fetchone()
+        return json.loads(row[0]) if row else None
+
+    def set_maintenance_input(self, value):
+        self.connection.execute("DELETE FROM maintenance_input")
+        if value is not None:
+            self.connection.execute("INSERT INTO maintenance_input VALUES(1,?)", (_json(value),))
+
+    def mark_reference_reviewed(self, file_id, source_hash, exists, *, source_commit=None):
+        """Record existing-card review independently of whole-source ingestion."""
+        if (type(exists) is not bool or (exists and not re.fullmatch(r"[0-9a-f]{64}", str(source_hash)))
+                or (not exists and source_hash is not None)):
+            raise ContractError("INVALID_REFERENCE_REVIEW", "Use the reviewed source hash and existence")
+        resource = self._resources_by_id[file_id]
+        previous = resource.get("reference_review", {})
+        last_present = (previous.get("source_sha256") or previous.get("last_present_sha256")
+                        or resource.get("processed_hash"))
+        resource["reference_review"] = {
+            "source_sha256": source_hash, "exists": exists,
+            "reviewed_at": datetime.now(timezone.utc).isoformat(), "source_commit": source_commit,
+        }
+        if not exists and last_present is not None:
+            resource["reference_review"]["last_present_sha256"] = last_present
+        self._save_registry()
+        return self.get_file(file_id)

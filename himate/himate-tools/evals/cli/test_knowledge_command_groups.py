@@ -29,7 +29,7 @@ def test_grouped_help_lists_new_and_compatibility_commands(tmp_path):
         ("library", ("overview", "cards", "graph", "search", "read", "view_revision")),
         ("raw", ("list", "path", "save", "mkdir", "rmdir", "categories", "preflight", "save-package")),
         ("ingest", ("scan", "check", "commit", "status")),
-        ("maintain", ("audit", "lint", "reindex")),
+        ("maintain", ("audit", "lint", "reindex", "prepare", "check", "commit")),
         ("doctor", ("--environment-only", "--bin-dir")),
         ("setup", ("--json", "--jsonl", "--bin-dir")),
         ("panel", ("raw-list", "intake-save")),

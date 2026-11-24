@@ -45,10 +45,13 @@ COMMAND_HELP = {
     "search": ("[TEXT]", "Search knowledge cards by text and optional tags."),
     "read": ("[CARD_ID]", "Read a full knowledge card."),
     "patrol": ("{sync,plan,reindex,complete}", "Plan and track knowledge maintenance."),
-    "maintain": ("[{audit,lint,reindex}]", "Maintain the knowledge base.\n\n"
+    "maintain": ("[{audit,lint,reindex,prepare,check,commit}]", "Maintain the knowledge base.\n\n"
                  "  audit    Audit source references. This is the default.\n"
                  "  lint     Validate the formal knowledge cards.\n"
-                 "  reindex  Update the published index. Use --full to rebuild it from scratch."),
+                 "  reindex  Update the published index. Use --full to rebuild it from scratch.\n"
+                 "  prepare  Fix the source version and existing-card scope with --source ID.\n"
+                 "  check    Validate the prepared existing-card maintenance candidates.\n"
+                 "  commit   Publish independently reviewed maintenance and record its baseline."),
     "library": ("{" + ",".join(LIBRARY_ACTIONS) + "}", "Browse and read the published knowledge view.\n\n"
                 "Pass view_revision in the JSON input to pin the published snapshot."),
     "raw": ("ACTION", "Manage files in the raw materials directory.\n\n"
@@ -299,15 +302,23 @@ def execute(args, root, tool_root, manifest_digest):
             raise CommandError("INVALID_ARGUMENT", "Maintain lint parameters belong in --input")
         data, phase = ingest.check(root, {**request, "formal": True}, rules)
     elif command == "maintain":
-        if action == "reindex":
+        if words:
+            raise CommandError("INVALID_ARGUMENT", "Maintain parameters belong in --input or --source")
+        if action == "prepare":
+            data, phase = ingest.maintenance_prepare(root, request)
+        elif action == "check":
+            data, phase = ingest.maintenance_check(root, request, rules)
+        elif action == "commit":
+            data, phase = ingest.maintenance_commit(root, request)
+        elif action == "reindex":
             data, phase = library.patrol(root, "reindex", request)
         elif action in (None, "audit", "references", "audit-references"):
             data, phase = library.audit(root)
         else:
-            raise CommandError("INVALID_ACTION", "Use maintain audit, lint or reindex")
+            raise CommandError("INVALID_ACTION", "Use maintain audit, lint, reindex, prepare, check or commit")
     else:
         raise CommandError("INVALID_COMMAND", command)
-    code = 1 if phase == "failed" or command == "ingest" and phase == "blocked" else 0
+    code = 1 if phase == "failed" or command in {"ingest", "maintain"} and phase == "blocked" else 0
     return envelope("failed" if code else "ok", phase, data), code
 
 

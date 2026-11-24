@@ -3,42 +3,32 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "请用 hs-knowledge-source 看一下 docs-raw/specs/scan-timing.md 要不要入库。测试库里它是已登记的 Markdown，里面的扫描等待时间刚改过，已有一张正式的扫描时序卡引用它。先准备这一批交给下一步。",
-      "expected_output": "准备一批只针对该文件的来源任务，交接可读取的材料和已有引用卡。",
+      "prompt": "请用 hs-knowledge-source 为 docs-raw/specs/scan-timing.md 准备入库材料。它的主动扫描等待时间刚改过，已有一张卡引用它。只处理这份文档。",
+      "expected_output": "为指定文档准备同版材料和关联旧卡，交接 P2。",
       "expectations": [
-        "扫描的 --source 指向 docs-raw/specs/scan-timing.md 或其登记 ID，返回阶段为 prepared。",
-        "交接包含 .build/task.json、实际来源 ID、原件副本入口和引用该文件的旧卡。",
-        "扫描前后的原件字节一致。"
+        "scan 的 --source 为该文件或其登记 ID，回执为 prepared。",
+        "交接 task_type=document_ingest、实际来源身份、固定材料与关联旧卡，原件字节不变。",
+        "没有将其它文件或代码作为本批主来源。"
       ]
     },
     {
       "id": 2,
-      "prompt": "巡检刚选中来源 doc-radio-old。这份文件和成功处理时一样，另一个目录确实还有一份新文档。请按 hs-knowledge-source 处理巡检交给你的这份，确认我该回哪一步。",
-      "expected_output": "仅检查巡检交接的来源，报告该来源暂无待办，返回巡检选源步骤。",
+      "prompt": "同一份 12 单元文档已发布单元 1–4，版本未变，请沿用上批解析配置和阅读预算准备下一批。",
+      "expected_output": "从首个未评估单元准备续办材料。",
       "expectations": [
-        "扫描采用 doc-radio-old 作为 --source，保留 unchanged 结果。",
-        "将结果交回 L2 重新选源，报告只针对 doc-radio-old。",
-        "本次工具调用里没有对另一个目录或新文档发起扫描。"
+        "task.document_review.start_unit 为 5，候选结束不超过 12。",
+        "交接 packet_ref、index_ref、markdown_ref 及实际来源 ID。",
+        "请求未重置 reprocess，保留既有处理进度和配置。"
       ]
     },
     {
       "id": 3,
-      "prompt": "那份 12 页的 docs-raw/specs/radio.pdf 已发布并登记了第 1–4 页，原件版本没变。请用 hs-knowledge-source 给后面的人准备下一批，沿用上轮配置。",
-      "expected_output": "从第 5 页准备 PDF 续办候选，交接阅读入口和实际候选边界。",
+      "prompt": "OpenFlow 给了两份文档的 upload_ingest 批次，现在位于第一份。scan 返回 unchanged，但现场哈希与上传清单不符。请继续处理这个上传任务。",
+      "expected_output": "报告当前文档版本缺口并保留批次位置。",
       "expectations": [
-        "task.pdf_review.start_page 为 5，且候选结束页处于第 5–12 页。",
-        "交接列出 packet_ref、page_index_ref、已登记来源 ID 和实际候选起止页。",
-        "本批扫描的请求中省略 reprocess，保留既有处理进度。"
-      ]
-    },
-    {
-      "id": 4,
-      "prompt": "L2 交接了 code-wait，kind 是 code，change 是 baseline_missing，已有等待时序卡引用它。请准备这批代码巡检材料。",
-      "expected_output": "用代码复核请求准备已选来源，交接 CLI 返回的受影响卡片。",
-      "expectations": [
-        "使用 ingest scan --input FILE.json --json，请求 source 为 code-wait 且 code_review 为 true。",
-        "只有任务返回代码复核标记、来源身份匹配并提供 affected_cards，才交给 P2。",
-        "交接保留 baseline_missing、实际 task 和材料入口。"
+        "核对执行端、知识根、原件路径和 SHA-256。",
+        "未推进到第二份文件，未将整批宣称完成。",
+        "报告具体不符路径，保留 source_index 和未完成事项。"
       ]
     }
   ]

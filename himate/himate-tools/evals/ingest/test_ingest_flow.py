@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import sqlite3
+import subprocess
 import sys
 
 import pytest
@@ -32,6 +33,13 @@ def library_root(tmp_path):
     for name in ("docs-raw", "knowledge", "governance", "artifacts"):
         (root / name).mkdir(parents=True, exist_ok=True)
     return root
+
+
+def retain_fixture_history(root):
+    for arguments in (["init"], ["config", "core.autocrlf", "false"], ["add", "."],
+                      ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "Retain synthetic history"]):
+        subprocess.run(["git", "-c", "commit.gpgsign=false", "-C", str(root), *arguments],
+                       check=True, capture_output=True)
 
 
 def put_doc(root, name="design.md", text="# Waiting\n\nWait for a reply.\n"):
@@ -457,13 +465,17 @@ def test_deleted_document_is_handed_off_without_automatically_deleting_cards(tmp
         source = catalog.register("raw", "docs-raw/design.md", source_id="doc-design")
         catalog.mark_processed(source["id"], digest(original.read_bytes()))
     formal(root, "historical", [source["id"]], body="Still useful historical knowledge.")
+    retain_fixture_history(root)
     original.unlink()
-    task = scan(root)
+    task, phase = module("ingest").maintenance_prepare(root, {"source": source["id"]})
+    assert phase == "prepared", task
     assert task["source"]["change"] == "deleted"
     assert "original_ref" not in task["source"]
     assert [card["id"] for card in task["affected_cards"]] == ["historical"]
     assert (root / "knowledge/historical.md").is_file()
-    result, status = module("ingest").commit(root, {"reason": "Keep the historical card; source retirement is reviewed."})
+    write_plan(root, [])
+    assert module("ingest").maintenance_check(root, {})[1] == "passed"
+    result, status = module("ingest").maintenance_commit(root, {"reason": "Keep the historical card; source retirement is reviewed."})
     assert status == "completed", result
     assert (root / "knowledge/historical.md").is_file()
     _, status = module("ingest").scan(root, {})
@@ -488,6 +500,7 @@ def code_project(tmp_path):
         source = catalog.register("code", "code/wifi/wait.c", source_id="code-wait")
         catalog.mark_processed(doc["id"], digest(original.read_bytes()))
         catalog.mark_processed(source["id"], digest(code.read_bytes()))
+        catalog.mark_reference_reviewed(source["id"], digest(code.read_bytes()), True)
     formal(root, "waiting", [doc["id"]], code_refs=[{
         "code_id": source["id"], "line_start": 1, "line_end": 3, "symbol": "wait_reply"}])
     return root, code, doc["id"], source["id"]
@@ -500,7 +513,7 @@ def test_code_patrol_detects_inserted_lines_and_check_requires_updated_location(
     root, code, doc_id, code_id = code_project(tmp_path)
     code.write_text("// Added header\n// Added explanation\nint wait_reply(void) {\n    return 5;\n}\n")
     planned, status = module("library").patrol(root, "plan", {})
-    assert status == "needs_ingest", planned
+    assert status == "needs_maintenance", planned
     assert planned["next_file"]["source_id"] == code_id
     task = scan(root, code_id)
     assert task["source"]["kind"] == "code"
@@ -521,7 +534,7 @@ def test_function_body_change_is_patrol_work_and_not_a_fixed_check_semantic_verd
         old_doc_hash = catalog.get_file(doc_id)["processed_hash"]
     code.write_text("int wait_reply(void) {\n    return 8;\n}\n")
     planned, status = module("library").patrol(root, "plan", {})
-    assert status == "needs_ingest", planned
+    assert status == "needs_maintenance", planned
     assert planned["next_file"]["source_id"] == code_id
     task = scan(root, code_id)
     draft(root, "waiting", [doc_id], body="The design requires a wait; implementation changed and needs reviewer judgement.",
@@ -533,7 +546,7 @@ def test_function_body_change_is_patrol_work_and_not_a_fixed_check_semantic_verd
     result, status = module("ingest").commit(root, {})
     assert status == "completed", result
     with module("catalog").Catalog(root) as catalog:
-        assert catalog.get_file(code_id)["processed_hash"] == task["source"]["hash"]
+        assert catalog.get_file(code_id)["reference_review"]["source_sha256"] == task["source"]["hash"]
         assert catalog.get_file(doc_id)["processed_hash"] == old_doc_hash
 
 
@@ -575,9 +588,10 @@ def test_code_review_detects_a_deleted_source_and_its_return(tmp_path):
     root, code, _, code_id = code_project(tmp_path)
     ingest, library = module("ingest"), module("library")
     original = code.read_bytes()
+    retain_fixture_history(root.parents[1])
     code.unlink()
     plan, phase = library.patrol(root, "plan", {})
-    assert phase == "needs_ingest" and plan["next_file"]["change"] == "deleted"
+    assert phase == "needs_maintenance" and plan["next_file"]["change"] == "deleted"
     task, phase = ingest.scan(root, {"source": code_id, "code_review": True})
     assert phase == "prepared" and task["source"]["exists"] is False
     assert [card["id"] for card in task["affected_cards"]] == ["waiting"]
@@ -588,7 +602,7 @@ def test_code_review_detects_a_deleted_source_and_its_return(tmp_path):
 
     code.write_bytes(original)
     plan, phase = library.patrol(root, "plan", {})
-    assert phase == "needs_ingest" and plan["next_file"]["change"] == "modified"
+    assert phase == "needs_maintenance" and plan["next_file"]["change"] == "modified"
 
 
 def test_code_review_rechecks_card_membership_before_publishing(tmp_path):
@@ -601,7 +615,7 @@ def test_code_review_rechecks_card_membership_before_publishing(tmp_path):
     assert ingest.check(root, {})[1] == "passed"
 
     formal(root, "waiting", [doc_id], body="Updated separately with no code reference.")
-    with pytest.raises(ingest.ContractError, match="CODE_REVIEW_SCOPE"):
+    with pytest.raises(ingest.ContractError, match="MAINTENANCE_SCOPE"):
         ingest.commit(root, {})
     assert "Updated separately" in (root / "knowledge/waiting.md").read_text(encoding="utf-8")
 
@@ -613,7 +627,8 @@ def test_required_code_ref_distinguishes_scoped_symbols_in_one_file(tmp_path):
                     "namespace current {\nint send() { return 1; }\n}\n", encoding="utf-8")
     with module("catalog").Catalog(root) as catalog:
         source = catalog.register("code", "code/wifi/dispatch.cpp")
-    scan(root, source["id"])
+    task, phase = module("ingest").scan(root, {"source": doc_id, "reprocess": True})
+    assert phase == "prepared", task
 
     requirement = {"path": "wifi/dispatch.cpp", "symbol": "current::send"}
     plan = {"cards": [{"id": "waiting", "path": "knowledge/waiting.md", "required_code_refs": [requirement]}]}

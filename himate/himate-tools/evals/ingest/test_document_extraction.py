@@ -21,6 +21,15 @@ def library(tmp_path):
     return root
 
 
+def symlink_or_skip(link, target):
+    try:
+        link.symlink_to(target)
+    except OSError as error:
+        if getattr(error, "winerror", None) == 1314:
+            pytest.skip("Windows account cannot create symbolic links; covered on Linux")
+        raise
+
+
 def candidate(root, identity, reference):
     path = root / ".build/cards" / (identity + ".md")
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -77,6 +86,12 @@ def test_txt_original_with_bom_and_crlf_survives_p4_and_p5(tmp_path, source_kind
         }), encoding="utf-8")
         module("library").sources(root, "register", {
             "kind": "code", "path": "main/wifi/design.txt", "source_id": "code-text", "encoding": "utf-8"})
+        (root / "docs-raw/design.md").write_text("# Requirement\n", encoding="utf-8")
+        module("library").sources(root, "register", {
+            "kind": "doc", "path": "docs-raw/design.md", "source_id": "doc-design"})
+        (root / "knowledge/requirement.md").write_text(
+            "---\nid: requirement\ndoc_ref:\n- doc_id: doc-design\n  line_start: 1\n  line_end: 1\n"
+            "code_ref:\n- code_id: code-text\n  line_start: 1\n  line_end: 2\n---\n# Requirement\n", encoding="utf-8")
         task, status = module("ingest").scan(root, {"source": "code-text"})
         assert status == "prepared", task
     source = task["source"]
@@ -89,7 +104,8 @@ def test_txt_original_with_bom_and_crlf_survives_p4_and_p5(tmp_path, source_kind
     assert status == "passed", checked
     assert (root / source["original_ref"]).read_bytes() == original_bytes
     committed, status = module("ingest").commit(root, {"reason": "Reviewed source adds no additional knowledge."})
-    assert status == "completed" and committed["processed_hash"] == source["hash"], committed
+    assert status == "completed", committed
+    assert committed["reviewed_hash" if source_kind == "code" else "processed_hash"] == source["hash"]
     assert not (root / ".build").exists()
     assert original.read_bytes() == original_bytes
 
@@ -290,7 +306,7 @@ def test_secondary_parse_index_rejects_an_internal_link_before_conversion(tmp_pa
     original = root / "docs-raw/keep.txt"
     original.write_bytes(b"{}")
     index = root / ".build/materials/reference-parses.json"
-    index.symlink_to(original)
+    symlink_or_skip(index, original)
 
     def forbid_conversion(*args, **kwargs):
         pytest.fail("An unsafe index must be rejected before document conversion")
@@ -315,7 +331,7 @@ def test_secondary_parse_index_is_checked_again_before_writing(tmp_path, monkeyp
 
     def introduce_link_after_conversion(*args, **kwargs):
         parsed = parse(*args, **kwargs)
-        index.symlink_to(original)
+        symlink_or_skip(index, original)
         return parsed
 
     monkeypatch.setattr(parser, "parse", introduce_link_after_conversion)

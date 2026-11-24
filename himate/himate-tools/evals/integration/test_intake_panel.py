@@ -155,6 +155,47 @@ def test_unsupported_file_is_reported_but_cannot_be_saved(knowledge, package):
     _no_ingest_mutation(knowledge, registry)
 
 
+@pytest.mark.parametrize("changed", [None, "document", "image"])
+def test_source_extract_rebuilds_only_verified_package_images_without_ingest(knowledge, package, changed):
+    document, image, _unsupported = package
+    receipt = _panel(knowledge, "intake-save", _save_request(document, image))
+    source_path = "docs-raw/" + receipt["path"]
+    status, registered = invoke(knowledge, "source", "register", request={"kind": "doc", "path": source_path})
+    assert status == 0 and registered["phase"] == "registered", registered
+    source_id = registered["data"]["source"]["id"]
+    if changed == "document":
+        archived = knowledge / source_path
+        archived.write_bytes(archived.read_bytes() + b"\nChanged outside the archived version.\n")
+    elif changed == "image":
+        (knowledge / "docs-raw/specs/receive" / image["path"]).write_bytes(b"Changed image bytes")
+    protected = {
+        path.relative_to(knowledge).as_posix(): path.read_bytes()
+        for directory in ("docs-raw", "knowledge", "governance")
+        for path in (knowledge / directory).rglob("*") if path.is_file()
+    }
+    assert not (knowledge / ".build").exists()
+    status, report = invoke(knowledge, "source", "extract", request={"source_id": source_id})
+    assert status == 0 and report["phase"] == "extracted", report
+    reading = report["data"]
+    try:
+        parsed = reading["parsed"]
+        if changed is None:
+            assert parsed["parse_status"] == "parsed", parsed["gaps"]
+            assert len(parsed["images"]) == 1
+            fixed_image = knowledge / parsed["images"][0]["ref"]
+            assert sha256(fixed_image.read_bytes()).hexdigest() == image["sha256"]
+            assert "![Receive timing](images/" in (knowledge / parsed["markdown_ref"]).read_text(encoding="utf-8")
+        else:
+            assert parsed["images"] == []
+            assert any(gap["code"] == "EXTERNAL_IMAGE_NOT_READ" for gap in parsed["gaps"])
+    finally:
+        status, released = invoke(knowledge, "source", "release", request={"read_id": reading["read_id"]})
+        assert status == 0 and released["data"]["released"] is True, released
+    assert not (knowledge / ".build").exists()
+    assert not (knowledge / "artifacts/source-read" / reading["read_id"]).exists()
+    assert all((knowledge / path).read_bytes() == data for path, data in protected.items())
+
+
 def test_intake_uses_live_nested_folders_and_excludes_packages_and_special_tree(knowledge, package):
     document, image, _unsupported = package
     raw = knowledge / "docs-raw"

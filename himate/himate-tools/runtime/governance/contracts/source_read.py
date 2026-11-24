@@ -1,6 +1,7 @@
 """Short-lived, isolated source-reading jobs; ingestion owns its own materials."""
 
 from contextlib import ExitStack, contextmanager
+from hashlib import sha256
 import json
 import math
 import os
@@ -222,7 +223,7 @@ def release(root, read_id):
 
 def create(root, source, data, *, options=None, page_range=None, page_preview=True):
     """Convert fixed bytes once; never register sources or touch ingest state."""
-    from . import document_parser
+    from . import document_parser, intake
 
     root = Path(root).resolve(strict=True)
     source_id = validate_id(source.get("source_id", source.get("id")))
@@ -265,8 +266,11 @@ def create(root, source, data, *, options=None, page_range=None, page_preview=Tr
                                           "expires_at": now + max(timeout, TTL_SECONDS)})
             original_ref = reference + "/source" + suffix
             _safe(root, original_ref).write_bytes(data)
+            assets = (intake.package_assets(root, source["path"], expected_sha256=sha256(data).hexdigest())
+                      if suffix == ".md" else None)
             parsed = document_parser.parse(root, source, data, reference + "/parsed",
-                                           options=options, page_range=page_range, page_preview=page_preview)
+                                           options=options, page_range=page_range, page_preview=page_preview,
+                                           local_images=assets)
             directory = _safe(root, reference + "/parsed")
             _validate_tree(root, directory)
             total = sum(path.stat().st_size for path in directory.rglob("*") if path.is_file())

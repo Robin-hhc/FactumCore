@@ -7,7 +7,7 @@ description: 从实际变化中选择文档入库、已有卡维护或索引刷�
 
 沿用本轮已确认的知识根、执行端和 CLI 入口。独立使用时先读取该根的 `AGENTS.md`、`config.yml`，运行 `doctor --knowledge-root <知识根绝对路径> --json` 核对目标。下文 `knowledge` 指实际入口，工作目录为知识根，每次调用传入同一 `--knowledge-root`。
 
-运行 `knowledge patrol plan --json`，采用 CLI 返回的待办和变化类型，不根据文件名或记忆改选来源。
+OpenFlow 提供 `knowledge_patrol_plan` 时使用它。独立部署运行 `knowledge patrol plan --json`。采用回执返回的待办和变化类型，不根据文件名或记忆改选来源。
 
 - `needs_ingest`：原样交接 `data.next_file` 的来源身份、路径及变化类型，进入文档 P1。
 - `needs_maintenance`：原样交接选定来源及维护任务，进入 L3。已引用代码的缺基线、代码变化或引用问题，以及文档删除属于已有卡维护。

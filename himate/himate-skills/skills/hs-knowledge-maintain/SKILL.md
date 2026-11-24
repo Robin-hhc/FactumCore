@@ -9,6 +9,6 @@ description: 检查正式知识的来源引用与定位问题；用于独立审�
 
 ## 执行
 
-运行 `knowledge maintain audit --json`，检查正式卡与登记来源的引用及定位。报告实际问题和涉及的卡、文件，不自动修卡或修改来源。
+当前节点提供 `knowledge_maintain_audit` 时使用它。独立部署运行 `knowledge maintain audit --json`，检查正式卡与登记来源的引用及定位。报告实际问题和涉及的卡、文件，不自动修卡或修改来源。
 
 文档新增或变更使用 ingest Workflow；已有代码引用的持续复核及修复使用 lint Workflow。独立审计不清理 `.build`，不触发同步，不推进文件成功处理版本。

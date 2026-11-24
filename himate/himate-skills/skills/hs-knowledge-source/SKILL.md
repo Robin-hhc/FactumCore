@@ -9,7 +9,7 @@ description: 按指定文档范围准备同版材料、图片和关联旧卡，�
 
 ## 执行
 
-运行 `knowledge ingest scan --json`，指定文档、目录或来源 ID 时加 `--source`。采用本次任务的原始范围，每批保留解析配置和阅读预算。未限定来源时不把上一批来源 ID 变成后续扫描范围。巡检已选中文档时，仅扫描交接的来源。
+OpenFlow 提供 `knowledge_ingest_scan` 时使用它，按实际 schema 传入 `source` 和本次使用的转换选项。独立部署运行 `knowledge ingest scan --json`，指定文档、目录或来源 ID 时加 `--source`。采用本次任务的原始范围，每批保留解析配置和阅读预算。未限定来源时不把上一批来源 ID 变成后续扫描范围。巡检已选中文档时，仅扫描交接的来源。
 
 有宿主提供的 `upload_ingest` 时，先按[上传批次约定](references/upload-batch.md)核对执行端、当前文件哈希和批次位置。其余文档材料字段及旧 PDF 兼容见[来源操作](references/materials.md)。
 

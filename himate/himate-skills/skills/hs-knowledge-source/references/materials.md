@@ -1,12 +1,12 @@
 # 来源操作
 
-`knowledge source register --input FILE.json --json` 登记实际来源文件。请求包含 `kind`（doc/code）、`path` 和需要时的仓库身份；代码路径按实际配置解析。ID 由 CLI 返回，不根据标题猜测。
+本节点提供 `knowledge_source_register` 时使用它，独立部署用 `knowledge source register --input FILE.json --json`。请求包含 `kind`（doc/code）、`path` 和需要时的 `repo_id`；代码路径按实际配置解析。采用回执返回的来源 ID。
 
 代码默认按 UTF-8 读取；实际为 GB18030 时在登记请求中填写 `"encoding":"gb18030"`。编码由来源登记保存，原字节不转码；不要伪造旧快照声明编码。
 
-`knowledge source list --input QUERY.json --json` 查询来源及关联。`processing` 给出同版原件已评估且完成登记的 `reviewed_units`，按完整物理页登记的 PDF 使用 `reviewed_pages`。整份完成以当前原件和成功 hash 一致为准。
+用 `knowledge_source_list` 查询来源及关联，独立部署用 `knowledge source list --input QUERY.json --json`。`processing` 给出同版原件已评估且完成登记的 `reviewed_units`，按完整物理页登记的 PDF 使用 `reviewed_pages`。整份完成以当前原件和成功 hash 一致为准。
 
-`knowledge source resolve --input SOURCE.json --json` 按来源 ID 和需要的 Git 版本读取原文。恢复只限可用历史中的实际版本；没有提交且没有保存的旧内容无法凭 hash 找回。缺旧版时将缺口交 P2，不冒充已读。
+用 `knowledge_source_resolve` 按来源 ID 和已有版本参数回源，独立部署用 `knowledge source resolve --input SOURCE.json --json`。恢复只限可用历史中的实际版本；没有提交且没有保存的旧内容无法凭 hash 找回。缺旧版时将缺口交 P2。
 
 P1 返回的是本次副本和关联卡入口，不要求一次加载全部正文。Git 仅用于按需回看历史，不参与日常变化判定。
 
@@ -22,4 +22,4 @@ PDF、DOCX、XLSX 的 `task.source.parsed` 用紧凑描述符交接全文 Markdo
 
 P2 自主缩短结束单元，并在计划写 `source_units`。只有实际选定、经过评估、P4 和 P5 的范围进入覆盖。
 
-独立回源用 `source extract`，按需指定 PDF 页范围；读取结束用返回的 read_id 执行 `source release`，较长读取先 `source renew`。各读任务使用 `artifacts/source-read/<read_id>/`，不影响当前 `.build` 或其他查询。`source cleanup` 有界回收过期且非转换中的产物。
+回源用 `knowledge_source_extract`，按需指定 PDF 物理页范围。读取结束用返回的 `read_id` 调用 `knowledge_source_release`，较长读取先调用 `knowledge_source_renew`。独立部署用 CLI 的 `source extract/release/renew`。各读任务使用 `artifacts/source-read/<read_id>/`，与本轮 `.build` 独立。`source cleanup` 用于宿主回收过期且非转换中的产物。

@@ -5,9 +5,11 @@ description: 独立审阅关联卡维护的修改范围、引用和结论，也�
 
 # 独立审阅关联卡维护
 
-沿用本轮已确认的知识根、执行端和 CLI 入口。独立使用时先读取该根的 `AGENTS.md`、`config.yml`，运行 `doctor --knowledge-root <知识根绝对路径> --json` 核对目标。下文 `knowledge` 指实际入口，工作目录为知识根，每次调用传入同一 `--knowledge-root`。
+沿用本轮已确认的知识根和执行端。当前会话提供本步骤所需的 Knowledge MCP 工具时，调用该工具并沿用其绑定的知识根。采用 MCP 时，缺少工具则报告工具名，调用被拒、失败或返回 `blocked` 时按实际诊断处理。
 
-由独立 reviewer 调用 `knowledge_maintain_check`，独立部署运行 `knowledge maintain check --json`。固定检查通过后，结合任务、逐卡决定、原卡、候选差异和实际证据核对以下事项。
+采用 CLI 时，从知识根运行该执行端已确认的 `knowledge` 入口，每次传入同一 `--knowledge-root`。首次单独使用 CLI 时，先读取知识根的 `AGENTS.md` 和 `config.yml`，运行 `knowledge doctor --knowledge-root <知识根绝对路径> --json` 核对目标和版本。
+
+由独立 reviewer 调用 `knowledge_maintain_check`，使用 CLI 时运行 `knowledge maintain check --json`。固定检查通过后，结合任务、逐卡决定、原卡、候选差异和实际证据核对以下事项。
 
 1. 修改仅涉及任务关联卡，原 ID、路径和知识边界保留，没有新卡、无关卡或物理删除。
 2. 引用定位真实且支持对应结论，适用条件及有效历史依据未因修订丢失。仅定位修复还须有可信旧证据及相关行为不变的依据。

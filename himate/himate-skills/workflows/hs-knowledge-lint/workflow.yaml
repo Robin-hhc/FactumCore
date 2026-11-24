@@ -14,8 +14,8 @@ nodes:
   owner: coder
   skill: hs-knowledge-patrol-sync
   prompt: |-
-    复用宿主绑定或本次已确认的知识根与执行端，读取该根的 AGENTS.md 和 config.yml。OpenFlow 提供 `knowledge_doctor` 时用它核对绑定。独立部署或仅提供已确认 CLI 入口的旧宿主使用该执行端已安装的 CLI，在知识根显式传入 --knowledge-root 运行 doctor --json。确认实际知识根与 phase 为 ready 后继续。交接执行端、知识根和 data.runtime_version；使用 CLI 时还需交接命令入口。
-    后续节点沿用同一执行端、知识根和版本。使用 OpenFlow 为本节点提供的对应 MCP 工具。工具拒绝、失败或返回 blocked 时，按真实 phase、data 和 diagnostics 分流并报告，禁止用终端重复同一动作。
+    复用宿主绑定或本次已确认的知识根与执行端，读取该根的 AGENTS.md 和 config.yml。当前节点提供 `knowledge_doctor` 时用它核对绑定。采用已确认的 CLI 方式时，在知识根显式传入 --knowledge-root 运行 doctor --json。确认实际知识根与 phase 为 ready 后继续。交接执行端、知识根、调用方式和 data.runtime_version。使用 CLI 时还需交接命令入口。
+    后续节点沿用同一执行端、知识根、调用方式和版本。采用 Knowledge MCP 时使用当前节点提供的对应工具。缺少工具时报告工具名，按该节点的阻塞或失败出口交接。工具拒绝、失败或返回 blocked 时，按实际 phase、data 和 diagnostics 分流并报告。禁止用终端重复上述调用。采用 CLI 时使用已确认的入口。
     使用 hs-knowledge-patrol-sync。成功或未配置同步时交 L2，环境或同步阻塞时交 L8，说明实际缺口。
   exits:
   - id: synced
@@ -36,16 +36,16 @@ nodes:
   owner: coder
   skill: hs-knowledge-patrol-plan
   prompt: |-
-    使用 hs-knowledge-patrol-plan，按 CLI 返回的 phase 分流。交接 data.next_file 的 source_id、kind、path、change 和 task_type，不自行改选来源或任务类型。
+    使用 hs-knowledge-patrol-plan，按工具回执的 phase 分流。交接 data.next_file 的 source_id、kind、path、change 和 task_type，不自行改选来源或任务类型。
     needs_ingest 交 P1，needs_maintenance 交 L3。仅索引问题交 L7，无待办交 L8。观察失败交 blocked，不能当作无待办。
   exits:
   - id: needs_ingest
     label: 入库文档
-    condition: CLI 选定新建、修改或尚未完成的文档，任务类型为 document_ingest。
+    condition: 工具选定新建、修改或尚未完成的文档，任务类型为 document_ingest。
     target: prepare_sources
   - id: needs_maintenance
     label: 维护已有卡
-    condition: CLI 选定已引用代码或已删除文档的关联卡维护任务，任务类型为 card_maintenance。
+    condition: 工具选定已引用代码或已删除文档的关联卡维护任务，任务类型为 card_maintenance。
     target: prepare_maintenance
   - id: needs_reindex
     label: 刷新索引
@@ -69,7 +69,7 @@ nodes:
   exits:
   - id: prepared
     label: 文档材料已准备
-    condition: 本次文档、来源 ID、hash 和关联旧卡入口已由 CLI 保存。
+    condition: 本次文档、来源 ID、hash 和关联旧卡入口已按工具回执保存。
     target: plan_change
   - id: unchanged
     label: 选定文档无待办
@@ -121,7 +121,7 @@ nodes:
   exits:
   - id: passed
     label: 文档检查与审阅通过
-    condition: CLI 检查及独立内容审阅实际完成，无未解决的必要问题。
+    condition: 工具检查及独立内容审阅实际完成，无未解决的必要问题。
     target: apply_view
   - id: needs_plan
     label: 重新判断文档内容
@@ -161,11 +161,11 @@ nodes:
   owner: coder
   skill: hs-knowledge-patrol-prepare
   prompt: |-
-    使用 hs-knowledge-patrol-prepare，接收 L2 的固定维护任务或本分支的重新备料请求。prepared 交接 CLI 固定的任务、版本、关联卡及证据入口。unchanged 回 L2，blocked 向 L8 报告实际缺口，保留待办。
+    使用 hs-knowledge-patrol-prepare，接收 L2 的固定维护任务或本分支的重新备料请求。prepared 交接工具固定的任务、版本、关联卡及证据入口。unchanged 回 L2，blocked 向 L8 报告实际缺口，保留待办。
   exits:
   - id: prepared
     label: 维护材料已固定
-    condition: CLI 已固定 card_maintenance 任务、来源版本与正式关联卡范围。
+    condition: 工具已固定 card_maintenance 任务、来源版本与正式关联卡范围。
     target: repair_cards
   - id: unchanged
     label: 选定维护任务已无待办
@@ -205,7 +205,7 @@ nodes:
   exits:
   - id: passed
     label: 维护检查与独立审阅通过
-    condition: CLI 检查及逐卡独立审阅实际完成，无未解决的必要问题。
+    condition: 工具检查及逐卡独立审阅实际完成，无未解决的必要问题。
     target: apply_maintenance
   - id: needs_revision
     label: 修订关联卡维护结果

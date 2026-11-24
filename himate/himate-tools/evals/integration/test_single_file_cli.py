@@ -59,11 +59,11 @@ def _panel(root, action, request=None):
     return report["data"]
 
 
-def _panel_card(root, identity, references, body):
+def _panel_card(root, identity, references, body, *, tags=None):
     directory = root / "knowledge/rules"
     directory.mkdir(exist_ok=True)
     target = directory / (identity + ".md")
-    header = {"id": identity, "doc_ref": references, "code_ref": [], "tags": ["wifi"]}
+    header = {"id": identity, "doc_ref": references, "code_ref": [], "tags": ["wifi"] if tags is None else tags}
     target.write_text("---\n" + yaml.safe_dump(header) + "---\n" + body, encoding="utf-8")
     return target
 
@@ -234,6 +234,78 @@ def test_panel_reads_published_cards_and_rejects_stale_revisions(knowledge):
     assert status == 2 and report["diagnostics"][0]["code"] == "PANEL_REVISION_MISMATCH"
     status, report = invoke(knowledge, "panel", "read", request={"card_id": "a", "view_revision": revision})
     assert status == 2 and report["diagnostics"][0]["code"] == "PANEL_REVISION_MISMATCH"
+
+
+def test_cli_and_published_search_share_normalized_ranking_and_complete_tag_filters(knowledge):
+    (knowledge / "docs-raw/specs/original.md").write_text("# Original\n", encoding="utf-8")
+    status, report = invoke(knowledge, "source", "register",
+                            request={"path": "docs-raw/specs/original.md", "source_id": "doc-a"})
+    assert status == 0, report
+    refs = [{"doc_id": "doc-a", "line_start": 1, "line_end": 1}]
+    stored_tags = [" ８０２１１ＢＥ ", "80211be", "Ｄｅｖｉｃｅ", "rx  path"]
+    paths = [_panel_card(knowledge, identity, refs, f"# {title}\n\nShared rule.\n", tags=stored_tags)
+             for identity, title in (("a-upper", "80211BE"), ("z-lower", "80211be"))]
+    original = [path.read_bytes() for path in paths]
+    status, report = invoke(knowledge, "maintain", "reindex")
+    assert status == 0, report
+    revision = _panel(knowledge, "overview")["view_revision"]
+    variants = [
+        {"query": "80211be shared", "tags": ["80211be", "device"]},
+        {"query": "80211BE    SHARED", "tags": [" 80211BE ", "\tDEVICE\n"]},
+        {"query": "\t８０２１１Ｂｅ\nShared ", "tags": ["８０２１１ｂｅ", "ＤＥＶＩＣＥ", "80211be"]},
+    ]
+    for top_k in (1, 100):
+        expected = [{"card_id": identity, "path": f"knowledge/rules/{identity}.md", "title": title,
+                     "tags": stored_tags, "lifecycle": "stable", "score": 15}
+                    for identity, title in (("a-upper", "80211BE"), ("z-lower", "80211be"))][:top_k]
+        for variant in variants:
+            request = {**variant, "top_k": top_k}
+            for action in ("query", "search"):
+                status, report = invoke(knowledge, action, request=request)
+                assert status == 0, report
+                assert report["data"]["matches"] == expected
+                assert report["data"]["truncated"] is (top_k == 1)
+            published = _panel(knowledge, "search", {**request, "view_revision": revision})
+            assert published["matches"] == expected
+            assert published["truncated"] is (top_k == 1)
+
+    for tag in ("80211be", " ８０２１１ＢＥ ", " DEVICE ", "RX  PATH"):
+        listed = _panel(knowledge, "cards", {"tag": tag, "view_revision": revision})
+        assert [card["id"] for card in listed["items"]] == ["a-upper", "z-lower"]
+        assert all(card["tags"] == stored_tags for card in listed["items"])
+    for tags in (["80211b"], ["80211be", "missing"], ["rx path"]):
+        request = {"query": "80211be", "tags": tags}
+        assert invoke(knowledge, "search", request=request)[1]["data"]["matches"] == []
+        assert _panel(knowledge, "search", request)["matches"] == []
+    assert _panel(knowledge, "cards", {"tag": "rx path"})["items"] == []
+    status, report = invoke(knowledge, "read", "a-upper")
+    assert status == 0 and report["data"]["tags"] == stored_tags
+    assert [path.read_bytes() for path in paths] == original
+
+
+def test_older_published_search_requires_reindex_then_restores_normalized_results(knowledge):
+    (knowledge / "docs-raw/specs/original.md").write_text("# Original\n", encoding="utf-8")
+    status, report = invoke(knowledge, "source", "register",
+                            request={"path": "docs-raw/specs/original.md", "source_id": "doc-a"})
+    assert status == 0, report
+    refs = [{"doc_id": "doc-a", "line_start": 1, "line_end": 1}]
+    card = _panel_card(knowledge, "a", refs, "# 80211BE\n", tags=["  RX ", "rx"])
+    before = card.read_bytes()
+    status, report = invoke(knowledge, "maintain", "reindex")
+    assert status == 0, report
+    old_revision = _panel(knowledge, "overview")["view_revision"]
+    database = knowledge / "artifacts/knowledge.sqlite"
+    with sqlite3.connect(database) as connection:
+        connection.execute("UPDATE panel_state SET version=3")
+    status, report = invoke(knowledge, "panel", "search", request={"query": "80211be", "tags": ["rx"]})
+    assert status == 2 and report["diagnostics"][0]["code"] == "PANEL_VIEW_UNAVAILABLE", report
+    status, report = invoke(knowledge, "maintain", "reindex")
+    assert status == 0 and report["data"]["mode"] == "full", report
+    revision = _panel(knowledge, "overview")["view_revision"]
+    assert revision != old_revision
+    result = _panel(knowledge, "search", {"query": "80211be", "tags": ["rx"], "view_revision": revision})
+    assert [(hit["card_id"], hit["score"], hit["tags"]) for hit in result["matches"]] == [("a", 9, ["  RX ", "rx"])]
+    assert card.read_bytes() == before
 
 
 def test_panel_graph_pages_high_degree_neighbors_and_filters_kinds(knowledge):

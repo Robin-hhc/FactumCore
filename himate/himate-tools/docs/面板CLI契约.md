@@ -54,6 +54,10 @@ OpenFlow 的绑定响应使用 `ETag` 标识所选知识库。浏览器后续以
 
 `overview` 的文档和代码数量分别去重统计被正式卡引用的来源。类型项为 `{type,count}`，最近卡片为 `{id,title,type}`，按文件更新时间取至多 10 张。类型由目录映射，旧 draft 不进入面板，其他旧卡仍可浏览。卡片列表按 ID 排序，查询可按正文词项、卡片类型和单个标签过滤。标题、摘要和标签只显示列表所需的短值，完整内容可用 `read` 取得。
 
+`library search` 与普通 `query/search` 采用相同的归一化词项和标题、标签、正文权重（8、5、1）。查询经 NFKC 和 casefold，忽略大小写及多余分隔空白，同一卡须命中全部词组；同一词项在同一卡的同一字段只计一次，仅切换大小写不影响分数、排序和截断。`library cards.tag`、`library search.tags` 和普通搜索的 `tags` 都将比较双方经 NFKC、首尾去空白和 casefold 后按完整值比较；多个标签为 AND。展示值保持原样，标签内部空白和标点仍参与比较。
+
+升级至工具 0.26.2 后，普通查询会自动重建旧搜索缓存。旧面板快照按现有契约返回 `PANEL_VIEW_UNAVAILABLE`，宿主执行一次 `maintain reindex` 后使用新的 `view_revision`；后续输入未变的重建仍保持该发布版本。页面读取保持只读。
+
 ## 图谱
 
 带 `scope` 的请求共享由发布事务生成的图。节点包括正式卡、被这些卡引用的原件及代码文件，保留没有关系的正式卡。节点字段为 `{id,kind,ref_id,title,path}`。图 ID 按类型固定为 `card/<ref_id>`、`document/<ref_id>` 或 `code/<ref_id>`；读卡或查来源时传原始 `ref_id`。路径与对应卡片或来源登记一致。边为 `{source,target,kind}`，两端使用图 ID。边类型是 `doc_ref`、`code_ref`、`card_link`、`related_to`。同卡同来源的多个定位聚为一条边。指向同一发布视图内另一张卡的有效 Markdown 链接按方向去重，旧卡显式声明的 `related_to` 保留方向和独立类型。具体引用定位通过读卡获得。

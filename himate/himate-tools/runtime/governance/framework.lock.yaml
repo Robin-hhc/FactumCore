@@ -1,6 +1,6 @@
 schema_version: '2.0'
 contract_family: aiot-wifi
-tool_version: 0.26.1
+tool_version: 0.26.2
 files:
   contracts/__init__.py:
     path: runtime/governance/contracts/__init__.py
@@ -19,7 +19,7 @@ files:
     sha256: e2bf86d6656cb098eeae991bb02e1519dd379ae3d2a29d76d97faa620df50202
   contracts/indexing.py:
     path: runtime/governance/contracts/indexing.py
-    sha256: 6b3bda52445bf7f4eb99858fb63c85381a794f9e622f7d5c6ec99bafcd8f4337
+    sha256: 6bc061199c782e63f2589afa15e9e02aedc475d9c922567b7a0a8d5a7d588cb0
   contracts/ingest.py:
     path: runtime/governance/contracts/ingest.py
     sha256: dcb348820e7ee1151c953c6d74953ca09c3cbd4559c17c44514a165b4663a1af
@@ -28,10 +28,10 @@ files:
     sha256: 2b165355fa1548c9c5e58bc9fe3e0c0802d0e02bdbc61c498b37424785faebe9
   contracts/library.py:
     path: runtime/governance/contracts/library.py
-    sha256: f7d77a3f0d48fe46a22ed7d9cc48091c2903bc31dd11c2d04d754c05b5537c2f
+    sha256: 8aa4c30ce9bcfff231642a54c76ae3ab68c5267ae23129d2da9205770278a9c7
   contracts/panel.py:
     path: runtime/governance/contracts/panel.py
-    sha256: 0e17672ddf1fe9ac4e9ed5b75aa0e55881d248374b7d1054c8733294b0b3c2f9
+    sha256: ce29fbf97f06310639cb2e82db4671930a2fd1393917d06345a8ecb1d1d0ce0c
   contracts/raw_materials.py:
     path: runtime/governance/contracts/raw_materials.py
     sha256: 85697d5486c7fff5fcdd0ec149e53ab224a520542040fee0b1d4aa03354cc8fc

@@ -14,12 +14,17 @@ def term_groups(text):
             chunks = [word] if len(word) == 1 else [word[i:i + 2] for i in range(len(word) - 1)]
             result.extend({chunk} for chunk in chunks)
         else:
-            result.append({word.casefold(), "=" + word})
+            result.append({word.casefold()})
     return [set(group) for group in sorted({tuple(sorted(group)) for group in result})]
 
 
 def lexical(text):
     return sorted(set().union(*term_groups(text))) if text else []
+
+
+def normalize_tag(value):
+    """Compare complete labels while preserving their original display values."""
+    return unicodedata.normalize("NFKC", value).strip().casefold()
 
 
 def _sqlite_file_uri(path):

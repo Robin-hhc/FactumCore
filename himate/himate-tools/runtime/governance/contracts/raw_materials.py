@@ -110,9 +110,11 @@ def categories(root):
 
 
 def _raw_write_lock(root):
+    directory = safe_path(root, "artifacts", ["artifacts"])
+    no_links(directory)
+    directory.mkdir(parents=True, exist_ok=True)
     lock = safe_path(root, "artifacts/raw-save.lock", ["artifacts"])
     no_links(lock)
-    lock.parent.mkdir(parents=True, exist_ok=True)
     return _file_lock(lock)
 
 

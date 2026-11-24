@@ -1,19 +1,17 @@
 ---
 name: hs-knowledge-view-materialize
-description: 按本轮编辑计划和卡片模板撰写或修订完整候选卡；用于P3。
+description: 按文档编辑计划和卡片模板撰写完整候选，核实文档与必要源码引用，用于 P3。
 ---
 
 # 按计划写完整卡
 
-复用 Workflow 已确认的知识根、执行端和工具命令前缀。独立使用时从宿主或部署配置确认该执行端的工具入口，读取知识根的 `AGENTS.md` 和 `config.yml`，以知识根为工作目录，用该入口运行 `doctor --knowledge-root <知识根绝对路径> --json` 核对目标和工具版本。后续示例中的 `knowledge` 代表该已确认的入口，每次调用都传入同一 `--knowledge-root`，工作目录为知识根。
+复用 Workflow 已确认的知识根、执行端和 CLI 入口。独立使用时先读取知识根的 `AGENTS.md`、`config.yml`，用实际入口运行 `doctor --knowledge-root <知识根绝对路径> --json` 核对目标。下文 `knowledge` 均指该入口，工作目录为知识根，每次调用传入同一 `--knowledge-root`。
 
 ## 成稿
 
 读取 `.build/plan.md` 的 `cards` 清单、本次材料和必要旧卡。按[卡头、引用与模板](references/card-authoring.md)选本 Skill 自带的模板，按既定 ID 和路径写完整 Markdown 候选。
 
 将计划 `path` 的 `knowledge/` 前缀替换为 `.build/cards/`，在对应位置写卡；不自行重选目录，不在卡头增加 `path`。清单为 `cards: []` 时不生成候选。
-
-有 `task.code_review` 时，以 `affected_cards` 中的原 ID 和正式路径修订，保持删除清单为空。计划超出该范围时交回 P2。
 
 - 按主题融合新旧知识，保留仍成立的结论、适用条件和其它来源。
 - 普通更新沿用卡 ID 和原生命周期；合并、拆分、退役写好旧卡去向与替代入口，状态变化按 P2 决定。

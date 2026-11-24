@@ -18,8 +18,9 @@ import yaml
 SKILLS = tuple("hs-knowledge-" + name for name in (
     "source", "change-plan", "view-materialize", "review", "apply", "query", "maintain", "capture",
     "patrol-sync", "patrol-plan", "patrol-reindex", "patrol-complete",
+    "patrol-prepare", "patrol-repair", "patrol-review", "patrol-apply",
 ))
-OWNERS = {"lint_view": "reviewer"}
+OWNERS = {"lint_view": "reviewer", "review_maintenance": "reviewer"}
 NODE_SKILLS = {
     "prepare_sources": "hs-knowledge-source",
     "plan_change": "hs-knowledge-change-plan",
@@ -28,6 +29,10 @@ NODE_SKILLS = {
     "apply_view": "hs-knowledge-apply",
     "sync_workspace": "hs-knowledge-patrol-sync",
     "plan_patrol": "hs-knowledge-patrol-plan",
+    "prepare_maintenance": "hs-knowledge-patrol-prepare",
+    "repair_cards": "hs-knowledge-patrol-repair",
+    "review_maintenance": "hs-knowledge-patrol-review",
+    "apply_maintenance": "hs-knowledge-patrol-apply",
     "refresh_index": "hs-knowledge-patrol-reindex",
     "complete_patrol": "hs-knowledge-patrol-complete",
 }
@@ -44,17 +49,42 @@ EDGES = {
         "plan_change": {"content_planned": "materialize_view", "deferred": "__end__"},
         "materialize_view": {"ready": "lint_view", "needs_plan": "plan_change"},
         "lint_view": {"passed": "apply_view", "needs_plan": "plan_change", "needs_revision": "materialize_view"},
-        "apply_view": {"completed": "prepare_sources", "needs_revision": "materialize_view"},
+        "apply_view": {
+            "completed": "prepare_sources", "needs_revision": "materialize_view",
+            "retry": "apply_view", "failed": "__end__",
+        },
     },
     "hs-knowledge-lint": {
-        "sync_workspace": {"synced": "plan_patrol", "skipped": "plan_patrol"},
-        "plan_patrol": {"needs_ingest": "prepare_sources", "needs_reindex": "refresh_index", "unchanged": "complete_patrol"},
+        "sync_workspace": {
+            "synced": "plan_patrol", "skipped": "plan_patrol", "blocked": "complete_patrol",
+        },
+        "plan_patrol": {
+            "needs_ingest": "prepare_sources", "needs_maintenance": "prepare_maintenance",
+            "needs_reindex": "refresh_index", "unchanged": "complete_patrol", "blocked": "complete_patrol",
+        },
         "prepare_sources": {"prepared": "plan_change", "unchanged": "plan_patrol", "blocked": "complete_patrol"},
         "plan_change": {"content_planned": "materialize_view", "deferred": "complete_patrol"},
         "materialize_view": {"ready": "lint_view", "needs_plan": "plan_change"},
         "lint_view": {"passed": "apply_view", "needs_plan": "plan_change", "needs_revision": "materialize_view"},
-        "apply_view": {"completed": "plan_patrol", "needs_revision": "materialize_view"},
-        "refresh_index": {"reindexed": "complete_patrol"},
+        "apply_view": {
+            "completed": "plan_patrol", "needs_revision": "materialize_view",
+            "retry": "apply_view", "failed": "complete_patrol",
+        },
+        "prepare_maintenance": {
+            "prepared": "repair_cards", "unchanged": "plan_patrol", "blocked": "complete_patrol",
+        },
+        "repair_cards": {
+            "ready": "review_maintenance", "needs_preparation": "prepare_maintenance", "deferred": "complete_patrol",
+        },
+        "review_maintenance": {
+            "passed": "apply_maintenance", "needs_revision": "repair_cards",
+            "needs_preparation": "prepare_maintenance", "deferred": "complete_patrol",
+        },
+        "apply_maintenance": {
+            "completed": "plan_patrol", "needs_revision": "repair_cards", "needs_preparation": "prepare_maintenance",
+            "retry": "apply_maintenance", "failed": "complete_patrol",
+        },
+        "refresh_index": {"reindexed": "plan_patrol", "failed": "complete_patrol"},
         "complete_patrol": {"completed": "__end__"},
     },
 }

@@ -3,29 +3,32 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "先跑一下已绑定验收库的 L2。演练回执给出 needs_ingest，next_file 是 {\"source_id\":\"doc-delay\",\"kind\":\"raw\",\"path\":\"docs-raw/specs/delay.md\",\"change\":\"added\"}。把本轮要处理哪一份交接清楚。",
-      "expected_output": "交接回执所选的一份原件，由 P1 按确切的来源 ID 准备材料。",
+      "prompt": "请检查下一项待办，真实 CLI 返回 needs_ingest，next_file 指向新文档 docs-raw/specs/delay.md，change 为 added。",
+      "expected_output": "保持来源身份并交文档 P1。",
       "expectations": [
-        "交接保留 doc-delay、raw、docs-raw/specs/delay.md 和 added 四个回执字段。",
-        "后续步骤指向 P1，L2 运行期间不创建 .build 暂存。"
+        "实际调用 patrol plan。",
+        "原样交接 next_file 的 source_id、kind、path 和 change。",
+        "下一步为 P1，本步未创建候选或推进来源完成状态。"
       ]
     },
     {
       "id": 2,
-      "prompt": "正式卡和原件这轮都没新变化，验收库的 L2 回执为 needs_reindex、pending 为 0。按回执告诉我该继续哪个步骤。",
-      "expected_output": "说明暂无内容待办，交给 L3 重建索引。",
+      "prompt": "CLI 返回 needs_maintenance，next_file 是 code-wait，change 为 baseline_missing；旁边还有未被卡引用的新代码。请继续。",
+      "expected_output": "将已引用代码交 L3 维护。",
       "expectations": [
-        "报告明确待处理来源数量为 0，并说明需要重建索引。",
-        "交接指向 L3，不编造 next_file 或安排 P1。"
+        "保留 code-wait 和 baseline_missing，下一步为 L3。",
+        "未将缺基线变成新增文档或交 P1。",
+        "未登记或入库旁边未引用代码。"
       ]
     },
     {
       "id": 3,
-      "prompt": "用巡检 L2 查已绑定库。演练回执是 unchanged，pending 为 0，旁边的未登记代码文件改过。我们还要处理它吗，还是可以收尾？",
-      "expected_output": "按本轮可观察范围进入 L4 汇总，未登记代码不进入内容待办。",
+      "prompt": "本轮没有内容待办，首次调用返回 needs_reindex，重建成功后再次调用返回 unchanged，请按回执安排。",
+      "expected_output": "先交 L7 刷新，再按实际无待办结果交 L8。",
       "expectations": [
-        "本轮报告保持 unchanged 并交给 L4。",
-        "没有将未登记代码列为待处理来源，也没有启动 P1 或 L3。"
+        "needs_reindex 对应 L7，unchanged 对应 L8。",
+        "没有编造内容来源或维护候选。",
+        "后一次结果来自实际再次检查，不用上次状态宣称完成。"
       ]
     }
   ]

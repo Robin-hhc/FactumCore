@@ -1,0 +1,35 @@
+{
+  "skill_name": "hs-knowledge-patrol-repair",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "L3 已交接 scan-timing 的维护任务、原卡、前后版本材料和定位候选。原卡的 wait_reply 引用在当前文件中校验失败。请读取实际材料，按 hs-knowledge-patrol-repair 完成作者维护，交接你的决定和候选。",
+      "expected_output": "仅修正既有卡引用位置，保留正文及历史依据。",
+      "expectations": [
+        "plan.md 和候选只使用 scan-timing 的原 ID、原路径。",
+        "正文及有效 doc_ref 保持不变，code_ref 对应真实新位置。",
+        "候选交 L5，未直接发布。"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "维护任务只关联 rx-rule，原卡写着当前构建最多重试3次。旧版代码为 #define RETRY_LIMIT 3，函数 int retry_limit(void) { return RETRY_LIMIT; }；当前代码为 #define RETRY_LIMIT 5，函数 int retry_limit(void) { return RETRY_LIMIT; }，文件末尾另有 int calibration_watermark(void) { return 713; }。L3 已提供完整前后源码、原卡和文档依据。请读取材料并完成本批维护。",
+      "expected_output": "根据完整代码上下文修正原卡的当前重试条件，保留历史依据，独立主题仅记录。",
+      "expectations": [
+        "核对函数使用的 RETRY_LIMIT 定义，当前上限写为5，原卡适用条件及有效历史文档依据保留。",
+        "未创建校准卡，未合并拆分或修改无关卡。",
+        "记录校准函数实际位置供汇总，维护候选交 L5。"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "L3 交接 code-wait 的缺复核基线任务，两张原卡、当前源码和相关文档均可读取，没有可恢复的旧版源码。请按 hs-knowledge-patrol-repair 自行核对本批材料，完成作者维护决定。",
+      "expected_output": "记录当前复核依据并形成零修改结果。",
+      "expectations": [
+        "plan.md 的 cards 为 []，逐卡说明当前证据支持的结论。",
+        "没有编造旧版本比较，也未把缺基线解释为需全文入库。",
+        "空候选仍交 L5，不直接登记成功。"
+      ]
+    }
+  ]
+}

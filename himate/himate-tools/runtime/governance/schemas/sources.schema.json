@@ -54,6 +54,23 @@
             ],
             "pattern": "^[0-9a-f]{40,64}$"
           },
+          "reference_review": {
+            "type": "object",
+            "required": ["source_sha256", "exists", "reviewed_at", "source_commit"],
+            "properties": {
+              "source_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+              "exists": {"type": "boolean"},
+              "reviewed_at": {"type": "string", "minLength": 1},
+              "last_present_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+              "source_commit": {"type": ["string", "null"], "pattern": "^[0-9a-f]{40,64}$"}
+            },
+            "allOf": [{
+              "if": {"properties": {"exists": {"const": false}}},
+              "then": {"properties": {"source_sha256": {"type": "null"}}},
+              "else": {"properties": {"source_sha256": {"type": "string"}}}
+            }],
+            "additionalProperties": false
+          },
           "processing": {
             "type": "object",
             "required": ["source_sha256"],

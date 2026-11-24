@@ -25,7 +25,7 @@ RULE_SUBTREES = tuple(RULE_ROOT + "/" + name for name in ("contracts", "schemas"
 REQUIRED_RULE_FILES = {
     RULE_CONTRACT_PREFIX + name + ".py"
     for name in ("__init__", "cards_v3", "catalog", "citation_versions", "document_parser", "indexing",
-                 "ingest", "intake", "knowledge", "library", "markdown_images", "panel", "pdf_pictures",
+                 "ingest", "intake", "knowledge", "library", "maintenance", "markdown_images", "panel", "pdf_pictures",
                  "pdf_text", "raw_materials", "runtime", "source_read", "source_resources", "staging",
                  "validation", "workspace_config")
 } | {

@@ -62,10 +62,16 @@ def test_explicit_encoding_is_returned_and_survives_catalog_rebuild(library):
     assert code.read_bytes() == original
 
 
-def test_new_gb18030_source_is_readable_in_p1_and_checked_by_p4(library):
+def test_referenced_gb18030_source_is_readable_in_maintenance_and_checked(library):
     root, code = library
     original = code.read_bytes()
     register(root, "gb18030")
+    header = {
+        "id": "wait-reply", "doc_ref": [{"doc_id": "doc-design", "line_start": 1, "line_end": 3}],
+        "code_ref": [{"code_id": "code-reply", "line_start": 1, "line_end": 4, "symbol": "wait_reply"}],
+    }
+    (root / "knowledge/wait-reply.md").write_text(
+        "---\n" + yaml.safe_dump(header) + "---\n# Wait reply\n\nDocumented waiting rule.\n", encoding="utf-8")
 
     task, status = module("ingest").scan(root, {"source": "code-reply"})
 
@@ -74,10 +80,6 @@ def test_new_gb18030_source_is_readable_in_p1_and_checked_by_p4(library):
     assert task["source"]["encoding"] == "gb18030"
     assert (root / task["source"]["text_ref"]).read_text(encoding="utf-8") == CODE
     assert (root / task["source"]["original_ref"]).read_bytes() == original
-    header = {
-        "id": "wait-reply", "doc_ref": [{"doc_id": "doc-design", "line_start": 1, "line_end": 3}],
-        "code_ref": [{"code_id": "code-reply", "line_start": 1, "line_end": 4, "symbol": "wait_reply"}],
-    }
     candidate = root / ".build/cards/wait-reply.md"
     candidate.write_text("---\n" + yaml.safe_dump(header, sort_keys=False)
                          + "---\n# Wait reply\n\nThe function returns one.\n", encoding="utf-8")
@@ -117,6 +119,11 @@ def test_reregistering_encoding_does_not_advance_processed_hash(library):
     register(root, "utf-8")
     with module("catalog").Catalog(root) as catalog:
         catalog.mark_processed("code-reply", old_hash)
+        catalog.mark_reference_reviewed("code-reply", old_hash, True)
+    (root / "knowledge/wait-reply.md").write_text(
+        "---\nid: wait-reply\ndoc_ref:\n- doc_id: doc-design\n  line_start: 1\n  line_end: 3\n"
+        "code_ref:\n- code_id: code-reply\n  line_start: 1\n  line_end: 4\n  symbol: wait_reply\n"
+        "---\n# Wait reply\n\nDocumented waiting rule.\n", encoding="utf-8")
     code.write_bytes(CODE.encode("gb18030"))
 
     result, status = register(root, "gb18030")

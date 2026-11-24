@@ -19,6 +19,16 @@
         ".build/cards/ 中没有为本批生成 Markdown 候选，也没有额外的正式卡变更。",
         "保留原编辑计划，并将空清单及本批材料入口交给 P4。"
       ]
+    },
+    {
+      "id": 3,
+      "prompt": "文档流程卡的计划 required_code_refs 包含 driver/radio.c 的 start_rx 和 driver/check.c 的 validate_rx，两个定义都已核实，尚未登记第二个代码文件，请成稿。",
+      "expected_output": "按计划写文档候选并补齐真实代码引用。",
+      "expectations": [
+        "必要时用 source register 登记真实代码文件，采用CLI返回的code_id。",
+        "两个关键位置分别写有效code_ref，并在对应正文附近说明用途与适用条件。",
+        "保留文档doc_ref，未把代码文件另行作为主来源入库。"
+      ]
     }
   ]
 }

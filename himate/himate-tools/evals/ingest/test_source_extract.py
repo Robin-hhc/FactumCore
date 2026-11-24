@@ -171,10 +171,15 @@ def test_historical_resolve_accepts_a_registered_source_id_with_a_colon(tmp_path
     old_commit = git("rev-parse", "HEAD")
     with module("catalog").Catalog(root) as catalog:
         catalog.mark_processed(source["id"], module("ingest").sha(old_bytes), source_commit=old_commit)
-    path.write_text("# New source\n\nA newer requirement.\n", encoding="utf-8")
+    path.write_bytes(b"# New source\n\nA newer requirement.\n")
     current = path.read_bytes()
-    resolved, phase = module("library").sources(root, "resolve", {"source_id": source["id"]})
+    latest, phase = module("library").sources(root, "resolve", {"source_id": source["id"]})
+    assert phase == "resolved" and latest["source_id"] == "doc:design"
+    assert (root / latest["original_ref"]).read_bytes() == current
+    assert (root / latest["text_ref"]).read_text(encoding="utf-8") == current.decode("utf-8")
+    resolved, phase = module("library").sources(root, "resolve", {
+        "source_id": source["id"], "hash": module("ingest").sha(old_bytes)})
     assert phase == "resolved" and resolved["source_id"] == "doc:design"
     assert (root / resolved["original_ref"]).read_bytes() == old_bytes
-    assert (root / resolved["text_ref"]).read_bytes() == old_bytes
+    assert (root / resolved["text_ref"]).read_text(encoding="utf-8") == old_bytes.decode("utf-8")
     assert path.read_bytes() == current

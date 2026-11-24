@@ -118,7 +118,9 @@ def source_commit(path, data):
 
 def old_source(root, source, *, commit=None, expected_hash=None):
     """Find only a real historical version, including an uncommitted baseline."""
-    expected_hash = expected_hash or source.get("processed_hash")
+    reviewed = source.get("reference_review", {}) if source.get("kind") == "code" else {}
+    expected_hash = (expected_hash or reviewed.get("source_sha256") or reviewed.get("last_present_sha256")
+                     or source.get("processed_hash"))
     path = source_path(root, source)
     repository, relative = git_location(path)
     if commit:
@@ -209,7 +211,7 @@ def _raw_files(root, selected=None):
 
 
 def observe(root, catalog, selected=None, *, include_code=False, code_review=False,
-            first=False, keep_content=False, reprocess=False):
+            first=False, keep_content=False, reprocess=False, ingest_only=False):
     target = catalog.get_file(selected) if selected else None
     if code_review and (target is None or target["kind"] != "code"):
         raise ContractError("CODE_REVIEW_SOURCE_REQUIRED", "Select one registered code source ID")
@@ -255,15 +257,21 @@ def observe(root, catalog, selected=None, *, include_code=False, code_review=Fal
             data = None
         current = sha(data) if data is not None else None
         exists = data is not None
+        if ingest_only and (row["kind"] == "code" or not exists):
+            continue
         if row["kind"] == "code" and (include_code or code_review):
             change = _code_review_change(root, catalog, row, data, current)
         else:
             processing = row.get("processing") or {}
             unfinished = exists and processing.get("source_sha256") == current
-            if not (reprocess or unfinished or row.get("processed_exists") is None
+            handled_missing = (not exists and row.get("reference_review", {}).get("exists") is False)
+            restored = exists and row["kind"] == "raw" and row.get("reference_review", {}).get("exists") is False
+            if handled_missing:
+                continue
+            if not (reprocess or restored or unfinished or row.get("processed_exists") is None
                     or bool(row["processed_exists"]) != exists or row.get("processed_hash") != current):
                 continue
-            change = ("deleted" if not exists else "reprocess" if reprocess else
+            change = ("deleted" if not exists else "reprocess" if reprocess or restored else
                       "resume" if unfinished else
                       "added" if row.get("processed_exists") is None else "modified")
         if change is None:
@@ -371,6 +379,17 @@ def scan(root, request):
         raise ContractError("PDF_REVIEW_BUDGET", "review_text_budget must be an integer from 1 to 4000000")
     with Catalog(root) as catalog:
         selected_source = request.get("source")
+        registered = catalog.get_file(selected_source) if isinstance(selected_source, str) else None
+        if registered is None and isinstance(selected_source, str):
+            matches = [row for row in catalog.list_files() if row["path"] == selected_source]
+            registered = matches[0] if len(matches) == 1 else None
+        if registered is not None and (registered["kind"] == "code" or not source_path(root, registered).exists()):
+            if reprocess:
+                raise ContractError("MAINTENANCE_SOURCE_REQUIRED", "Use maintain prepare for existing-card reference maintenance")
+            from .maintenance import prepare
+            return prepare(root, {"source": registered["id"]}, catalog=catalog)
+        if code_review:
+            raise ContractError("CODE_REVIEW_SOURCE_REQUIRED", "Select one registered code source ID")
         if reprocess:
             registered = catalog.get_file(selected_source) if isinstance(selected_source, str) else None
             if registered is None and isinstance(selected_source, str):
@@ -379,14 +398,12 @@ def scan(root, request):
             if registered is None:
                 raise ContractError("REPROCESS_SOURCE_REQUIRED", "Select one explicitly registered source ID or exact path")
             selected_source = registered["id"]
-        if not code_review:
-            _clear_build(root)
+        _clear_build(root)
+        catalog.set_maintenance_input(None)
         pending = observe(root, catalog, selected_source, code_review=code_review, first=True,
-                          keep_content=True, reprocess=reprocess)
+                          keep_content=True, reprocess=reprocess, ingest_only=True)
         if not pending:
             return {"pending": 0}, "unchanged"
-        if code_review:
-            _clear_build(root)
         selected = pending[0]
         catalog.touch_attempt(selected["id"])
         cards = catalog.cards_for(selected["id"])
@@ -443,8 +460,7 @@ def scan(root, request):
     task = {"source": source, "affected_cards": [{"id": card["id"], "path": card["path"],
                                                  "title": card["title"]} for card in cards],
             "cards_dir": ".build/cards", "plan_ref": ".build/plan.md", "gaps": gaps}
-    if code_review:
-        task["code_review"] = True
+    task["task_type"] = "document_ingest"
     if pdf_review is not None:
         task["pdf_review"] = pdf_review
     if review is not None:
@@ -678,11 +694,12 @@ def _code_review_change(root, catalog, source, data, digest):
     references = catalog.reference_rows(source["id"])
     if not references:
         return None
+    reviewed = source.get("reference_review", {})
     if data is None:
-        return None if source["processed_exists"] is False else "deleted"
-    if source["processed_exists"] is None:
+        return None if reviewed.get("exists") is False else "deleted"
+    if "exists" not in reviewed:
         return "baseline_missing"
-    if not source["processed_exists"] or source.get("processed_hash") != digest:
+    if not reviewed["exists"] or reviewed.get("source_sha256") != digest:
         return "modified"
 
     check_input = sha(canonical_bytes([digest, source["path"], source.get("encoding"), references]))
@@ -694,36 +711,6 @@ def _code_review_change(root, catalog, source, data, digest):
         return "reference_invalid"
     catalog.record_code_reference_check(source["id"], check_input)
     return None
-
-
-def _code_review_findings(root, catalog, task, drafts, deletes, data):
-    source = task["source"]
-    approved = {card["id"]: card["path"] for card in task["affected_cards"]}
-    replacements = {card["id"]: card for card in drafts}
-    stored_references = catalog.reference_rows(source["id"])
-    current_cards = {card_id for card_id, _ in stored_references}
-    findings = []
-    for card in drafts:
-        existing = catalog.get_card(card["id"])
-        # A P5 retry may find an already copied card that removed this reference.
-        # Allow that identical write while rejecting changes to unrelated cards.
-        if (approved.get(card["id"]) != card["path"] or existing is None or existing["path"] != card["path"]
-                or (card["id"] not in current_cards and existing["raw"] != card["raw"])):
-            error = ContractError("CODE_REVIEW_SCOPE", "Update only existing affected cards at their original paths")
-            findings.append(_finding(error, card["path"]))
-    for path in sorted(deletes):
-        error = ContractError("CODE_REVIEW_SCOPE", "Code review cannot delete cards")
-        findings.append(_finding(error, path))
-    if findings or data is None:
-        return findings
-
-    # Check the effective published view as well as drafts. An empty plan must
-    # not complete a review while a live reference still points to the wrong range.
-    references = [(card_id, json.loads(value))
-                  for card_id, value in stored_references if card_id not in replacements]
-    references.extend((card["id"], reference) for card in drafts for reference in card["code_ref"]
-                      if reference["code_id"] == source["id"])
-    return _code_reference_findings(root, source, references, data)
 
 
 def _snapshot_reference_check(root, source, reference, snapshot, registry, context):
@@ -772,13 +759,40 @@ def _snapshot_reference_check(root, source, reference, snapshot, registry, conte
         source_resources.validate_reference(evidence, registry, lambda _snapshot: data)
 
 
+def _card_reference_check(root, source, reference, kind, registry, context, staged=None):
+    """Use the same actual-version checks for candidates and retained refs."""
+    identity = source["source_id"]
+    if (source["kind"] == "code") != (kind == "code"):
+        raise ContractError("SOURCE_KIND_MISMATCH", identity)
+    snapshot_id = reference.get("snapshot_id")
+    snapshot = next((item for item in registry.get("snapshots", []) if item["snapshot_id"] == snapshot_id), None)
+    # Old cards may retain a version label without a registered snapshot.
+    # Validate their actual current/recoverable source and native locator;
+    # only a registered snapshot establishes immutable version semantics.
+    if snapshot is not None and snapshot.get("source_id") != identity:
+        raise ContractError("SOURCE_SNAPSHOT_MISMATCH", "The retained snapshot does not belong to this source")
+    if snapshot is not None:
+        if kind == "doc":
+            _snapshot_reference_check(root, source, reference, snapshot, registry, context)
+            return None
+        frozen = context.setdefault("frozen", {})
+        if snapshot_id not in frozen:
+            frozen[snapshot_id], _ = recover_bound_source(root, source, snapshot)
+        staged = frozen[snapshot_id]
+    extractor = code_extractor(source, snapshot) if kind == "code" else None
+    return _reference_check(root, source, reference, staged, extractor=extractor, context=context)
+
+
 def check(root, request, rules=None):
     """Fixed checks only; the independent reviewer judges actual knowledge."""
     findings = []
     formal = bool(request.get("formal"))
+    maintenance_fixed = None
     try:
         if not formal:
             safe_path(root, DOCUMENT_CHECK, [".build"]).unlink(missing_ok=True)
+            from . import maintenance
+            safe_path(root, maintenance.CHECK, [".build"]).unlink(missing_ok=True)
         planned = None if formal else _planned_cards(root)
         catalog = Catalog(root)
     except (ValueError, OSError, ContractError, yaml.YAMLError) as error:
@@ -816,9 +830,10 @@ def check(root, request, rules=None):
                                                   expected_sha256=source["hash"])
                     context["loaded"][(source["source_id"], source["hash"])] = loaded
                 document_batch = _review_batch(root, task, context["loaded"].get((source["source_id"], source["hash"])))
-                if task.get("code_review"):
-                    findings.extend(_code_review_findings(
-                        root, catalog, task, drafts, deletes, staged_sources.get(source["id"])))
+                if maintenance.required(task, catalog):
+                    findings.extend(maintenance.findings(root, catalog, task, drafts, deletes))
+                    if not findings:
+                        maintenance_fixed = catalog.maintenance_input()
         except (ValueError, OSError, ContractError, yaml.YAMLError) as error:
             return {"findings": [_finding(error)]}, "failed"
         if planned is not None:
@@ -843,7 +858,6 @@ def check(root, request, rules=None):
             findings.append({"code": "DUPLICATE_CARD_ID", "message": "Draft IDs repeat"})
         source_lookup = {row["source_id"]: row for row in catalog.list_files()}
         registry = catalog.registry
-        snapshots = {row["snapshot_id"]: row for row in catalog.registry.get("snapshots", [])}
     code_paths = {}
     for card in drafts:
         required = (planned or {}).get(card["id"], {}).get("required_code_refs", [])
@@ -855,18 +869,8 @@ def check(root, request, rules=None):
                 try:
                     if source is None:
                         raise ContractError("UNKNOWN_SOURCE_ID", identity)
-                    if (source["kind"] == "code") != (kind == "code"):
-                        raise ContractError("SOURCE_KIND_MISMATCH", identity)
-                    snapshot = snapshots.get(reference.get("snapshot_id"), {})
-                    if snapshot and snapshot.get("source_id") != identity:
-                        raise ContractError("SOURCE_SNAPSHOT_MISMATCH", "The retained snapshot belongs to another source")
-                    if kind == "doc" and snapshot.get("source_id") == identity:
-                        _snapshot_reference_check(root, source, reference, snapshot, registry, context)
-                        continue
-                    extractor = (code_extractor(source, snapshot if snapshot.get("source_id") == identity else None)
-                                 if kind == "code" else None)
-                    resolved = _reference_check(root, source, reference, staged_sources.get(identity),
-                                                extractor=extractor, context=context)
+                    resolved = _card_reference_check(root, source, reference, kind, registry, context,
+                                                     staged_sources.get(identity))
                     if kind == "code" and required:
                         if identity not in code_paths:
                             code_paths[identity] = (_code_source_location(root, source)[1]
@@ -923,6 +927,12 @@ def check(root, request, rules=None):
             atomic_write(safe_path(root, DOCUMENT_CHECK, [".build"]), canonical_bytes(checked))
         except (ValueError, OSError, ContractError) as error:
             findings.append(_finding(error))
+    if not findings and maintenance_fixed is not None:
+        try:
+            atomic_write(safe_path(root, maintenance.CHECK, [".build"]),
+                         canonical_bytes({"sha256": maintenance.digest(root, maintenance_fixed, drafts, deletes)}))
+        except (ValueError, OSError, ContractError) as error:
+            findings.append(_finding(error))
     return {"findings": findings, "card_ids": [card["id"] for card in drafts],
             "parsed_sources": context["descriptors"],
             "review_required": True}, "failed" if findings else "passed"
@@ -939,6 +949,12 @@ def commit(root, request):
         raise ContractError("TASK_REQUIRED", "Run ingest scan before commit")
     task_bytes = task_path.read_bytes()
     task = read_json(task_path, raw=task_bytes)
+    from . import maintenance
+    with Catalog(root, refresh=False) as catalog:
+        _task_source(catalog, task)
+        maintenance_required = maintenance.required(task, catalog)
+    if maintenance_required:
+        return maintenance.commit(root, request)
     source = task["source"]
     # A previous copy may have stopped before deleting a moved card's old path.
     # Finish the reviewed overlay before reading formal cards into the catalog.
@@ -949,19 +965,6 @@ def commit(root, request):
         deletes = _deletes(root)
         if request.get("defer"):
             return {"source_id": source["source_id"], "reason": request.get("reason", "Materials are incomplete")}, "deferred"
-        if task.get("code_review"):
-            catalog.refresh()
-            try:
-                code_bytes = source_path(root, source).read_bytes()
-            except FileNotFoundError:
-                code_bytes = None
-            current_digest = sha(code_bytes) if code_bytes is not None else None
-            if current_digest != source["hash"]:
-                raise ContractError("SOURCE_CHANGED", "Run code review again for the current source version")
-            findings = _code_review_findings(root, catalog, task, drafts, deletes, code_bytes)
-            if findings:
-                first_finding = findings[0]
-                raise ContractError(first_finding["code"], first_finding["message"], first_finding["path"])
         document_batch = _review_batch(root, task)
         pdf_batch = document_batch["pdf_batch"] if document_batch is not None else None
         if not drafts and not request.get("reason"):
@@ -1045,3 +1048,18 @@ def commit(root, request):
     except OSError as error:
         result["cleanup_error"] = str(error)
     return result, "completed"
+
+
+def maintenance_prepare(root, request):
+    from .maintenance import prepare
+    return prepare(root, request)
+
+
+def maintenance_check(root, request, rules=None):
+    from .maintenance import check
+    return check(root, request, rules)
+
+
+def maintenance_commit(root, request):
+    from .maintenance import commit
+    return commit(root, request)

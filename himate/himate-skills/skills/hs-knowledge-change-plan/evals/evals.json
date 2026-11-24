@@ -3,42 +3,32 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "帮我按这批 Markdown 和旧卡定个计划。材料第 8–12 行把设备 A 的主动扫描等待时间从 25 ms 改到 30 ms，设备 B 的历史条件没变。旧卡 ID 是 scan-timing，路径是 knowledge/rules/scan-timing.md。同主题已经查到这一张卡。",
-      "expected_output": "提交一份针对同主题旧卡的更新计划，保留有效历史条件，标明本次变更的依据。",
+      "prompt": "文档第 8–12 行把设备 A 的扫描等待时间从 25 ms 改到 30 ms，设备 B 的历史条件没变。已有同主题卡 scan-timing，位于 knowledge/rules/scan-timing.md。请制定本批计划。",
+      "expected_output": "更新同主题旧卡并保留有效历史条件。",
       "expectations": [
-        ".build/plan.md 的 cards 仅列 scan-timing 和原正式路径，计划正文选择 update。",
-        "变更说明指向第 8–12 行及设备 A，写明 25 ms 到 30 ms 的变化。",
-        "计划明确设备 B 的历史条件仍应保留。"
+        "plan.md 只列 scan-timing 及原路径，选择 update。",
+        "计划指向设备 A 的实际文档依据和 25 ms 到 30 ms 的变化。",
+        "保留设备 B 的有效历史条件。"
       ]
     },
     {
       "id": 2,
-      "prompt": "接着评估这份 PDF。task 给的候选范围是第 5–18 页，按本批预算已完整核对第 5–8 页，包含已确认无增量的目录页和参考页；这一段没有可新增或更新的知识。请给后续审阅留计划。",
-      "expected_output": "用空卡清单记录实际评估的连续页段，说明本批无增量并交接审阅。",
+      "prompt": "文档候选单元 5–18，已完整核对 5–8，包括确认无增量的目录和参考内容，本批没有新增知识。请留计划给审阅。",
+      "expected_output": "用空候选记录实际评估范围。",
       "expectations": [
-        ".build/plan.md 的 YAML 同时包含 cards: [] 和 source_pages: [[5, 8]]。",
-        "计划说明本批无增量的依据，并将第 9 页起的内容留给续办。",
-        "无新增候选卡，计划仍交后续审阅。"
+        "plan.md 包含 cards: [] 和 source_units: [[5, 8]]。",
+        "说明本批无增量理由，单元 9 起留待续办。",
+        "仍交后续独立审阅，不直接登记全文完成。"
       ]
     },
     {
       "id": 3,
-      "prompt": "这篇设计稿改了一条接口适用条件，但关联旧卡只记录了另一版本的结论，决定怎么改必须核对的旧版原文也取不到。这一批你能先按 hs-knowledge-change-plan 判断一下怎么处理吗？",
-      "expected_output": "指出无法核实的依据和受影响的决定，将本批暂缓。",
+      "prompt": "这份设计文档描述 start_rx 入口和校验分支，准备建立流程卡。两个实现位置分属 driver/radio.c 与 driver/check.c，必须核实它们才能准确说明行为。请制定计划。",
+      "expected_output": "文档驱动的计划列出必要代码位置和适用条件。",
       "expectations": [
-        "报告明确选择 defer，并写出缺失的旧版原文和待核对的接口适用条件。",
-        "相关旧卡保持原生命周期，处理进度保留待办。",
-        "没有把有缺口的范围登记为已评估无增量。"
-      ]
-    },
-    {
-      "id": 4,
-      "prompt": "task.code_review 已启用，affected_cards 只列 knowledge/rules/scan-timing.md，ID 是 scan-timing。wait_reply 的定义下移两行，结论没变。同文件另外新增了统计功能，与老卡无关。请制定巡检计划。",
-      "expected_output": "沿用旧卡 ID 和路径修订定位，保持原有结论，统计功能作为待报告主题。",
-      "expectations": [
-        "cards 只列 scan-timing 和 knowledge/rules/scan-timing.md。",
-        "计划写明符号行段如何修正，并保留仍成立的等待时序结论。",
-        "保留统计功能的证据位置供 L4 汇报，候选和删除清单保持在代码复核允许的范围。"
+        "required_code_refs 覆盖两个不同关键位置。",
+        "计划将代码位置对应到文档结论或回查入口，保留文档依据。",
+        "缺少影响决定的实现证据时报告缺口，不凭函数名推断行为。"
       ]
     }
   ]

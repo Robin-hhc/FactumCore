@@ -64,8 +64,14 @@ def commit_no_card(root):
 
 def publish_selected(root, task):
     synthetic_plan(root, task)
-    status, checked = invoke(root, "ingest", "check")
+    group = "maintain" if task.get("task_type") == "card_maintenance" else "ingest"
+    status, checked = invoke(root, group, "check")
     assert status == 0 and checked["phase"] == "passed", checked
+    if group == "maintain":
+        status, receipt = invoke(root, "maintain", "commit", request={"reason": "Reviewed existing cards need no change."})
+        assert status == 0 and receipt["phase"] == "completed", receipt
+        assert "source_complete" not in receipt["data"]
+        return receipt["data"]
     return commit_no_card(root)
 
 
@@ -333,6 +339,12 @@ def test_lint_reselects_when_its_selected_source_was_completed_before_p1(knowled
     publish_selected(knowledge, prepared["data"])
     assert graph["apply_view"]["completed"] == "plan_patrol"
     status, empty = invoke(knowledge, "patrol", "plan")
+    if empty["phase"] == "needs_reindex":
+        assert graph["plan_patrol"]["needs_reindex"] == "refresh_index"
+        status, refreshed = invoke(knowledge, "patrol", "reindex")
+        assert status == 0 and refreshed["phase"] == "reindexed", refreshed
+        assert graph["refresh_index"]["reindexed"] == "plan_patrol"
+        status, empty = invoke(knowledge, "patrol", "plan")
     assert status == 0 and empty["phase"] == "unchanged", empty
     assert graph["plan_patrol"][empty["phase"]] == "complete_patrol"
     assert_processed(knowledge, [first, second])
@@ -340,17 +352,19 @@ def test_lint_reselects_when_its_selected_source_was_completed_before_p1(knowled
 
 def patrol_task(root, path, change, *, code_review=False):
     status, selection = invoke(root, "patrol", "plan")
-    assert status == 0 and selection["phase"] == "needs_ingest", selection
+    assert status == 0 and selection["phase"] == ("needs_maintenance" if code_review else "needs_ingest"), selection
     selected = selection["data"]["next_file"]
     assert selected["path"] == path and selected.get("change") == change, selected
     request = {"source": selected["source_id"]}
     if code_review:
-        request["code_review"] = True
-    prepared = scan(root, request)
+        status, prepared = invoke(root, "maintain", "prepare", request=request)
+        assert status == 0, prepared
+    else:
+        prepared = scan(root, request)
     assert prepared["phase"] == "prepared", prepared
     task = prepared["data"]
     assert task["source"]["source_id"] == selected["source_id"]
-    assert bool(task.get("code_review")) == code_review
+    assert task["task_type"] == ("card_maintenance" if code_review else "document_ingest")
     return task
 
 
@@ -369,9 +383,11 @@ def card_text(header, body):
 
 
 def publish_patrol_candidates(root, expected_ids):
-    status, checked = invoke(root, "ingest", "check")
+    task = json.loads((root / ".build/task.json").read_bytes())
+    group = "maintain" if task["task_type"] == "card_maintenance" else "ingest"
+    status, checked = invoke(root, group, "check")
     assert status == 0 and checked["phase"] == "passed", checked
-    status, published = invoke(root, "ingest", "commit")
+    status, published = invoke(root, group, "commit")
     assert status == 0 and published["phase"] == "completed", published
     assert sorted(published["data"]["card_ids"]) == sorted(expected_ids)
 
@@ -446,10 +462,10 @@ def test_patrol_closes_document_and_code_reference_work_at_the_cli(knowledge):
         # Attempt commit before invoking P4. Staged changes must stay private.
         status, rejected = invoke(knowledge, "ingest", "commit", request={"reason": "Synthetic scope test"})
         assert status != 0, rejected
-        assert rejected["diagnostics"][0]["code"] == "CODE_REVIEW_SCOPE", rejected
+        assert rejected["diagnostics"][0]["code"] == "MAINTENANCE_SCOPE", rejected
         status, rejected = invoke(knowledge, "ingest", "check")
         assert status != 0 and rejected["phase"] == "failed", rejected
-        assert any(finding["code"] == "CODE_REVIEW_SCOPE" for finding in rejected["data"]["findings"]), rejected
+        assert any(finding["code"] == "MAINTENANCE_SCOPE" for finding in rejected["data"]["findings"]), rejected
         assert lock.read_bytes() == prior_lock
         for path, content in formal.items():
             assert (knowledge / path).read_bytes() == content

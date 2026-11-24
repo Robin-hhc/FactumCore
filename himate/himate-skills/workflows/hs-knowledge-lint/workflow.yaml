@@ -14,7 +14,8 @@ nodes:
   owner: coder
   skill: hs-knowledge-patrol-sync
   prompt: |-
-    复用宿主绑定或本次已确认的知识根与执行端，读取该根的 AGENTS.md 和 config.yml。使用已注册的 knowledge 命令或宿主交接的 CLI 入口，以知识根为工作目录，显式传入 --knowledge-root，运行 doctor --json。确认实际目标和 phase 为 ready，交接执行端、知识根、命令入口和 data.runtime_version，各节点沿用同一入口、版本及目标。
+    复用宿主绑定或本次已确认的知识根与执行端，读取该根的 AGENTS.md 和 config.yml。OpenFlow 提供 `knowledge_doctor` 时用它核对绑定。独立部署或仅提供已确认 CLI 入口的旧宿主使用该执行端已安装的 CLI，在知识根显式传入 --knowledge-root 运行 doctor --json。确认实际知识根与 phase 为 ready 后继续。交接执行端、知识根和 data.runtime_version；使用 CLI 时还需交接命令入口。
+    后续节点沿用同一执行端、知识根和版本。使用 OpenFlow 为本节点提供的对应 MCP 工具。工具拒绝、失败或返回 blocked 时，按真实 phase、data 和 diagnostics 分流并报告，禁止用终端重复同一动作。
     使用 hs-knowledge-patrol-sync。成功或未配置同步时交 L2，环境或同步阻塞时交 L8，说明实际缺口。
   exits:
   - id: synced

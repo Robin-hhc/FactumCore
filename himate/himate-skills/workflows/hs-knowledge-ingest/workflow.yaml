@@ -14,7 +14,8 @@ nodes:
   owner: coder
   skill: hs-knowledge-source
   prompt: |-
-    首次进入时，有 OpenFlow 提供的 upload_ingest 清单则以其中的 execution 确定执行端与知识根。否则复用宿主绑定或本次已确认的知识根与执行端，仍不明确时询问用户。读取该根的 AGENTS.md 和 config.yml。使用该执行端已注册的 knowledge 命令或宿主提供的已安装 CLI 入口，以知识根为工作目录，显式传入 --knowledge-root，运行 doctor --json。回执的知识根正确且 phase 为 ready 后才继续；环境阻塞时报告实际缺口。交接执行端、知识根、CLI 调用入口和 data.runtime_version，后续节点沿用同一入口、版本和目标。
+    首次进入时，有 OpenFlow 提供的 upload_ingest 清单则以其中的 execution 确定执行端与知识根。否则复用宿主绑定或本次已确认的知识根与执行端，仍不明确时询问用户。读取该根的 AGENTS.md 和 config.yml。OpenFlow 提供 `knowledge_doctor` 时用它核对绑定。独立部署或仅提供已确认 CLI 入口的旧宿主使用该执行端已安装的 CLI，在知识根显式传入 --knowledge-root 运行 doctor --json。确认实际知识根与 phase 为 ready 后继续。交接执行端、知识根和 data.runtime_version；使用 CLI 时还需交接命令入口。
+    后续节点沿用同一执行端、知识根和版本。使用 OpenFlow 为本节点提供的对应 MCP 工具。工具拒绝、失败或返回 blocked 时，按真实 phase、data 和 diagnostics 分流并报告，禁止用终端重复同一动作。
 
     保留文档任务原始范围与解析配置。使用 hs-knowledge-source。有 OpenFlow 提供的 upload_ingest 清单时，按 Skill 的上传批次参考验证并扫描当前文件，通过 progressNote 交接 upload_ingest_position。当前文件无待办且清单还有后续文件时走 next_upload_source。prepared 时交接本批文档 task，blocked 时报告准备缺口和已完成范围，unchanged 时汇总原范围处理结果。
   exits:

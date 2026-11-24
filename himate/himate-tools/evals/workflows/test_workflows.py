@@ -56,6 +56,36 @@ def test_current_distribution_is_structurally_valid():
     assert validator_module().validate(TOOL_ROOT, CAPABILITIES_ROOT) == []
 
 
+@pytest.mark.parametrize("skill,operation", [
+    ("source", "ingest_scan"),
+    ("review", "ingest_check"),
+    ("apply", "ingest_commit"),
+    ("view-materialize", "source_register"),
+    ("patrol-sync", "patrol_sync"),
+    ("patrol-plan", "patrol_plan"),
+    ("patrol-prepare", "maintain_prepare"),
+    ("patrol-review", "maintain_check"),
+    ("patrol-apply", "maintain_commit"),
+    ("patrol-reindex", "patrol_reindex"),
+    ("patrol-complete", "patrol_complete"),
+    ("query", "search"),
+    ("maintain", "maintain_audit"),
+])
+def test_assigned_skills_name_their_scoped_openflow_operation(skill, operation):
+    instruction = CAPABILITIES_ROOT / "skills" / f"hs-knowledge-{skill}" / "SKILL.md"
+    assert f"`knowledge_{operation}`" in instruction.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(("workflow", "first_node"), [
+    ("hs-knowledge-ingest", "prepare_sources"), ("hs-knowledge-lint", "sync_workspace"),
+])
+def test_openflow_workflow_bootstraps_on_the_bound_execution_end(workflow, first_node):
+    prompt = workflow_nodes(workflow)[first_node]["prompt"]
+    assert "`knowledge_doctor`" in prompt
+    assert "--knowledge-root" in prompt
+    assert "data.runtime_version" in prompt
+
+
 def test_five_steps_keep_decision_writing_and_independent_review_separate():
     graph = yaml.safe_load((CAPABILITIES_ROOT / "workflows/hs-knowledge-ingest/workflow.yaml").read_bytes())
     nodes = {row["id"]: row for row in graph["nodes"]}

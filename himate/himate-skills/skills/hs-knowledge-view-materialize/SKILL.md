@@ -5,7 +5,9 @@ description: 按文档编辑计划和卡片模板撰写完整候选，核实文�
 
 # 按计划写完整卡
 
-复用 Workflow 已确认的知识根、执行端和 CLI 入口。独立使用时先读取知识根的 `AGENTS.md`、`config.yml`，用实际入口运行 `doctor --knowledge-root <知识根绝对路径> --json` 核对目标。下文 `knowledge` 均指该入口，工作目录为知识根，每次调用传入同一 `--knowledge-root`。
+沿用本轮已确认的知识根和执行端。当前会话提供本步骤所需的 Knowledge MCP 工具时，调用该工具并沿用其绑定的知识根。采用 MCP 时，缺少工具则报告工具名，调用被拒、失败或返回 `blocked` 时按实际诊断处理。
+
+采用 CLI 时，从知识根运行该执行端已确认的 `knowledge` 入口，每次传入同一 `--knowledge-root`。首次单独使用 CLI 时，先读取知识根的 `AGENTS.md` 和 `config.yml`，运行 `knowledge doctor --knowledge-root <知识根绝对路径> --json` 核对目标和版本。
 
 ## 成稿
 
@@ -18,9 +20,9 @@ description: 按文档编辑计划和卡片模板撰写完整候选，核实文�
 - 采用模板的简洁卡头。需要新增来源 ID 或补看 PDF 原页时，按[来源登记和页面预览](references/source-commands.md)调用 CLI。
 - `tags` 可为空数组；填写时各项须为非空且唯一的字符串。纯数字、布尔等易被 YAML 识别为其它类型的标识需加引号，例如 `tags: ['80211', '1108', '8023']`。
 - 涉及图的结论使用本轮图片及 OCR/结构材料核对后写入正文，引用原件 ID 和真实位置，不链接临时图片。采用 `element` 定位且 P1 使用非默认配置时，在该 locator 的 `parser` 中复制 manifest.profile.options，确保本轮清理后仍可按同一配置读取；旧快照定位保留原语义。
-- 优先打开本轮 Markdown 中原位置的图片及 OCR。确需核对 PDF 原页时，用 `knowledge_source_extract` 指定物理页，按预览资源提示分批，读后用 `knowledge_source_release` 释放。独立部署用 `source extract/release`。正式 PDF 卡采用原件物理页或页段。
+- 优先打开本轮 Markdown 中原位置的图片及 OCR。确需核对 PDF 原页时，用 `knowledge_source_extract` 指定物理页，按预览资源提示分批，读后用 `knowledge_source_release` 释放。CLI 对应 `source extract/release`。正式 PDF 卡采用原件物理页或页段。
 - 条件、版本、各段依据和缺口写在正文。正常更新旧卡时迁入仍有效的结构化知识，保留历史定位、锚点及入链；不批量改卡。
-- 逐项核对该卡 `required_code_refs`，在实际配置的模块内查定义，按适用条件辨别同名项。复用已登记的文件，新增代码来源用 `knowledge_source_register`（独立部署用 `knowledge source register`）取得 `code_id`，按已配置的模块或仓库填写 `path`，必要时填写 `repo_id`。带符号的引用填写完整符号行段，只有文件线索时填写支持该段的实际代码行段。缺少必要源码或适用版本无法确认时，说明具体缺口并把结论交回 P2 判断。
+- 逐项核对该卡 `required_code_refs`，在实际配置的模块内查定义，按适用条件辨别同名项。复用已登记的文件，新增代码来源用 `knowledge_source_register`（CLI 对应 `knowledge source register`）取得 `code_id`，按已配置的模块或仓库填写 `path`，必要时填写 `repo_id`。带符号的引用填写完整符号行段，只有文件线索时填写支持该段的实际代码行段。缺少必要源码或适用版本无法确认时，说明具体缺口并把结论交回 P2 判断。
 - 为计划中每个不同的关键位置写 `code_ref`，在使用它的正文段落旁标明引用。同一位置支持多段时复用，入口、校验和执行逻辑落在不同位置时各自引用。原文的其他设计条件与例外继续按原文归因。静态代码观察写清已核实的范围，插行时调整定位。
 
 必须移除的旧卡文件列入可选 `.build/changes.json`；具体格式见[候选组织](references/request.md)。正式 `knowledge/` 在本步保持不变。

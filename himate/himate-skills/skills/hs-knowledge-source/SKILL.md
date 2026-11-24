@@ -5,11 +5,13 @@ description: 按指定文档范围准备同版材料、图片和关联旧卡，�
 
 # 准备文档材料
 
-复用 Workflow 已确认的知识根、执行端和 CLI 入口。独立使用时先读取知识根的 `AGENTS.md`、`config.yml`，用实际入口运行 `doctor --knowledge-root <知识根绝对路径> --json` 核对目标。下文 `knowledge` 均指该入口，工作目录为知识根，每次调用传入同一 `--knowledge-root`。
+沿用本轮已确认的知识根和执行端。当前会话提供本步骤所需的 Knowledge MCP 工具时，调用该工具并沿用其绑定的知识根。采用 MCP 时，缺少工具则报告工具名，调用被拒、失败或返回 `blocked` 时按实际诊断处理。
+
+采用 CLI 时，从知识根运行该执行端已确认的 `knowledge` 入口，每次传入同一 `--knowledge-root`。首次单独使用 CLI 时，先读取知识根的 `AGENTS.md` 和 `config.yml`，运行 `knowledge doctor --knowledge-root <知识根绝对路径> --json` 核对目标和版本。
 
 ## 执行
 
-OpenFlow 提供 `knowledge_ingest_scan` 时使用它，按实际 schema 传入 `source` 和本次使用的转换选项。独立部署运行 `knowledge ingest scan --json`，指定文档、目录或来源 ID 时加 `--source`。采用本次任务的原始范围，每批保留解析配置和阅读预算。未限定来源时不把上一批来源 ID 变成后续扫描范围。巡检已选中文档时，仅扫描交接的来源。
+当前会话提供 `knowledge_ingest_scan` 时使用它，按实际 schema 传入 `source` 和本次使用的转换选项。使用 CLI 时运行 `knowledge ingest scan --json`，指定文档、目录或来源 ID 时加 `--source`。采用本次任务的原始范围，每批保留解析配置和阅读预算。未限定来源时不把上一批来源 ID 变成后续扫描范围。巡检已选中文档时，仅扫描交接的来源。
 
 有宿主提供的 `upload_ingest` 时，先按[上传批次约定](references/upload-batch.md)核对执行端、当前文件哈希和批次位置。其余文档材料字段及旧 PDF 兼容见[来源操作](references/materials.md)。
 

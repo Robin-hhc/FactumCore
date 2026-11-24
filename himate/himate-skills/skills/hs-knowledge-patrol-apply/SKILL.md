@@ -5,9 +5,11 @@ description: 发布已经独立审阅的关联卡维护批次并记录复核结�
 
 # 发布关联卡维护结果
 
-沿用本轮已确认的知识根、执行端和 CLI 入口。独立使用时先读取该根的 `AGENTS.md`、`config.yml`，运行 `doctor --knowledge-root <知识根绝对路径> --json` 核对目标。下文 `knowledge` 指实际入口，工作目录为知识根，每次调用传入同一 `--knowledge-root`。
+沿用本轮已确认的知识根和执行端。当前会话提供本步骤所需的 Knowledge MCP 工具时，调用该工具并沿用其绑定的知识根。采用 MCP 时，缺少工具则报告工具名，调用被拒、失败或返回 `blocked` 时按实际诊断处理。
 
-确认本批通过 L5 后调用 `knowledge_maintain_commit`。零改卡时传入实际复核理由 `reason`。独立部署运行 `knowledge maintain commit --json`；零改卡时，将 `reason` 写入 `.build/commit.json`，用 `knowledge maintain commit --input .build/commit.json --json` 登记。
+采用 CLI 时，从知识根运行该执行端已确认的 `knowledge` 入口，每次传入同一 `--knowledge-root`。首次单独使用 CLI 时，先读取知识根的 `AGENTS.md` 和 `config.yml`，运行 `knowledge doctor --knowledge-root <知识根绝对路径> --json` 核对目标和版本。
+
+确认本批通过 L5 后调用 `knowledge_maintain_commit`。零改卡时传入实际复核理由 `reason`。采用 CLI 时运行 `knowledge maintain commit --json`。零改卡时，将 `reason` 写入 `.build/commit.json`，用 `knowledge maintain commit --input .build/commit.json --json` 登记。
 
 以命令回执交接实际修改的 `card_ids`、本批复核的 `reviewed_card_ids`、`reviewed_hash`、`source_exists` 及 `maintenance_complete`。回执表达关联卡维护和来源复核结果，不表达整份代码入库或文档阅读覆盖。出现 `receipt_warning` 时以本次返回值为准，不使用可能陈旧的落盘回执。
 

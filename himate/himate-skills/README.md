@@ -2,7 +2,7 @@
 
 本仓维护 Agent 的步骤指引、参考资料、写作模板和工作流编排。`skills/` 提供各 Skill，`workflows/` 提供 OpenFlow 工作流，根目录的 deploy 脚本负责把这些能力包安装到宿主。
 
-使用前，在实际执行端通过 npm 安装 `@himate/knowledge-models` 和 `@himate/knowledge-cli`，运行 `knowledge --version` 和 `knowledge setup`。在 OpenFlow 会话中，Agent 使用宿主提供的知识库 MCP 工具，宿主在绑定的执行端调用 CLI。独立运行时，Agent 通过已确认执行端的 PATH 调用 `knowledge`。
+使用前，在实际执行端通过 npm 安装 `@himate/knowledge-models` 和 `@himate/knowledge-cli`，运行 `knowledge --version` 和 `knowledge setup`。当前会话提供对应的 Knowledge MCP 工具时，Agent 沿用工具绑定的知识根。采用 CLI 方式时，从已确认的执行端运行 `knowledge`。
 
 ## 安装能力包
 
@@ -53,7 +53,7 @@ himate-skills/
 └── workflows/
 ```
 
-Agent 在相应节点加载 Skill 后，使用 OpenFlow 为该节点提供的知识库 MCP 操作。独立部署按随包指引调用已安装的 CLI。安装器和安装测试随本仓维护。
+Agent 在相应节点加载 Skill 后，使用该节点提供的 Knowledge MCP 工具。采用 CLI 的节点按随包指引调用该执行端已安装的 CLI。安装器和安装测试随本仓维护。
 
 ## 验证安装器
 

@@ -61,8 +61,48 @@ def test_query_terms_can_match_different_paragraphs_and_tags_are_exact_and(tmp_p
     write_card(root, "one", "# RX\n\nrx_validate_frame delivers.\n", tags=["RX"])
     result = search(root, "rx_validate_frame Delivery", tags=["RX", "Device"])
     assert [hit["card_id"] for hit in result["matches"]] == ["both"]
-    assert search(root, "rx_validate_frame", tags=["rx"])["matches"] == []
+    assert {hit["card_id"] for hit in search(root, "rx_validate_frame", tags=["rx"])["matches"]} == {"both", "one"}
+    assert search(root, "rx_validate_frame", tags=["RX", "Missing"])["matches"] == []
     assert search(root, "rx_validate_frames")["matches"] == []
+
+
+@pytest.mark.parametrize("tags", [
+    ["80211BE", "Device", "STRASSE"],
+    [" 80211be ", "\tdevice\n", "straße"],
+    ["８０２１１ｂｅ", "ＤＥＶＩＣＥ", "Strasse", "80211BE"],
+])
+def test_tags_normalize_both_sides_without_rewriting_display_or_card_bytes(tmp_path, tags):
+    root = library_at(tmp_path)
+    stored = [" ８０２１１ＢＥ ", "Ｄｅｖｉｃｅ", "Straße", "80211be"]
+    path, metadata = write_card(root, "tagged", "# Needle\n\nA useful rule.\n", tags=stored)
+    before = path.read_bytes()
+    result = search(root, "needle", tags=tags)
+    assert [(hit["card_id"], hit["tags"]) for hit in result["matches"]] == [("tagged", stored)]
+    read, _ = module("library").query(root, {"card_id": "tagged"}, read=True)
+    assert read["metadata"] == metadata
+    assert path.read_bytes() == before
+
+
+def test_normalized_tags_still_require_complete_values_and_keep_internal_spaces(tmp_path):
+    root = library_at(tmp_path)
+    write_card(root, "tagged", "# Needle\n", tags=["rx  path", "802.11BE"])
+    assert [hit["card_id"] for hit in search(root, "needle", tags=["RX  PATH", "802.11be"])["matches"]] == ["tagged"]
+    for tags in (["rx path"], ["rx"], ["80211be"], ["802.11be", "missing"]):
+        assert search(root, "needle", tags=tags)["matches"] == []
+
+
+@pytest.mark.parametrize("top_k", [1, 100])
+def test_case_and_whitespace_variants_keep_scores_order_and_top_k(tmp_path, top_k):
+    root = library_at(tmp_path)
+    write_card(root, "a-upper", "# 80211BE\n\nShared rule.\n")
+    write_card(root, "z-lower", "# 80211be\n\nShared rule.\n")
+    expected = [{"card_id": identity, "path": f"knowledge/{identity}.md", "title": title,
+                 "tags": [], "lifecycle": "stable", "score": 9}
+                for identity, title in (("a-upper", "80211BE"), ("z-lower", "80211be"))][:top_k]
+    for text in ("80211be", "80211BE", "80211Be", "  ８０２１１ｂｅ\t\n", "80211BE  80211be"):
+        result = search(root, text, top_k=top_k)
+        assert result["matches"] == expected
+        assert result["truncated"] is (top_k == 1)
 
 
 def test_lifecycle_filters_whole_cards_and_read_preserves_deprecated_and_legacy_draft(tmp_path):
@@ -94,15 +134,14 @@ def test_top_k_contract_is_still_one_to_one_hundred(tmp_path, top_k):
         search(root, "RX", top_k=top_k)
 
 
-def test_field_weights_deduplicate_terms_and_ties_use_card_id(tmp_path):
+@pytest.mark.parametrize("query", ["needle", "NEEDLE", "Ｎｅｅｄｌｅ", "  needle\t\n", "needle NEEDLE"])
+def test_field_weights_deduplicate_terms_and_ties_use_card_id(tmp_path, query):
     root = library_at(tmp_path)
     write_card(root, "title", "# needle\n\nNo extra match.\n")
     write_card(root, "tag", "# Tagged\n\nNo extra match.\n", tags=["needle"])
     write_card(root, "body-b", "# B\n\nneedle needle\n\nneedle\n")
     write_card(root, "body-a", "# A\n\nneedle\n")
-    # A differently cased query selects one casefold token per word, keeping
-    # field weights visible independently of the tokenizer's literal token.
-    result = search(root, "NEEDLE", top_k=3)
+    result = search(root, query, top_k=3)
     assert [(hit["card_id"], hit["score"]) for hit in result["matches"]] == [("title", 9), ("tag", 5), ("body-a", 1)]
     assert result["truncated"] is True
 
@@ -167,9 +206,28 @@ def test_search_format_upgrade_without_card_changes_preserves_source_versions_an
     assert [hit["card_id"] for hit in search(root, "rx_timeout")["matches"]] == ["rx"]
     with module("catalog").Catalog(root) as catalog:
         assert catalog.get_file("doc-design") == source_before
-        assert catalog.connection.execute("SELECT value FROM search_state WHERE key='format'").fetchone()[0] == "card-v1"
+        assert catalog.connection.execute("SELECT value FROM search_state WHERE key='format'").fetchone()[0] == module("library").SEARCH_VERSION
         assert [row[1] for row in catalog.connection.execute("PRAGMA table_info(search_terms)")] == ["token", "card_id", "field"]
     assert path.read_bytes() == card_before
+    assert (root / "governance/sources.lock.yaml").read_bytes() == registry
+
+
+def test_old_card_cache_with_compatible_structure_rebuilds_without_card_changes(tmp_path):
+    root = library_at(tmp_path)
+    path, _ = write_card(root, "rule", "# Needle\n\nA useful rule.\n", tags=["  RX "])
+    search(root, "needle")
+    before = path.read_bytes()
+    registry = (root / "governance/sources.lock.yaml").read_bytes()
+    with module("catalog").Catalog(root) as catalog:
+        catalog.connection.execute("UPDATE search_state SET value='card-v1' WHERE key='format'")
+        catalog.connection.execute("DELETE FROM search_terms")
+        catalog.connection.execute("INSERT INTO search_terms VALUES('sentinel','rule','body')")
+    result = search(root, "NEEDLE", tags=["rx"])
+    assert [(hit["card_id"], hit["score"], hit["tags"]) for hit in result["matches"]] == [("rule", 9, ["  RX "])]
+    with module("catalog").Catalog(root) as catalog:
+        assert catalog.connection.execute("SELECT value FROM search_state WHERE key='format'").fetchone()[0] == module("library").SEARCH_VERSION
+    assert search(root, "sentinel")["matches"] == []
+    assert path.read_bytes() == before
     assert (root / "governance/sources.lock.yaml").read_bytes() == registry
 
 

@@ -6,14 +6,14 @@
 
 | 请求字段 | 规则 |
 |---|---|
-| `query` | 必填关键词；沿用确定性分词，同一卡须命中全部查询词组，可分布于不同段落 |
-| `tags` | 可选字符串数组；多个标签按完整字符串精确 AND 匹配，保留大小写规则；缺省不按标签过滤 |
+| `query` | 必填关键词；NFKC 归一化后确定性分词并忽略大小写，多余分隔空白不影响结果；同一卡须命中全部查询词组，可分布于不同段落 |
+| `tags` | 可选字符串数组；标签比较双方均经 NFKC、首尾去空白和 casefold 后按完整字符串 AND 匹配，保留原始展示值；缺省不按标签过滤 |
 | `top_k` | 可选整数，1—100，默认 10；CLI 可用 `--top-k` |
 | `include_deprecated` | 可选布尔值，默认 false；CLI 可用 `--include-deprecated` 额外包含显式整卡退役卡 |
 
 标签通过 `--input` 提供，不猜宏、芯片或版本。只检索正式 `knowledge/`，不读 `.build/`；旧 draft 不自动升为 stable，也不进入默认搜索。没有用途或 context 资格门，缺适用条件不让相关卡消失。
 
-标题、标签、正文权重分别为 8、5、1；同一 `(token, card_id, field)` 只计一次，平分按 card_id 稳定排序。分数仅表示词项相关性。`matches` 包含 `card_id/path/title/tags/lifecycle/score`，另有 `truncated` 和本次独立 `report_ref`，不返回 Claim 资格集合。
+标题、标签、正文权重分别为 8、5、1；同一归一化词项在同一卡的同一字段只计一次，平分按 card_id 稳定排序。仅改变查询大小写不改变分数、排序和截断结果。标签内部空格和标点仍参与完整值比较，例如 `80211` 不匹配标签 `80211BE`；`80211be` 与 `802.11be` 不自动等价。分数仅表示词项相关性。`matches` 包含 `card_id/path/title/tags/lifecycle/score`，另有 `truncated` 和本次独立 `report_ref`，不返回 Claim 资格集合。
 
 显式传入旧 `--purpose`，或 JSON 中含 `purpose/context`，在搜索或读卡执行前返回 `QUERY_PARAMETERS_REMOVED`、退出码 2，不生成正常命中报告。删除旧字段，改用关键词、可选标签，再通过正文与来源判断适用性；不把旧参数静默忽略。
 

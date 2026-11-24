@@ -19,7 +19,7 @@ CARD_TYPES = {
     "rules": "rule", "commands": "command", "runbooks": "runbook", "glossaries": "glossary",
 }
 KINDS = {"card", "document", "code"}
-VERSION = 3
+VERSION = 4
 GRAPH_MAX_NODES = 4000
 GRAPH_MAX_EDGES = 15000
 GRAPH_MAX_BYTES = 4 * 1024 * 1024
@@ -272,7 +272,7 @@ def _write_card(db, card, structure, links, graph_targets, files, versions):
 def _write_terms(db, card, weights):
     identity = card["id"]
     db.executemany("INSERT OR IGNORE INTO panel_tags VALUES(?,?)",
-                   ((identity, tag) for tag in card["metadata"].get("tags", [])))
+                   ((identity, indexing.normalize_tag(tag)) for tag in card["metadata"].get("tags", [])))
     db.execute("""
         INSERT INTO panel_terms
         SELECT card_id,token,SUM(CASE field WHEN 'title' THEN ? WHEN 'tags' THEN ? ELSE ? END)
@@ -477,7 +477,7 @@ def _cards(db, revision, request):
         params.append(category)
     if tag:
         predicates.append("EXISTS(SELECT 1 FROM panel_tags t WHERE t.card_id=c.id AND t.tag=?)")
-        params.append(tag)
+        params.append(indexing.normalize_tag(tag))
     if query:
         groups = indexing.term_groups(query)
         if not groups:
@@ -506,7 +506,7 @@ def _search(db, revision, request):
     marks = ",".join("?" for _ in terms)
     predicates, params = ["c.lifecycle != 'deprecated'"], list(terms)
     predicates.extend(_has_terms(groups, params))
-    for tag in sorted(set(tags)):
+    for tag in sorted({indexing.normalize_tag(tag) for tag in tags}):
         predicates.append("EXISTS(SELECT 1 FROM panel_tags t WHERE t.card_id=c.id AND t.tag=?)")
         params.append(tag)
     rows = db.execute(f"""

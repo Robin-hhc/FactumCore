@@ -14,23 +14,24 @@ indexing = _helper.module("indexing")
 
 @pytest.mark.parametrize("text,expected", [
     ("", set()),
-    ("TX_LIMIT", {"tx_limit", "=TX_LIMIT"}),
-    ("tx_limit", {"tx_limit", "=tx_limit"}),
-    ("ＦＯＯ", {"foo", "=FOO"}),
+    ("TX_LIMIT", {"tx_limit"}),
+    ("tx_limit", {"tx_limit"}),
+    ("ＦＯＯ", {"foo"}),
     ("发送窗口", {"发送", "送窗", "窗口"}),
     ("帧", {"帧"}),
-    ("TX / retry", {"tx", "=TX", "retry", "=retry"}),
+    ("TX / retry", {"tx", "retry"}),
 ])
 def test_lexical_terms_match_independent_expected_tokens(text, expected):
     assert set(indexing.lexical(text)) == expected
 
 
-def test_query_terms_keep_case_variants_in_one_alternative_group():
-    assert indexing.term_groups("TX_LIMIT") == [{"tx_limit", "=TX_LIMIT"}]
+def test_query_terms_are_casefolded_after_compatibility_normalization():
+    assert indexing.term_groups("ＴＸ_LIMIT") == [{"tx_limit"}]
+    assert indexing.term_groups("Straße") == [{"strasse"}]
 
 
 def test_repeated_terms_do_not_increase_the_number_of_query_conditions():
-    assert indexing.term_groups("TX_LIMIT TX_LIMIT") == [{"tx_limit", "=TX_LIMIT"}]
+    assert indexing.term_groups("TX_LIMIT tx_limit ＴＸ_LIMIT") == [{"tx_limit"}]
 
 
 def test_chinese_query_requires_each_adjacent_term():

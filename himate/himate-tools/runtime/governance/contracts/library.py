@@ -15,7 +15,7 @@ from . import indexing, ingest, panel, source_resources
 from .validation import ContractError, safe_path, validate_id
 
 
-SEARCH_VERSION = "card-v1"
+SEARCH_VERSION = "card-v2"
 SEARCH_COLUMNS = [("token", 1), ("card_id", 2), ("field", 3)]
 SEARCH_WEIGHTS = {"title": 8, "tags": 5, "body": 1}
 
@@ -142,10 +142,11 @@ def query(root, request, *, read=False):
         for row in rows:
             hits.setdefault(row["card_id"], []).append(dict(row))
         matches = []
+        requested_tags = {indexing.normalize_tag(tag) for tag in request.get("tags", [])}
         for identity, found in hits.items():
             card = catalog.get_card(identity)
-            tags = set(card["metadata"].get("tags", []))
-            if not set(request.get("tags", [])).issubset(tags):
+            tags = {indexing.normalize_tag(tag) for tag in card["metadata"].get("tags", [])}
+            if not requested_tags.issubset(tags):
                 continue
             lifecycle = card["metadata"].get("lifecycle", "stable")
             if lifecycle == "draft" or lifecycle == "deprecated" and not request.get("include_deprecated", False):

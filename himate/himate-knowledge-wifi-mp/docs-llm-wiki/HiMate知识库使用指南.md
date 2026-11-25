@@ -1,6 +1,6 @@
 # HiMate 知识库使用指南
 
-首次使用时，先确认知识库命令在哪台机器执行并部署能力包，再在 OpenFlow 的知识库页校验目录、补齐环境并保存绑定。
+首次使用时，先确认知识库命令在哪台机器执行并部署能力包。可以在会话里让 Agent 使用 `hs-knowledge-setup` 补齐环境，再继续原任务。使用 OpenFlow 工作台时，在知识库页校验目录并保存绑定。
 
 ## 1. 准备
 
@@ -59,7 +59,7 @@ sh ./deploy.sh
 
 ## 5. 在终端安装和校验
 
-在上面确定的命令执行端，用对应账户运行以下命令。模型包会校验并准备 OCR 模型。`knowledge setup` 会安装所需的 Python 依赖并复查。
+已部署能力包时，可以让 Agent 在前面确认的执行端运行 [`hs-knowledge-setup`](../../himate-skills/skills/hs-knowledge-setup/README.md)。需要直接用终端安装时，用对应账户运行以下命令。模型包会校验并准备 OCR 模型。`knowledge setup` 会安装所需的 Python 依赖并复查。
 
 ```sh
 npm install -g @himate/knowledge-models --registry http://10.143.57.12:4873 --allow-scripts=@himate/knowledge-models

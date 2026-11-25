@@ -5,7 +5,7 @@ description: 复核并修订维护任务关联的已有卡及引用，保留原�
 
 # 修订已有引用卡
 
-在本轮已确认的知识根和执行端读取材料并写本轮暂存文件。首次单独使用时，先读取知识根的 `AGENTS.md` 和 `config.yml`，用当前会话提供的 `knowledge_doctor` 或已确认 CLI 的 `doctor --knowledge-root <知识根绝对路径> --json` 核对目标。
+在本轮已确认的知识根和执行端读取材料并写本轮暂存文件。首次单独使用时，先读取知识根的 `AGENTS.md` 和 `config.yml`，用当前会话提供的 `knowledge_doctor` 或已确认 CLI 的 `doctor --knowledge-root <知识根绝对路径> --json` 核对目标。命令找不到、启动入口有明确缺项或诊断仅表明缺运行依赖时，加载 `hs-knowledge-setup`，在同一执行端补齐并复查。得到与知识根匹配的就绪回执后继续原任务。
 
 读取 `.build/task.json`、其中的 `affected_cards` 原卡和材料入口。逐卡核对引用对应的结论、适用条件及必要代码上下文，按[维护候选格式](references/maintenance-candidates.md)记录简短决定和完整候选。
 

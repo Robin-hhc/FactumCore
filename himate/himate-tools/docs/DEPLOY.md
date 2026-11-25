@@ -1,6 +1,8 @@
 # 安装与部署
 
-在 OpenFlow 宿主部署 Skills 和 Workflows，在实际运行 `knowledge` 的机器上安装 CLI、模型和 Python 依赖。对于本地知识库，可在终端预装，也可从 OpenFlow 页面检查和补装。[HiMate 知识库使用指南](../../himate-knowledge-wifi-mp/docs-llm-wiki/HiMate知识库使用指南.md)
+在宿主部署 Skills 和 Workflows，在实际运行 `knowledge` 的机器上安装 CLI、模型和 Python 依赖。[HiMate 知识库使用指南](../../himate-knowledge-wifi-mp/docs-llm-wiki/HiMate知识库使用指南.md)
+
+能力包已经安装时，可以让 Agent 使用 [`hs-knowledge-setup`](../../himate-skills/skills/hs-knowledge-setup/README.md) 检查指定知识库的环境，按诊断补齐缺项并复查。查询、入库或巡检的自检发现缺少工具时，也会加载该 Skill。终端安装命令如下。
 
 ## 安装模型与 CLI
 

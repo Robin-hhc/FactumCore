@@ -5,17 +5,19 @@ description: 按关键词和可选标签检索正式知识卡，精读正文并�
 
 # 搜索、精读与回源
 
-沿用本轮已确认的知识根和执行端。当前会话提供本步骤所需的 Knowledge MCP 工具时，调用该工具并沿用其绑定的知识根。采用 MCP 时，缺少工具则报告工具名，调用被拒、失败或返回 `blocked` 时按实际诊断处理。
+沿用本轮已确认的知识根和执行端。尚未确认时，以用户给出的目录或当前工作区内唯一可核实的知识根为候选，仍有歧义时询问用户。当前会话提供本步骤所需的 Knowledge MCP 工具时，调用该工具并沿用已确认的绑定。采用 MCP 时，缺少工具则报告工具名，调用被拒、失败或返回 `blocked` 时按实际诊断处理。
 
-采用 CLI 时，从知识根运行该执行端已确认的 `knowledge` 入口，每次传入同一 `--knowledge-root`。首次单独使用 CLI 时，先读取知识根的 `AGENTS.md` 和 `config.yml`，运行 `knowledge doctor --knowledge-root <知识根绝对路径> --json` 核对目标和版本。
+查询前自检或首次只读调用明确返回 `KNOWLEDGE_CLI_NOT_FOUND`、`KNOWLEDGE_REMOTE_CLI_NOT_FOUND`，或确认缺少启动入口、运行依赖时，用 `hs-knowledge-setup` 修复同一知识根的实际执行端。复查通过后，原先使用 Knowledge MCP 的查询继续用同一个 MCP。环境仍阻塞时报告安装器回执。正式检索和读卡以知识工具的结果为准。绑定不明、权限、连接以及业务诊断按实际错误处理。
+
+采用 CLI 时，从知识根运行该执行端已确认的 `knowledge` 入口，每次传入同一 `--knowledge-root`。首次单独使用 CLI 时，先读取知识根的 `AGENTS.md` 和 `config.yml`，运行 `knowledge doctor --knowledge-root <知识根绝对路径> --json` 核对目标和版本。命令找不到、启动入口有明确缺项或诊断仅表明缺运行依赖时，加载 `hs-knowledge-setup`，在同一执行端补齐并复查。得到与知识根匹配的就绪回执后继续原任务。
 
 ## 检索
 
-当前会话提供 `knowledge_search` 和 `knowledge_read` 时，用 `knowledge_search` 查询，传入 `query` 和所需的 `tags`。选出相关卡后调用 `knowledge_read`，传入 `card_id` 和搜索返回的 `view_revision`。采用 CLI 时用下面的命令。
+当前会话提供 `knowledge_search` 和 `knowledge_read` 时，用 `knowledge_search` 查询，传入 `query` 和所需的 `tags`。选出相关卡后调用 `knowledge_read`，传入 `card_id` 和搜索返回的 `view_revision`。采用 CLI 时用已核实的命令入口执行。若 Setup 回执给出了 `knowledge.argv`，用它替换示例里的 `knowledge`。
 
 ```sh
-knowledge search "关键词" --json
-knowledge read CARD_ID --json
+knowledge search "关键词" --knowledge-root "<知识根绝对路径>" --json
+knowledge read CARD_ID --knowledge-root "<知识根绝对路径>" --json
 ```
 
 搜索返回完整卡的相关候选，不认证当前适用或已实现。需要标签时用 `--input`，检索整卡退役资料时用 `--include-deprecated`；请求和结果字段见[公开 API](references/public-api.md)。
@@ -24,7 +26,7 @@ knowledge read CARD_ID --json
 
 读取当前来源时，采用 `read` 返回的 `sources` 及其实际路径基准。需要补查登记来源时使用 `knowledge_source_list`，需要确认历史版本时使用 `knowledge_source_resolve`，按 `source_id` 和已有版本参数回源。CLI 的 `source list/resolve` 参数见公开 API。
 
-需要解析 PDF/Office/图片时用 `knowledge_source_extract`，CLI 对应 `source extract --input FILE.json --json`。实际打开相关图片并结合 OCR 和结构判断。用本次回执的 `read_id` 调用 `knowledge_source_renew` 延长阅读，完成后调用 `knowledge_source_release`。CLI 对应 `source renew/release`。外部图片链接、缺模型及未解析范围保留为缺口。
+需要解析 PDF/Office/图片时用 `knowledge_source_extract`，CLI 对应 `source extract --input FILE.json --json`。实际打开相关图片并结合 OCR 和结构判断。用本次回执的 `read_id` 调用 `knowledge_source_renew` 延长阅读，完成后调用 `knowledge_source_release`。CLI 对应 `source renew/release`。明确返回 `PARSER_MODELS_REQUIRED` 且缺的是默认模型时，用 `hs-knowledge-setup` 补齐后续办本次回源。外部图片链接、仍缺的模型及未解析范围保留为缺口。
 
 指定 PDF 物理页范围可取得 `role: page_preview`，逐页生成到像素和字节预算。按实际回执查看图片，需要时缩小范围补读。
 

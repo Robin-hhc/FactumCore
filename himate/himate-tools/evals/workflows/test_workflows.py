@@ -75,6 +75,7 @@ def test_assigned_skills_name_their_harness_independent_mcp_operation(skill, ope
     instruction = CAPABILITIES_ROOT / "skills" / f"hs-knowledge-{skill}" / "SKILL.md"
     body = instruction.read_text(encoding="utf-8")
     assert f"`knowledge_{operation}`" in body
+    assert "`hs-knowledge-setup`" in body
     assert "OpenFlow" not in body
 
 
@@ -86,6 +87,7 @@ def test_workflow_bootstraps_on_the_bound_execution_end(workflow, first_node):
     assert "`knowledge_doctor`" in prompt
     assert "--knowledge-root" in prompt
     assert "data.runtime_version" in prompt
+    assert "hs-knowledge-setup" in prompt
     assert "OpenFlow" not in prompt
 
 
@@ -231,6 +233,15 @@ def test_skill_packages_do_not_own_execution_or_test_code(distribution, resource
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("synthetic wrong owner", encoding="utf-8")
     assert any("Skill source owns implementation" in error for error in validate_distribution(distribution))
+
+
+def test_setup_skill_requires_its_launcher_and_rejects_extra_scripts(distribution):
+    package = distribution / "skills/hs-knowledge-setup"
+    (package / "scripts/setup.cjs").unlink()
+    (package / "scripts/extra.cjs").write_text("synthetic wrong owner", encoding="utf-8")
+    errors = validate_distribution(distribution)
+    assert "hs-knowledge-setup: missing setup launcher scripts/setup.cjs" in errors
+    assert "hs-knowledge-setup: Skill source owns implementation, tests or dependency locks" in errors
 
 
 def test_authoring_template_links_resolve_within_the_skill_package(distribution):

@@ -2,7 +2,7 @@
 
 本仓维护 Agent 的步骤指引、参考资料、写作模板和工作流编排。`skills/` 提供各 Skill，`workflows/` 提供 OpenFlow 工作流，根目录的 deploy 脚本负责把这些能力包安装到宿主。
 
-使用前，在实际执行端通过 npm 安装 `@himate/knowledge-models` 和 `@himate/knowledge-cli`，运行 `knowledge --version` 和 `knowledge setup`。当前会话提供对应的 Knowledge MCP 工具时，Agent 沿用工具绑定的知识根。采用 CLI 方式时，从已确认的执行端运行 `knowledge`。
+安装能力包并打开知识库后，可以直接发起查询、入库或巡检。已有 Knowledge MCP 工具时，Agent 沿用工具绑定的知识根。采用 CLI 时，Agent 在实际执行端自检，明确缺少安装项时加载 [`hs-knowledge-setup`](skills/hs-knowledge-setup/README.md)，复查通过后接着处理原任务。也可以直接让 Agent 使用该 Skill 准备环境。
 
 ## 安装能力包
 

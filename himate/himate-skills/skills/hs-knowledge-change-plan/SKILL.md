@@ -5,7 +5,7 @@ description: 阅读本批文档和关联旧卡，决定知识主题及编辑动�
 
 # 制定简短编辑计划
 
-在本轮已确认的知识根和执行端读取材料并写本轮暂存文件。首次单独使用时，先读取知识根的 `AGENTS.md` 和 `config.yml`，用当前会话提供的 `knowledge_doctor` 或已确认 CLI 的 `doctor --knowledge-root <知识根绝对路径> --json` 核对目标。
+在本轮已确认的知识根和执行端读取材料并写本轮暂存文件。首次单独使用时，先读取知识根的 `AGENTS.md` 和 `config.yml`，用当前会话提供的 `knowledge_doctor` 或已确认 CLI 的 `doctor --knowledge-root <知识根绝对路径> --json` 核对目标。命令找不到、启动入口有明确缺项或诊断仅表明缺运行依赖时，加载 `hs-knowledge-setup`，在同一执行端补齐并复查。得到与知识根匹配的就绪回执后继续原任务。
 
 ## 阅读和决策
 

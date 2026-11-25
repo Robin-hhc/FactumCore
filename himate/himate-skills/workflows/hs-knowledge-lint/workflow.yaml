@@ -14,7 +14,7 @@ nodes:
   owner: coder
   skill: hs-knowledge-patrol-sync
   prompt: |-
-    复用宿主绑定或本次已确认的知识根与执行端，读取该根的 AGENTS.md 和 config.yml。当前节点提供 `knowledge_doctor` 时用它核对绑定。采用已确认的 CLI 方式时，在知识根显式传入 --knowledge-root 运行 doctor --json。确认实际知识根与 phase 为 ready 后继续。交接执行端、知识根、调用方式和 data.runtime_version。使用 CLI 时还需交接命令入口。
+    复用宿主绑定或本次已确认的知识根与执行端，读取该根的 AGENTS.md 和 config.yml。当前节点提供 `knowledge_doctor` 时用它核对绑定。采用已确认的 CLI 方式时，在知识根显式传入 --knowledge-root 运行 doctor --json。命令找不到、启动入口有明确缺项或诊断仅表明缺运行依赖时，加载 hs-knowledge-setup，在同一执行端补齐并复查。确认实际知识根与 phase 为 ready 后继续原巡检任务。交接执行端、知识根、调用方式和 data.runtime_version。使用 CLI 时还需交接命令入口。
     后续节点沿用同一执行端、知识根、调用方式和版本。采用 Knowledge MCP 时使用当前节点提供的对应工具。缺少工具时报告工具名，按该节点的阻塞或失败出口交接。工具拒绝、失败或返回 blocked 时，按实际 phase、data 和 diagnostics 分流并报告。禁止用终端重复上述调用。采用 CLI 时使用已确认的入口。
     使用 hs-knowledge-patrol-sync。成功或未配置同步时交 L2，环境或同步阻塞时交 L8，说明实际缺口。
   exits:

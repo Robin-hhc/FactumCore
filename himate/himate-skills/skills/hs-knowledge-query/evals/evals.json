@@ -32,6 +32,16 @@
         "说明只改变 query 大小写不应改变命中排序或截断，无需因此扩大 top_k 或枚举大小写变体。",
         "没有声称已执行查询或已有命中；没有把 802.11be 和 80211be 说成自动等价。"
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "在已绑定的远端测试库中查「扫描重试」，允许补齐该库所在账户的运行环境。首次查询返回 KNOWLEDGE_REMOTE_CLI_NOT_FOUND。宿主已确认 SSH MCP、Linux 知识根和账户。",
+      "expected_output": "在既有 SSH 对端补齐环境并复查，然后继续原 Knowledge MCP 查询和读卡。",
+      "expectations": [
+        "将远端 CLI 缺失交给 hs-knowledge-setup，沿用原知识根和已授权的 SSH 执行端。",
+        "安装和复查在 Linux 对端进行，未以 Windows 上的 CLI 替代。",
+        "就绪后继续同一个 Knowledge MCP 查询，依据实际读卡输出答复。"
+      ]
     }
   ]
 }

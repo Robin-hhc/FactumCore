@@ -7,7 +7,7 @@ description: 按指定文档范围准备同版材料、图片和关联旧卡，�
 
 沿用本轮已确认的知识根和执行端。当前会话提供本步骤所需的 Knowledge MCP 工具时，调用该工具并沿用其绑定的知识根。采用 MCP 时，缺少工具则报告工具名，调用被拒、失败或返回 `blocked` 时按实际诊断处理。
 
-采用 CLI 时，从知识根运行该执行端已确认的 `knowledge` 入口，每次传入同一 `--knowledge-root`。首次单独使用 CLI 时，先读取知识根的 `AGENTS.md` 和 `config.yml`，运行 `knowledge doctor --knowledge-root <知识根绝对路径> --json` 核对目标和版本。
+采用 CLI 时，从知识根运行该执行端已确认的 `knowledge` 入口，每次传入同一 `--knowledge-root`。首次单独使用 CLI 时，先读取知识根的 `AGENTS.md` 和 `config.yml`，运行 `knowledge doctor --knowledge-root <知识根绝对路径> --json` 核对目标和版本。命令找不到、启动入口有明确缺项或诊断仅表明缺运行依赖时，加载 `hs-knowledge-setup`，在同一执行端补齐并复查。得到与知识根匹配的就绪回执后继续原任务。
 
 ## 执行
 
@@ -22,4 +22,4 @@ description: 按指定文档范围准备同版材料、图片和关联旧卡，�
 
 原件只读。P5 失败时保留当前已审批次，不重新扫描或清暂存。对未改文档重评时，首批使用具体已登记 ID 和 `reprocess: true`，后续按原范围普通续办。
 
-三种转换格式会备好全文 Markdown、原图及适用的离线 OCR，按最早未评估单元续办。模型由部署准备，累计进度保存在来源登记。新增知识主题由 P2 判断，脚本反查的旧卡仅提供引用候选。
+三种转换格式会备好全文 Markdown、原图及适用的离线 OCR，按最早未评估单元续办。明确返回 `PARSER_MODELS_REQUIRED` 且缺的是默认模型时，用 `hs-knowledge-setup` 补齐，按原范围和来源续办。累计进度保存在来源登记。新增知识主题由 P2 判断，脚本反查的旧卡仅提供引用候选。

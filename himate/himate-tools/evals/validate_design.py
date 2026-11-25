@@ -19,7 +19,10 @@ SKILLS = tuple("hs-knowledge-" + name for name in (
     "source", "change-plan", "view-materialize", "review", "apply", "query", "maintain", "capture",
     "patrol-sync", "patrol-plan", "patrol-reindex", "patrol-complete",
     "patrol-prepare", "patrol-repair", "patrol-review", "patrol-apply",
+    "setup",
 ))
+SETUP_SKILL = "hs-knowledge-setup"
+SETUP_ENTRY = Path("scripts/setup.cjs")
 OWNERS = {"lint_view": "reviewer", "review_maintenance": "reviewer"}
 NODE_SKILLS = {
     "prepare_sources": "hs-knowledge-source",
@@ -139,7 +142,12 @@ def validate(root, capabilities_root=None):
     for skill in SKILLS:
         package = package_root / skill
         try:
+            # Setup needs its launcher before the tool package can be installed.
+            setup_entry = package / SETUP_ENTRY if skill == SETUP_SKILL else None
+            if setup_entry is not None and not setup_entry.is_file():
+                errors.append(f"{skill}: missing setup launcher {SETUP_ENTRY.as_posix()}")
             forbidden = [path for path in package.rglob("*") if path.is_file()
+                         and path != setup_entry
                          and "__pycache__" not in path.parts
                          and (path.relative_to(package).parts[0] in {"scripts", "tests"}
                               or path.name.startswith("requirements")

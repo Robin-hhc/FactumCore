@@ -169,6 +169,27 @@ def test_group_keeps_pytest_cache_under_its_external_results(runner, monkeypatch
     assert (output / "pytest-cache/fixture/v/cache/nodeids").is_file()
 
 
+def test_group_consumes_temporary_location_without_exposing_control_to_tests(runner, monkeypatch, tmp_path):
+    source = tmp_path / "source"
+    tests = source / "evals/fixture"
+    tests.mkdir(parents=True)
+    (tests / "test_environment.py").write_text(
+        "import os\n"
+        "def test_child_environment():\n"
+        "    assert 'HIMATE_ACCEPTANCE_TEMP_ROOT' not in os.environ\n", encoding="utf-8")
+    output, temporary = tmp_path / "reports", tmp_path / "work"
+    output.mkdir()
+    monkeypatch.setattr(runner, "ROOT", source)
+    environment = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", HIMATE_ACCEPTANCE_TEMP_ROOT=str(temporary))
+
+    result = runner.run_group((0, "fixture", (tests,)), output, environment)
+
+    assert result["exit_code"] == 0 and result["tests"] == 1, result
+    assert (temporary / "pytest-cache/fixture/v/cache/nodeids").is_file()
+    assert not (output / "pytest-cache").exists()
+    assert environment["HIMATE_ACCEPTANCE_TEMP_ROOT"] == str(temporary)
+
+
 def test_timeout_stops_process_tree_and_collects_partial_output(runner, monkeypatch):
     class Process:
         returncode = 124
@@ -337,3 +358,191 @@ def test_json_integer_outside_float_range_cannot_break_soft_comparison(runner, t
     current = report_fixture()
     assert runner.compare_baseline(current, path)["status"] == "unavailable"
     assert current["passed"] is True
+
+
+def small_suite(runner, monkeypatch, tmp_path, *, fail=False):
+    source = tmp_path / "source"
+    tests = source / "evals/contracts"
+    tests.mkdir(parents=True)
+    (tests / "test_small.py").write_text(
+        "def test_small(tmp_path):\n"
+        "    (tmp_path / 'evidence.txt').write_text('small fixture')\n"
+        f"    assert {not fail!r}\n", encoding="utf-8")
+    monkeypatch.setattr(runner, "ROOT", source)
+    monkeypatch.setattr(runner, "runtime_environment", lambda root: {})
+    return source
+
+
+def test_separate_temporary_files_are_removed_after_success_but_reports_remain(runner, monkeypatch, tmp_path):
+    small_suite(runner, monkeypatch, tmp_path)
+    output, temporary = tmp_path / "reports", tmp_path / "run-work"
+    code = runner.main(["--output-dir", str(output), "--temp-dir", str(temporary),
+                        "--cleanup-temp", "on-success", "--jobs", "1"])
+    report = json.loads((output / "summary.json").read_text(encoding="utf-8"))
+    assert code == 0 and report["passed"] is True
+    assert report["storage"]["cleanup_status"] == "removed"
+    assert report["storage"]["temp_dir"] == str(temporary)
+    assert not temporary.exists()
+    assert (output / "00.xml").is_file()
+    assert (output / "00.stdout.txt").is_file()
+    assert not (output / "t").exists()
+    assert not (output / "pytest-cache").exists()
+
+
+def test_failed_group_keeps_separate_temporary_evidence(runner, monkeypatch, tmp_path):
+    small_suite(runner, monkeypatch, tmp_path, fail=True)
+    output, temporary = tmp_path / "reports", tmp_path / "run-work"
+    code = runner.main(["--output-dir", str(output), "--temp-dir", str(temporary),
+                        "--cleanup-temp", "on-success", "--jobs", "1"])
+    report = json.loads((output / "summary.json").read_text(encoding="utf-8"))
+    assert code == 2 and report["passed"] is False
+    assert report["storage"]["cleanup_status"] == "retained"
+    assert list(temporary.rglob("evidence.txt"))
+    assert (output / "00.xml").is_file()
+
+
+def test_separate_temporary_files_are_retained_by_default(runner, monkeypatch, tmp_path):
+    small_suite(runner, monkeypatch, tmp_path)
+    output, temporary = tmp_path / "reports", tmp_path / "run-work"
+    assert runner.main(["--output-dir", str(output), "--temp-dir", str(temporary), "--jobs", "1"]) == 0
+    report = json.loads((output / "summary.json").read_text(encoding="utf-8"))
+    assert report["storage"]["cleanup_policy"] == "never"
+    assert report["storage"]["cleanup_status"] == "retained"
+    assert list(temporary.rglob("evidence.txt"))
+
+
+@pytest.mark.parametrize("layout", ["same", "temporary_contains_reports", "reports_contains_temporary", "source", "knowledge"])
+def test_managed_temporary_root_rejects_overlap_and_business_paths(runner, monkeypatch, tmp_path, layout):
+    source = small_suite(runner, monkeypatch, tmp_path)
+    output, temporary = tmp_path / "reports", tmp_path / "run-work"
+    if layout == "same":
+        temporary = output
+    elif layout == "temporary_contains_reports":
+        output = temporary / "reports"
+    elif layout == "reports_contains_temporary":
+        temporary = output / "work"
+    elif layout == "source":
+        temporary = source / "work"
+    else:
+        knowledge = tmp_path / "domain-wiki"
+        (knowledge / "docs-raw").mkdir(parents=True)
+        (knowledge / "knowledge").mkdir()
+        (knowledge / "config.yml").write_text("schema_version: '2.0'", encoding="utf-8")
+        temporary = knowledge / "work"
+    with pytest.raises(SystemExit) as error:
+        runner.main(["--output-dir", str(output), "--temp-dir", str(temporary), "--cleanup-temp", "on-success"])
+    assert error.value.code == 2
+    assert not temporary.exists()
+    assert not output.exists()
+
+
+def test_cleanup_requires_a_separate_new_temporary_root(runner, monkeypatch, tmp_path):
+    small_suite(runner, monkeypatch, tmp_path)
+    output = tmp_path / "reports"
+    with pytest.raises(SystemExit) as error:
+        runner.main(["--output-dir", str(output), "--cleanup-temp", "on-success"])
+    assert error.value.code == 2 and not output.exists()
+    temporary = tmp_path / "existing-work"
+    temporary.mkdir()
+    previous = temporary / "previous.txt"
+    previous.write_text("keep existing evidence", encoding="utf-8")
+    with pytest.raises(SystemExit) as error:
+        runner.main(["--output-dir", str(output), "--temp-dir", str(temporary), "--cleanup-temp", "on-success"])
+    assert error.value.code == 2 and previous.read_text(encoding="utf-8") == "keep existing evidence"
+
+
+def directory_link(source, link):
+    if os.name == "nt":
+        import shutil
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Windows directory-junction check needs the available Node.js")
+        result = subprocess.run([node, "-e", "require('fs').symlinkSync(process.argv[1],process.argv[2],'junction')",
+                                 str(source), str(link)], capture_output=True, timeout=10)
+        if result.returncode:
+            pytest.skip("Directory junction creation is unavailable")
+    else:
+        link.symlink_to(source, target_is_directory=True)
+
+
+def test_temporary_root_rejects_linked_parent_without_touching_target(runner, monkeypatch, tmp_path):
+    small_suite(runner, monkeypatch, tmp_path)
+    external = tmp_path / "external"
+    external.mkdir()
+    linked = tmp_path / "linked"
+    directory_link(external, linked)
+    with pytest.raises(SystemExit) as error:
+        runner.main(["--output-dir", str(tmp_path / "reports"), "--temp-dir", str(linked / "work")])
+    assert error.value.code == 2
+    assert external.is_dir() and not (external / "work").exists()
+
+
+def test_successful_cleanup_unlinks_nested_directory_link_but_keeps_external_files(runner, monkeypatch, tmp_path):
+    small_suite(runner, monkeypatch, tmp_path)
+    output, temporary = tmp_path / "reports", tmp_path / "run-work"
+    external = tmp_path / "external"
+    external.mkdir()
+    original = external / "original.txt"
+    original.write_text("user material", encoding="utf-8")
+
+    def group(item, report_dir, environment):
+        directory_link(external, temporary / "outside-link")
+        (report_dir / "00.stdout.txt").write_text("passed", encoding="utf-8")
+        return {"group": item[1], "exit_code": 0, "seconds": 0.01, "tests": 1, "failures": 0,
+                "errors": 0, "skipped": 0, "cases": [], "timed_out": False, "diagnostic": None}
+
+    monkeypatch.setattr(runner, "run_group", group)
+    assert runner.main(["--output-dir", str(output), "--temp-dir", str(temporary),
+                        "--cleanup-temp", "on-success", "--jobs", "1"]) == 0
+    assert not temporary.exists()
+    assert original.read_text(encoding="utf-8") == "user material"
+    assert (output / "summary.json").is_file()
+
+
+@pytest.mark.parametrize("problem", ["owner_changed", "file_busy"])
+def test_temporary_cleanup_failure_is_reported_and_retains_reports(runner, monkeypatch, tmp_path, problem):
+    small_suite(runner, monkeypatch, tmp_path)
+    output, temporary = tmp_path / "reports", tmp_path / "run-work"
+    busy = temporary / "busy.txt"
+
+    def group(item, report_dir, environment):
+        busy.write_text("retain this fixture", encoding="utf-8")
+        if problem == "owner_changed":
+            (temporary / ".factum-acceptance-owner.json").write_text("{}", encoding="utf-8")
+        return {"group": item[1], "exit_code": 0, "seconds": 0.01, "tests": 1, "failures": 0,
+                "errors": 0, "skipped": 0, "cases": [], "timed_out": False, "diagnostic": None}
+
+    unlink = Path.unlink
+
+    def file_access(path, *args, **kwargs):
+        if path == busy and problem == "file_busy":
+            raise PermissionError("fixture is busy")
+        return unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(runner, "run_group", group)
+    monkeypatch.setattr(Path, "unlink", file_access)
+    assert runner.main(["--output-dir", str(output), "--temp-dir", str(temporary),
+                        "--cleanup-temp", "on-success", "--jobs", "1"]) == 2
+    report = json.loads((output / "summary.json").read_text(encoding="utf-8"))
+    assert report["storage"]["cleanup_status"] == "failed"
+    assert report["storage"]["cleanup_error"]
+    assert report["passed"] is False
+    assert busy.read_text(encoding="utf-8") == "retain this fixture"
+
+
+def test_timed_out_group_never_reclaims_its_temporary_files(runner, monkeypatch, tmp_path):
+    small_suite(runner, monkeypatch, tmp_path)
+    output, temporary = tmp_path / "reports", tmp_path / "run-work"
+
+    def group(item, report_dir, environment):
+        (temporary / "partial.txt").write_text("partial fixture", encoding="utf-8")
+        return {"group": item[1], "exit_code": 124, "seconds": 0.01, "tests": 0, "failures": 0,
+                "errors": 0, "skipped": 0, "cases": [], "timed_out": True,
+                "diagnostic": "Process exit not confirmed"}
+
+    monkeypatch.setattr(runner, "run_group", group)
+    assert runner.main(["--output-dir", str(output), "--temp-dir", str(temporary),
+                        "--cleanup-temp", "on-success", "--jobs", "1"]) == 2
+    report = json.loads((output / "summary.json").read_text(encoding="utf-8"))
+    assert report["storage"]["cleanup_status"] == "retained"
+    assert (temporary / "partial.txt").is_file()

@@ -18,6 +18,7 @@ import sys
 import tempfile
 import time
 from acceptance_report import COUNT_KEYS, compare_baseline, performance_report, read_junit, runtime_environment
+from support.run_storage import RunStorage
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -113,6 +114,8 @@ def execute_pytest(command, environment, timeout):
 def run_group(item, output, environment):
     number, label, paths = item
     xml = output / f"{number:02d}.xml"
+    environment = dict(environment)
+    temporary = Path(environment.pop("HIMATE_ACCEPTANCE_TEMP_ROOT", output))
     command = [
         sys.executable,
         "-m",
@@ -121,9 +124,9 @@ def run_group(item, output, environment):
         *(str(path) for path in paths),
         "-q",
         "--basetemp",
-        str(output / "t" / f"{number:02d}"),
+        str(temporary / "t" / f"{number:02d}"),
         "-o",
-        "cache_dir=" + str(output / "pytest-cache" / label),
+        "cache_dir=" + str(temporary / "pytest-cache" / label),
         "--junitxml",
         str(xml),
     ]
@@ -153,6 +156,9 @@ def run_group(item, output, environment):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--temp-dir", type=Path, help="Fresh temporary directory separate from reports and source")
+    parser.add_argument("--cleanup-temp", choices=("never", "on-success"), default="never",
+                        help="Remove only this run's separate temporary directory after all groups pass")
     parser.add_argument("--jobs", type=int, choices=(1, 2, 3), default=3)
     parser.add_argument("--profile", choices=("quick", "full"), default="full")
     parser.add_argument("--groups", nargs="+", help="Exact group names; default includes every group available to the profile")
@@ -164,15 +170,15 @@ def main(argv=None):
         groups = select_groups(ROOT, args.profile, args.groups)
     except ValueError as exc:
         parser.error(str(exc))
-    output = Path(args.output_dir).absolute()
-    if output.exists():
-        parser.error("Use a new output directory; previous evidence is never removed")
-    for path in (output, *output.parents):
-        if path.is_symlink():
-            parser.error("Linked output paths are not accepted")
-    output.mkdir(parents=True)
-    (output / "t").mkdir()
-    env = dict(os.environ, HIMATE_TEST_TMP=str(output / "unittest-tmp"))
+    capabilities = args.capabilities_root or ROOT.parent / "himate-skills"
+    try:
+        storage = RunStorage(args.output_dir, args.temp_dir, args.cleanup_temp,
+                             [ROOT, capabilities, ROOT.parent.parent / "main"])
+    except (ValueError, OSError) as exc:
+        parser.error(str(exc))
+    output = storage.output
+    env = dict(os.environ, HIMATE_TEST_TMP=str(storage.temporary / "unittest-tmp"),
+               HIMATE_ACCEPTANCE_TEMP_ROOT=str(storage.temporary))
     if args.capabilities_root is not None:
         env["HIMATE_TEST_CAPABILITIES_ROOT"] = str(args.capabilities_root.resolve())
     # Selection belongs to this command, not a hidden inherited -k/-m/-x.
@@ -223,7 +229,15 @@ def main(argv=None):
     }
     if args.baseline:
         report["performance"]["comparison"] = compare_baseline(report, args.baseline)
-    (output / "summary.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    # Persist the completed test evidence before reclaiming any temporary data.
+    report["storage"] = storage.describe()
+    summary = output / "summary.json"
+    summary.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    storage_passed = report["passed"] and not any(row.get("timed_out") for row in results)
+    report["storage"] = storage.finish(storage_passed)
+    if report["storage"]["cleanup_status"] == "failed":
+        report["passed"] = False
+    summary.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(report, ensure_ascii=True))
     return 0 if report["passed"] else 2
 

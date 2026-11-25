@@ -1,6 +1,24 @@
 # FactumCore 开发规范
 
-本文件适用于本仓的开发、Git 发布和真实环境验收。`himate/` 随 HiMate 迁移，仓库分支、发布步骤和本地开发记录集中在仓库根目录范围。工具开发和部署参见 [HiMate 工具文档](himate/himate-tools/docs/README.md)。
+本文件是 Agent 进入本仓后的开发入口，适用于开发、验证、环境管理和 Git 发布。按任务读取下级 `AGENTS.md`；环境与场景细节见[开发和验证指南](docs/DEVELOPMENT.md)，产品安装见 [HiMate 工具文档](himate/himate-tools/docs/README.md)。开发规范不随业务 Skill 部署到领域知识库。
+
+## 开始前
+
+1. 用 `git status --short --branch` 确认分支和已有修改，保留其他任务的代码、原件、卡片及来源登记。在 `main` 上执行 `git pull --ff-only origin main`；已有修改阻碍更新时先确认归属，不使用 reset、clean 或 stash 掩盖现场。
+2. 用 `python dev/lab.py status` 查看已登记环境，再按下表选择验证范围。默认测试根是主仓同级的 `<主仓名>-Test`；自定义时使用 `FACTUM_TEST_ROOT` 或 `--root <绝对路径>`，不要在每个工作树下另建一套测试根。
+3. 沿用平台、解释器版本及依赖锁匹配的资源。普通验证只新建可写状态，不逐轮复制完整仓库、vendor、OCR 模型或 Python 环境；安装/升级验证才使用干净安装目标。工作树的 Node 依赖直接引用已登记实体，不串联多级目录链接。OpenFlow 使用统一宿主启动器，同时隔离应用数据和每宿主的平台状态目录。
+
+## 选择验证场景
+
+| 改动 | 至少完成 |
+|---|---|
+| 文档、Agent 指引 | 检查链接、命令与当前实现；涉及 Skill 行为时运行相应 eval |
+| 算法、CLI、契约 | 受影响测试组及相关集成；默认使用已登记 Python 3.12 |
+| 安装、依赖、发行 | 干净 HOME/prefix/venv 的安装/升级验证；需要时覆盖 Python 3.10/3.11/3.12 |
+| 解析、Skill、Workflow | 对应机制测试；内容/节点行为变化增加真实材料、真实模型执行与独立审阅 |
+| OpenFlow、SSH、Samba | 对应实际宿主/页面/执行端验收，单独记录版本和边界 |
+
+日常优先 `python dev/lab.py run --groups <受影响组>`；`quick` 是局部冒烟，`full` 也只证明其实际执行层级。测试通过后，只有新增变更、失败或尚未解决的疑点才扩大或重复验证。隔离脚本通过、真实材料解析、模型工作流、真实页面和远端权限分别报告，不能互相替代。具体矩阵和命令见[开发和验证指南](docs/DEVELOPMENT.md#验证场景)。
 
 ## 分支约定
 
@@ -14,9 +32,9 @@ WiFi 知识根位于 `himate/himate-knowledge-wifi-mp/`。
 
 ### 在 main 开发和自测
 
-开始前用 `git status --short --branch` 确认工作区和分支，在 `main` 上通过 `git pull --ff-only origin main` 同步。按改动范围运行单元测试，涉及 CLI、安装或 Workflow 时增加对应集成用例。[验收命令](himate/himate-tools/evals/README.md#执行)
+按上述场景完成自测。统一入口将报告放入测试根的 `reports/<run-id>`，临时状态放入 `runs/<run-id>/work`；需要直接调用底层 runner 时，显式分开 `--output-dir` 和 `--temp-dir`。[验收命令](himate/himate-tools/evals/README.md#执行)
 
-自测通过后检查 `git diff --cached` 和 `git diff --cached --check`。开发代码、相关测试、文档及受影响的发行锁随提交更新，确认原件目录、卡片目录和来源登记仍是空库模板。提交后执行 `git push origin main`。
+自测通过后检查 `git diff --cached` 和 `git diff --cached --check`。开发代码、相关测试、文档及受影响的发行锁随提交更新，确认原件目录、卡片目录和来源登记仍是空库模板。提交、推送和合入均以本轮用户授权为准；获得发布授权后执行对应步骤，不能把自测通过当作发布授权。
 
 ### 将 main 同步到远端 test
 
@@ -27,7 +45,7 @@ git fetch origin refs/heads/main:refs/remotes/origin/main refs/heads/test:refs/r
 git worktree add --detach .worktrees/test-sync origin/test
 git -C .worktrees/test-sync merge --no-edit origin/main
 git -C .worktrees/test-sync merge-base --is-ancestor origin/main HEAD
-git -C .worktrees/test-sync diff --exit-code origin/main HEAD -- AGENTS.md himate/himate-tools himate/himate-skills
+git -C .worktrees/test-sync diff --exit-code origin/main HEAD -- AGENTS.md dev docs himate/himate-tools himate/himate-skills
 git -C .worktrees/test-sync diff --name-status origin/test HEAD -- .gitignore himate/himate-knowledge-wifi-mp main
 ```
 
@@ -54,6 +72,10 @@ git rev-parse HEAD
 
 用实际样本验证受影响的场景，记录 `main` 和 `test` 提交、执行端、运行版本、步骤和结果。代码、Skill 或 Workflow 有问题时回 `main` 修复，从自测、推送和同步重新走一轮。环境问题在对应执行端修复后复测同一版本。
 
-## 本地开发记录
+## 收尾与本地记录
 
-本仓的 SDD 记录放在根目录的 `.scratch/sdd/`，任务草稿和本地验证报告保存在 `.scratch/`。OpenFlow 知识库工作台的联动开发记录见 [OpenFlow PR #29](https://github.com/xmkid/OpenFlow/pull/29)。
+- 成功验证先保存报告和必要证据，再回收本轮临时状态；失败保留复现。启动前需要保留现场时用 `run --keep-temp`，已结束运行可用 `pin`；运行中不修改 pin。`clean --run <id>` 默认预览，明确 `--apply` 才清理有本工具登记、已结束且未 pin 的运行。
+- 活动运行、共享依赖、宿主数据、正式知识库、旧开发备份和没有所有权标记的历史目录不由运行清理命令删除。迁移或清理这些目录前，核对精确路径、运行引用、Git 状态及唯一资料；保留未提交修改。
+- 报告写明代码提交、执行端、依赖与模型版本、场景、结果、跳过/失败、人工介入和未验证范围；指向被回收目录的证据先转存到报告目录。结束前确认临时目录的回收或保留原因，以及 Git 改动范围。
+
+SDD 设计和任务说明放在 `.scratch/sdd/`，其中不保留完整运行环境；可复用资源与验证产物按[标准目录](docs/DEVELOPMENT.md#标准目录)管理。OpenFlow 知识库工作台联动开发记录见 [OpenFlow PR #29](https://github.com/xmkid/OpenFlow/pull/29)。

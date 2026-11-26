@@ -1,4 +1,4 @@
-"""Check or install Python dependencies and the knowledge launcher."""
+"""Check or install execution dependencies and the knowledge launcher."""
 
 from ast import literal_eval
 from contextlib import contextmanager
@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import platform
 import re
+import shutil
 import stat
 import subprocess
 import sys
@@ -22,6 +23,7 @@ from .protocol import NodeError
 
 
 INSTALL_TIMEOUT_SECONDS = 30 * 60
+APT_COMMAND_TIMEOUT_SECONDS = 10 * 60
 DEPENDENCY_CHECK_MESSAGE = "无法读取工具包的依赖清单，请检查工具包版本和 Python 路径。"
 CLI_CHECK_MESSAGE = "知识命令无法启动，请检查命令目录、工具包和 Python 路径后重试。"
 NPM_PACKAGE = "@himate/knowledge-cli"
@@ -31,6 +33,10 @@ PIP_FAILURE_MESSAGE = "依赖安装失败，请查看本地安装日志后重试
 LOG_FAILURE_MESSAGE = "无法写入本地安装日志，请检查用户目录的权限和磁盘空间。"
 PIP_LOCATION_OPTIONS = {"target", "prefix", "root", "python"}
 PIP_LOCATION_MESSAGE = "pip 安装位置被配置覆盖，请移除 pip 配置中的 target、prefix、root 或 python 设置后重试。"
+APT_GET = "/usr/bin/apt-get"
+SUDO = "/usr/bin/sudo"
+LIBREOFFICE_PACKAGE = "libreoffice-writer-nogui"
+LIBREOFFICE_INSTALL_HINT = "请让执行端管理员安装 libreoffice-writer-nogui，并确认该账户可以运行 soffice --version。"
 PYTHON_MODULE_FLAGS = ("-E", "-X", "utf8", "-m")
 SECRET_URL = re.compile(r"\b(?:https?|socks5h?)://[^\s\"'<>]+", re.IGNORECASE)
 
@@ -117,12 +123,53 @@ def _verify_command(tool_root, command):
                    env=_child_environment())
 
 
+def _is_apt_linux():
+    if sys.platform != "linux":
+        return False
+    try:
+        return platform.freedesktop_os_release().get("ID") in {"ubuntu", "debian"}
+    except OSError:
+        return False
+
+
+def _libreoffice_gap():
+    # Match Docling's precedence. Installing an apt package cannot repair an
+    # explicit override that still points to a broken executable.
+    configured = os.environ.get("DOCLING_LIBREOFFICE_CMD")
+    # An environment check may run with the knowledge repository as its cwd.
+    search_path = os.pathsep.join(item for item in os.get_exec_path() if os.path.isabs(item))
+    if configured:
+        command = configured if os.path.isabs(configured) else None
+        if not command and not os.path.dirname(configured):
+            command = shutil.which(configured, path=search_path)
+    else:
+        command = shutil.which("libreoffice", path=search_path) or shutil.which("soffice", path=search_path)
+        if command is None:
+            return {"code": "LIBREOFFICE_MISSING",
+                    "message": "执行端缺少用于渲染 Office 矢量图的 LibreOffice Writer。"}
+    if command:
+        try:
+            subprocess.run([command, "--version"], cwd="/", check=True, timeout=10, stdin=subprocess.DEVNULL,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                           env=dict(_child_environment(), PATH=search_path))
+        except (OSError, subprocess.SubprocessError):
+            pass
+        else:
+            return None
+    return {"code": "LIBREOFFICE_COMMAND_UNAVAILABLE",
+            "message": "无法运行 LibreOffice，请检查 DOCLING_LIBREOFFICE_CMD 或 PATH 中的软件路径和权限。"}
+
+
 def _report(tool_root, version, bin_dir, *, dependencies_only=False):
     dependencies, gaps = doctor.inspect_dependencies(tool_root / "runtime/requirements.lock.txt")
     dependencies_missing = bool(gaps)
     if dependencies_missing and find_spec("pip") is None:
         gaps.insert(0, {"code": "DEPENDENCY_PIP_MISSING", "message": PIP_MISSING_MESSAGE})
-    result = {"status": "needs_install" if dependencies_missing else "ready", "python": sys.executable,
+    office_gap = _libreoffice_gap() if _is_apt_linux() else None
+    if office_gap:
+        gaps.append(office_gap)
+    needs_install = dependencies_missing or office_gap is not None
+    result = {"status": "needs_install" if needs_install else "ready", "python": sys.executable,
               "python_version": platform.python_version(), "toolkit_version": version,
               "tool_root": str(tool_root), "dependencies": dependencies, "diagnostics": gaps, "command": None}
     if dependencies_only:
@@ -137,8 +184,8 @@ def _report(tool_root, version, bin_dir, *, dependencies_only=False):
         gaps.append({"code": error.code, "message": "无法检查知识命令，请检查命令目录。"})
     except OSError:
         gaps.append({"code": "CLI_CHECK_FAILED", "message": "无法读取知识命令，请检查命令目录的权限。"})
-    status = "needs_install" if dependencies_missing else "needs_cli"
-    if not dependencies_missing and command and command["installed"]:
+    status = "needs_install" if needs_install else "needs_cli"
+    if not needs_install and command and command["installed"]:
         try:
             _verify_command(tool_root, command)
         except (OSError, subprocess.SubprocessError):
@@ -203,14 +250,14 @@ def _log_output(output):
     return SECRET_URL.sub(safe_url, output or "")
 
 
-def _run_logged(argv, cwd, log, phase, *, log_output=True):
+def _run_logged(argv, cwd, log, phase, *, log_output=True, timeout=INSTALL_TIMEOUT_SECONDS):
     env = _child_environment()
     env.update({"PIP_NO_INPUT": "1", "PYTHONIOENCODING": "utf-8"})
     log.write("\n[" + phase + "]\n")
     log.flush()
     try:
         process = subprocess.run(argv, cwd=cwd, check=True, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                                 stderr=subprocess.STDOUT, timeout=INSTALL_TIMEOUT_SECONDS,
+                                 stderr=subprocess.STDOUT, timeout=timeout,
                                  text=True, encoding="utf-8", errors="replace", env=env)
     except (OSError, subprocess.SubprocessError) as error:
         output = _log_output(getattr(error, "stdout", None) or getattr(error, "stderr", None)) if log_output else ""
@@ -351,6 +398,27 @@ def _install_dependencies(tool_root, log):
         _run_logged([*pip, "install", "-r", requirements], cwd, log, "install dependencies")
 
 
+def _install_libreoffice(log):
+    if not os.access(APT_GET, os.X_OK):
+        raise NodeError("LIBREOFFICE_PACKAGE_MANAGER_UNAVAILABLE", "执行端没有可用的 apt-get。" + LIBREOFFICE_INSTALL_HINT)
+    prefix = []
+    if os.geteuid() != 0:
+        if not os.access(SUDO, os.X_OK):
+            raise NodeError("LIBREOFFICE_INSTALL_PERMISSION_REQUIRED", LIBREOFFICE_INSTALL_HINT)
+        prefix = [SUDO, "-n", "--"]
+    try:
+        _run_logged([*prefix, APT_GET, "update"], "/", log, "update apt package lists",
+                    timeout=APT_COMMAND_TIMEOUT_SECONDS)
+        _run_logged([*prefix, APT_GET, "install", "-y", "--no-install-recommends", "--no-remove", LIBREOFFICE_PACKAGE],
+                    "/", log, "install LibreOffice Writer", timeout=APT_COMMAND_TIMEOUT_SECONDS)
+    except (OSError, subprocess.SubprocessError) as error:
+        output = _log_output(getattr(error, "stdout", None) or getattr(error, "stderr", None))
+        if prefix and any(line.startswith("sudo:") for line in output.splitlines()):
+            raise NodeError("LIBREOFFICE_INSTALL_PERMISSION_REQUIRED", LIBREOFFICE_INSTALL_HINT) from error
+        raise NodeError("LIBREOFFICE_INSTALL_FAILED",
+                        "LibreOffice 安装失败，请查看本地安装日志并检查执行端的 apt 软件源。" + LIBREOFFICE_INSTALL_HINT) from error
+
+
 def _install(tool_root, version, bin_dir, result, progress, *, legacy, dependencies_only):
     log_path = None
 
@@ -361,7 +429,12 @@ def _install(tool_root, version, bin_dir, result, progress, *, legacy, dependenc
         return final, status
 
     if result["status"] == "needs_install":
-        progress("installing", "正在用 pip 安装知识库依赖。")
+        pip_needed = any(item["code"] == "DEPENDENCY_UNAVAILABLE" for item in result["diagnostics"])
+        office_gap = next((item for item in result["diagnostics"] if item["code"].startswith("LIBREOFFICE_")), None)
+        office_progress = "正在用 apt 安装 LibreOffice Writer。"
+        if office_gap and office_gap["code"] != "LIBREOFFICE_MISSING":
+            return fail("checking", office_gap["code"], office_gap["message"])
+        progress("installing", "正在用 pip 安装知识库依赖。" if pip_needed else office_progress)
         try:
             log = _open_install_log(managed_home(tool_root))
         except OSError:
@@ -374,7 +447,12 @@ def _install(tool_root, version, bin_dir, result, progress, *, legacy, dependenc
                 log.write(prerequisite["message"] + "\n")
                 return fail("installing", prerequisite["code"], prerequisite["message"])
             try:
-                _install_dependencies(tool_root, log)
+                if pip_needed:
+                    _install_dependencies(tool_root, log)
+                if office_gap:
+                    if pip_needed:
+                        progress("installing", office_progress)
+                    _install_libreoffice(log)
             except NodeError as error:
                 return fail("installing", error.code, str(error))
             except (OSError, subprocess.SubprocessError) as error:
@@ -383,6 +461,9 @@ def _install(tool_root, version, bin_dir, result, progress, *, legacy, dependenc
         if result is None:
             return fail("verifying", "DEPENDENCY_CHECK_FAILED", DEPENDENCY_CHECK_MESSAGE)
         if result["status"] == "needs_install":
+            office_gap = next((item for item in result["diagnostics"] if item["code"].startswith("LIBREOFFICE_")), None)
+            if office_gap:
+                return fail("verifying", "LIBREOFFICE_VERIFICATION_FAILED", LIBREOFFICE_INSTALL_HINT)
             return fail("verifying", "DEPENDENCY_INSTALL_FAILED", "依赖复查仍有缺失或版本不匹配，请检查 Python 后重试。")
 
     if result["status"] == "needs_cli":
@@ -405,7 +486,7 @@ def _install(tool_root, version, bin_dir, result, progress, *, legacy, dependenc
         except (OSError, ValueError, subprocess.SubprocessError):
             return fail("registering", "CLI_REGISTRATION_FAILED", "无法写入知识命令，请检查命令目录后重试。")
 
-    progress("verifying", "正在复查 Python 依赖。" if dependencies_only else "正在复查 Python 依赖和知识命令。")
+    progress("verifying", "正在复查执行端依赖。" if dependencies_only else "正在复查执行端依赖和知识命令。")
     if result["status"] == "needs_cli":
         report = _fresh_report if log_path else _try_report
         result = report(tool_root, version, bin_dir)
@@ -433,7 +514,7 @@ def run_environment(tool_root, manifest, action, *, bin_dir=None, output="text",
 
     installing = action == "install"
     if installing:
-        progress("checking", "正在检查工具包和 Python 依赖。")
+        progress("checking", "正在检查工具包和执行端依赖。")
     version = manifest["version"]
     result = _try_report(tool_root, version, bin_dir, dependencies_only=dependencies_only)
     code = 0
@@ -446,7 +527,7 @@ def run_environment(tool_root, manifest, action, *, bin_dir=None, output="text",
             code = 1
     elif installing:
         if result["status"] == "ready":
-            progress("verifying", "Python 依赖已就绪。" if dependencies_only else "Python 依赖和知识命令已就绪。")
+            progress("verifying", "执行端依赖已就绪。" if dependencies_only else "执行端依赖和知识命令已就绪。")
         else:
             try:
                 with _setup_lock(managed_home(tool_root)):

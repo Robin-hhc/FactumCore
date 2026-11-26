@@ -10,7 +10,6 @@ import os
 from pathlib import Path
 import platform
 import re
-import shutil
 import stat
 import subprocess
 import sys
@@ -18,7 +17,7 @@ import tempfile
 from urllib.parse import urlsplit
 
 from . import command_install, doctor
-from .execution import managed_home
+from .execution import PIP_LOCATION_OPTIONS, child_environment, managed_home
 from .protocol import NodeError
 
 
@@ -31,7 +30,6 @@ NPM_REPAIR_MESSAGE = "请重新安装 @himate/knowledge-cli，并检查 npm 命�
 PIP_MISSING_MESSAGE = "当前 Python 缺少 pip，请选择已安装 pip 的 Python 3.10–3.12，然后重试 knowledge setup。"
 PIP_FAILURE_MESSAGE = "依赖安装失败，请查看本地安装日志后重试。"
 LOG_FAILURE_MESSAGE = "无法写入本地安装日志，请检查用户目录的权限和磁盘空间。"
-PIP_LOCATION_OPTIONS = {"target", "prefix", "root", "python"}
 PIP_LOCATION_MESSAGE = "pip 安装位置被配置覆盖，请移除 pip 配置中的 target、prefix、root 或 python 设置后重试。"
 APT_GET = "/usr/bin/apt-get"
 SUDO = "/usr/bin/sudo"
@@ -120,55 +118,14 @@ def _verify_command(tool_root, command):
         executable = [sys.executable, "-E", "-B", command["dispatcher"]] if os.name == "nt" else [command["path"]]
     subprocess.run([*executable, "--help"], cwd=command["bin_dir"], check=True, timeout=10,
                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                   env=_child_environment())
-
-
-def _is_apt_linux():
-    if sys.platform != "linux":
-        return False
-    try:
-        return platform.freedesktop_os_release().get("ID") in {"ubuntu", "debian"}
-    except OSError:
-        return False
-
-
-def _libreoffice_gap():
-    # Match Docling's precedence. Installing an apt package cannot repair an
-    # explicit override that still points to a broken executable.
-    configured = os.environ.get("DOCLING_LIBREOFFICE_CMD")
-    # An environment check may run with the knowledge repository as its cwd.
-    search_path = os.pathsep.join(item for item in os.get_exec_path() if os.path.isabs(item))
-    if configured:
-        command = configured if os.path.isabs(configured) else None
-        if not command and not os.path.dirname(configured):
-            command = shutil.which(configured, path=search_path)
-    else:
-        command = shutil.which("libreoffice", path=search_path) or shutil.which("soffice", path=search_path)
-        if command is None:
-            return {"code": "LIBREOFFICE_MISSING",
-                    "message": "执行端缺少用于渲染 Office 矢量图的 LibreOffice Writer。"}
-    if command:
-        try:
-            subprocess.run([command, "--version"], cwd="/", check=True, timeout=10, stdin=subprocess.DEVNULL,
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                           env=dict(_child_environment(), PATH=search_path))
-        except (OSError, subprocess.SubprocessError):
-            pass
-        else:
-            return None
-    return {"code": "LIBREOFFICE_COMMAND_UNAVAILABLE",
-            "message": "无法运行 LibreOffice，请检查 DOCLING_LIBREOFFICE_CMD 或 PATH 中的软件路径和权限。"}
+                   env=child_environment())
 
 
 def _report(tool_root, version, bin_dir, *, dependencies_only=False):
-    dependencies, gaps = doctor.inspect_dependencies(tool_root / "runtime/requirements.lock.txt")
-    dependencies_missing = bool(gaps)
-    if dependencies_missing and find_spec("pip") is None:
+    dependencies, gaps = doctor.inspect_runtime_dependencies(tool_root / "runtime/requirements.lock.txt")
+    if any(gap["code"] == "DEPENDENCY_UNAVAILABLE" for gap in gaps) and find_spec("pip") is None:
         gaps.insert(0, {"code": "DEPENDENCY_PIP_MISSING", "message": PIP_MISSING_MESSAGE})
-    office_gap = _libreoffice_gap() if _is_apt_linux() else None
-    if office_gap:
-        gaps.append(office_gap)
-    needs_install = dependencies_missing or office_gap is not None
+    needs_install = bool(gaps)
     result = {"status": "needs_install" if needs_install else "ready", "python": sys.executable,
               "python_version": platform.python_version(), "toolkit_version": version,
               "tool_root": str(tool_root), "dependencies": dependencies, "diagnostics": gaps, "command": None}
@@ -227,13 +184,6 @@ def _failure(phase, code, message, *, legacy=False):
     return result, 1
 
 
-def _child_environment():
-    ignored = {"PIP_" + option.upper() for option in PIP_LOCATION_OPTIONS}
-    ignored.update({"PYTHONHOME", "PYTHONPATH", "PYTHONUSERBASE", "VIRTUAL_ENV"})
-    return {key: value for key, value in os.environ.items()
-            if key.upper() not in ignored}
-
-
 def _log_output(output):
     if isinstance(output, bytes):
         output = output.decode("utf-8", errors="replace")
@@ -251,7 +201,7 @@ def _log_output(output):
 
 
 def _run_logged(argv, cwd, log, phase, *, log_output=True, timeout=INSTALL_TIMEOUT_SECONDS):
-    env = _child_environment()
+    env = child_environment()
     env.update({"PIP_NO_INPUT": "1", "PYTHONIOENCODING": "utf-8"})
     log.write("\n[" + phase + "]\n")
     log.flush()
@@ -344,7 +294,7 @@ def _fresh_report(tool_root, version, bin_dir, *, dependencies_only=False):
     statuses = {"ready", "needs_install"} if dependencies_only else {"ready", "needs_install", "needs_cli"}
     try:
         process = subprocess.run(argv, cwd=tool_root, stdin=subprocess.DEVNULL, capture_output=True,
-                                 text=True, encoding="utf-8", errors="replace", timeout=30, env=_child_environment())
+                                 text=True, encoding="utf-8", errors="replace", timeout=30, env=child_environment())
         result = json.loads(process.stdout)
         if (process.returncode == 0 and isinstance(result, dict)
                 and result.get("status") in statuses

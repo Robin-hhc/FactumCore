@@ -25,7 +25,7 @@ def environment_module(monkeypatch):
 
 @pytest.fixture
 def environment(environment_module, monkeypatch):
-    monkeypatch.setattr(environment_module, "_is_apt_linux", lambda: False)
+    monkeypatch.setattr(environment_module.doctor, "_is_apt_linux", lambda: False)
     return environment_module
 
 
@@ -255,7 +255,7 @@ def apt_office_host(environment, runtime, monkeypatch):
     state.dependencies_ready = True
     office = SimpleNamespace(installed=False, after_install=True, uid=1000, sudo=True, apt=True, apt_error=None,
                              calls=[])
-    monkeypatch.setattr(environment, "_is_apt_linux", lambda: True)
+    monkeypatch.setattr(environment.doctor, "_is_apt_linux", lambda: True)
     monkeypatch.delenv("DOCLING_LIBREOFFICE_CMD", raising=False)
     monkeypatch.setattr(environment.os, "geteuid", lambda: office.uid, raising=False)
     actual_access = environment.os.access
@@ -294,7 +294,7 @@ def apt_office_host(environment, runtime, monkeypatch):
         return SimpleNamespace(stdout="apt finished")
 
     monkeypatch.setattr(environment.os, "access", access)
-    monkeypatch.setattr(environment.shutil, "which", which)
+    monkeypatch.setattr(environment.doctor.shutil, "which", which)
     monkeypatch.setattr(environment.subprocess, "run", run)
     return office
 
@@ -311,6 +311,47 @@ def test_environment_doctor_reports_missing_libreoffice_without_installing(
     assert not isolated_home.exists()
 
 
+@pytest.mark.parametrize(("office", "valid_config", "expected_code"), [
+    ("missing", True, "LIBREOFFICE_MISSING"),
+    ("missing", False, "LIBREOFFICE_MISSING"),
+    ("broken", True, "LIBREOFFICE_COMMAND_UNAVAILABLE"),
+    ("installed", True, None),
+])
+def test_rooted_doctor_checks_the_same_libreoffice_dependency_and_validates_the_root(
+        environment, apt_office_host, capsys, monkeypatch, tmp_path, office, valid_config, expected_code):
+    apt_office_host.installed = office == "installed"
+    if office == "broken":
+        monkeypatch.setenv("DOCLING_LIBREOFFICE_CMD", "./soffice")
+    knowledge_root = tmp_path / "knowledge-root"
+    knowledge_root.mkdir()
+    if valid_config:
+        (knowledge_root / "config.yml").write_text(
+            "schema_version: '2.0'\nworkspace_id: doctor-fixture\ncode_root: ../main\nmodules: []\n",
+            encoding="utf-8",
+        )
+    manifest = json.loads((TOOL_ROOT / "runtime/manifest.json").read_text(encoding="utf-8"))
+    monkeypatch.setattr(environment.doctor, "inspect_dependencies", lambda _: (
+        [{"name": "PyYAML", "expected": "6.0.3", "actual": "6.0.3", "status": "ready"}], [],
+    ))
+
+    assert environment.run_environment(TOOL_ROOT, manifest, "check", output="json", dependencies_only=True) == 0
+    [unrooted] = events(capsys)
+    rooted, exit_code = environment.doctor.doctor(TOOL_ROOT, knowledge_root, manifest)
+    dependency_codes = [gap["code"] for gap in unrooted["diagnostics"]]
+    assert dependency_codes == ([expected_code] if expected_code else [])
+    assert rooted["diagnostics"][:len(dependency_codes)] == unrooted["diagnostics"]
+    assert [gap["code"] for gap in rooted["diagnostics"][len(dependency_codes):]] == (
+        [] if valid_config else ["CONFIG_UNAVAILABLE"]
+    )
+    assert rooted["data"]["configuration"]["status"] == ("verified" if valid_config else "blocked")
+    assert rooted["data"]["knowledge_root"] == str(knowledge_root)
+    assert unrooted["status"] == ("needs_install" if expected_code else "ready")
+    assert (rooted["status"], rooted["phase"], exit_code) == (
+        ("blocked", "blocked", 3) if expected_code or not valid_config else ("ok", "ready", 0)
+    )
+    assert apt_office_host.calls == []
+
+
 @pytest.mark.parametrize(("host", "distribution", "status"), [
     ("linux", "ubuntu", "needs_install"),
     ("linux", "debian", "needs_install"),
@@ -321,12 +362,10 @@ def test_environment_doctor_reports_missing_libreoffice_without_installing(
 def test_libreoffice_is_checked_only_on_supported_linux_hosts(
         environment_module, monkeypatch, capsys, host, distribution, status):
     environment = environment_module
-    monkeypatch.setattr(environment, "sys", SimpleNamespace(platform=host, executable=sys.executable))
-    monkeypatch.setattr(environment, "platform", SimpleNamespace(
-        freedesktop_os_release=lambda: {"ID": distribution}, python_version=platform.python_version,
-    ))
+    monkeypatch.setattr(environment.doctor, "sys", SimpleNamespace(platform=host))
+    monkeypatch.setattr(environment.doctor, "platform", SimpleNamespace(freedesktop_os_release=lambda: {"ID": distribution}))
     monkeypatch.setattr(environment.doctor, "inspect_dependencies", lambda _: ([], []))
-    monkeypatch.setattr(environment.shutil, "which", lambda _, *, path: None)
+    monkeypatch.setattr(environment.doctor.shutil, "which", lambda _, *, path: None)
     monkeypatch.setattr(environment.subprocess, "run", lambda *a, **kw: pytest.fail("Unexpected execution"))
 
     assert environment.run_environment(TOOL_ROOT, {"version": "test"}, "check",
@@ -410,13 +449,13 @@ def test_libreoffice_probe_skips_relative_paths(environment, monkeypatch, tmp_pa
         looked_up.append((name, path))
         return None
 
-    monkeypatch.setattr(environment.shutil, "which", which)
+    monkeypatch.setattr(environment.doctor.shutil, "which", which)
     monkeypatch.setattr(environment.subprocess, "run", lambda *a, **kw: pytest.fail("Unexpected execution"))
-    assert environment._libreoffice_gap()["code"] == "LIBREOFFICE_MISSING"
+    assert environment.doctor._libreoffice_gap()["code"] == "LIBREOFFICE_MISSING"
     assert looked_up == [("libreoffice", str(tmp_path)), ("soffice", str(tmp_path))]
 
     monkeypatch.setenv("DOCLING_LIBREOFFICE_CMD", "./soffice")
-    assert environment._libreoffice_gap()["code"] == "LIBREOFFICE_COMMAND_UNAVAILABLE"
+    assert environment.doctor._libreoffice_gap()["code"] == "LIBREOFFICE_COMMAND_UNAVAILABLE"
     assert len(looked_up) == 2
 
 

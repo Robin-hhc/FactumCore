@@ -40,7 +40,8 @@ function fixture(t) {
   write(path.join(bin, "node_modules", "npm", "bin", "npm-cli.js"), "test only");
   write(path.join(bin, "node_modules", "npm", "package.json"), { name: "npm" });
 
-  const state = { dependencies: false, pip: true, cliInstallError: false, brokenConfig: false, registry: "undefined" };
+  const state = { dependencies: false, libreOfficeGap: null, pip: true, cliInstallError: false,
+    brokenConfig: false, registry: "undefined" };
   const probes = [];
   const installCli = () => {
     write(path.join(toolRoot, "knowledge.py"), "# fixture");
@@ -70,20 +71,21 @@ function fixture(t) {
       return respond("");
     }
     assert.deepEqual(argv, [process.execPath, dispatcher]);
-    const report = {
-      status: state.dependencies ? "ready" : "needs_install", toolkit_version: VERSION, tool_root: toolRoot, python,
-      diagnostics: state.dependencies ? [] : [{ code: "DEPENDENCY_UNAVAILABLE", message: "missing locked dependency" }],
-    };
+    const report = { status: "ready", toolkit_version: VERSION, tool_root: toolRoot, python, diagnostics: [] };
+    if (!state.dependencies) report.diagnostics.push({ code: "DEPENDENCY_UNAVAILABLE", message: "missing locked dependency" });
+    if (state.libreOfficeGap) report.diagnostics.push({ code: state.libreOfficeGap, message: "LibreOffice unavailable" });
     if (!state.pip && !state.dependencies) report.diagnostics.push({ code: "DEPENDENCY_PIP_MISSING", message: "missing pip" });
+    if (report.diagnostics.length) report.status = "needs_install";
     if (args[0] === "--version") return respond("knowledge " + VERSION);
     if (args[0] === "setup") {
       assert.deepEqual(args, ["setup", "--dependencies-only", "--json"]);
       state.dependencies = true;
+      state.libreOfficeGap = null;
       return respond({ ...report, status: "ready" });
     }
     if (args.includes("--environment-only")) return respond(report);
     assert.deepEqual(args, ["doctor", "--knowledge-root", root, "--json"]);
-    const valid = state.dependencies && !state.brokenConfig;
+    const valid = report.status === "ready" && !state.brokenConfig;
     return respond({
       status: valid ? "ok" : "blocked", phase: valid ? "ready" : "blocked",
       data: { knowledge_root: root, tool_root: toolRoot, python, runtime_version: VERSION },
@@ -120,6 +122,32 @@ test("Python dependencies alone use existing canonical CLI and do not invoke npm
   assert.equal(ready.status, "ready");
   assert.deepEqual(ready.performed, ["setup_python"]);
   assert.deepEqual(f.changes(), [["setup", "--dependencies-only", "--json"]]);
+});
+
+test("rooted doctor can report LibreOffice as the only missing dependency", (t) => {
+  const f = fixture(t);
+  f.installCli();
+  f.installModels();
+  f.state.dependencies = true;
+  f.state.libreOfficeGap = "LIBREOFFICE_MISSING";
+  const check = f.setup("check");
+  assert.equal(check.status, "needs_setup");
+  assert.deepEqual(check.diagnostics.map(({ code }) => code), ["LIBREOFFICE_MISSING"]);
+  assert.deepEqual(check.planned, ["setup_python"]);
+  assert.equal(f.setup("install").status, "ready");
+  assert.deepEqual(f.changes(), [["setup", "--dependencies-only", "--json"]]);
+});
+
+test("a broken LibreOffice command requires fixing its configuration", (t) => {
+  const f = fixture(t);
+  f.installCli();
+  f.installModels();
+  f.state.dependencies = true;
+  f.state.libreOfficeGap = "LIBREOFFICE_COMMAND_UNAVAILABLE";
+  const result = f.setup("install");
+  assert.equal(result.status, "blocked");
+  assert.deepEqual(result.diagnostics.map(({ code }) => code), ["LIBREOFFICE_COMMAND_UNAVAILABLE"]);
+  assert.deepEqual(f.changes(), []);
 });
 
 test("missing model alone installs the model package", (t) => {

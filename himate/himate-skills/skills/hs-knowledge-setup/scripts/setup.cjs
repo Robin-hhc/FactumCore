@@ -12,7 +12,9 @@ const MODELS = "@himate/knowledge-models";
 const REGISTRY = "http://10.143.57.12:4873";
 const DISPATCHER = "distribution/npm/knowledge.js";
 const WINDOWS = process.platform === "win32";
-const DEPENDENCY_GAPS = new Set(["DEPENDENCY_UNAVAILABLE", "YAML_PARSER_UNAVAILABLE"]);
+const DEPENDENCY_GAPS = new Set([
+  "DEPENDENCY_UNAVAILABLE", "YAML_PARSER_UNAVAILABLE", "LIBREOFFICE_MISSING",
+]);
 const MODEL_FILES = [
   "docling-project--docling-layout-heron/config.json",
   "docling-project--docling-layout-heron/preprocessor_config.json",
@@ -215,7 +217,8 @@ function checkInstalled(knowledge, root, find, execute, receipt) {
   }
   receipt.knowledge = { ...knowledge, python: environment.python };
   receipt.diagnostics.push(...diagnostics(environment));
-  if (receipt.diagnostics.some(({ code }) => code === "DEPENDENCY_PIP_MISSING")) return false;
+  if (receipt.diagnostics.some(({ code }) => code === "DEPENDENCY_PIP_MISSING"
+      || code === "LIBREOFFICE_COMMAND_UNAVAILABLE")) return false;
   if (root) {
     const probe = execute(knowledge.argv, ["doctor", "--knowledge-root", root, "--json"]);
     const rooted = subprocessReport(probe);
@@ -228,7 +231,9 @@ function checkInstalled(knowledge, root, find, execute, receipt) {
         && gaps.length > 0 && gaps.every(({ code }) => DEPENDENCY_GAPS.has(code))) {
       // The existing CLI classifies the only observed gaps as installable.
     } else if (!verifiedTarget || probe.status !== 0 || rooted?.status !== "ok" || rooted.phase !== "ready") {
-      receipt.diagnostics.push(...gaps);
+      receipt.diagnostics.push(...gaps.filter(({ code, message }) => !receipt.diagnostics.some(
+        (gap) => gap.code === code && gap.message === message,
+      )));
       if (!gaps.length) receipt.diagnostics.push({ code: "KNOWLEDGE_ROOT_CHECK_FAILED", message: "未能核对所选知识根和当前执行端。" });
       return false;
     }

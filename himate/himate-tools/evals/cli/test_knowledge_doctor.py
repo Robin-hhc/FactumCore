@@ -39,7 +39,10 @@ def knowledge(tmp_path):
 def observe(root, *, no_site=False, site_packages=None, python=sys.executable):
     before = {p.relative_to(root).as_posix(): p.read_bytes() for p in root.rglob("*") if p.is_file()}
     command = [str(python), "-B"] + (["-S"] if no_site else [])
-    environment = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8")
+    # These tests isolate workspace and rule validation. LibreOffice detection
+    # is exercised separately in deploy/test_environment.py.
+    environment = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8",
+                       DOCLING_LIBREOFFICE_CMD=sys.executable)
     environment.pop("PYTHONPATH", None)
     arguments = [str(root / "knowledge.py"), "doctor", "--knowledge-root", str(root), "--json"]
     if site_packages is not None:

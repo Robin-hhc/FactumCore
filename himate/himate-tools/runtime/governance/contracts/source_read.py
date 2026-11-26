@@ -246,6 +246,7 @@ def create(root, source, data, *, options=None, page_range=None, page_preview=Tr
             raise ContractError("INVALID_PARSER_OPTIONS", field + " must be a positive integer")
     if input_limit > MAX_SOURCE_BYTES:
         raise ContractError("INVALID_PARSER_OPTIONS", "max_input_bytes must not exceed 256 MiB")
+    document_parser.require_document_parser(suffix)
     read_id = uuid4().hex
     reference = READ_ROOT + "/" + read_id
     busy_path = None
@@ -271,6 +272,9 @@ def create(root, source, data, *, options=None, page_range=None, page_preview=Tr
             parsed = document_parser.parse(root, source, data, reference + "/parsed",
                                            options=options, page_range=page_range, page_preview=page_preview,
                                            local_images=assets)
+            for gap in parsed.get("gaps", []):
+                if gap.get("code") in document_parser.PARSER_SETUP_CODES:
+                    raise ContractError(gap["code"], gap["message"])
             directory = _safe(root, reference + "/parsed")
             _validate_tree(root, directory)
             total = sum(path.stat().st_size for path in directory.rglob("*") if path.is_file())

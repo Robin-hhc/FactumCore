@@ -14,6 +14,8 @@ import pytest
 
 TOOL_ROOT = Path(__file__).resolve().parents[2]
 ENTRY = TOOL_ROOT / "distribution/source/environment.py"
+BASE_LOCK = TOOL_ROOT / "runtime/requirements-base.lock.txt"
+DOCUMENT_LOCK = TOOL_ROOT / "runtime/requirements.lock.txt"
 
 
 @pytest.fixture
@@ -70,11 +72,12 @@ def test_check_reports_dependencies_without_a_knowledge_root(tmp_path):
 
 @pytest.fixture
 def runtime(environment, monkeypatch, tmp_path):
-    state = SimpleNamespace(dependencies_ready=False, installed=False, error=None, registered=[], checked=[])
+    state = SimpleNamespace(dependencies_ready=False, installed=False, error=None, registered=[], checked=[], locks=[])
     bin_dir = tmp_path / "isolated bin"
 
     def dependencies(requirements):
-        assert requirements == TOOL_ROOT / "runtime/requirements.lock.txt"
+        assert requirements in {BASE_LOCK, DOCUMENT_LOCK}
+        state.locks.append(requirements)
         state.checked.append(state.dependencies_ready)
         gaps = [] if state.dependencies_ready else [{"code": "DEPENDENCY_UNAVAILABLE"}]
         return [], gaps
@@ -99,7 +102,7 @@ def runtime(environment, monkeypatch, tmp_path):
     monkeypatch.setattr(environment.doctor, "inspect_dependencies", dependencies)
     monkeypatch.setattr(environment.command_install, "inspect_command", inspect)
     monkeypatch.setattr(environment.command_install, "deploy_command", register)
-    monkeypatch.setattr(environment, "find_spec", lambda _: object())
+    monkeypatch.setattr(environment.doctor, "find_spec", lambda _: object())
     monkeypatch.setattr(environment, "_fresh_report", environment._report)
     return state, bin_dir
 
@@ -121,7 +124,7 @@ def test_setup_reuses_missing_pip_diagnostic_and_keeps_local_log(
         assert name == "pip"
         return None
 
-    monkeypatch.setattr(environment, "find_spec", probe)
+    monkeypatch.setattr(environment.doctor, "find_spec", probe)
     monkeypatch.setattr(environment.subprocess, "run", lambda *a, **kw: pytest.fail("Unexpected execution"))
 
     assert execute(environment, "check", bin_dir, legacy=False) == 0
@@ -150,7 +153,7 @@ def test_setup_reuses_missing_pip_diagnostic_and_keeps_local_log(
 def test_ready_interpreter_can_be_used_without_pip(environment, runtime, monkeypatch, capsys):
     state, bin_dir = runtime
     state.dependencies_ready = state.installed = True
-    monkeypatch.setattr(environment, "find_spec", lambda _: None)
+    monkeypatch.setattr(environment.doctor, "find_spec", lambda _: None)
 
     def run(argv, **kwargs):
         assert argv[-1] == "--help"
@@ -172,7 +175,7 @@ def test_install_runs_pinned_pip_on_the_invoked_interpreter_before_registering(
         assert name == "pip"
         return object()
 
-    monkeypatch.setattr(environment, "find_spec", probe)
+    monkeypatch.setattr(environment.doctor, "find_spec", probe)
     for key in ("PIP_TARGET", "PIP_PREFIX", "PIP_ROOT", "PIP_PYTHON"):
         monkeypatch.setenv(key, str(isolated_home / "other destination"))
     monkeypatch.setenv("PIP_USER", "1")
@@ -196,11 +199,12 @@ def test_install_runs_pinned_pip_on_the_invoked_interpreter_before_registering(
     assert final["status"] == "ready"
     assert final["command"]["installed"]
     assert state.checked == [False, False, True, True]
+    assert set(state.locks) == {BASE_LOCK}
     assert len(state.registered) == 1
     (configuration, configuration_options), (argv, options), (verification, verification_options) = calls
     assert configuration == [sys.executable, *environment.PYTHON_MODULE_FLAGS, "pip", "--python=", "config", "list"]
     assert argv == [sys.executable, "-E", "-X", "utf8", "-m", "pip", "install", "-r",
-                    str(TOOL_ROOT / "runtime/requirements.lock.txt")]
+                    str(BASE_LOCK)]
     assert options["env"]["PIP_USER"] == "1"
     assert options["env"]["PIP_INDEX_URL"] == "https://packages.test/simple"
     assert not {"PIP_TARGET", "PIP_PREFIX", "PIP_ROOT", "PIP_PYTHON"}.intersection(options["env"])
@@ -246,7 +250,7 @@ def test_dependencies_only_uses_setup_install_and_verification_without_launcher(
     assert final["status"] == "ready" and final["command"] is None
     assert state.checked == [False, False, True]
     assert calls[-1] == [sys.executable, *environment.PYTHON_MODULE_FLAGS, "pip", "install", "-r",
-                         str(TOOL_ROOT / "runtime/requirements.lock.txt")]
+                         str(BASE_LOCK)]
 
 
 @pytest.fixture
@@ -256,6 +260,7 @@ def apt_office_host(environment, runtime, monkeypatch):
     office = SimpleNamespace(installed=False, after_install=True, uid=1000, sudo=True, apt=True, apt_error=None,
                              calls=[])
     monkeypatch.setattr(environment.doctor, "_is_apt_linux", lambda: True)
+    monkeypatch.setattr(environment.doctor, "sys", SimpleNamespace(platform="linux", executable=sys.executable))
     monkeypatch.delenv("DOCLING_LIBREOFFICE_CMD", raising=False)
     monkeypatch.setattr(environment.os, "geteuid", lambda: office.uid, raising=False)
     actual_access = environment.os.access
@@ -303,7 +308,7 @@ def test_environment_doctor_reports_missing_libreoffice_without_installing(
         environment, apt_office_host, capsys, isolated_home):
 
     assert environment.run_environment(TOOL_ROOT, {"version": "test"}, "check",
-                                       output="json", dependencies_only=True) == 0
+                                       output="json", dependencies_only=True, capability="libreoffice") == 0
     [report] = events(capsys)
     assert report["status"] == "needs_install"
     assert [gap["code"] for gap in report["diagnostics"]] == ["LIBREOFFICE_MISSING"]
@@ -334,9 +339,10 @@ def test_rooted_doctor_checks_the_same_libreoffice_dependency_and_validates_the_
         [{"name": "PyYAML", "expected": "6.0.3", "actual": "6.0.3", "status": "ready"}], [],
     ))
 
-    assert environment.run_environment(TOOL_ROOT, manifest, "check", output="json", dependencies_only=True) == 0
+    assert environment.run_environment(TOOL_ROOT, manifest, "check", output="json", dependencies_only=True,
+                                       capability="libreoffice") == 0
     [unrooted] = events(capsys)
-    rooted, exit_code = environment.doctor.doctor(TOOL_ROOT, knowledge_root, manifest)
+    rooted, exit_code = environment.doctor.doctor(TOOL_ROOT, knowledge_root, manifest, capability="libreoffice")
     dependency_codes = [gap["code"] for gap in unrooted["diagnostics"]]
     assert dependency_codes == ([expected_code] if expected_code else [])
     assert rooted["diagnostics"][:len(dependency_codes)] == unrooted["diagnostics"]
@@ -352,29 +358,74 @@ def test_rooted_doctor_checks_the_same_libreoffice_dependency_and_validates_the_
     assert apt_office_host.calls == []
 
 
-@pytest.mark.parametrize(("host", "distribution", "status"), [
-    ("linux", "ubuntu", "needs_install"),
-    ("linux", "debian", "needs_install"),
-    ("linux", "fedora", "ready"),
-    ("win32", None, "ready"),
-    ("darwin", None, "ready"),
+@pytest.mark.parametrize(("host", "distribution"), [
+    ("linux", "ubuntu"),
+    ("linux", "debian"),
+    ("linux", "fedora"),
+    ("win32", None),
+    ("darwin", None),
 ])
-def test_libreoffice_is_checked_only_on_supported_linux_hosts(
-        environment_module, monkeypatch, capsys, host, distribution, status):
+def test_libreoffice_is_only_checked_when_selected(
+        environment_module, monkeypatch, capsys, tmp_path, host, distribution):
     environment = environment_module
+    search_requests = []
     monkeypatch.setattr(environment.doctor, "sys", SimpleNamespace(platform=host))
     monkeypatch.setattr(environment.doctor, "platform", SimpleNamespace(freedesktop_os_release=lambda: {"ID": distribution}))
     monkeypatch.setattr(environment.doctor, "inspect_dependencies", lambda _: ([], []))
-    monkeypatch.setattr(environment.doctor.shutil, "which", lambda _, *, path: None)
+
+    def get_exec_path():
+        search_requests.append(tmp_path)
+        return [str(tmp_path)]
+
+    monkeypatch.delenv("DOCLING_LIBREOFFICE_CMD", raising=False)
+    monkeypatch.setattr(environment.os, "get_exec_path", get_exec_path)
     monkeypatch.setattr(environment.subprocess, "run", lambda *a, **kw: pytest.fail("Unexpected execution"))
 
+    for capability in (None, "documents"):
+        assert environment.run_environment(TOOL_ROOT, {"version": "test"}, "check",
+                                           output="json", dependencies_only=True, capability=capability) == 0
+        [report] = events(capsys)
+        assert report["status"] == "ready" and not report["diagnostics"]
+        assert search_requests == []
+
     assert environment.run_environment(TOOL_ROOT, {"version": "test"}, "check",
-                                       output="json", dependencies_only=True) == 0
+                                       output="json", dependencies_only=True, capability="libreoffice") == 0
     [report] = events(capsys)
-    assert report["status"] == status
-    assert [gap["code"] for gap in report["diagnostics"]] == (
-        ["LIBREOFFICE_MISSING"] if status == "needs_install" else []
-    )
+    assert report["status"] == "needs_install"
+    code = "LIBREOFFICE_MISSING" if distribution in {"ubuntu", "debian"} else "LIBREOFFICE_MANUAL_SETUP_REQUIRED"
+    assert [gap["code"] for gap in report["diagnostics"]] == [code]
+    assert search_requests == [tmp_path]
+
+
+def test_install_libreoffice_requires_manual_setup_without_apt(
+        environment, apt_office_host, monkeypatch, capsys, isolated_home):
+    monkeypatch.setattr(environment.doctor, "_is_apt_linux", lambda: False)
+    assert environment.run_environment(TOOL_ROOT, {"version": "test"}, "check",
+                                       output="json", dependencies_only=True, capability="libreoffice") == 0
+    [check] = events(capsys)
+    assert [gap["code"] for gap in check["diagnostics"]] == ["LIBREOFFICE_MANUAL_SETUP_REQUIRED"]
+
+    assert environment.run_environment(TOOL_ROOT, {"version": "test"}, "install",
+                                       output="json", dependencies_only=True, capability="libreoffice") == 1
+    [report] = events(capsys)
+    assert report["code"] == "LIBREOFFICE_MANUAL_SETUP_REQUIRED"
+    assert apt_office_host.calls == []
+    assert not (isolated_home / ".himate/knowledge/logs").exists()
+
+
+def test_documents_setup_only_installs_the_locked_python_stack(
+        environment, runtime, apt_office_host, monkeypatch, capsys):
+    state, _ = runtime
+    state.dependencies_ready = False
+    monkeypatch.setattr(environment.doctor, "_libreoffice_gap", lambda: pytest.fail("Unexpected Office probe"))
+    assert environment.run_environment(TOOL_ROOT, {"version": "test"}, "install",
+                                       output="json", dependencies_only=True, capability="documents") == 0
+    [report] = events(capsys)
+    assert report["status"] == "ready"
+    assert set(state.locks) == {DOCUMENT_LOCK}
+    assert [argv for kind, argv in apt_office_host.calls if kind != "pip"] == []
+    assert apt_office_host.calls[-1] == ("pip", [sys.executable, *environment.PYTHON_MODULE_FLAGS,
+                                               "pip", "install", "-r", str(DOCUMENT_LOCK)])
 
 
 @pytest.mark.parametrize(("uid", "python_ready"), [(1000, True), (0, False)])
@@ -385,7 +436,7 @@ def test_setup_installs_missing_libreoffice_and_reuses_it(
     apt_office_host.uid = uid
 
     assert environment.run_environment(TOOL_ROOT, {"version": "test"}, "install",
-                                       output="jsonl", dependencies_only=True) == 0
+                                       output="jsonl", dependencies_only=True, capability="libreoffice") == 0
     *steps, final = events(capsys)
     assert steps[0]["phase"] == "checking" and steps[-1]["phase"] == "verifying"
     assert final["status"] == "ready" and final["diagnostics"] == []
@@ -395,17 +446,18 @@ def test_setup_installs_missing_libreoffice_and_reuses_it(
         ["update"], ["install", "-y", "--no-install-recommends", "--no-remove", "libreoffice-writer-nogui"],
     ]
     assert any(kind == "pip" for kind, _ in apt_office_host.calls) == (not python_ready)
+    assert set(state.locks) == {DOCUMENT_LOCK}
     first_calls = list(apt_office_host.calls)
 
     assert environment.run_environment(TOOL_ROOT, {"version": "test"}, "install",
-                                       output="jsonl", dependencies_only=True) == 0
+                                       output="jsonl", dependencies_only=True, capability="libreoffice") == 0
     *steps, final = events(capsys)
     assert [event["phase"] for event in steps] == ["checking", "verifying"]
     assert final["status"] == "ready" and apt_office_host.calls == first_calls
 
 
-def test_setup_reuses_configured_libreoffice_outside_path(environment, apt_office_host, monkeypatch, capsys):
-    configured = "/opt/office tools/program/soffice"
+def test_setup_reuses_configured_libreoffice_outside_path(environment, apt_office_host, monkeypatch, capsys, tmp_path):
+    configured = str(tmp_path / "office tools" / "program" / "soffice")
     monkeypatch.setenv("DOCLING_LIBREOFFICE_CMD", configured)
 
     def run(argv, **kwargs):
@@ -415,14 +467,14 @@ def test_setup_reuses_configured_libreoffice_outside_path(environment, apt_offic
     monkeypatch.setattr(environment.subprocess, "run", run)
 
     assert environment.run_environment(TOOL_ROOT, {"version": "test"}, "install",
-                                       output="json", dependencies_only=True) == 0
+                                       output="json", dependencies_only=True, capability="libreoffice") == 0
     [report] = events(capsys)
     assert report["status"] == "ready" and report["diagnostics"] == []
     assert "log_path" not in report
 
 
-def test_setup_reports_broken_libreoffice_override_without_apt(environment, apt_office_host, monkeypatch, capsys):
-    configured = "/opt/missing/soffice"
+def test_setup_reports_broken_libreoffice_override_without_apt(environment, apt_office_host, monkeypatch, capsys, tmp_path):
+    configured = str(tmp_path / "missing" / "soffice")
     monkeypatch.setenv("DOCLING_LIBREOFFICE_CMD", configured)
     apt_office_host.installed = True
 
@@ -433,7 +485,7 @@ def test_setup_reports_broken_libreoffice_override_without_apt(environment, apt_
     monkeypatch.setattr(environment.subprocess, "run", run)
 
     assert environment.run_environment(TOOL_ROOT, {"version": "test"}, "install",
-                                       output="json", dependencies_only=True) == 1
+                                       output="json", dependencies_only=True, capability="libreoffice") == 1
     [report] = events(capsys)
     assert report["code"] == "LIBREOFFICE_COMMAND_UNAVAILABLE"
     assert "DOCLING_LIBREOFFICE_CMD" in report["message"]
@@ -441,6 +493,8 @@ def test_setup_reports_broken_libreoffice_override_without_apt(environment, apt_
 
 
 def test_libreoffice_probe_skips_relative_paths(environment, monkeypatch, tmp_path):
+    monkeypatch.setattr(environment.doctor, "sys", SimpleNamespace(platform="linux"))
+    monkeypatch.setattr(environment.doctor, "_is_apt_linux", lambda: True)
     monkeypatch.setenv("PATH", os.pathsep.join((".", "", "relative", str(tmp_path))))
     monkeypatch.delenv("DOCLING_LIBREOFFICE_CMD", raising=False)
     looked_up = []
@@ -459,6 +513,35 @@ def test_libreoffice_probe_skips_relative_paths(environment, monkeypatch, tmp_pa
     assert len(looked_up) == 2
 
 
+@pytest.mark.skipif(os.name != "nt", reason="Windows executable search behavior")
+@pytest.mark.parametrize("configured", [None, "soffice.exe"])
+def test_libreoffice_probe_on_windows_uses_absolute_path_entry(environment, monkeypatch, tmp_path, capsys, configured):
+    knowledge_root = tmp_path / "knowledge root"
+    tools = tmp_path / "Office tools"
+    knowledge_root.mkdir()
+    tools.mkdir()
+    (knowledge_root / "soffice.exe").touch()
+    executable = tools / "soffice.exe"
+    executable.touch()
+    monkeypatch.chdir(knowledge_root)
+    monkeypatch.setenv("PATH", str(tools))
+    monkeypatch.setenv("PATHEXT", ".EXE")
+    monkeypatch.delenv("NoDefaultCurrentDirectoryInExePath", raising=False)
+    monkeypatch.delenv("DOCLING_LIBREOFFICE_CMD", raising=False)
+    if configured:
+        monkeypatch.setenv("DOCLING_LIBREOFFICE_CMD", configured)
+    monkeypatch.setattr(environment.doctor, "inspect_dependencies", lambda _: ([], []))
+    invocations = []
+    monkeypatch.setattr(environment.subprocess, "run", lambda argv, **_: invocations.append(argv))
+
+    assert environment.run_environment(TOOL_ROOT, {"version": "test"}, "check", output="json",
+                                       dependencies_only=True, capability="libreoffice") == 0
+    [report] = events(capsys)
+    assert report["status"] == "ready"
+    [(command, argument)] = invocations
+    assert Path(command) == executable and argument == "--version"
+
+
 @pytest.mark.parametrize(("changes", "code"), [
     ({"sudo": False}, "LIBREOFFICE_INSTALL_PERMISSION_REQUIRED"),
     ({"apt": False}, "LIBREOFFICE_PACKAGE_MANAGER_UNAVAILABLE"),
@@ -471,7 +554,7 @@ def test_libreoffice_setup_fails_actionably(environment, apt_office_host, capsys
         setattr(apt_office_host, key, value)
 
     assert environment.run_environment(TOOL_ROOT, {"version": "test"}, "install",
-                                       output="json", dependencies_only=True) == 1
+                                       output="json", dependencies_only=True, capability="libreoffice") == 1
     [failure] = events(capsys)
     assert failure["status"] == "failed" and failure["code"] == code
     assert "libreoffice" in failure["message"].casefold()
@@ -614,7 +697,7 @@ def test_npm_setup_reuses_launcher_and_invoked_python(environment, npm_installat
     monkeypatch.setattr(environment.command_install, "deploy_command", lambda *a, **kw: pytest.fail("Duplicate launcher"))
 
     def dependencies(requirements):
-        assert requirements == tool_root / "runtime/requirements.lock.txt"
+        assert requirements == tool_root / "runtime/requirements-base.lock.txt"
         return [], [] if state.ready else [{"code": "DEPENDENCY_UNAVAILABLE"}]
 
     def run(argv, **kwargs):
@@ -629,7 +712,7 @@ def test_npm_setup_reuses_launcher_and_invoked_python(environment, npm_installat
             assert argv == [sys.executable, "-E", "-B", str(tool_root / "knowledge.py"), "--help"]
 
     monkeypatch.setattr(environment.doctor, "inspect_dependencies", dependencies)
-    monkeypatch.setattr(environment, "find_spec", lambda _: object())
+    monkeypatch.setattr(environment.doctor, "find_spec", lambda _: object())
     monkeypatch.setattr(environment, "_fresh_report", environment._report)
     monkeypatch.setattr(environment.subprocess, "run", run)
     assert execute(environment, "install", None, legacy=False, tool_root=tool_root) == 0

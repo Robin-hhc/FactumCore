@@ -39,7 +39,6 @@ npm publish --registry http://10.143.57.12:4873
 Windows 和 Linux 使用相同的命令。npm 11 默认执行安装脚本，可以直接安装。
 
 ```bash
-npm i -g @himate/knowledge-models --registry http://10.143.57.12:4873
 npm i -g @himate/knowledge-cli --registry http://10.143.57.12:4873
 knowledge --version
 knowledge setup
@@ -48,13 +47,12 @@ knowledge setup
 npm 12 默认拦截未授权的安装脚本。全局安装时为各包授权执行其安装脚本。
 
 ```bash
-npm i -g @himate/knowledge-models --registry http://10.143.57.12:4873 --allow-scripts=@himate/knowledge-models
 npm i -g @himate/knowledge-cli --registry http://10.143.57.12:4873 --allow-scripts=@himate/knowledge-cli
 knowledge --version
 knowledge setup
 ```
 
-模型包准备完整本机模型，CLI 包注册 `knowledge`。`knowledge --version` 检查命令能否启动，`knowledge setup` 安装并复查 Python 依赖。随后从 `himate-skills` 目录运行 deploy 脚本安装 Skills 和 Workflows，再启动 OpenFlow。 [能力安装步骤](../../himate-skills/README.md)
+CLI 包注册 `knowledge`，`knowledge --version` 检查命令能否启动，`knowledge setup` 安装并复查基础 Python 依赖。Docling 和 OCR 模型可随首次转换准备，也可提前安装。随后从 `himate-skills` 目录运行 deploy 脚本安装 Skills 和 Workflows，再启动 OpenFlow。 [按需准备文档解析](DEPLOY.md#按需准备文档解析) · [能力安装步骤](../../himate-skills/README.md)
 
 安装后的内容位于当前账户的工具目录。
 

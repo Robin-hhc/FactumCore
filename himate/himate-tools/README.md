@@ -5,13 +5,12 @@
 配置好内网 npm 源后，按以下顺序安装。执行机器需要 Node.js 18 或更新版本，以及带 pip 的 Python 3.10–3.12。 [npm 安装说明](docs/NPM-PUBLISH.md)
 
 ```sh
-npm install -g @himate/knowledge-models
-npm install -g @himate/knowledge-cli
+npm install -g @himate/knowledge-cli --registry http://10.143.57.12:4873 --allow-scripts=@himate/knowledge-cli
 knowledge --version
 knowledge setup
 ```
 
-模型包准备本机 OCR 模型，CLI 包注册全局 `knowledge`。`setup` 使用选定的 Python 安装锁定依赖并复查，安装位置应允许写入。可用 `HIMATE_KNOWLEDGE_PYTHON` 指定解释器绝对路径。能力包安装完成后，启动或重启 OpenFlow。
+CLI 包注册全局 `knowledge`。`setup` 使用选定的 Python 安装基础锁定依赖并复查，安装位置应允许写入。可用 `HIMATE_KNOWLEDGE_PYTHON` 指定解释器绝对路径。文档解析工具和 OCR 模型按需准备。部署时更新配套的 Skills 和 Workflows，再启动或重启 OpenFlow。 [按需部署](docs/DEPLOY.md#按需准备文档解析)
 
 终端和自动化统一使用 `knowledge`。下例检查指定知识库的配置和运行环境。
 

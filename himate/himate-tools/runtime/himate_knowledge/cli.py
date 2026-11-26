@@ -69,10 +69,10 @@ COMMAND_HELP = {
     "lint": ("", "Validate published knowledge cards."),
     "apply": ("", "Publish the checked changes."),
     "status": ("", "Show the current ingest task or latest receipt."),
-    "doctor": ("[--environment-only [--bin-dir DIR | --dependencies-only]]",
+    "doctor": ("[--environment-only [--bin-dir DIR | --dependencies-only]] [--capability {documents,libreoffice}]",
                "Check the runtime, dependencies, configuration and rules.\n\n"
                "Use --environment-only to check dependencies and the launcher without a knowledge root."),
-    "setup": ("[--bin-dir DIR | --dependencies-only] [--json | --jsonl]",
+    "setup": ("[--bin-dir DIR | --dependencies-only] [--capability {documents,libreoffice}] [--json | --jsonl]",
               "Install missing dependencies and set up the knowledge launcher.\n\n"
               "Use --dependencies-only to leave the launcher and PATH untouched.\n"
               "Use --json for the final result or --jsonl for progress events and the final result."),
@@ -117,6 +117,8 @@ def parser(version):
     output_modes.add_argument("--jsonl", action="store_true", help="stream setup progress as JSON lines")
     result.add_argument("--environment-only", action="store_true", help="check the environment without a knowledge root")
     result.add_argument("--dependencies-only", action="store_true", help="skip launcher checks and registration")
+    result.add_argument("--capability", choices=("documents", "libreoffice"),
+                        help="check or prepare optional document conversion dependencies")
     result.add_argument("--add-path", action="store_true")
     result.add_argument("--include-deprecated", action="store_true", default=None)
     result.add_argument("--full", action="store_true", default=None, help="rebuild the index from scratch with reindex")
@@ -329,7 +331,8 @@ def execute(args, root, tool_root, manifest_digest):
     else:
         raise CommandError("INVALID_COMMAND", command)
     code = 1 if phase == "failed" or command in {"ingest", "maintain"} and phase == "blocked" else 0
-    return envelope("failed" if code else "ok", phase, data), code
+    diagnostics = data.pop("diagnostics", None) if command == "ingest" and action == "scan" and phase == "blocked" else None
+    return envelope("failed" if code else "ok", phase, data, diagnostics), code
 
 
 def emit(value, as_json, *, failed):
@@ -357,6 +360,8 @@ def main(argv=None, *, tool_root, manifest):
                 raise CommandError("INVALID_ARGUMENT", "--full is for maintain reindex or patrol reindex")
         if args.environment_only and args.command != "doctor":
             raise CommandError("INVALID_ARGUMENT", "--environment-only is for doctor")
+        if args.capability and args.command not in {"doctor", "setup"}:
+            raise CommandError("INVALID_ARGUMENT", "--capability is for doctor or setup")
         if args.jsonl and args.command != "setup":
             raise CommandError("INVALID_ARGUMENT", "--jsonl is for setup")
         if args.dependencies_only and not (args.environment_only or args.command == "setup"):
@@ -372,7 +377,7 @@ def main(argv=None, *, tool_root, manifest):
             action = "check" if args.environment_only else "install"
             output_mode = "jsonl" if args.jsonl else "json" if args.json else "text"
             return run_environment(tool_root, manifest, action, bin_dir=args.bin_dir, output=output_mode,
-                                   dependencies_only=args.dependencies_only)
+                                   dependencies_only=args.dependencies_only, capability=args.capability)
         root = None
         if args.command != "install-command" or args.knowledge_root is not None:
             root = _knowledge_root(args.knowledge_root, tool_root, diagnostic=args.command == "doctor")
@@ -381,7 +386,7 @@ def main(argv=None, *, tool_root, manifest):
             if args.arguments or args.input or args.action:
                 raise CommandError("INVALID_ACTION", "doctor accepts no business request")
             from .doctor import doctor
-            value, code = doctor(tool_root, root, manifest)
+            value, code = doctor(tool_root, root, manifest, capability=args.capability)
         elif args.command == "install-command":
             from .command_install import install_command
             value, code = install_command(args, tool_root, root)

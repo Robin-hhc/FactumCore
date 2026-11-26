@@ -11,7 +11,7 @@ const { runSetup } = require("../../skills/hs-knowledge-setup/scripts/setup.cjs"
 const CLI = "@himate/knowledge-cli";
 const MODELS = "@himate/knowledge-models";
 const REGISTRY = "http://10.143.57.12:4873";
-const VERSION = "0.26.3";
+const VERSION = require("../../../himate-tools/package.json").version;
 const manifest = require("../../../himate-tools/distribution/models/manifest.json");
 
 function write(file, value) {
@@ -40,8 +40,8 @@ function fixture(t) {
   write(path.join(bin, "node_modules", "npm", "bin", "npm-cli.js"), "test only");
   write(path.join(bin, "node_modules", "npm", "package.json"), { name: "npm" });
 
-  const state = { dependencies: false, libreOfficeGap: null, pip: true, cliInstallError: false,
-    brokenConfig: false, registry: "undefined" };
+  const state = { dependencies: false, documents: false, libreOfficeGap: null, pip: true, cliInstallError: false,
+    brokenConfig: false, registry: "undefined", reportedRoot: root, setupPython: python };
   const probes = [];
   const installCli = () => {
     write(path.join(toolRoot, "knowledge.py"), "# fixture");
@@ -71,31 +71,40 @@ function fixture(t) {
       return respond("");
     }
     assert.deepEqual(argv, [process.execPath, dispatcher]);
+    const scope = args.includes("--capability") ? args[args.indexOf("--capability") + 1] : null;
+    assert.ok([null, "documents", "libreoffice"].includes(scope));
+    const flags = scope ? ["--capability", scope] : [];
     const report = { status: "ready", toolkit_version: VERSION, tool_root: toolRoot, python, diagnostics: [] };
     if (!state.dependencies) report.diagnostics.push({ code: "DEPENDENCY_UNAVAILABLE", message: "missing locked dependency" });
-    if (state.libreOfficeGap) report.diagnostics.push({ code: state.libreOfficeGap, message: "LibreOffice unavailable" });
-    if (!state.pip && !state.dependencies) report.diagnostics.push({ code: "DEPENDENCY_PIP_MISSING", message: "missing pip" });
+    if (scope && !state.documents) report.diagnostics.push({ code: "DEPENDENCY_UNAVAILABLE", message: "missing Docling" });
+    if (!state.pip && report.diagnostics.length) report.diagnostics.push({ code: "DEPENDENCY_PIP_MISSING", message: "missing pip" });
+    if (scope === "libreoffice" && state.libreOfficeGap) report.diagnostics.push({ code: state.libreOfficeGap, message: "LibreOffice unavailable" });
     if (report.diagnostics.length) report.status = "needs_install";
     if (args[0] === "--version") return respond("knowledge " + VERSION);
     if (args[0] === "setup") {
-      assert.deepEqual(args, ["setup", "--dependencies-only", "--json"]);
+      assert.deepEqual(args, ["setup", "--dependencies-only", ...flags, "--json"]);
       state.dependencies = true;
-      state.libreOfficeGap = null;
-      return respond({ ...report, status: "ready" });
+      if (scope) state.documents = true;
+      if (scope === "libreoffice") state.libreOfficeGap = null;
+      return respond({ ...report, status: "ready", python: state.setupPython, diagnostics: [] });
     }
-    if (args.includes("--environment-only")) return respond(report);
-    assert.deepEqual(args, ["doctor", "--knowledge-root", root, "--json"]);
+    if (args.includes("--environment-only")) {
+      assert.deepEqual(args, ["doctor", "--environment-only", "--dependencies-only", ...flags, "--json"]);
+      return respond(report);
+    }
+    assert.deepEqual(args, ["doctor", "--knowledge-root", root, ...flags, "--json"]);
     const valid = report.status === "ready" && !state.brokenConfig;
     return respond({
       status: valid ? "ok" : "blocked", phase: valid ? "ready" : "blocked",
-      data: { knowledge_root: root, tool_root: toolRoot, python, runtime_version: VERSION },
+      data: { knowledge_root: state.reportedRoot, tool_root: toolRoot, python, runtime_version: VERSION },
       diagnostics: state.brokenConfig ? [{ code: "CONFIG_INVALID", message: "invalid config" }] : report.diagnostics,
     }, valid ? 0 : 3);
   };
   const context = { toolRoot, execute, find: (name) => name.startsWith("npm") ? npm : name.startsWith("python") ? python : null };
-  const setup = (action) => runSetup([action, "--knowledge-root", root, "--json"], context);
+  const setup = (action, scope) => runSetup([action, "--knowledge-root", root,
+    ...(scope ? ["--capability", scope] : []), "--json"], context);
   const changes = () => probes.filter(([action]) => action === "install" || action === "setup");
-  return { setup, root, toolRoot, context, state, installCli, installModels, changes, dispatcher };
+  return { setup, root, toolRoot, context, state, installCli, installModels, changes, dispatcher, probes };
 }
 
 test("cold check is read-only, install verifies the same root, and another run makes no changes", (t) => {
@@ -105,12 +114,13 @@ test("cold check is read-only, install verifies the same root, and another run m
   assert.deepEqual(f.changes(), []);
   const ready = f.setup("install");
   assert.equal(ready.status, "ready", JSON.stringify(ready));
-  assert.deepEqual(ready.performed, ["install_models", "install_cli", "setup_python"]);
+  assert.deepEqual(ready.performed, ["install_cli", "setup_python"]);
+  assert.equal(ready.models.status, "not_requested");
   assert.equal(ready.knowledge_root, f.root);
   assert.equal(ready.knowledge.version, VERSION);
   assert.deepEqual(ready.knowledge.argv, [process.execPath, f.dispatcher]);
   assert.deepEqual(f.setup("install").performed, []);
-  assert.equal(f.changes().length, 3);
+  assert.equal(f.changes().length, 2);
 });
 
 test("Python dependencies alone use existing canonical CLI and do not invoke npm", (t) => {
@@ -127,46 +137,77 @@ test("Python dependencies alone use existing canonical CLI and do not invoke npm
 test("rooted doctor can report LibreOffice as the only missing dependency", (t) => {
   const f = fixture(t);
   f.installCli();
-  f.installModels();
   f.state.dependencies = true;
+  f.state.documents = true;
   f.state.libreOfficeGap = "LIBREOFFICE_MISSING";
-  const check = f.setup("check");
+  assert.equal(f.setup("check").status, "ready");
+  const check = f.setup("check", "libreoffice");
   assert.equal(check.status, "needs_setup");
   assert.deepEqual(check.diagnostics.map(({ code }) => code), ["LIBREOFFICE_MISSING"]);
   assert.deepEqual(check.planned, ["setup_python"]);
-  assert.equal(f.setup("install").status, "ready");
-  assert.deepEqual(f.changes(), [["setup", "--dependencies-only", "--json"]]);
+  assert.equal(f.setup("install", "libreoffice").status, "ready");
+  assert.deepEqual(f.changes(), [["setup", "--dependencies-only", "--capability", "libreoffice", "--json"]]);
 });
 
 test("a broken LibreOffice command requires fixing its configuration", (t) => {
   const f = fixture(t);
   f.installCli();
-  f.installModels();
   f.state.dependencies = true;
+  f.state.documents = true;
   f.state.libreOfficeGap = "LIBREOFFICE_COMMAND_UNAVAILABLE";
-  const result = f.setup("install");
+  const result = f.setup("install", "libreoffice");
   assert.equal(result.status, "blocked");
   assert.deepEqual(result.diagnostics.map(({ code }) => code), ["LIBREOFFICE_COMMAND_UNAVAILABLE"]);
   assert.deepEqual(f.changes(), []);
 });
 
-test("missing model alone installs the model package", (t) => {
+test("documents install uses only the canonical CLI and checks the root once per inspection", (t) => {
   const f = fixture(t);
   f.installCli();
   f.state.dependencies = true;
-  const ready = f.setup("install");
+  f.state.libreOfficeGap = "LIBREOFFICE_MISSING";
+  const ready = f.setup("install", "documents");
+  const flags = ["--capability", "documents", "--json"];
+  const doctor = ["doctor", "--knowledge-root", f.root, ...flags];
+  assert.equal(ready.status, "ready", JSON.stringify(ready));
+  assert.equal(ready.models.status, "not_requested");
+  assert.deepEqual(ready.performed, ["setup_python"]);
+  assert.deepEqual(f.probes, [doctor, ["setup", "--dependencies-only", ...flags], doctor]);
+});
+
+test("missing model alone installs the model package for OCR", (t) => {
+  const f = fixture(t);
+  f.installCli();
+  f.state.dependencies = true;
+  f.state.documents = true;
+  const check = f.setup("check", "ocr");
+  assert.deepEqual(check.planned, ["install_models"]);
+  assert.deepEqual(check.diagnostics.map(({ code }) => code), ["PARSER_MODELS_REQUIRED"]);
+  const ready = f.setup("install", "ocr");
   assert.equal(ready.status, "ready");
+  assert.equal(ready.models.status, "ready");
   assert.deepEqual(ready.performed, ["install_models"]);
+  assert.deepEqual(f.probes[0], ["doctor", "--knowledge-root", f.root, "--capability", "documents", "--json"]);
 });
 
 test("explicit environment-only repair does not infer a knowledge root", (t) => {
   const f = fixture(t);
   f.installCli();
-  f.installModels();
   const ready = runSetup(["install", "--environment-only", "--json"], f.context);
   assert.equal(ready.status, "ready");
   assert.equal(ready.knowledge_root, null);
   assert.deepEqual(ready.performed, ["setup_python"]);
+});
+
+test("unknown, dangling, and repeated capability flags cannot start Setup", (t) => {
+  const f = fixture(t);
+  for (const flag of [["--capability", "remote"], ["--capability"],
+    ["--capability", "documents", "--capability", "ocr"]]) {
+    const result = runSetup(["install", "--environment-only", ...flag, "--json"], f.context);
+    assert.equal(result.status, "blocked");
+    assert.equal(result.diagnostics[0].code, "INVALID_ARGUMENT");
+  }
+  assert.deepEqual(f.probes, []);
 });
 
 test("Windows share paths never reach local installers", { skip: process.platform !== "win32" }, (t) => {
@@ -180,12 +221,12 @@ test("Windows share paths never reach local installers", { skip: process.platfor
 test("retry uses models already installed before an npm CLI failure", (t) => {
   const f = fixture(t);
   f.state.cliInstallError = true;
-  const failed = f.setup("install");
+  const failed = f.setup("install", "ocr");
   assert.equal(failed.status, "blocked");
   assert.equal(failed.diagnostics.at(-1).code, "NPM_INSTALL_FAILED");
   assert.deepEqual(failed.performed, ["install_models"]);
   f.state.cliInstallError = false;
-  const ready = f.setup("install");
+  const ready = f.setup("install", "ocr");
   assert.equal(ready.status, "ready");
   assert.deepEqual(ready.performed, ["install_cli", "setup_python"]);
 });
@@ -207,10 +248,28 @@ test("invalid roots, nondependency diagnostics, absent pip and conflicting npm r
     assert.ok(blocked.diagnostics.some(({ code }) => code === "CONFIG_INVALID"));
     assert.deepEqual(f.changes(), []);
   });
+  await t.test("installed CLI reports a different root", (child) => {
+    const f = fixture(child);
+    f.installCli();
+    f.state.reportedRoot = path.join(f.root, "wrong root");
+    const blocked = f.setup("install", "documents");
+    assert.equal(blocked.status, "blocked");
+    assert.equal(blocked.diagnostics.at(-1).code, "KNOWLEDGE_ROOT_CHECK_FAILED");
+    assert.deepEqual(f.changes(), []);
+  });
   await t.test("supported Python has no pip", (child) => {
     const f = fixture(child);
     f.state.pip = false;
     const blocked = f.setup("install");
+    assert.equal(blocked.status, "blocked");
+    assert.ok(blocked.diagnostics.some(({ code }) => code === "DEPENDENCY_PIP_MISSING"));
+    assert.deepEqual(f.changes(), []);
+  });
+  await t.test("installed CLI reports missing pip from rooted diagnostics", (child) => {
+    const f = fixture(child);
+    f.installCli();
+    f.state.pip = false;
+    const blocked = f.setup("install", "documents");
     assert.equal(blocked.status, "blocked");
     assert.ok(blocked.diagnostics.some(({ code }) => code === "DEPENDENCY_PIP_MISSING"));
     assert.deepEqual(f.changes(), []);
@@ -223,4 +282,14 @@ test("invalid roots, nondependency diagnostics, absent pip and conflicting npm r
     assert.equal(blocked.diagnostics.at(-1).code, "NPM_REGISTRY_CONFLICT");
     assert.deepEqual(f.changes(), []);
   });
+});
+
+test("does not report ready when Python changed during capability setup", (t) => {
+  const f = fixture(t);
+  f.installCli();
+  f.state.setupPython = path.join(f.root, "different python");
+  const blocked = f.setup("install", "documents");
+  assert.equal(blocked.status, "blocked");
+  assert.equal(blocked.diagnostics.at(-1).code, "DEPENDENCY_INSTALL_FAILED");
+  assert.deepEqual(blocked.performed, []);
 });

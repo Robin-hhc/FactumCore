@@ -39,11 +39,11 @@ printf '%s' '{"limit":20}' | python -B /absolute/tool/root/knowledge.py library 
 
 检查只读。需要补装依赖且所选 Python 缺少 pip 时，在 `needs_install` 报告的 `diagnostics` 中返回 `DEPENDENCY_PIP_MISSING`。无法加载工具包或依赖清单时，返回非零退出码和 `status: "unavailable"` 的诊断。`command` 为 `null` 或 `{path,bin_dir,dispatcher,installed,path_registered,on_path,shadowed_by}`。`installed` 表示启动文件与所选工具及 Python 匹配，并符合默认目录的注册要求。`path_registered` 表示 Windows 当前账户的用户 `PATH` 已登记该目录。`on_path` 表示当前进程的 `PATH` 实际优先解析到该命令，`shadowed_by` 记录优先匹配到的其他命令。Linux 上 `ready` 可以与 `on_path: false` 同时出现。
 
-`doctor --environment-only` 和 `doctor --knowledge-root <目录>` 使用同一套运行依赖检查。在 Ubuntu、Debian 上，`LIBREOFFICE_MISSING` 表示未安装，`LIBREOFFICE_COMMAND_UNAVAILABLE` 表示无法启动命令。指定知识根时，`doctor` 还会校验规则和知识库配置。缺项时返回 `blocked`，退出码为 3。
+`doctor --environment-only` 和 `doctor --knowledge-root <目录>` 默认检查基础依赖。`--capability documents` 选择完整文档解析锁。`--capability libreoffice` 再验证后备渲染程序，`LIBREOFFICE_MISSING` 表示缺少命令，`LIBREOFFICE_COMMAND_UNAVAILABLE` 表示无法运行选中的命令。指定知识根时，`doctor` 也会校验规则和知识库配置，缺项时返回 `blocked`，退出码为 3。文档业务命令按需报告 `PARSER_DEPENDENCIES_REQUIRED`、`PARSER_MODELS_REQUIRED` 或 `LIBREOFFICE_MISSING`。缺项补齐后可以重试同一个来源。
 
 `knowledge setup --jsonl` 发出 `checking`、按需的 `installing` 和 `registering`，以及 `verifying`，最后发送一条结果。`installing` 阶段按缺项安装锁定的 Python 依赖，并在 Ubuntu、Debian 上通过 apt 安装缺失的 LibreOffice Writer。成功时最终状态为 `ready`，退出码为 0，`python` 指向通过复查的解释器。失败结果带 `phase`、`code`、`message` 和 `diagnostics` 并退出非零，可用的本机日志路径由 `log_path` 给出。只需要最终一条结果时使用 `setup --json`。重复执行会跳过已完成的安装阶段，复用 npm 启动器或按需准备手动安装的启动器。
 
-OpenFlow 用 `POST /api/knowledge/environment/check` 检查，用 `POST /api/knowledge/environment/install` 开启后台环境安装，两者以 JSON `{}` 提交。缺少本地 CLI 时，用户确认后以 `{"approved":true}` 请求 `POST /api/knowledge/environment/install-cli`，由宿主尝试安装 CLI 和模型。用 `GET /api/knowledge/environment/install` 查询当前任务。宿主同一时间执行一项安装。安装执行端依赖时转发 `setup --jsonl` 的阶段进度，以退出码和最终 `ready` 报告判定成功。Windows 绑定 Samba 后通过 SSH MCP 检查对端环境，安装由 SSH 账户在 Linux 对端执行。面板业务命令仍兼容旧 `panel` 命令。
+OpenFlow 用 `POST /api/knowledge/environment/check` 检查，用 `POST /api/knowledge/environment/install` 开启后台基础安装，两者以 JSON `{}` 提交。缺少本地 CLI 时，用户确认后以 `{"approved":true}` 请求 `POST /api/knowledge/environment/install-cli`，由宿主尝试安装 CLI。用 `GET /api/knowledge/environment/install` 查询当前任务。宿主同一时间执行一项安装。安装执行端依赖时转发 `setup --jsonl` 的阶段进度，以退出码和最终 `ready` 报告判定成功。Windows 绑定 Samba 后通过 SSH MCP 检查对端环境，安装由 SSH 账户在 Linux 对端执行。面板业务命令仍兼容旧 `panel` 命令。
 
 ## 面板操作
 

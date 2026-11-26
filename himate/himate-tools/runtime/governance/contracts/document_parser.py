@@ -9,6 +9,7 @@ from base64 import b64decode
 from bisect import bisect_right
 from collections import Counter, defaultdict
 from importlib import metadata
+from importlib.util import find_spec
 from io import BytesIO
 import hashlib
 import math
@@ -28,6 +29,8 @@ SUPPORTED_FORMATS = frozenset({
     ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp",
 })
 IMAGE_FORMATS = frozenset({".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp"})
+PARSER_SETUP_CODES = frozenset({"PARSER_DEPENDENCIES_REQUIRED", "PARSER_MODELS_REQUIRED", "LIBREOFFICE_MISSING"})
+PARSER_DEPENDENCIES_MESSAGE = "Prepare the document conversion dependencies on this host with knowledge setup --capability documents."
 _DEFAULTS = {
     "pipeline": "native", "models_path": None, "ocr_languages": ["ch"], "threads": 4,
     "timeout_seconds": 300, "max_input_bytes": 256 * 1024 * 1024,
@@ -453,11 +456,16 @@ def _model_directory(root, options):
     return directory
 
 
-def _models(root, options):
+def require_document_parser(suffix):
+    if suffix in SUPPORTED_FORMATS and suffix not in {".md", ".txt"} and find_spec("docling") is None:
+        raise ContractError("PARSER_DEPENDENCIES_REQUIRED", PARSER_DEPENDENCIES_MESSAGE)
+
+
+def _models(root, options, references=OCR_MODEL_FILES):
     directory = _model_directory(root, options)
     if not directory.is_dir():
         raise ContractError("PARSER_MODELS_REQUIRED", "OCR models are unavailable. Install @himate/knowledge-models with npm.")
-    for reference in OCR_MODEL_FILES:
+    for reference in references:
         path = safe_path(directory, reference)
         if not path.is_file() or not path.stat().st_size:
             raise ContractError("PARSER_MODELS_REQUIRED", "Preinstalled standard model set is incomplete: " + reference)
@@ -489,9 +497,9 @@ def _converter(root, suffix, options):
         InputFormat.HTML: HTMLFormatOption(pipeline_options=ConvertPipelineOptions(**common), backend_options=HTMLBackendOptions(enable_remote_fetch=False, enable_local_fetch=False)),
     }
     if suffix == ".docx":
-        from .docx_pictures import DocxPictureBackend
+        from .docx_pictures import docx_picture_backend
 
-        formats[InputFormat.DOCX].backend = DocxPictureBackend
+        formats[InputFormat.DOCX].backend = docx_picture_backend()
     if models is not None:
         standard = PdfPipelineOptions(**common, artifacts_path=models, do_ocr=True,
                                       generate_page_images=False, generate_picture_images=True,
@@ -919,10 +927,12 @@ def _docling(root, source, data, output, options, page_range, source_hash, profi
     if suffix == ".docx":
         from .docx_pictures import export_docx
 
-        markdown, exported, omitted, missing_body_pictures = export_docx(
+        markdown, exported, omitted, missing_body_pictures, needs_libreoffice = export_docx(
             document, result.input._backend, output, office_layers,
             max_bytes=options["max_output_bytes"], max_images=_MAX_PARSE_FILES - 4,
         )
+        if needs_libreoffice:
+            raise ContractError("LIBREOFFICE_MISSING", "Rendering required Word images needs LibreOffice on this execution host.")
         Path(native_path(output / "document.md")).write_bytes(markdown.encode("utf-8"))
         _write_json(output / "document.json", exported)
     elif suffix == ".pdf":
@@ -1054,9 +1064,12 @@ def parse(root, source, data, output_ref, options=None, page_range=None, *, loca
     else:
         extractor = "docling:" + profile["versions"].get("docling-slim", profile["versions"].get("docling", "unavailable"))
         try:
+            require_document_parser(suffix)
             conversion_options = {**options, "complete_material": True} if complete else options
             text, segments, images, gaps, pages = _docling(root, source, data, output, conversion_options, page_range, source_hash, profile_hash)
         except (ImportError, OSError, ValueError, RuntimeError) as error:
+            if isinstance(error, ImportError):
+                error = ContractError("PARSER_DEPENDENCIES_REQUIRED", PARSER_DEPENDENCIES_MESSAGE)
             code = error.code if isinstance(error, ContractError) else "DOCUMENT_CONVERSION_UNAVAILABLE"
             gaps = [_gap(code, str(error), severity="review")]
             text, segments = "", []
@@ -1070,6 +1083,8 @@ def parse(root, source, data, output_ref, options=None, page_range=None, *, loca
         try:
             gaps = document_material.finish(root, output, suffix, data, images, gaps, pages, options)
         except (ContractError, ImportError, OSError, ValueError, RuntimeError) as error:
+            if isinstance(error, ImportError):
+                error = ContractError("PARSER_DEPENDENCIES_REQUIRED", PARSER_DEPENDENCIES_MESSAGE)
             gaps.append(_gap(getattr(error, "code", "DOCUMENT_IMAGE_PREPARATION_FAILED"), str(error), severity="review"))
     multiframe = _multiframe_gap(data, suffix, pages)
     if multiframe is not None:

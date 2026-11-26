@@ -357,6 +357,12 @@ def _checked_document_digest(root, batch, drafts, deletes):
     }))
 
 
+def _scan_waiting_for_setup(source, pending, gaps):
+    return {"source": source, "pending_at_least": len(pending),
+            "gaps": [gap["message"] for gap in gaps],
+            "diagnostics": [{"code": gap["code"], "message": gap["message"]} for gap in gaps]}, "blocked"
+
+
 def scan(root, request):
     root = Path(root)
     unknown = set(request) - {"source", "reprocess", "parser", "review_page_budget", "review_text_budget", "code_review"}
@@ -398,21 +404,28 @@ def scan(root, request):
             if registered is None:
                 raise ContractError("REPROCESS_SOURCE_REQUIRED", "Select one explicitly registered source ID or exact path")
             selected_source = registered["id"]
-        _clear_build(root)
-        catalog.set_maintenance_input(None)
         pending = observe(root, catalog, selected_source, code_review=code_review, first=True,
                           keep_content=True, reprocess=reprocess, ingest_only=True)
         if not pending:
+            _clear_build(root)
+            catalog.set_maintenance_input(None)
             return {"pending": 0}, "unchanged"
         selected = pending[0]
+        source = {key: value for key, value in selected.items() if key != "content"}
+        source["code_id" if source["kind"] == "code" else "doc_id"] = source["id"]
+        source["source_id"] = source["id"]
+        if selected["kind"] != "code" and selected["content"] is not None:
+            try:
+                document_parser.require_document_parser(Path(source["path"]).suffix.lower())
+            except ContractError as error:
+                return _scan_waiting_for_setup(source, pending, [{"code": error.code, "message": str(error)}])
+        _clear_build(root)
+        catalog.set_maintenance_input(None)
         catalog.touch_attempt(selected["id"])
         cards = catalog.cards_for(selected["id"])
-    source = {key: value for key, value in selected.items() if key != "content"}
     if (source.get("processing", {}).get("source_sha256") != source["hash"]
             or source["change"] == "reprocess"):
         source.pop("processing", None)
-    source["code_id" if source["kind"] == "code" else "doc_id"] = source["id"]
-    source["source_id"] = source["id"]
     source["source_commit"] = (source_commit(source_path(root, selected), selected["content"])
                                if selected["content"] is not None else None)
     materials = safe_path(root, ".build/materials")
@@ -440,6 +453,9 @@ def scan(root, request):
                                                    options=request.get("parser"), local_images=assets)
                 source["parsed"] = parsed
                 source["text_ref"] = parsed["text_ref"]
+                setup_gaps = [gap for gap in parsed.get("gaps", []) if gap.get("code") in document_parser.PARSER_SETUP_CODES]
+                if setup_gaps:
+                    return _scan_waiting_for_setup(source, pending, setup_gaps)
                 # Keep the old entry usable without changing the parser's
                 # manifest-owned files or its text/locator semantics.
                 if suffix not in {".txt", ".pdf"}:

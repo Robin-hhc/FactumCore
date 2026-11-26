@@ -148,11 +148,13 @@ def test_unavailable_ocr_can_retry_same_source_without_publishing_a_partial_cach
     monkeypatch.setattr(material, "image_reader", unavailable)
     failed, phase = run_scan(knowledge, "scan.pdf")
     assert phase == "blocked" and failed["source"]["parsed"]["parse_status"] == "partial"
+    assert [item["code"] for item in failed["diagnostics"]] == ["PARSER_MODELS_REQUIRED"]
     assert not (knowledge / ".build/task.json").exists()
     assert not list((knowledge / "artifacts/ingest/parsed").glob("*.json"))
     monkeypatch.setattr(material, "image_reader", lambda *args: lambda path: "SCAN RECOVERED")
     prepared, phase = run_scan(knowledge, "scan.pdf")
     assert phase == "prepared", prepared
+    assert prepared["source"]["source_id"] == failed["source"]["source_id"]
     assert prepared["source"]["parsed"]["parse_status"] == "parsed"
     assert prepared["source"]["parsed"]["manifest_sha256"] != failed["source"]["parsed"]["manifest_sha256"]
 
@@ -184,6 +186,63 @@ def docx_png(mode, size, color):
     Image.new(mode, size, color).save(stream, format="PNG")
     stream.seek(0)
     return stream
+
+
+@pytest.mark.parametrize("extension,hidden,renderer,needs_libreoffice", [
+    ("emf", False, None, True),
+    ("wmf", True, None, False),
+    ("png", False, None, False),
+    ("emf", False, "configured-renderer", False),
+])
+def test_word_renderer_required_only_for_visible_unrendered_vector_picture(
+        knowledge, monkeypatch, extension, hidden, renderer, needs_libreoffice):
+    from docling.backend import msword_backend
+    from docling.backend.docx.drawingml import utils as drawingml
+    from docling.datamodel.base_models import DocumentStream, InputFormat
+    from docling.document_converter import DocumentConverter, WordFormatOption
+    from docx import Document
+
+    monkeypatch.setattr(msword_backend, "get_docx_to_pdf_converter", lambda: None)
+    monkeypatch.setattr(drawingml, "get_libreoffice_cmd", lambda: renderer)
+    word_document = Document()
+    picture = word_document.add_picture(docx_png("RGB", (40, 25), "blue"))
+    if hidden:
+        picture._inline.docPr.set("hidden", "1")
+    packaged = BytesIO()
+    word_document.save(packaged)
+    stream = BytesIO()
+    with ZipFile(packaged) as original, ZipFile(stream, "w") as sample:
+        for member in original.namelist():
+            data = original.read(member)
+            if member == "word/media/image1.png":
+                member = "word/media/image1." + extension
+                data = b"Opaque picture bytes requiring the fallback renderer"
+            elif member in {"[Content_Types].xml", "word/_rels/document.xml.rels"} and extension != "png":
+                data = data.replace(b".png", ("." + extension).encode("ascii"))
+                data = data.replace(b'Extension="png" ContentType="image/png"',
+                                    f'Extension="{extension}" ContentType="image/x-{extension}"'.encode("ascii"))
+            sample.writestr(member, data)
+    stream.seek(0)
+    source_bytes = stream.getvalue()
+
+    pictures = module("docx_pictures")
+    converter = DocumentConverter(allowed_formats=[InputFormat.DOCX], format_options={
+        InputFormat.DOCX: WordFormatOption(backend=pictures.docx_picture_backend()),
+    })
+    result = converter.convert(DocumentStream(name="drawing.docx", stream=stream))
+    _, _, omitted, missing, renderer_required = pictures.export_docx(
+        result.document, result.input._backend, knowledge / "artifacts", None, max_bytes=10000, max_images=10,
+    )
+
+    assert missing == (0 if hidden else 1)
+    assert bool(omitted) == hidden
+    assert renderer_required is needs_libreoffice
+    if needs_libreoffice:
+        (knowledge / "docs-raw/drawing.docx").write_bytes(source_bytes)
+        task, phase = run_scan(knowledge, "drawing.docx")
+        assert phase == "blocked", task
+        assert [item["code"] for item in task["diagnostics"]] == ["LIBREOFFICE_MISSING"]
+        assert not (knowledge / ".build/task.json").exists()
 
 
 def test_word_skips_blank_and_header_images_but_keeps_header_text(knowledge, monkeypatch):

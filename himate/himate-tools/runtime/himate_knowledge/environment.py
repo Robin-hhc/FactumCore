@@ -4,7 +4,6 @@ from ast import literal_eval
 from contextlib import contextmanager
 import errno
 import hashlib
-from importlib.util import find_spec
 import json
 import os
 from pathlib import Path
@@ -27,7 +26,6 @@ DEPENDENCY_CHECK_MESSAGE = "无法读取工具包的依赖清单，请检查工�
 CLI_CHECK_MESSAGE = "知识命令无法启动，请检查命令目录、工具包和 Python 路径后重试。"
 NPM_PACKAGE = "@himate/knowledge-cli"
 NPM_REPAIR_MESSAGE = "请重新安装 @himate/knowledge-cli，并检查 npm 命令目录是否在 PATH 中。"
-PIP_MISSING_MESSAGE = "当前 Python 缺少 pip，请选择已安装 pip 的 Python 3.10–3.12，然后重试 knowledge setup。"
 PIP_FAILURE_MESSAGE = "依赖安装失败，请查看本地安装日志后重试。"
 LOG_FAILURE_MESSAGE = "无法写入本地安装日志，请检查用户目录的权限和磁盘空间。"
 PIP_LOCATION_MESSAGE = "pip 安装位置被配置覆盖，请移除 pip 配置中的 target、prefix、root 或 python 设置后重试。"
@@ -121,10 +119,8 @@ def _verify_command(tool_root, command):
                    env=child_environment())
 
 
-def _report(tool_root, version, bin_dir, *, dependencies_only=False):
-    dependencies, gaps = doctor.inspect_runtime_dependencies(tool_root / "runtime/requirements.lock.txt")
-    if any(gap["code"] == "DEPENDENCY_UNAVAILABLE" for gap in gaps) and find_spec("pip") is None:
-        gaps.insert(0, {"code": "DEPENDENCY_PIP_MISSING", "message": PIP_MISSING_MESSAGE})
+def _report(tool_root, version, bin_dir, *, dependencies_only=False, capability=None):
+    dependencies, gaps = doctor.inspect_runtime_dependencies(doctor.dependency_lock(tool_root, capability), capability)
     needs_install = bool(gaps)
     result = {"status": "needs_install" if needs_install else "ready", "python": sys.executable,
               "python_version": platform.python_version(), "toolkit_version": version,
@@ -231,7 +227,7 @@ def _install_diagnostic(error):
             "permission denied", "access is denied", "[winerror 5]", "[errno 13]", "read-only file system")):
         return "DEPENDENCY_PERMISSION_DENIED", "无法写入 Python 依赖目录，请检查执行账户的权限。"
     if "no module named pip" in output:
-        return "DEPENDENCY_PIP_MISSING", PIP_MISSING_MESSAGE
+        return "DEPENDENCY_PIP_MISSING", doctor.PIP_MISSING_MESSAGE
     if "externally-managed-environment" in output or "externally managed" in output:
         return "DEPENDENCY_EXTERNALLY_MANAGED", "当前 Python 由系统管理，请选择允许 pip 安装依赖的 Python。"
     if any(phrase in output for phrase in (
@@ -283,7 +279,7 @@ def _python_key(python):
     return os.path.normcase(os.path.normpath(python))
 
 
-def _fresh_report(tool_root, version, bin_dir, *, dependencies_only=False):
+def _fresh_report(tool_root, version, bin_dir, *, dependencies_only=False, capability=None):
     # A first per-user install may create the user site directory after this
     # process started. Reopen the selected Python to inspect its new sys.path.
     argv = [sys.executable, "-E", "-B", str(tool_root / "knowledge.py"), "doctor", "--environment-only", "--json"]
@@ -291,6 +287,8 @@ def _fresh_report(tool_root, version, bin_dir, *, dependencies_only=False):
         argv.extend(["--bin-dir", str(bin_dir)])
     if dependencies_only:
         argv.append("--dependencies-only")
+    if capability:
+        argv.extend(["--capability", capability])
     statuses = {"ready", "needs_install"} if dependencies_only else {"ready", "needs_install", "needs_cli"}
     try:
         process = subprocess.run(argv, cwd=tool_root, stdin=subprocess.DEVNULL, capture_output=True,
@@ -335,9 +333,9 @@ def _has_pip_location_override(configuration):
     return bool(sections["global"].get("python")) or any(settings.values())
 
 
-def _install_dependencies(tool_root, log):
+def _install_dependencies(tool_root, log, capability):
     pip = [sys.executable, *PYTHON_MODULE_FLAGS, "pip"]
-    requirements = str((tool_root / "runtime/requirements.lock.txt").absolute())
+    requirements = str(doctor.dependency_lock(tool_root, capability).absolute())
     # Python 3.10 searches the working directory when invoking a module. Use
     # an empty directory while keeping the selected interpreter's user site.
     with tempfile.TemporaryDirectory(prefix="knowledge-pip-") as cwd:
@@ -369,7 +367,7 @@ def _install_libreoffice(log):
                         "LibreOffice 安装失败，请查看本地安装日志并检查执行端的 apt 软件源。" + LIBREOFFICE_INSTALL_HINT) from error
 
 
-def _install(tool_root, version, bin_dir, result, progress, *, legacy, dependencies_only):
+def _install(tool_root, version, bin_dir, result, progress, *, legacy, dependencies_only, capability):
     log_path = None
 
     def fail(phase, code, message):
@@ -398,7 +396,7 @@ def _install(tool_root, version, bin_dir, result, progress, *, legacy, dependenc
                 return fail("installing", prerequisite["code"], prerequisite["message"])
             try:
                 if pip_needed:
-                    _install_dependencies(tool_root, log)
+                    _install_dependencies(tool_root, log, capability)
                 if office_gap:
                     if pip_needed:
                         progress("installing", office_progress)
@@ -407,7 +405,7 @@ def _install(tool_root, version, bin_dir, result, progress, *, legacy, dependenc
                 return fail("installing", error.code, str(error))
             except (OSError, subprocess.SubprocessError) as error:
                 return fail("installing", *_install_diagnostic(error))
-        result = _fresh_report(tool_root, version, bin_dir, dependencies_only=dependencies_only)
+        result = _fresh_report(tool_root, version, bin_dir, dependencies_only=dependencies_only, capability=capability)
         if result is None:
             return fail("verifying", "DEPENDENCY_CHECK_FAILED", DEPENDENCY_CHECK_MESSAGE)
         if result["status"] == "needs_install":
@@ -439,7 +437,7 @@ def _install(tool_root, version, bin_dir, result, progress, *, legacy, dependenc
     progress("verifying", "正在复查执行端依赖。" if dependencies_only else "正在复查执行端依赖和知识命令。")
     if result["status"] == "needs_cli":
         report = _fresh_report if log_path else _try_report
-        result = report(tool_root, version, bin_dir)
+        result = report(tool_root, version, bin_dir, capability=capability)
         if result is None:
             return fail("verifying", "DEPENDENCY_CHECK_FAILED", DEPENDENCY_CHECK_MESSAGE)
         if result["status"] == "needs_install":
@@ -451,14 +449,15 @@ def _install(tool_root, version, bin_dir, result, progress, *, legacy, dependenc
     return result, 0
 
 
-def _try_report(tool_root, version, bin_dir, *, dependencies_only=False):
+def _try_report(tool_root, version, bin_dir, *, dependencies_only=False, capability=None):
     try:
-        return _report(tool_root, version, bin_dir, dependencies_only=dependencies_only)
+        return _report(tool_root, version, bin_dir, dependencies_only=dependencies_only, capability=capability)
     except (OSError, ValueError, ImportError, subprocess.SubprocessError):
         return None
 
 
-def run_environment(tool_root, manifest, action, *, bin_dir=None, output="text", legacy=False, dependencies_only=False):
+def run_environment(tool_root, manifest, action, *, bin_dir=None, output="text", legacy=False,
+                    dependencies_only=False, capability=None):
     def progress(phase, message):
         _emit({"phase": phase, "message": message}, output, progress=True)
 
@@ -466,7 +465,7 @@ def run_environment(tool_root, manifest, action, *, bin_dir=None, output="text",
     if installing:
         progress("checking", "正在检查工具包和执行端依赖。")
     version = manifest["version"]
-    result = _try_report(tool_root, version, bin_dir, dependencies_only=dependencies_only)
+    result = _try_report(tool_root, version, bin_dir, dependencies_only=dependencies_only, capability=capability)
     code = 0
     if result is None:
         if installing:
@@ -481,13 +480,14 @@ def run_environment(tool_root, manifest, action, *, bin_dir=None, output="text",
         else:
             try:
                 with _setup_lock(managed_home(tool_root)):
-                    result = _try_report(tool_root, version, bin_dir, dependencies_only=dependencies_only)
+                    result = _try_report(tool_root, version, bin_dir, dependencies_only=dependencies_only,
+                                         capability=capability)
                     if result is None:
                         result, code = _failure("checking", "DEPENDENCY_CHECK_FAILED", DEPENDENCY_CHECK_MESSAGE,
                                                 legacy=legacy)
                     else:
                         result, code = _install(tool_root, version, bin_dir, result, progress, legacy=legacy,
-                                                dependencies_only=dependencies_only)
+                                                 dependencies_only=dependencies_only, capability=capability)
             except NodeError as error:
                 result, code = _failure("installing", error.code, str(error), legacy=legacy)
             except OSError as error:

@@ -53,21 +53,22 @@ sh ./deploy.sh
 
 ## 4. 在页面检查和安装环境
 
-- 本地目录缺少 `knowledge` 时，打开绑定页的「查看 CLI 安装指引」，也可以从页头「环境检查」进入。在弹窗点「同意并安装」，OpenFlow 会尝试安装模型和 CLI。使用终端安装后可点「重新检查」。如果仍找不到命令，把 npm 全局命令目录加入启动账户的 PATH，再重启 OpenFlow。
+- 本地目录缺少 `knowledge` 时，打开绑定页的「查看 CLI 安装指引」，也可以从页头「环境检查」进入。在弹窗点「同意并安装」，OpenFlow 会尝试安装 CLI。使用终端安装后可点「重新检查」。如果仍找不到命令，把 npm 全局命令目录加入启动账户的 PATH，再重启 OpenFlow。
 - 本地 CLI 已就绪但缺少 Python 依赖时，点「安装环境」。可以看进度或选「后台继续」。后台安装进度显示在知识库页头，完成或需要处理时会出现提示。
-- Windows 绑定 Samba 时，缺少 CLI、模型或 Python 依赖，由 SSH 连接使用的 Linux 账户在对端执行下一节命令。安装后确认该 SSH 账户的 PATH 能找到 `knowledge`，再回 OpenFlow 重新校验目录或重新检查环境。
+- Windows 绑定 Samba 时，缺少 CLI 或基础依赖，由 SSH 连接使用的 Linux 账户在对端执行下一节命令。安装后确认该 SSH 账户的 PATH 能找到 `knowledge`，再回 OpenFlow 重新校验目录或重新检查环境。
 
 ## 5. 在终端安装和校验
 
-已部署能力包时，可以让 Agent 在前面确认的执行端运行 [`hs-knowledge-setup`](../../himate-skills/skills/hs-knowledge-setup/README.md)。需要直接用终端安装时，用对应账户运行以下命令。模型包会校验并准备 OCR 模型。`knowledge setup` 会安装所需的 Python 依赖并复查。
+已部署能力包时，可以让 Agent 在前面确认的执行端运行 [`hs-knowledge-setup`](../../himate-skills/skills/hs-knowledge-setup/README.md)。需要直接用终端安装时，用对应账户运行以下命令。`knowledge setup` 会安装并复查基础 Python 依赖。
 
 ```sh
-npm install -g @himate/knowledge-models --registry http://10.143.57.12:4873 --allow-scripts=@himate/knowledge-models
 npm install -g @himate/knowledge-cli --registry http://10.143.57.12:4873 --allow-scripts=@himate/knowledge-cli
 knowledge --version
 knowledge setup
 knowledge doctor --environment-only
 ```
+
+首次解析 PDF、Word、Excel 等来源遇到缺项时，Agent 会在实际执行端准备对应依赖后重试同一份原件。可提前准备 Docling、离线 OCR 模型和用于 Office 矢量图的后备渲染程序。 [按需准备文档解析](../../himate-tools/docs/DEPLOY.md#按需准备文档解析)
 
 ## 6. 文件上传与入库
 

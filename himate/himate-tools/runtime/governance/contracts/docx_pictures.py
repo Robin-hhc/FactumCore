@@ -1,16 +1,9 @@
 """Keep DOCX picture locations while omitting decorative image assets."""
 
 from base64 import b64decode
+from functools import cache
 from io import BytesIO
 from pathlib import Path
-
-from docling.backend.msword_backend import MsWordDocumentBackend
-from docling_core.transforms.serializer.common import create_ser_result
-from docling_core.transforms.serializer.markdown import MarkdownDocSerializer, MarkdownParams, MarkdownPictureSerializer
-from docling_core.types.doc import ContentLayer, GroupItem, ImageRefMode
-from docx.text.paragraph import Paragraph
-from docx.text.run import Run
-from PIL import Image
 
 from .runtime import native_path
 from .validation import ContractError, sha256_bytes
@@ -25,64 +18,86 @@ _ALTERNATE = "{http://schemas.openxmlformats.org/markup-compatibility/2006}Alter
 _PNG_DATA = "data:image/png;base64,"
 
 
-class DocxPictureBackend(MsWordDocumentBackend):
-    """Track individual body embeddings before Docling separates content layers."""
+@cache
+def docx_picture_backend():
+    """Load the DOCX backend when the converter selects Word input."""
+    from docling.backend.docx.drawingml import utils as drawingml
+    from docling.backend.msword_backend import MsWordDocumentBackend
+    from docx.text.paragraph import Paragraph
+    from docx.text.run import Run
 
-    def _body_embeddings(self, element):
-        if element.tag == _ALTERNATE:
-            branch = self._select_alternate_content_branch(element)
-            if branch is not None:
-                yield from self._body_embeddings(branch)
-            return
-        if element.tag == _BLIP and element.get(_EMBED):
-            yield element
-        for child in element:
-            yield from self._body_embeddings(child)
+    class DocxPictureBackend(MsWordDocumentBackend):
+        """Track individual body embeddings before Docling separates content layers."""
 
-    def convert(self):
-        self.body_pictures = dict.fromkeys(self._body_embeddings(self.docx_obj.element.body))
-        self.omitted_pictures = set()
-        return super().convert()
+        def _body_embeddings(self, element):
+            if element.tag == _ALTERNATE:
+                branch = self._select_alternate_content_branch(element)
+                if branch is not None:
+                    yield from self._body_embeddings(branch)
+                return
+            if element.tag == _BLIP and element.get(_EMBED):
+                yield element
+            for child in element:
+                yield from self._body_embeddings(child)
 
-    def _is_invisible_spacer(self, image):
-        if image is None:
-            return False
-        if image.mode in {"RGBA", "LA"}:
-            return image.getchannel("A").getextrema() == (0, 0)
-        return image.mode == "RGB" and image.getextrema() == ((255, 255),) * 3
+        def convert(self):
+            self.body_pictures = dict.fromkeys(self._body_embeddings(self.docx_obj.element.body))
+            self.omitted_pictures = set()
+            self.libreoffice_missing = set()
+            return super().convert()
 
-    def _add_picture_to_doc(self, doc, parent, pil_image, is_spacer=False):
-        ref = super()._add_picture_to_doc(doc, parent, pil_image, is_spacer=is_spacer)
-        if is_spacer:
-            self.omitted_pictures.add(ref.cref)
-        return ref
+        def _is_invisible_spacer(self, image):
+            if image is None:
+                return False
+            if image.mode in {"RGBA", "LA"}:
+                return image.getchannel("A").getextrema() == (0, 0)
+            return image.mode == "RGB" and image.getextrema() == ((255, 255),) * 3
 
-    def _record_hidden_pictures(self, elements, refs):
-        for element, ref in zip(elements or (), refs, strict=True):
-            if _drawing_hidden(element):
+        def _add_picture_to_doc(self, doc, parent, pil_image, is_spacer=False):
+            ref = super()._add_picture_to_doc(doc, parent, pil_image, is_spacer=is_spacer)
+            if is_spacer:
                 self.omitted_pictures.add(ref.cref)
-                continue
-            if not self._uses_hidden_text:
-                continue
-            run = next(element.iterancestors(_WORD + "r"), None)
-            paragraph = next(element.iterancestors(_WORD + "p"), None)
-            if run is not None and paragraph is not None:
-                paragraph = Paragraph(paragraph, self.docx_obj)
-                if self._is_hidden_run(Run(run, paragraph), self._get_style_chain(paragraph.style)):
+            return ref
+
+        def _record_hidden_pictures(self, elements, refs):
+            for element, ref in zip(elements or (), refs, strict=True):
+                if _drawing_hidden(element):
                     self.omitted_pictures.add(ref.cref)
+                    continue
+                if not self._uses_hidden_text:
+                    continue
+                run = next(element.iterancestors(_WORD + "r"), None)
+                paragraph = next(element.iterancestors(_WORD + "p"), None)
+                if run is not None and paragraph is not None:
+                    paragraph = Paragraph(paragraph, self.docx_obj)
+                    if self._is_hidden_run(Run(run, paragraph), self._get_style_chain(paragraph.style)):
+                        self.omitted_pictures.add(ref.cref)
 
-    def _handle_pictures(self, drawing_blip, doc):
-        refs = super()._handle_pictures(drawing_blip, doc)
-        for element, ref in zip(drawing_blip or (), refs, strict=True):
-            if element in self.body_pictures:
-                self.body_pictures[element] = ref.cref
-        self._record_hidden_pictures(drawing_blip, refs)
-        return refs
+        def _handle_pictures(self, drawing_blip, doc):
+            refs = super()._handle_pictures(drawing_blip, doc)
+            for element, ref in zip(drawing_blip or (), refs, strict=True):
+                if element in self.body_pictures:
+                    self.body_pictures[element] = ref.cref
+            self._record_hidden_pictures(drawing_blip, refs)
+            return refs
 
-    def _handle_vml_pictures(self, vml_imagedatas, doc):
-        refs = super()._handle_vml_pictures(vml_imagedatas, doc)
-        self._record_hidden_pictures(vml_imagedatas, refs)
-        return refs
+        def _handle_vml_pictures(self, vml_imagedatas, doc):
+            refs = super()._handle_vml_pictures(vml_imagedatas, doc)
+            self._record_hidden_pictures(vml_imagedatas, refs)
+            return refs
+
+        def _convert_elements_via_docx(self, elements, element_tag=None):
+            image = super()._convert_elements_via_docx(elements, element_tag=element_tag)
+            if (image is None and self.docx_to_pdf_converter is None
+                    and not isinstance(elements, list) and elements in self.body_pictures):
+                relation = self.docx_obj.part.rels.get(elements.get(_EMBED))
+                if (relation is not None and not relation.is_external
+                        and Path(relation.target_part.partname).suffix.lower() in {".emf", ".wmf"}
+                        and drawingml.get_libreoffice_cmd() is None):
+                    self.libreoffice_missing.add(elements)
+            return image
+
+    return DocxPictureBackend
 
 
 def _drawing_hidden(element):
@@ -93,17 +108,9 @@ def _drawing_hidden(element):
     return any(props is not None and props.get("hidden") in {"1", "true"} for props in (frame_props, picture_props))
 
 
-class _PictureSerializer(MarkdownPictureSerializer):
-    def __init__(self, omitted):
-        self.omitted = omitted
-
-    def _serialize_image_part(self, *, item, **kwargs):
-        if item.self_ref in self.omitted:
-            return create_ser_result(text="", span_source=item)
-        return super()._serialize_image_part(item=item, **kwargs)
-
-
 def _in_page_header(picture, document):
+    from docling_core.types.doc import ContentLayer, GroupItem
+
     node = picture
     while node.parent is not None:
         node = node.parent.resolve(document)
@@ -113,6 +120,8 @@ def _in_page_header(picture, document):
 
 
 def _png_bytes(picture, limit):
+    from PIL import Image
+
     uri = str(picture.image.uri) if picture.image else ""
     if not uri.startswith(_PNG_DATA):
         return None
@@ -130,6 +139,19 @@ def _png_bytes(picture, limit):
 
 def export_docx(document, backend, output, layers, *, max_bytes, max_images):
     """Write local PNGs once, keeping the original references for every picture node."""
+    from docling_core.transforms.serializer.common import create_ser_result
+    from docling_core.transforms.serializer.markdown import MarkdownDocSerializer, MarkdownParams, MarkdownPictureSerializer
+    from docling_core.types.doc import ContentLayer, ImageRefMode
+
+    class PictureSerializer(MarkdownPictureSerializer):
+        def __init__(self, omitted):
+            self.omitted = omitted
+
+        def _serialize_image_part(self, *, item, **kwargs):
+            if item.self_ref in self.omitted:
+                return create_ser_result(text="", span_source=item)
+            return super()._serialize_image_part(item=item, **kwargs)
+
     omitted = backend.omitted_pictures | {pic.self_ref for pic in document.pictures if _in_page_header(pic, document)}
     rendered, assets, total_bytes = set(), set(), 0
     for picture in document.pictures:
@@ -153,7 +175,7 @@ def export_docx(document, backend, output, layers, *, max_bytes, max_images):
         rendered.add(picture.self_ref)
 
     markdown = MarkdownDocSerializer(
-        doc=document, picture_serializer=_PictureSerializer(omitted=omitted),
+        doc=document, picture_serializer=PictureSerializer(omitted=omitted),
         params=MarkdownParams(layers=layers or {ContentLayer.BODY}, image_mode=ImageRefMode.REFERENCED,
                               traverse_pictures=True, mark_meta=True),
     ).serialize().text
@@ -163,4 +185,6 @@ def export_docx(document, backend, output, layers, *, max_bytes, max_images):
             picture["image"]["uri"] = picture["image"]["uri"].replace("\\", "/")
     accounted_for = rendered | omitted
     missing = sum(ref not in accounted_for for ref in backend.body_pictures.values())
-    return markdown, exported, omitted, missing
+    needs_libreoffice = any(backend.body_pictures[element] not in accounted_for
+                            for element in backend.libreoffice_missing)
+    return markdown, exported, omitted, missing, needs_libreoffice

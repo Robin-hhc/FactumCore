@@ -7,7 +7,7 @@
       "expected_output": "给出实际执行端、知识根、工具版本和就绪回执。",
       "expectations": [
         "核对唯一知识根和实际执行端后运行安装器 check。",
-        "已获授权且明确缺项时，在同一执行端运行 install。",
+        "已获授权且基础环境明确缺项时，在同一执行端运行默认 install，只准备 CLI 和基础 Python 依赖。",
         "以带指定知识根的就绪回执判定结果，保留实际工具版本。"
       ]
     },
@@ -46,6 +46,16 @@
       "expectations": [
         "获得只读 check 回执。",
         "即使返回 needs_setup，也不调用 install，不改动宿主配置或知识库。"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "已绑定的 Windows Samba 测试库可以查询。回源回执返回 PARSER_MODELS_REQUIRED，明确缺 Linux 对端默认 OCR 模型。SSH MCP 已确认实际账户和知识根，请补齐并继续回源。",
+      "expected_output": "在原执行端准备默认 OCR 模型和缺少的解析依赖，复查后继续原回源。",
+      "expectations": [
+        "通过已配置的 SSH MCP 在同一 Linux 执行端用 --capability ocr 运行 check 和需要的 install。",
+        "以原知识根、对应能力和工具版本的 ready 回执判断就绪。",
+        "继续原调用方式和原回源范围，没有切回 Windows 执行。"
       ]
     }
   ]

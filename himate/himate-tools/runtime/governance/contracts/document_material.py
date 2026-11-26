@@ -1,6 +1,6 @@
 """Assemble the canonical visual reading material at the P1 boundary."""
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 import hashlib
 from html import escape
 from io import BytesIO
@@ -172,14 +172,13 @@ def _drawing_nodes(node):
         yield from _drawing_nodes(child)
 
 
-def _office_image_count(data, suffix):
-    # Only local drawing relationships in the main document/workbook count.
+def _workbook_image_count(data):
+    # Only local drawing relationships in the workbook count.
     drawing = "{http://schemas.openxmlformats.org/drawingml/2006/main}blip"
     embedded = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed"
     try:
         with ZipFile(BytesIO(data)) as archive:
-            parts = (["word/document.xml"] if suffix == ".docx" else
-                     [name for name in archive.namelist() if re.fullmatch(r"xl/drawings/drawing\d+\.xml", name)])
+            parts = [name for name in archive.namelist() if re.fullmatch(r"xl/drawings/drawing\d+\.xml", name)]
             return sum(node.tag == drawing and bool(node.get(embedded)) for name in parts
                        for node in _drawing_nodes(ElementTree.fromstring(archive.read(name))))
     except (BadZipFile, KeyError, ElementTree.ParseError) as error:
@@ -240,11 +239,12 @@ def finish(root, output, suffix, data, images, gaps, pages, options):
     if suffix == ".pdf" and [int(match.group(1)) for match in PAGE_MARKER.finditer(markdown.encode("utf-8"))] != pages:
         return [*gaps, _gap("DOCUMENT_REVIEW_PAGE_MAP", "Markdown is missing physical page markers", severity="review")]
     tokens = list(markdown_image_tokens(markdown))
-    shown = {unquote(uri) for _, _, uri in tokens if uri}
-    local = {PurePosixPath(row["ref"]).relative_to(output.relative_to(root).as_posix()).as_posix()
-             for row in images if row.get("ref")}
-    if ("<!-- image -->" in markdown or not local.issubset(shown)
-            or suffix != ".pdf" and _office_image_count(data, suffix) > len(tokens)):
+    shown = Counter(unquote(uri) for _, _, uri in tokens if uri)
+    local = Counter(PurePosixPath(row["ref"]).relative_to(output.relative_to(root).as_posix()).as_posix()
+                    for row in images if row.get("ref"))
+    absent = (local - shown) if suffix == ".docx" else (local.keys() - shown.keys())
+    if ("<!-- image -->" in markdown or absent
+            or suffix == ".xlsx" and _workbook_image_count(data) > len(tokens)):
         return [*gaps, _gap("DOCUMENT_IMAGE_COVERAGE", "At least one original image has no local Markdown link", severity="review")]
     if not tokens:
         markdown_path.write_bytes(markdown.encode("utf-8"))
@@ -259,7 +259,7 @@ def finish(root, output, suffix, data, images, gaps, pages, options):
                  for row in images if row.get("role") == "source_page_view" and row.get("ref")
                  and any(item.get("page_no") in ocr_pages for item in row["provenance"])}
     source_text_views = view_refs - ocr_views
-    read = image_reader(root, options) if shown - source_text_views else None
+    read = image_reader(root, options) if shown.keys() - source_text_views else None
     readings = {}
     pieces, cursor = [], 0
     for start, end, uri in tokens:

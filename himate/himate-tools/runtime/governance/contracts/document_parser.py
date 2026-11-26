@@ -277,6 +277,8 @@ def _prepare_cached(root, source, data, options, *, complete):
     identity = {"source_id": source_id, "source_sha256": source_hash, "profile_sha256": profile_hash}
     if complete:
         identity["material_version"] = 1
+        if suffix == ".docx":
+            identity["docx_picture_policy"] = 1
         models = _model_directory(root, effective)
         identity["image_ocr_files"] = [
             sha256_bytes(path.read_bytes()) if path.is_file() else None
@@ -486,6 +488,10 @@ def _converter(root, suffix, options):
         InputFormat.PPTX: PowerpointFormatOption(pipeline_options=ConvertPipelineOptions(**common), backend_options=MsPowerpointBackendOptions(enable_remote_fetch=False, enable_local_fetch=False, render_chart_images=False)),
         InputFormat.HTML: HTMLFormatOption(pipeline_options=ConvertPipelineOptions(**common), backend_options=HTMLBackendOptions(enable_remote_fetch=False, enable_local_fetch=False)),
     }
+    if suffix == ".docx":
+        from .docx_pictures import DocxPictureBackend
+
+        formats[InputFormat.DOCX].backend = DocxPictureBackend
     if models is not None:
         standard = PdfPipelineOptions(**common, artifacts_path=models, do_ocr=True,
                                       generate_page_images=False, generate_picture_images=True,
@@ -908,8 +914,18 @@ def _docling(root, source, data, output, options, page_range, source_hash, profi
         from .document_material import retain_workbook_formulas
 
         retain_workbook_formulas(document, data)
-    hidden_text_refs, pattern_textures, rendered = set(), set(), set()
-    if suffix == ".pdf":
+    hidden_text_refs, pattern_textures, rendered, omitted = set(), set(), set(), set()
+    missing_body_pictures = 0
+    if suffix == ".docx":
+        from .docx_pictures import export_docx
+
+        markdown, exported, omitted, missing_body_pictures = export_docx(
+            document, result.input._backend, output, office_layers,
+            max_bytes=options["max_output_bytes"], max_images=_MAX_PARSE_FILES - 4,
+        )
+        Path(native_path(output / "document.md")).write_bytes(markdown.encode("utf-8"))
+        _write_json(output / "document.json", exported)
+    elif suffix == ".pdf":
         from .pdf_text import mark_margin_line_numbers
 
         hidden_text_refs = mark_margin_line_numbers(document)
@@ -958,6 +974,8 @@ def _docling(root, source, data, output, options, page_range, source_hash, profi
     images, image_refs, image_directories = [], {}, {}
     image_pages = set()
     for picture in exported.get("pictures", []):
+        if picture["self_ref"] in omitted:
+            continue
         provenance = picture.get("prov", [])
         locator = {"kind": "element", "ref": picture["self_ref"], "source_sha256": source_hash, "profile_sha256": profile_hash}
         uri = (picture.get("image") or {}).get("uri")
@@ -980,6 +998,8 @@ def _docling(root, source, data, output, options, page_range, source_hash, profi
                        "provenance": provenance, "ocr_status": "unverified" if options["pipeline"] == "standard" and suffix in ({".pdf"} | IMAGE_FORMATS) else "not_requested",
                        "description_status": "agent_required"})
         image_pages.update(p["page_no"] for p in provenance)
+    if options.get("complete_material") and missing_body_pictures and not any(gap["code"] == "IMAGE_UNAVAILABLE" for gap in gaps):
+        gaps.append(_gap("DOCUMENT_IMAGE_COVERAGE", "At least one original DOCX body image was not exported", severity="review"))
     if options["pipeline"] == "native" and suffix in ({".pdf"} | IMAGE_FORMATS):
         for segment in segments:
             locator = segment["locator"]

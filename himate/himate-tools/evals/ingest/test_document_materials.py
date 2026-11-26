@@ -4,6 +4,7 @@ from pathlib import Path
 import sys
 from io import BytesIO
 import json
+from zipfile import ZipFile
 
 import pytest
 import yaml
@@ -174,6 +175,152 @@ def test_word_table_retains_image_ocr_inside_its_cell_and_keeps_header(knowledge
     row = next(line for line in text.splitlines() if "RIGHT CELL CHECK" in line)
     assert row.startswith("|") and "![Image](images/" in row and "<br>OCR<br>IMAGE LIMIT" in row
     assert "HEADER CHECK" in text
+
+
+def docx_png(mode, size, color):
+    from PIL import Image
+
+    stream = BytesIO()
+    Image.new(mode, size, color).save(stream, format="PNG")
+    stream.seek(0)
+    return stream
+
+
+def test_word_skips_blank_and_header_images_but_keeps_header_text(knowledge, monkeypatch):
+    from docx import Document
+    from PIL import Image
+
+    ocr_inputs = []
+
+    def read_image(path):
+        with Image.open(module("document_parser").native_path(path)) as image:
+            ocr_inputs.append((image.size, image.convert("RGB").getpixel((0, 0))))
+        return "BODY FIGURE OCR"
+
+    monkeypatch.setattr(module("document_material"), "image_reader", lambda *args: read_image)
+    document = Document()
+    document.add_picture(docx_png("RGBA", (40, 20), (255, 255, 255, 0)))
+    document.add_picture(docx_png("RGB", (45, 25), "white"))
+    document.add_paragraph("BODY CHECK")
+    document.add_picture(docx_png("RGB", (60, 40), "blue"))
+    header = document.sections[0].header.paragraphs[0]
+    header.text = "HEADER CHECK"
+    header.add_run().add_picture(docx_png("RGB", (24, 24), "red"))
+    original = knowledge / "docs-raw/figures.docx"
+    document.save(original)
+    original_bytes = original.read_bytes()
+
+    task, phase = run_scan(knowledge, "figures.docx")
+
+    assert phase == "prepared", task
+    assert original.read_bytes() == original_bytes
+    parsed = task["source"]["parsed"]
+    assert parsed["parse_status"] == "parsed"
+    loaded = module("document_parser").load(knowledge, parsed, expected_source_id=task["source"]["source_id"],
+                                             expected_sha256=task["source"]["hash"])
+    assert "BODY CHECK" in loaded["markdown"] and "HEADER CHECK" in loaded["markdown"]
+    assert loaded["markdown"].count("![Image](images/") == 1 and "<!-- image -->" not in loaded["markdown"]
+    assert "BODY FIGURE OCR" in loaded["markdown"]
+    assert "data:image" not in json.dumps(loaded["document"])
+    assert [item["element_ref"] for item in loaded["manifest"]["images"] if item["ref"]] == ["#/pictures/2"]
+    assert ocr_inputs == [((60, 40), (0, 0, 255))]
+
+
+def test_word_missing_body_picture_still_blocks_with_decorations(knowledge, monkeypatch):
+    from docx import Document
+
+    monkeypatch.setattr(module("document_material"), "image_reader", lambda *args: lambda path: "")
+    document = Document()
+    document.add_picture(docx_png("RGB", (45, 25), "white"))
+    document.add_picture(docx_png("RGB", (60, 40), "blue"))
+    document.add_picture(docx_png("RGB", (70, 50), "green"))
+    header = document.sections[0].header.paragraphs[0]
+    header.add_run().add_picture(docx_png("RGB", (24, 24), "red"))
+    packaged = BytesIO()
+    document.save(packaged)
+    packaged.seek(0)
+    with ZipFile(packaged) as original, ZipFile(knowledge / "docs-raw/broken.docx", "w") as broken:
+        for member in original.namelist():
+            data = original.read(member)
+            if member == "word/document.xml":
+                # rId for the final body image points to a relation absent from this document.
+                before, marker, after = data.rpartition(b'r:embed="')
+                assert marker and after.startswith(b"rId")
+                data = before + marker + b"rId999999" + after[after.index(b'"'):]
+            broken.writestr(member, data)
+
+    task, phase = run_scan(knowledge, "broken.docx")
+
+    assert phase == "blocked", task
+    source = task["source"]
+    materials = module("document_parser").load(knowledge, source["parsed"], expected_source_id=source["source_id"],
+                                                expected_sha256=source["hash"])
+    [gap] = materials["manifest"]["gaps"]
+    assert gap["code"] == "IMAGE_UNAVAILABLE" and gap["locator"]["ref"] == "#/pictures/2"
+    assert not (knowledge / ".build/task.json").exists()
+
+
+def test_word_keeps_tiny_colored_body_image(knowledge, monkeypatch):
+    from docx import Document
+    from PIL import Image
+
+    monkeypatch.setattr(module("document_material"), "image_reader", lambda *args: lambda path: "TINY FIGURE OCR")
+    document = Document()
+    document.add_paragraph("TINY FIGURE CHECK")
+    document.add_picture(docx_png("RGB", (5, 5), "red"))
+    document.save(knowledge / "docs-raw/tiny.docx")
+
+    task, phase = run_scan(knowledge, "tiny.docx")
+
+    assert phase == "prepared", task
+    parser = module("document_parser")
+    source = task["source"]
+    materials = parser.load(knowledge, source["parsed"], expected_source_id=source["source_id"],
+                            expected_sha256=source["hash"])
+    assert "TINY FIGURE OCR" in materials["markdown"]
+    [image] = [item for item in materials["manifest"]["images"] if item["ref"]]
+    with Image.open(parser.native_path(knowledge / image["ref"])) as bitmap:
+        assert bitmap.size == (5, 5)
+        assert bitmap.convert("RGB").getpixel((0, 0)) == (255, 0, 0)
+
+
+def test_word_omits_only_the_hidden_occurrence_of_a_shared_picture(knowledge, monkeypatch):
+    from docx import Document
+
+    monkeypatch.setattr(module("document_material"), "image_reader", lambda *args: lambda path: "SHARED OCR")
+    document = Document()
+    shared_picture = docx_png("RGB", (60, 40), "blue").getvalue()
+    hidden = document.add_paragraph().add_run()
+    hidden.font.hidden = True
+    hidden.add_picture(BytesIO(shared_picture))
+    hidden_drawing = document.add_picture(BytesIO(shared_picture))
+    hidden_drawing._inline.docPr.set("hidden", "1")
+    hidden_picture = document.add_picture(BytesIO(shared_picture))
+    hidden_picture._inline.graphic.graphicData.pic.nvPicPr.cNvPr.set("hidden", "1")
+    document.add_picture(BytesIO(shared_picture))
+    document.add_picture(BytesIO(shared_picture))
+    document.save(knowledge / "docs-raw/shared.docx")
+
+    task, phase = run_scan(knowledge, "shared.docx")
+
+    assert phase == "prepared", task
+    source = task["source"]
+    parser = module("document_parser")
+
+    def assert_visible_occurrences(parsed):
+        materials = parser.load(knowledge, parsed, expected_source_id=source["source_id"],
+                                expected_sha256=source["hash"])
+        figures = [item for item in materials["manifest"]["images"] if item["ref"]]
+        assert [item["element_ref"] for item in figures] == ["#/pictures/3", "#/pictures/4"]
+        assert figures[0]["ref"] == figures[1]["ref"]
+        assert materials["markdown"].count("![Image](images/") == 2
+
+    assert_visible_occurrences(source["parsed"])
+    library = module("library")
+    reading, phase = library.sources(knowledge, "extract", {"source_id": source["source_id"]})
+    assert phase == "extracted", reading
+    assert_visible_occurrences(reading["parsed"])
+    assert library.sources(knowledge, "release", {"read_id": reading["read_id"]})[1] == "released"
 
 
 def test_workbook_retains_hidden_sheet_and_formula_without_cached_value(knowledge):

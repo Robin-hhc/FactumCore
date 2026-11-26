@@ -42,6 +42,16 @@
         "安装和复查在 Linux 对端进行，未以 Windows 上的 CLI 替代。",
         "就绪后继续同一个 Knowledge MCP 查询，依据实际读卡输出答复。"
       ]
+    },
+    {
+      "id": 5,
+      "prompt": "我已经通过绑定的 Knowledge MCP 搜到并读完 scan-retry。为了核对条件需要回源 DOCX。knowledge_source_extract 返回 LIBREOFFICE_MISSING。允许在这个已确认的 Ubuntu 执行端补齐该依赖，请继续。",
+      "expected_output": "按 LibreOffice 缺项准备同一执行端，复查后继续原回源，区分卡片与实际原件的依据。",
+      "expectations": [
+        "用 hs-knowledge-setup 的 libreoffice 能力核对和处理明确缺项。",
+        "沿用原绑定、回源范围和参数继续 knowledge_source_extract。",
+        "依据实际读到的原件判断条件，没有把环境诊断当成搜索无命中。"
+      ]
     }
   ]
 }

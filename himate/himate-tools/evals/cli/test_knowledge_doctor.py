@@ -36,7 +36,7 @@ def knowledge(tmp_path):
     return root
 
 
-def observe(root, *, no_site=False, site_packages=None, python=sys.executable):
+def observe(root, *, no_site=False, site_packages=None, python=sys.executable, capability=None):
     before = {p.relative_to(root).as_posix(): p.read_bytes() for p in root.rglob("*") if p.is_file()}
     command = [str(python), "-B"] + (["-S"] if no_site else [])
     # These tests isolate workspace and rule validation. LibreOffice detection
@@ -45,6 +45,8 @@ def observe(root, *, no_site=False, site_packages=None, python=sys.executable):
                        DOCLING_LIBREOFFICE_CMD=sys.executable)
     environment.pop("PYTHONPATH", None)
     arguments = [str(root / "knowledge.py"), "doctor", "--knowledge-root", str(root), "--json"]
+    if capability:
+        arguments.extend(["--capability", capability])
     if site_packages is not None:
         launcher = ("import runpy, sys; sys.path.append(sys.argv[1]); "
                     "sys.argv = sys.argv[2:]; runpy.run_path(sys.argv[0], run_name='__main__')")
@@ -268,7 +270,7 @@ def test_doctor_without_site_packages_still_reports_pinned_dependencies(knowledg
     status, report = observe(knowledge, no_site=True)
     assert status == 3, report
     assert report["status"] == "blocked"
-    assert "DEPENDENCY_UNAVAILABLE" in {row["code"] for row in report["diagnostics"]}
+    assert {"DEPENDENCY_UNAVAILABLE", "DEPENDENCY_PIP_MISSING"} <= {row["code"] for row in report["diagnostics"]}
     assert any(row["name"].casefold() == "pyyaml" and row["actual"] is None for row in report["data"]["dependencies"])
     assert report["data"]["rules"]["status"] == "not_checked"
 
@@ -360,19 +362,41 @@ def test_doctor_never_imports_the_governance_package_even_when_its_bytes_are_loc
     assert not marker.exists()
 
 
-def test_doctor_checks_only_dependencies_for_the_current_python_and_platform(knowledge):
-    lock = knowledge / "runtime/requirements.lock.txt"
+def append_dependency(root, filename, requirement):
+    lock = root / "runtime" / filename
     with lock.open("a", encoding="utf-8") as stream:
-        stream.write('\nnonexistent-other-platform-dependency==1.0 ; python_version < "2.0"\n')
+        stream.write("\n" + requirement + "\n")
     # The fixture explicitly installs a new, trusted runtime release containing
-    # the synthetic dependency condition. The command must still be read-only.
-    manifest_path = knowledge / "runtime/manifest.json"
+    # the synthetic dependency. The command must still be read-only.
+    manifest_path = root / "runtime/manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["files"]["requirements.lock.txt"]["sha256"] = hashlib.sha256(lock.read_bytes()).hexdigest()
+    manifest["files"][filename]["sha256"] = hashlib.sha256(lock.read_bytes()).hexdigest()
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+
+def test_doctor_checks_only_dependencies_for_the_current_python_and_platform(knowledge):
+    append_dependency(knowledge, "requirements-base.lock.txt",
+                      'nonexistent-other-platform-dependency==1.0 ; python_version < "2.0"')
     status, report = observe(knowledge)
     assert status == 0, report
     assert all(row["name"] != "nonexistent-other-platform-dependency" for row in report["data"]["dependencies"])
+
+
+def test_doctor_checks_document_dependencies_only_when_requested(knowledge):
+    parser = "synthetic-optional-document-parser"
+    append_dependency(knowledge, "requirements.lock.txt", parser + "==1.0")
+
+    status, base = observe(knowledge)
+    assert status == 0, base
+    base_names = {row["name"].casefold() for row in base["data"]["dependencies"]}
+    assert not {parser, "docling-slim", "torch"} & base_names
+
+    status, documents = observe(knowledge, capability="documents")
+    assert status == 3, documents
+    assert documents["data"]["configuration"]["status"] == "verified"
+    assert {parser, "docling-slim", "torch"} <= {row["name"].casefold() for row in documents["data"]["dependencies"]}
+    assert {"code": "DEPENDENCY_UNAVAILABLE", "message": parser + " requires 1.0"} in documents["diagnostics"]
+    assert not any(row["code"].startswith("LIBREOFFICE_") for row in documents["diagnostics"])
 
 
 @pytest.mark.parametrize("version,ready", [
@@ -389,13 +413,7 @@ def test_doctor_matches_installed_distribution_versions_like_pip(knowledge, vers
         "Metadata-Version: 2.1\nName: sample-library\nVersion: " + version + "\n",
         encoding="utf-8",
     )
-    lock = knowledge / "runtime/requirements.lock.txt"
-    with lock.open("a", encoding="utf-8") as stream:
-        stream.write("\nsample-library==1.2.3\n")
-    manifest_path = knowledge / "runtime/manifest.json"
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["files"]["requirements.lock.txt"]["sha256"] = hashlib.sha256(lock.read_bytes()).hexdigest()
-    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    append_dependency(knowledge, "requirements-base.lock.txt", "sample-library==1.2.3")
 
     status, report = observe(knowledge, site_packages=site)
     dependency = next(row for row in report["data"]["dependencies"] if row["name"] == "sample-library")

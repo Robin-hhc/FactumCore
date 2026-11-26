@@ -16,10 +16,14 @@ description: 按指定文档范围准备同版材料、图片和关联旧卡，�
 有宿主提供的 `upload_ingest` 时，先按[上传批次约定](references/upload-batch.md)核对执行端、当前文件哈希和批次位置。其余文档材料字段及旧 PDF 兼容见[来源操作](references/materials.md)。
 
 - `prepared`：核对 task 的 `task_type: document_ingest`，再交接实际 task、固定原件和关联旧卡。PDF、DOCX、XLSX 使用 `task.document_review` 的 `packet_ref`、`index_ref`、`markdown_ref`。图片相对路径从完整 `markdown_ref` 所在目录解析，连同同版材料入口交 P2。返回维护任务时报告应使用 lint 的维护分支，不按文档交给 P2。
-- `blocked`：报告 `data.gaps` 中的解析、图片或原件缺口及具体位置，保留当前来源待办。
+- `blocked`：先看顶层 `diagnostics`，按下文处理明确的文档能力缺项。仍有阻塞时，报告 `data.gaps` 中的解析、图片或原件缺口及具体位置，保留当前来源待办。
 - `unchanged`：只确认本次扫描范围暂无待办，由 Workflow 决定继续选源或结束。
 - 调用或读取失败：保留真实错误，不能据此判断无变化或原件已删除。
 
 原件只读。P5 失败时保留当前已审批次，不重新扫描或清暂存。对未改文档重评时，首批使用具体已登记 ID 和 `reprocess: true`，后续按原范围普通续办。
 
-三种转换格式会备好全文 Markdown、原图及适用的离线 OCR，按最早未评估单元续办。明确返回 `PARSER_MODELS_REQUIRED` 且缺的是默认模型时，用 `hs-knowledge-setup` 补齐，按原范围和来源续办。累计进度保存在来源登记。新增知识主题由 P2 判断，脚本反查的旧卡仅提供引用候选。
+三种转换格式会备好全文 Markdown、原图及适用的离线 OCR，按最早未评估单元续办。顶层 `diagnostics` 明确返回 `PARSER_DEPENDENCIES_REQUIRED`、默认模型的 `PARSER_MODELS_REQUIRED` 或 `LIBREOFFICE_MISSING` 时，分别用 `hs-knowledge-setup` 的 `documents`、`ocr` 或 `libreoffice` 能力补齐同一执行端。自定义模型路径或 LibreOffice 命令配置错误按诊断处理。
+
+复查通过后，在同一执行端沿用原调用方式、解析选项、阅读预算和其他请求参数重试。有 `upload_ingest` 时，保留 `upload_ingest_position` 中的批次和索引，按清单约定重新核对知识根、当前项路径和 SHA-256。核对通过后，将 `upload_ingest.sources[source_index].path` 的完整 `docs-raw/…` 路径传给 MCP 的 `source` 或 CLI 的 `--source`。原件或位置不符时按上传批次约定走 `blocked`，保留当前索引。
+
+普通扫描将阻塞回执的 `data.source.source_id` 传给 `source` 或 `--source`，原请求未限定来源时也按该 ID 重试。若同一缺项复查后仍出现，报告实际回执并保留待办。准备成功后正常交 P2。已备批次处理完成后，上传批次继续核对清单当前项，普通扫描恢复原范围。累计进度保存在来源登记。新增知识主题由 P2 判断，脚本反查的旧卡仅提供引用候选。

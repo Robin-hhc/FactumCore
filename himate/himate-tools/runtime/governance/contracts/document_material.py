@@ -29,11 +29,9 @@ def image_reader(root, options):
     from docling.datamodel.pipeline_options import RapidOcrOptions
     from docling.models.stages.ocr.rapid_ocr_model import RapidOcrModel
 
-    from .document_parser import _model_directory, safe_path
+    from .document_parser import OCR_MODEL_FILES, _models
 
-    directory = _model_directory(root, options)
-    if not directory.is_dir() or not safe_path(directory, "RapidOcr").is_dir():
-        raise ContractError("PARSER_MODELS_REQUIRED", "Install the local knowledge OCR models before preparing images")
+    directory = _models(root, options, (ref for ref in OCR_MODEL_FILES if ref.startswith("RapidOcr/")))
     engine = RapidOcrModel(
         enabled=True, artifacts_path=directory,
         options=RapidOcrOptions(backend="onnxruntime", lang=options["ocr_languages"]),

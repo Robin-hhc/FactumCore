@@ -20,13 +20,23 @@ node "<已安装 Skill 目录>/scripts/setup.cjs" check --knowledge-root "<知�
 node "<已安装 Skill 目录>/scripts/setup.cjs" install --knowledge-root "<知识根绝对路径>" --json
 ```
 
+默认检查和安装 CLI 及基础 Python 依赖，足够查询、读卡、维护索引和处理 Markdown。用户要求预装文档能力，或实际调用明确报告对应缺项时，为 `check` 和 `install` 加同一个 `--capability` 参数。
+
+| 诊断 | 参数 | 准备内容 |
+|---|---|---|
+| `PARSER_DEPENDENCIES_REQUIRED` | `--capability documents` | 锁定的 Docling 文档解析依赖 |
+| `PARSER_MODELS_REQUIRED` 且缺少的是默认模型 | `--capability ocr` | 文档解析依赖和 `@himate/knowledge-models` |
+| `LIBREOFFICE_MISSING` | `--capability libreoffice` | 文档解析依赖和 Ubuntu、Debian 上的 LibreOffice Writer |
+
+自定义模型路径不可用时，报告原路径和具体缺项。`LIBREOFFICE_COMMAND_UNAVAILABLE` 时按回执修正 `DOCLING_LIBREOFFICE_CMD` 或执行端 PATH，再用 `check` 复查。
+
 | 回执 | 处理 |
 |---|---|
-| `ready` | 核对实际知识根及 `knowledge.argv`、`knowledge.version`。环境专用检查的知识根为空。 |
+| `ready` | 核对实际知识根、`capability`、`knowledge.argv` 和 `knowledge.version`。环境专用检查的知识根为空。 |
 | `needs_setup` | 根据 `planned` 告知实际主机、账户和缺项。用户已授权或宿主已有相应授权时，下一步直接运行 `install`。需要授权时合并确认一次。 |
 | `blocked` | 报告 `diagnostics`，例如缺 Node.js、npm、可用 Python，或知识根、网络、权限存在问题。按具体诊断续办。 |
 
-执行器返回 0、2、1 时分别对应 `ready`、`needs_setup`、`blocked`。安装器在实际账户按缺项执行 npm 安装和 `knowledge setup`，并复查。npm 安装使用团队内网 registry 和对应包的安装脚本授权。以 `install` 的回执判断 npm 是否可用，单独请求 registry 的结果不能替代安装回执。只缺执行端依赖时复用现有 npm 包。Ubuntu 和 Debian 缺少 LibreOffice 时，`knowledge setup` 会尝试安装无界面的 Writer。系统安装权限不足时，按回执提示由执行端管理员补齐。命令超时、会话断开或安装中途失败时，先核实原安装状态并重新 `check`，以实际已完成的步骤决定是否重试。
+执行器返回 0、2、1 时分别对应 `ready`、`needs_setup`、`blocked`。安装器在实际账户按缺项执行 npm 安装和 `knowledge setup`，并复查。npm 安装使用团队内网 registry 和对应包的安装脚本授权。以 `install` 的回执判断 npm 是否可用，单独请求 registry 的结果不能替代安装回执。只缺执行端依赖时复用现有 npm 包。系统安装权限不足时，按回执提示由执行端管理员补齐。命令超时、会话断开或安装中途失败时，先核实原安装状态并重新 `check`，以实际已完成的步骤决定是否重试。
 
 就绪后报告实际工具版本和执行端。继续 CLI 任务时，以 `knowledge.argv` 为命令前缀，仍显式传同一绝对 `--knowledge-root`。由业务自检触发时回到原业务步骤。原任务使用已配置的 Knowledge MCP 时，复查后用同一个工具继续。若宿主进程仍无法解析已核实的入口，报告实际账户的启动路径缺项。只重试明确卡在环境检查阶段的调用。对于状态不明的写操作，先核实原回执和写入状态。
 

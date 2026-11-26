@@ -111,7 +111,7 @@ function verifyRuntime(staging, version) {
   const sections = [
     [staging, manifest.entrypoints, ["knowledge.py"]],
     [path.join(staging, "runtime"), manifest.files,
-      ["requirements.lock.txt", "himate_knowledge/__init__.py", "himate_knowledge/cli.py"]],
+      ["requirements.lock.txt", "requirements-base.lock.txt", "himate_knowledge/__init__.py", "himate_knowledge/cli.py"]],
     [staging, manifest.assets, ["runtime/governance/framework.lock.yaml"]],
   ];
   for (const [root, rows, required] of sections) {

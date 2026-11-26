@@ -12,6 +12,7 @@ const MODELS = "@himate/knowledge-models";
 const REGISTRY = "http://10.143.57.12:4873";
 const DISPATCHER = "distribution/npm/knowledge.js";
 const WINDOWS = process.platform === "win32";
+const CAPABILITIES = new Set(["documents", "ocr", "libreoffice"]);
 const DEPENDENCY_GAPS = new Set([
   "DEPENDENCY_UNAVAILABLE", "YAML_PARSER_UNAVAILABLE", "LIBREOFFICE_MISSING",
 ]);
@@ -53,13 +54,17 @@ function parseArgs(args) {
   const [action] = args;
   const rootIndex = args.indexOf("--knowledge-root");
   const root = rootIndex > 0 ? args[rootIndex + 1] : null;
-  const expected = rootIndex > 0 ? [action, "--knowledge-root", root, "--json"] : [action, "--environment-only", "--json"];
+  const capabilityIndex = args.indexOf("--capability");
+  const capability = capabilityIndex > 0 ? args[capabilityIndex + 1] : null;
+  const target = rootIndex > 0 ? ["--knowledge-root", root] : ["--environment-only"];
+  const expected = [action, ...target, ...(capabilityIndex > 0 ? ["--capability", capability] : []), "--json"];
   if (!["check", "install"].includes(action) || args.length !== expected.length
       || expected.some((value) => !value || args.filter((arg) => arg === value).length !== 1)
+      || (capabilityIndex > 0 && !CAPABILITIES.has(capability))
       || (rootIndex > 0 && (!path.isAbsolute(root) || /[\r\n\0]/.test(root)))) {
-    fail("INVALID_ARGUMENT", "用法：setup.cjs check|install (--knowledge-root <绝对路径> | --environment-only) --json");
+    fail("INVALID_ARGUMENT", "用法：setup.cjs check|install (--knowledge-root <绝对路径> | --environment-only) [--capability documents|ocr|libreoffice] --json");
   }
-  return { action, root };
+  return { action, root, capability };
 }
 
 function samePath(a, b) {
@@ -202,50 +207,36 @@ function diagnostics(payload) {
     : [];
 }
 
-function checkInstalled(knowledge, root, find, execute, receipt) {
-  const envRun = execute(knowledge.argv, ["doctor", "--environment-only", "--dependencies-only", "--json"]);
-  const environment = subprocessReport(envRun);
-  if (envRun.error || envRun.status !== 0 || !["ready", "needs_install"].includes(environment?.status)
-      || environment.toolkit_version !== knowledge.version || !samePath(environment.tool_root, knowledge.tool_root)
-      || !path.isAbsolute(environment.python || "")) {
-    if (!environment) {
-      probePython(find, execute, false);
-      fail("KNOWLEDGE_START_FAILED", "已安装的 knowledge 无法运行，请确认执行端的 Python 和 CLI。");
-    }
-    receipt.diagnostics.push(...diagnostics(environment));
-    fail("ENVIRONMENT_CHECK_FAILED", "无法核对已安装 CLI 的版本和执行端。");
+function checkInstalled(knowledge, root, flags, find, execute, receipt) {
+  const target = root ? ["--knowledge-root", root] : ["--environment-only", "--dependencies-only"];
+  const probe = execute(knowledge.argv, ["doctor", ...target, ...flags, "--json"]);
+  const report = subprocessReport(probe);
+  if (!report) {
+    probePython(find, execute, false);
+    fail("KNOWLEDGE_START_FAILED", "已安装的 knowledge 无法运行，请确认执行端的 Python 和 CLI。");
+  }
+  const gaps = diagnostics(report);
+  receipt.diagnostics.push(...gaps);
+  const environment = root ? report.data : report;
+  const version = root ? environment?.runtime_version : environment?.toolkit_version;
+  const errorCode = root ? "KNOWLEDGE_ROOT_CHECK_FAILED" : "ENVIRONMENT_CHECK_FAILED";
+  if (probe.error || version !== knowledge.version || !samePath(environment?.tool_root, knowledge.tool_root)
+      || typeof environment?.python !== "string" || !path.isAbsolute(environment.python)
+      || (root && !samePath(environment.knowledge_root, root))) {
+    fail(errorCode, "无法核对已安装 CLI 的版本、执行端或指定知识根。");
   }
   receipt.knowledge = { ...knowledge, python: environment.python };
-  receipt.diagnostics.push(...diagnostics(environment));
-  if (receipt.diagnostics.some(({ code }) => code === "DEPENDENCY_PIP_MISSING"
-      || code === "LIBREOFFICE_COMMAND_UNAVAILABLE")) return false;
-  if (root) {
-    const probe = execute(knowledge.argv, ["doctor", "--knowledge-root", root, "--json"]);
-    const rooted = subprocessReport(probe);
-    const gaps = diagnostics(rooted);
-    const verifiedTarget = samePath(rooted?.data?.knowledge_root, root)
-      && samePath(rooted.data.tool_root, knowledge.tool_root)
-      && samePath(rooted.data.python, environment.python)
-      && rooted.data.runtime_version === knowledge.version;
-    if (verifiedTarget && probe.status === 3 && environment.status === "needs_install" && rooted.status === "blocked"
-        && gaps.length > 0 && gaps.every(({ code }) => DEPENDENCY_GAPS.has(code))) {
-      // The existing CLI classifies the only observed gaps as installable.
-    } else if (!verifiedTarget || probe.status !== 0 || rooted?.status !== "ok" || rooted.phase !== "ready") {
-      receipt.diagnostics.push(...gaps.filter(({ code, message }) => !receipt.diagnostics.some(
-        (gap) => gap.code === code && gap.message === message,
-      )));
-      if (!gaps.length) receipt.diagnostics.push({ code: "KNOWLEDGE_ROOT_CHECK_FAILED", message: "未能核对所选知识根和当前执行端。" });
-      return false;
-    }
+  if (probe.status === 0 && (root ? report.status === "ok" && report.phase === "ready" : report.status === "ready")) {
+    return true;
   }
-  if (environment.status === "needs_install") receipt.planned.push("setup_python");
-  else {
-    const version = execute(knowledge.argv, ["--version"]);
-    if (version.status !== 0 || version.stdout.trim() !== "knowledge " + knowledge.version) {
-      fail("KNOWLEDGE_VERSION_MISMATCH", "实际 knowledge 版本与 npm 安装标记不一致。");
-    }
+  const needsInstall = root ? probe.status === 3 && report.status === "blocked" && report.phase === "blocked"
+    : probe.status === 0 && report.status === "needs_install";
+  if (needsInstall && gaps.length && gaps.every(({ code }) => DEPENDENCY_GAPS.has(code))) {
+    receipt.planned.push("setup_python");
+    return true;
   }
-  return true;
+  if (!gaps.length) fail(errorCode, "已安装的 CLI 未返回有效的环境检查回执。");
+  return false;
 }
 
 function verifyNpmSettings(npm, execute) {
@@ -262,22 +253,26 @@ function verifyNpmSettings(npm, execute) {
 }
 
 function runSetup(args, { toolRoot = path.join(os.homedir(), ".himate", "knowledge"), find = pathExecutable, execute = run } = {}) {
-  const receipt = { status: "blocked", knowledge_root: null, knowledge: null, models: { status: "missing" },
+  const receipt = { status: "blocked", knowledge_root: null, knowledge: null, models: { status: "not_requested" },
     hostname: os.hostname(), platform: process.platform, planned: [], performed: [], diagnostics: [] };
   try {
-    const { action, root } = parseArgs(args);
+    const { action, root, capability } = parseArgs(args);
+    const flags = capability ? ["--capability", capability === "ocr" ? "documents" : capability] : [];
     const actualRoot = root ? confirmRoot(root, toolRoot) : null;
     receipt.knowledge_root = actualRoot;
+    receipt.capability = capability || "base";
     const inspect = () => {
       receipt.planned = [];
       receipt.diagnostics = [];
       receipt.knowledge = null;
-      receipt.models.status = modelsPresent(toolRoot) ? "ready" : "missing";
       const knowledge = findKnowledge(toolRoot);
-      if (knowledge && !checkInstalled(knowledge, actualRoot, find, execute, receipt)) return null;
-      if (receipt.models.status === "missing") {
-        receipt.planned.unshift("install_models");
-        receipt.diagnostics.push({ code: "PARSER_MODELS_REQUIRED", message: "执行端缺少完整的预置 OCR 模型。" });
+      if (knowledge && !checkInstalled(knowledge, actualRoot, flags, find, execute, receipt)) return null;
+      if (capability === "ocr") {
+        receipt.models.status = modelsPresent(toolRoot) ? "ready" : "missing";
+        if (receipt.models.status === "missing") {
+          receipt.planned.unshift("install_models");
+          receipt.diagnostics.push({ code: "PARSER_MODELS_REQUIRED", message: "执行端缺少完整的预置 OCR 模型。" });
+        }
       }
       if (!knowledge) {
         receipt.planned.push("install_cli");
@@ -293,22 +288,24 @@ function runSetup(args, { toolRoot = path.join(os.homedir(), ".himate", "knowled
     let state = inspect();
     if (!state) return receipt;
     if (action === "install" && receipt.planned.length) {
-      if (state.npm) verifyNpmSettings(state.npm, execute);
-      for (const [step, pkg] of [["install_models", MODELS], ["install_cli", CLI]]) {
-        if (!receipt.planned.includes(step)) continue;
-        const installed = execute(state.npm, ["install", "--global", pkg, "--registry", REGISTRY, "--allow-scripts=" + pkg], 30 * 60 * 1000);
-        if (installed.error || installed.status !== 0) {
-          fail("NPM_INSTALL_FAILED", "npm 安装 " + pkg + " 失败，请在实际执行端检查网络、权限和 npm 日志。");
+      if (state.npm) {
+        verifyNpmSettings(state.npm, execute);
+        for (const [step, pkg] of [["install_models", MODELS], ["install_cli", CLI]]) {
+          if (!receipt.planned.includes(step)) continue;
+          const installed = execute(state.npm, ["install", "--global", pkg, "--registry", REGISTRY, "--allow-scripts=" + pkg], 30 * 60 * 1000);
+          if (installed.error || installed.status !== 0) {
+            fail("NPM_INSTALL_FAILED", "npm 安装 " + pkg + " 失败，请在实际执行端检查网络、权限和 npm 日志。");
+          }
+          receipt.performed.push(step);
         }
-        receipt.performed.push(step);
+        state = inspect();
+        if (!state) return receipt;
+        if (state.npm) fail("NPM_INSTALL_INCOMPLETE", "npm 返回成功，但所需的模型或 CLI 安装回执仍缺失。");
       }
-      state = inspect();
-      if (!state) return receipt;
-      if (state.npm) fail("NPM_INSTALL_INCOMPLETE", "npm 返回成功，但模型或 CLI 安装回执仍缺失。");
       if (receipt.planned.includes("setup_python")) {
         // The npm package owns its executable. A dependency-only setup never
         // enters the manual Windows launcher registration or modifies user PATH.
-        const setup = execute(state.knowledge.argv, ["setup", "--dependencies-only", "--json"], 55 * 60 * 1000);
+        const setup = execute(state.knowledge.argv, ["setup", "--dependencies-only", ...flags, "--json"], 55 * 60 * 1000);
         const result = subprocessReport(setup);
         if (typeof result?.log_path === "string" && path.isAbsolute(result.log_path)
             && inside(path.join(toolRoot, "logs"), result.log_path)) receipt.log_path = result.log_path;

@@ -38,14 +38,14 @@ def knowledge(tmp_path):
     return root
 
 
-def invoke(root, *arguments, request=None):
+def invoke(root, *arguments, request=None, launcher=()):
     env = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8", PYTHONDONTWRITEBYTECODE="1")
     env.pop("PYTHONPATH", None)
     stdin = None if request is None else json.dumps(request)
     if stdin is not None:
         arguments = (*arguments, "--input", "-")
     result = subprocess.run(
-        [sys.executable, "-B", str(SOURCE / "knowledge.py"), *arguments, "--knowledge-root", str(root), "--json"],
+        [sys.executable, "-B", *launcher, str(SOURCE / "knowledge.py"), *arguments, "--knowledge-root", str(root), "--json"],
         input=stdin,
         cwd=root, env=env, capture_output=True, encoding="utf-8", timeout=60,
     )
@@ -66,6 +66,25 @@ def _panel_card(root, identity, references, body, *, tags=None):
     header = {"id": identity, "doc_ref": references, "code_ref": [], "tags": ["wifi"] if tags is None else tags}
     target.write_text("---\n" + yaml.safe_dump(header) + "---\n" + body, encoding="utf-8")
     return target
+
+
+def test_library_operations_do_not_import_document_parsers(knowledge):
+    program = """
+import runpy
+import sys
+
+class RejectDocumentImports:
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname.split('.', 1)[0] in {'docling', 'docling_core', 'docx', 'PIL', 'torch', 'transformers'}:
+            raise RuntimeError('Unexpected document dependency: ' + fullname)
+
+sys.meta_path.insert(0, RejectDocumentImports())
+sys.argv.pop(0)
+runpy.run_path(sys.argv[0], run_name='__main__')
+"""
+    for arguments in (("raw", "list"), ("maintain", "reindex"), ("library", "overview")):
+        status, report = invoke(knowledge, *arguments, launcher=("-c", program))
+        assert status == 0, report["diagnostics"]
 
 
 def test_reindex_keeps_the_published_revision_with_unchanged_inputs(knowledge):

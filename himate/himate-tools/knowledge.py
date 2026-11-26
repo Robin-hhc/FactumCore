@@ -105,7 +105,8 @@ def verified_runtime(root):
                 verified[reference] = data
     if "knowledge.py" not in manifest["entrypoints"]:
         raise ValueError("Runtime entrypoints are incomplete")
-    if not {"requirements.lock.txt", "himate_knowledge/__init__.py", "himate_knowledge/cli.py"}.issubset(verified):
+    if not {"requirements.lock.txt", "requirements-base.lock.txt",
+            "himate_knowledge/__init__.py", "himate_knowledge/cli.py"}.issubset(verified):
         raise ValueError("Runtime implementation is incomplete")
     if manifest_path.read_bytes() != raw:
         raise ValueError("Runtime manifest changed while loading")

@@ -1,7 +1,9 @@
 """Read-only execution-host diagnostics, independent of business assets."""
 
 import importlib.metadata
+from importlib.util import find_spec
 import os
+from pathlib import Path
 import platform
 import re
 import shutil
@@ -12,6 +14,9 @@ import sys
 from .execution import child_environment
 from .protocol import (FRAMEWORK_LOCK, RULE_CONTRACT_PREFIX, NodeError as CommandError,
                        envelope, read_regular_bytes, verify_rule_files)
+
+
+PIP_MISSING_MESSAGE = "当前 Python 缺少 pip，请选择已安装 pip 的 Python 3.10–3.12，然后重试 knowledge setup。"
 
 
 def _doctor_gap(gaps, code, message, path, next_step):
@@ -123,19 +128,40 @@ def _is_apt_linux():
         return False
 
 
+def _office_command_on_path(name, search_path):
+    if sys.platform != "win32":
+        return shutil.which(name, path=search_path)
+    # shutil.which can implicitly prepend the working directory on Windows.
+    extensions = (os.environ.get("PATHEXT") or ".COM;.EXE;.BAT;.CMD").split(os.pathsep)
+    names = [name + extension for extension in extensions if extension]
+    if Path(name).suffix.casefold() in {extension.casefold() for extension in extensions if extension}:
+        names.insert(0, name)
+    for directory in search_path.split(os.pathsep):
+        if not directory:
+            continue
+        for filename in names:
+            candidate = Path(directory) / filename
+            if candidate.is_file():
+                return str(candidate)
+    return None
+
+
 def _libreoffice_gap():
     # Match Docling's precedence. Installing an apt package cannot repair an
     # explicit override that still points to a broken executable.
     configured = os.environ.get("DOCLING_LIBREOFFICE_CMD")
     # A check may run with the knowledge repository as its cwd.
-    search_path = os.pathsep.join(item for item in os.get_exec_path() if os.path.isabs(item))
+    search_path = os.pathsep.join(item for item in os.get_exec_path() if Path(item).is_absolute())
     if configured:
-        command = configured if os.path.isabs(configured) else None
+        command = configured if Path(configured).is_absolute() else None
         if not command and not os.path.dirname(configured):
-            command = shutil.which(configured, path=search_path)
+            command = _office_command_on_path(configured, search_path)
     else:
-        command = shutil.which("libreoffice", path=search_path) or shutil.which("soffice", path=search_path)
+        command = _office_command_on_path("libreoffice", search_path) or _office_command_on_path("soffice", search_path)
         if command is None:
+            if not _is_apt_linux():
+                return {"code": "LIBREOFFICE_MANUAL_SETUP_REQUIRED",
+                        "message": "请在执行端安装 LibreOffice Writer，并让该账户通过 PATH 或 DOCLING_LIBREOFFICE_CMD 找到它。"}
             return {"code": "LIBREOFFICE_MISSING",
                     "message": "执行端缺少用于渲染 Office 矢量图的 LibreOffice Writer。"}
     if command:
@@ -151,17 +177,24 @@ def _libreoffice_gap():
             "message": "无法运行 LibreOffice，请检查 DOCLING_LIBREOFFICE_CMD 或 PATH 中的软件路径和权限。"}
 
 
-def inspect_runtime_dependencies(requirements):
+def dependency_lock(tool_root, capability):
+    filename = "requirements.lock.txt" if capability else "requirements-base.lock.txt"
+    return tool_root / "runtime" / filename
+
+
+def inspect_runtime_dependencies(requirements, capability=None):
     dependencies, gaps = inspect_dependencies(requirements)
-    office_gap = _libreoffice_gap() if _is_apt_linux() else None
+    if gaps and find_spec("pip") is None:
+        gaps.insert(0, {"code": "DEPENDENCY_PIP_MISSING", "message": PIP_MISSING_MESSAGE})
+    office_gap = _libreoffice_gap() if capability == "libreoffice" else None
     if office_gap:
         gaps.append(office_gap)
     return dependencies, gaps
 
 
-def doctor(tool_root, knowledge_root, manifest):
-    requirements = tool_root / "runtime/requirements.lock.txt"
-    reports, gaps = inspect_runtime_dependencies(requirements)
+def doctor(tool_root, knowledge_root, manifest, *, capability=None):
+    requirements = dependency_lock(tool_root, capability)
+    reports, gaps = inspect_runtime_dependencies(requirements, capability)
     yaml_available = any(row["name"].casefold() == "pyyaml" and row["status"] == "ready"
                          for row in reports)
     dependencies = [{key: value for key, value in row.items() if key != "status"} for row in reports]

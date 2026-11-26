@@ -30,6 +30,38 @@
         "未推进到第二份文件，未将整批宣称完成。",
         "报告具体不符路径，保留 source_index 和未完成事项。"
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "只处理 docs-raw/specs/scan-timing.docx，使用当前绑定的 CLI 和现有阅读预算。首次 scan 返回 blocked，顶层 diagnostics 中只有 PARSER_DEPENDENCIES_REQUIRED，data.source.source_id 为 raw-scan-timing，允许补齐该执行端的解析运行环境。",
+      "expected_output": "补齐文档解析能力后沿用原扫描范围续办。",
+      "expectations": [
+        "将明确的缺项交给 hs-knowledge-setup 的 documents 能力。",
+        "同一执行端复查通过后，用 --source raw-scan-timing 和原解析选项、阅读预算重试。",
+        "依据重试的真实回执判断是否准备完成。"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "用已确认的 Knowledge MCP 继续扫描整个知识库，没有指定 source。刚才 scan 在渲染第一份 Word 的矢量图时返回 blocked，顶层 diagnostics 为 LIBREOFFICE_MISSING，data.source.source_id 为 raw-vector-doc。下一份 Markdown 仍待处理。允许在原执行端补齐缺项。保持原解析选项和阅读预算。",
+      "expected_output": "补齐后先重试被阻塞的 Word，交接实际准备回执，在本批处理完成后恢复无来源限制的扫描。",
+      "expectations": [
+        "用 hs-knowledge-setup 的 libreoffice 能力，在原绑定的执行端安装并复查。",
+        "首次重试调用同一个 knowledge_ingest_scan，显式传 source=raw-vector-doc，沿用原解析选项和阅读预算。",
+        "以实际重试回执分流，同一缺项仍阻塞时保留当前待办，不推进到下一份文档。",
+        "若返回 prepared，交接同版材料给 P2，本批完成后恢复原本未指定 source 的范围。"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "OpenFlow 的 upload_ingest 有两项。当前是 job-42 的 source_index 0，路径 docs-raw/specs/scan-timing.docx，哈希已记录，第二项是 notes.md。基础环境就绪，首次 knowledge_ingest_scan 返回 blocked，顶层 diagnostics 为 PARSER_DEPENDENCIES_REQUIRED，data.source.source_id 为 raw-scan-timing。允许在已绑定的执行端补齐依赖并继续这批上传。",
+      "expected_output": "准备文档解析能力后，核对上传清单的当前项，按清单路径重试第一份 Word，并按实际回执交接。",
+      "expectations": [
+        "在同一执行端用 hs-knowledge-setup 的 documents 能力补齐并复查。",
+        "重试前复核原知识根、job-42、source_index 0 和当前文件的清单 SHA-256，核对失败时保留位置并报告阻塞。",
+        "复查通过时沿用原解析选项和预算，调用同一个 knowledge_ingest_scan，source 使用 docs-raw/specs/scan-timing.docx。",
+        "prepared 时核对任务类型、回执路径和哈希并交 P2，progressNote 保留原上传位置。第二项仍待处理。"
+      ]
     }
   ]
 }

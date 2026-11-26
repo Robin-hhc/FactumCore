@@ -1,11 +1,15 @@
 """Read-only execution-host diagnostics, independent of business assets."""
 
 import importlib.metadata
+import os
 import platform
 import re
+import shutil
 import socket
+import subprocess
 import sys
 
+from .execution import child_environment
 from .protocol import (FRAMEWORK_LOCK, RULE_CONTRACT_PREFIX, NodeError as CommandError,
                        envelope, read_regular_bytes, verify_rule_files)
 
@@ -110,9 +114,54 @@ def inspect_dependencies(requirements):
     return dependencies, gaps
 
 
+def _is_apt_linux():
+    if sys.platform != "linux":
+        return False
+    try:
+        return platform.freedesktop_os_release().get("ID") in {"ubuntu", "debian"}
+    except OSError:
+        return False
+
+
+def _libreoffice_gap():
+    # Match Docling's precedence. Installing an apt package cannot repair an
+    # explicit override that still points to a broken executable.
+    configured = os.environ.get("DOCLING_LIBREOFFICE_CMD")
+    # A check may run with the knowledge repository as its cwd.
+    search_path = os.pathsep.join(item for item in os.get_exec_path() if os.path.isabs(item))
+    if configured:
+        command = configured if os.path.isabs(configured) else None
+        if not command and not os.path.dirname(configured):
+            command = shutil.which(configured, path=search_path)
+    else:
+        command = shutil.which("libreoffice", path=search_path) or shutil.which("soffice", path=search_path)
+        if command is None:
+            return {"code": "LIBREOFFICE_MISSING",
+                    "message": "执行端缺少用于渲染 Office 矢量图的 LibreOffice Writer。"}
+    if command:
+        try:
+            subprocess.run([command, "--version"], cwd="/", check=True, timeout=10, stdin=subprocess.DEVNULL,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                           env=dict(child_environment(), PATH=search_path))
+        except (OSError, subprocess.SubprocessError):
+            pass
+        else:
+            return None
+    return {"code": "LIBREOFFICE_COMMAND_UNAVAILABLE",
+            "message": "无法运行 LibreOffice，请检查 DOCLING_LIBREOFFICE_CMD 或 PATH 中的软件路径和权限。"}
+
+
+def inspect_runtime_dependencies(requirements):
+    dependencies, gaps = inspect_dependencies(requirements)
+    office_gap = _libreoffice_gap() if _is_apt_linux() else None
+    if office_gap:
+        gaps.append(office_gap)
+    return dependencies, gaps
+
+
 def doctor(tool_root, knowledge_root, manifest):
     requirements = tool_root / "runtime/requirements.lock.txt"
-    reports, gaps = inspect_dependencies(requirements)
+    reports, gaps = inspect_runtime_dependencies(requirements)
     yaml_available = any(row["name"].casefold() == "pyyaml" and row["status"] == "ready"
                          for row in reports)
     dependencies = [{key: value for key, value in row.items() if key != "status"} for row in reports]

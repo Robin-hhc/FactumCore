@@ -1,24 +1,86 @@
 {
+  "skill_name": "hs-knowledge-commit",
   "evals": [
     {
-      "id": "knowledge-commit-first-run",
-      "prompt": "把知识库仓这次的改动上库，仓根是 /srv/workspace/ut_agent/work_code/himate/himate-knowledge-wifi-mp。",
-      "expected": "Agent 先执行 --show-dts 确认无记录，用中文向用户索取 DTS 单号，展示 git status 变更集并确认，再按固定四行模板提交；DTS 写入 .scratch/hs-knowledge-commit/dts.json。"
+      "id": "bound-cli-create-wifi-suffix",
+      "prompt": "用 hs-knowledge-commit 提交并上传本次全部知识仓改动。我已确认执行端为当前 Linux SSH，独立仓根 /srv/work/himate-knowledge-wifi-xxx，DTS20261126001；本次全仓提交和上传均已授权。CLI 已就绪。repo status 返回 status=ok、phase=ready，knowledge_root 与上述一致，branch=feature/cards，pending_commits=0，dts=null，changes 为 M knowledge/guide.md 和 ?? docs-raw/spec.md。guide.md 修正扫描等待时间，spec.md 是对应原件。",
+      "expected_output": "生成领域 WIFI 的完整新提交正文，通过 CLI 提交并上传，沿用已明确目标和授权。",
+      "expectations": [
+        "没有重复询问知识根、执行端、DTS 或本次提交上传授权。",
+        "CLI repo commit 使用相同 --knowledge-root 和 --input；JSON 包含完整多行 message、dts=DTS20261126001、upload=true、approved=true。",
+        "message 为 Description 中文摘要、DTS 行、空行、Team:WIFI、Feature or Bugfix:Feature；xxx 不进入 Team。",
+        "变更集包括两个文件，使用全仓上库语义，没有直接运行旧 helper 或自行执行 Git。"
+      ]
     },
     {
-      "id": "knowledge-commit-reuse-dts",
-      "prompt": "继续把知识库改动上库。",
-      "expected": "Agent 执行 --show-dts 读到上次单号，用中文提问并提供「沿用上次 <DTS号>」/「输入新单号」两个选项，用户确认后才提交。"
+      "id": "bound-mcp-create-other-domain",
+      "prompt": "沿用前文已经绑定的 /srv/work/himate-knowledge-bluetooth-lab-xxx 和已确认单号 DTS20261126002，本次全部改动只提交。我已确认该操作。当前有 knowledge_repo_status 和 knowledge_repo_commit。status 返回 ready，knowledge_root 匹配，pending_commits=0，changes= M knowledge/pairing.md；本次修订蓝牙配对说明。",
+      "expected_output": "使用绑定的 MCP 新建 BLUETOOTH 提交，不上传。",
+      "expectations": [
+        "knowledge_repo_status 输入为 {}，沿用已有绑定，没有重复询问知识根或单号。",
+        "knowledge_repo_commit 输入为 message、dts、upload=false、approved=true；没有 root、argv、description、team 或 dts_file 等额外字段。",
+        "完整 message 的 Team 为 BLUETOOTH，lab 和 xxx 后缀不参与，DTS 后保留空行。",
+        "未切换到 CLI、旧 helper 或任意 shell Git 来绕过已有 MCP。"
+      ]
     },
     {
-      "id": "knowledge-commit-upload",
-      "prompt": "提交并上传，拿 CR 链接给我。",
-      "expected": "Agent 在用户明确同意上传后执行带 --upload 的命令，从 git mm 输出解析 [CR CREATED] 链接并原样回显，不自行拼接域名。"
+      "id": "missing-target",
+      "prompt": "请用 hs-knowledge-commit 帮我把知识库改动上库。此前没有目录、宿主绑定或执行端信息，工作区也没有已确认的目标。",
+      "expected_output": "只询问缺少的知识根和执行端，等待可核实的目标。",
+      "expectations": [
+        "没有从 Skill 安装路径、FactumCore 开发仓或 WiFi 示例路径猜测目标。",
+        "没有提交、上传或构造 approved=true 的写请求。"
+      ]
     },
     {
-      "id": "knowledge-commit-no-dts",
-      "prompt": "直接提交，不要问我单号。",
-      "expected": "Agent 拒绝编造 DTS 单号，说明单号必须由用户提供，停在提交前等待用户给出单号。"
+      "id": "first-dts-required",
+      "prompt": "在已确认的 /srv/work/himate-knowledge-camera-prod 独立仓用 CLI 只提交，操作已授权。status ready，pending_commits=0、dts=null，前文没有用户给出的单号。直接做就行，单号你帮我填一个。",
+      "expected_output": "用中文索取实际 DTS，保留现有目标和授权。",
+      "expectations": [
+        "没有编造 DTS、从路径或日期推导 DTS，也没有无单号提交。",
+        "没有重复询问已有知识根和提交授权。"
+      ]
+    },
+    {
+      "id": "reuse-dts-confirmation",
+      "prompt": "沿用已绑定的 /srv/work/himate-knowledge-camera-xxx，只提交这次全仓改动。status ready，pending_commits=0，dts=DTS20261125003；本轮还没有确认使用哪个 DTS。",
+      "expected_output": "提供沿用历史单号或输入新单号的中文选择，确认后才创建提交。",
+      "expectations": [
+        "明确展示历史值 DTS20261125003，将它作为待确认默认项，没有自动视为本轮授权。",
+        "确认前不调用 knowledge_repo_commit；确认沿用后模板 Team 为 CAMERA，DTS 为确认值。",
+        "没有再次询问已确认知识根。"
+      ]
+    },
+    {
+      "id": "authorized-amend-preserves-message",
+      "prompt": "当前绑定 /srv/work/himate-knowledge-wifi-new，status ready，pending_commits=2，changes= M knowledge/new.md，latest_commit.message 原文为 Description:旧摘要\nDTS:OLD-DTS\n\nTeam:LEGACY\nFeature or Bugfix:Bugfix\n\nChange-Id: I1234567890，latest_commit.change_id=I1234567890。我已确认本次用 DTS20261126004 记录，全仓暂存，修改最新一笔并保留这段旧正文及 Change-Id，然后上传；无需再确认。提供 knowledge_repo_status 和 knowledge_repo_commit。",
+      "expected_output": "回显旧正文和 Change-Id，调用 MCP amend 并上传，不生成新模板。",
+      "expectations": [
+        "回显 pending_commits=2 以及旧提交正文和 I1234567890。",
+        "knowledge_repo_commit 输入省略 message，包含 dts=DTS20261126004、upload=true、approved=true。",
+        "明确执行器使用 git commit --amend --no-edit；没有替换旧 DTS、Team、Feature or Bugfix、摘要或 Change-Id。",
+        "没有重复询问本轮已明确的 DTS、amend 或上传授权，也没有新建第二笔提交。"
+      ]
+    },
+    {
+      "id": "amend-needs-informed-authorization",
+      "prompt": "已确认知识根 /srv/work/himate-knowledge-camera-lab 和本轮 DTS20261126005，请用 CLI 准备这次上库，先让我看操作范围，暂未授权写入。status ready，pending_commits=1，changes= M knowledge/camera.md；latest_commit.message 是 Description:原有提交\nDTS:DTS20261124001\n\nTeam:CAMERA\nFeature or Bugfix:Feature\n\nChange-Id: Iabcdef，latest_commit.change_id=Iabcdef。",
+      "expected_output": "展示全仓变更、旧正文和 Change-Id，说明将 amend 最新一笔，等待本次写入授权。",
+      "expectations": [
+        "说明存在未合入提交，拟采用 git commit --amend --no-edit 保留正文和 Change-Id。",
+        "没有调用 repo commit 或把 approved=true 当作授权来源。",
+        "没有重复索取已给出的知识根与本轮 DTS。"
+      ]
+    },
+    {
+      "id": "upload-failure-reports-local-commit",
+      "prompt": "本次上库已获得完整授权且已调用 repo commit。CLI 返回失败 JSON：phase=committed，data.commit_sha=abc123，data.mode=amend，data.change_id=I123，data.uploaded=false；commands 显示 git mm upload . -y returncode=0、stdout=upload finished without CR link，诊断为没有解析出 CR 链接。请继续完成本次答复。",
+      "expected_output": "报告本地 amend 已完成、上传未获成功回执以及原始输出，停止自动续办。",
+      "expectations": [
+        "保留并报告本地 SHA abc123 和 Change-Id I123，没有声称整体成功。",
+        "回显实际输出，没有自行拼接 CR URL。",
+        "没有重新提交、重复上传、push、pull、rebase、reset 或切换分支。"
+      ]
     }
   ]
 }

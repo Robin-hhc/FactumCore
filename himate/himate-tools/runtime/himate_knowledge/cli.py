@@ -29,11 +29,15 @@ COMMAND_GROUPS = (
     ("Set up the execution environment", ("doctor", "setup", "install-command")),
     ("Find and read knowledge", ("search", "read", "library")),
     ("Manage raw materials and evidence", ("raw", "source")),
-    ("Publish knowledge", ("ingest",)),
+    ("Publish knowledge", ("ingest", "repo")),
     ("Maintain the knowledge base", ("maintain", "patrol")),
     ("Compatibility commands", ("query", "panel", "review", "lint", "apply", "status")),
 )
 COMMAND_HELP = {
+    "repo": ("{status,commit}", "Inspect or commit the independent knowledge Git repository.\n\n"
+             "  status  Read the branch, pending commits, latest message and local DTS record.\n"
+             "  commit  Stage all changes, create or amend a commit, and optionally upload.\n"
+             "Commit JSON requires approved=true; provide the full message for a new commit."),
     "ingest": ("{scan,check,commit,status}", "Ingest sources into the knowledge base.\n\n"
                "  scan    Find source changes and prepare work.\n"
                "  check   Validate the proposed cards and their evidence.\n"
@@ -240,11 +244,17 @@ def execute(args, root, tool_root, manifest_digest):
             args.purpose is not None or "purpose" in request or "context" in request):
         raise CommandError("QUERY_PARAMETERS_REMOVED",
                            "purpose/context are removed; search by query and optional tags, then read the card's conditions")
-    modules, rules = domain(tool_root, root, manifest_digest, args.rules_digest)
-    ingest, library = modules["ingest"], modules["library"]
     words = list(args.arguments)
     action = args.action or (words.pop(0) if words and args.command not in {"search", "read", "query"} else None)
     command = args.command
+    if command == "repo":
+        if words:
+            raise CommandError("INVALID_ARGUMENT", "Repository parameters belong in --input")
+        from .repository import run
+        data, phase = run(root, action, request)
+        return envelope("ok", phase, data), 0
+    modules, rules = domain(tool_root, root, manifest_digest, args.rules_digest)
+    ingest, library = modules["ingest"], modules["library"]
     if command in INGEST_ALIASES:
         command, action, words = "ingest", INGEST_ALIASES[command], []
     if command == "ingest":
@@ -385,6 +395,7 @@ def main(argv=None, *, tool_root, manifest):
         diagnostic = {"code": getattr(error, "code", "INVALID_INPUT"), "message": str(error)}
         if getattr(error, "path", ""):
             diagnostic["path"] = str(error.path)
-        value = envelope("error", "invalid", diagnostics=[diagnostic])
+        value = envelope("error", getattr(error, "phase", "invalid"),
+                         data=getattr(error, "data", None), diagnostics=[diagnostic])
         emit(value, (args.json or args.jsonl) if args else bool({"--json", "--jsonl"}.intersection(arguments)), failed=True)
         return 2

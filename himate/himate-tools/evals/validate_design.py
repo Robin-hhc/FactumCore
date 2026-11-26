@@ -19,7 +19,7 @@ SKILLS = tuple("hs-knowledge-" + name for name in (
     "source", "change-plan", "view-materialize", "review", "apply", "query", "maintain", "capture",
     "patrol-sync", "patrol-plan", "patrol-reindex", "patrol-complete",
     "patrol-prepare", "patrol-repair", "patrol-review", "patrol-apply",
-    "setup",
+    "setup", "commit",
 ))
 SETUP_SKILL = "hs-knowledge-setup"
 SETUP_ENTRY = Path("scripts/setup.cjs")

@@ -227,9 +227,13 @@ def test_retired_skills_cannot_reappear_as_active_packages(distribution, skill):
     assert any("active Skill set mismatch" in error for error in validate_distribution(distribution))
 
 
-@pytest.mark.parametrize("resource", ["scripts/cli.py", "tests/test_hidden.py", "requirements.lock.txt"])
-def test_skill_packages_do_not_own_execution_or_test_code(distribution, resource):
-    path = distribution / "skills/hs-knowledge-query" / resource
+@pytest.mark.parametrize("skill", ["query", "commit"])
+@pytest.mark.parametrize("resource", [
+    "scripts/cli.py", "scripts/commit.py", "scripts/extra.cjs", "tests/test_hidden.py",
+    "requirements.lock.txt", "extra.py",
+])
+def test_skill_packages_do_not_own_execution_or_test_code(distribution, skill, resource):
+    path = distribution / "skills" / ("hs-knowledge-" + skill) / resource
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("synthetic wrong owner", encoding="utf-8")
     assert any("Skill source owns implementation" in error for error in validate_distribution(distribution))

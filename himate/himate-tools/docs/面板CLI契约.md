@@ -10,6 +10,23 @@ printf '%s' '{"limit":20}' | python -B /absolute/tool/root/knowledge.py library 
 
 带 `--json` 的业务命令在成功和失败时都将单条 JSON 结果写入 stdout。命令启动后的纯文本错误写入 stderr。帮助和版本查询不需要知识根，可执行 `knowledge`、`knowledge --help`、`knowledge help library` 或 `knowledge library --help`。总帮助也接受 `-h`、`-help` 和 `help`。`knowledge --version` 显示工具包版本。
 
+## 知识仓 Git 上库
+
+`knowledge repo status` 和 `knowledge repo commit` 操作 `--knowledge-root` 指定的独立 Git 仓根，接受 `--input <JSON文件或-> --json`。该根必须是实际 Git 仓根，不能借用父仓。固定以本地 `origin/master..HEAD` 计数；命令不拉取远端或切换分支。
+
+| 动作 | 请求 | 成功结果 |
+| --- | --- | --- |
+| `repo status` | `{}` | `phase: "ready"`；`data` 含 `knowledge_root`、`branch`、`pending_commits`、`latest_commit: {sha,subject,message,change_id}`、`dts` 和 `changes` |
+| `repo commit` | `{approved:true,message?,dts?,upload?}` | `phase: "committed"` 或 `"uploaded"`；`data` 含 `knowledge_root`、`commit_sha`、`mode`、`pending_commits`、`change_id`、`uploaded` 和 `commands`，识别到上传链接时含 `cr_url` |
+
+`status` 只读；`changes` 保留 `git status --short` 原文，`dts` 无本地记录时为 `null`。`commit` 必须显式提供 `approved: true`。`message` 和 `dts` 传入时须为非空白字符串，保留原文；`upload` 为布尔值，默认 `false`。不接受自定义 Git 参数、仓根覆盖或额外字段。
+
+`commit` 先确保实际知识仓的 `.scratch/` 被忽略，必要时补写 `.gitignore`，然后执行 `git add .`。`.scratch` 已有被 Git 跟踪的文件时停止，避免将本地记录上库。没有未合入提交时，必须传入完整 `message` 并原样创建提交；已有未合入提交时，仅执行 `git commit --amend --no-edit`，沿用最新一笔的正文和 Change-Id，传入的新 `message` 不替换原文。Git 对 amend 正文末尾换行的处理遵循该固定命令。
+
+提交成功后，若提供了 `dts`，将其作为不解释格式的用户值记录到 `.scratch/hs-knowledge-commit/dts.json`。`upload: true` 随后执行固定的 `git mm upload . -y`，CR 链接按既有 helper 的规则识别。模板、摘要、Team 和 DTS 业务交互由调用方负责。
+
+`commands` 中每项记录 `argv`、`stdout`、`stderr`、`returncode`。失败返回既有 JSON 错误结果，保留 `data.completed_phase`、`data.failed_phase`、命令记录和已取得的本地 `commit_sha`；停止后续动作且不自动重试。状态操作共享 30 秒预算，上库操作共享 110 秒预算，各 Git 子命令使用剩余时间；预算耗尽返回 `REPO_COMMAND_TIMEOUT`，该命令的 `returncode` 为 `null`。
+
 ## 环境检查和安装
 
 环境入口可在首次绑定前执行。`knowledge doctor --environment-only --json` 返回一行 JSON，包含 `status`、`tool_root`、`toolkit_version`、`python`、`python_version`、`dependencies`、`diagnostics` 和 `command`。`python` 和 `python_version` 给出实际执行检查和安装的解释器路径及版本。`dependencies` 每项包含 `name`、`expected`、`actual` 和 `status`（`ready`、`missing` 或 `mismatch`）。每条诊断包含 `code` 和 `message`。生成有效检查报告时退出码为 0，就绪情况以 `status` 为准。

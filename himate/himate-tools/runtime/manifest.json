@@ -14,7 +14,7 @@
       "sha256": "e4ae118eb0ebc99af582721a0ea74d1acaf24ac25b49f381c70911ac0708bb13"
     },
     "himate_knowledge/cli.py": {
-      "sha256": "4e713550fb0dea0abcedfdd5feeaa016059e5e61f6b903a170e2422995d8471a"
+      "sha256": "852897144445c1366762055cb012d29342bdcac434a9ac9a6daeb350852bec88"
     },
     "himate_knowledge/command_install.py": {
       "sha256": "e485fe25c7324ea4a54dd4f7949cc954c8690a82d1d66ebf6613bf28a89c5107"
@@ -31,10 +31,13 @@
     "himate_knowledge/protocol.py": {
       "sha256": "61e710109e49adfd73ca69822485b3cb2231991e652ba6e0404aa5c96ca99b92"
     },
+    "himate_knowledge/repository.py": {
+      "sha256": "3123e8807100adfadc8c27f0ab03169c771ee00083a2493055a2608ef93adf0c"
+    },
     "requirements.lock.txt": {
       "sha256": "4caac915df8bc54083c7cfb9169eec0f10eb0eafef96ba0851267739b21d2832"
     }
   },
   "schema_version": "1.1",
-  "version": "0.26.6"
+  "version": "0.26.7"
 }

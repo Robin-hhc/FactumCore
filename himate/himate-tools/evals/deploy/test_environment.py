@@ -17,10 +17,16 @@ ENTRY = TOOL_ROOT / "distribution/source/environment.py"
 
 
 @pytest.fixture
-def environment(monkeypatch):
+def environment_module(monkeypatch):
     monkeypatch.syspath_prepend(str(TOOL_ROOT / "runtime"))
     from himate_knowledge import environment
     return environment
+
+
+@pytest.fixture
+def environment(environment_module, monkeypatch):
+    monkeypatch.setattr(environment_module, "_is_apt_linux", lambda: False)
+    return environment_module
 
 
 @pytest.fixture(autouse=True)
@@ -241,6 +247,198 @@ def test_dependencies_only_uses_setup_install_and_verification_without_launcher(
     assert state.checked == [False, False, True]
     assert calls[-1] == [sys.executable, *environment.PYTHON_MODULE_FLAGS, "pip", "install", "-r",
                          str(TOOL_ROOT / "runtime/requirements.lock.txt")]
+
+
+@pytest.fixture
+def apt_office_host(environment, runtime, monkeypatch):
+    state, _ = runtime
+    state.dependencies_ready = True
+    office = SimpleNamespace(installed=False, after_install=True, uid=1000, sudo=True, apt=True, apt_error=None,
+                             calls=[])
+    monkeypatch.setattr(environment, "_is_apt_linux", lambda: True)
+    monkeypatch.delenv("DOCLING_LIBREOFFICE_CMD", raising=False)
+    monkeypatch.setattr(environment.os, "geteuid", lambda: office.uid, raising=False)
+    actual_access = environment.os.access
+
+    def access(path, mode, **kwargs):
+        if str(path) == "/usr/bin/apt-get":
+            return office.apt
+        if str(path) == "/usr/bin/sudo":
+            return office.sudo
+        return actual_access(path, mode, **kwargs)
+
+    def which(name, *, path):
+        assert all(os.path.isabs(entry) for entry in path.split(os.pathsep) if entry)
+        if office.installed and name == "soffice":
+            return "/usr/bin/soffice"
+        return None
+
+    def run(argv, **kwargs):
+        if argv == ["/usr/bin/soffice", "--version"]:
+            return SimpleNamespace(stdout="LibreOffice 24.2.7.2\n", returncode=0)
+        if "pip" in argv:
+            office.calls.append(("pip", argv))
+            if "install" in argv:
+                state.dependencies_ready = True
+            return SimpleNamespace(stdout="")
+        prefix = [] if office.uid == 0 else ["/usr/bin/sudo", "-n", "--"]
+        assert argv[:len(prefix) + 1] == [*prefix, "/usr/bin/apt-get"]
+        command = argv[len(prefix) + 1:]
+        office.calls.append(("apt", command))
+        assert str(kwargs["cwd"]) == "/" and kwargs["stdin"] == subprocess.DEVNULL
+        assert kwargs["timeout"] > 0 and kwargs["check"] is True
+        if office.apt_error:
+            raise subprocess.CalledProcessError(1, argv, output=office.apt_error)
+        if command[0] == "install":
+            office.installed = office.after_install
+        return SimpleNamespace(stdout="apt finished")
+
+    monkeypatch.setattr(environment.os, "access", access)
+    monkeypatch.setattr(environment.shutil, "which", which)
+    monkeypatch.setattr(environment.subprocess, "run", run)
+    return office
+
+
+def test_environment_doctor_reports_missing_libreoffice_without_installing(
+        environment, apt_office_host, capsys, isolated_home):
+
+    assert environment.run_environment(TOOL_ROOT, {"version": "test"}, "check",
+                                       output="json", dependencies_only=True) == 0
+    [report] = events(capsys)
+    assert report["status"] == "needs_install"
+    assert [gap["code"] for gap in report["diagnostics"]] == ["LIBREOFFICE_MISSING"]
+    assert apt_office_host.calls == []
+    assert not isolated_home.exists()
+
+
+@pytest.mark.parametrize(("host", "distribution", "status"), [
+    ("linux", "ubuntu", "needs_install"),
+    ("linux", "debian", "needs_install"),
+    ("linux", "fedora", "ready"),
+    ("win32", None, "ready"),
+    ("darwin", None, "ready"),
+])
+def test_libreoffice_is_checked_only_on_supported_linux_hosts(
+        environment_module, monkeypatch, capsys, host, distribution, status):
+    environment = environment_module
+    monkeypatch.setattr(environment, "sys", SimpleNamespace(platform=host, executable=sys.executable))
+    monkeypatch.setattr(environment, "platform", SimpleNamespace(
+        freedesktop_os_release=lambda: {"ID": distribution}, python_version=platform.python_version,
+    ))
+    monkeypatch.setattr(environment.doctor, "inspect_dependencies", lambda _: ([], []))
+    monkeypatch.setattr(environment.shutil, "which", lambda _, *, path: None)
+    monkeypatch.setattr(environment.subprocess, "run", lambda *a, **kw: pytest.fail("Unexpected execution"))
+
+    assert environment.run_environment(TOOL_ROOT, {"version": "test"}, "check",
+                                       output="json", dependencies_only=True) == 0
+    [report] = events(capsys)
+    assert report["status"] == status
+    assert [gap["code"] for gap in report["diagnostics"]] == (
+        ["LIBREOFFICE_MISSING"] if status == "needs_install" else []
+    )
+
+
+@pytest.mark.parametrize(("uid", "python_ready"), [(1000, True), (0, False)])
+def test_setup_installs_missing_libreoffice_and_reuses_it(
+        environment, runtime, apt_office_host, capsys, uid, python_ready):
+    state, _ = runtime
+    state.dependencies_ready = python_ready
+    apt_office_host.uid = uid
+
+    assert environment.run_environment(TOOL_ROOT, {"version": "test"}, "install",
+                                       output="jsonl", dependencies_only=True) == 0
+    *steps, final = events(capsys)
+    assert steps[0]["phase"] == "checking" and steps[-1]["phase"] == "verifying"
+    assert final["status"] == "ready" and final["diagnostics"] == []
+    assert final["command"] is None
+    assert Path(final["log_path"]).is_file()
+    assert [argv for kind, argv in apt_office_host.calls if kind == "apt"] == [
+        ["update"], ["install", "-y", "--no-install-recommends", "--no-remove", "libreoffice-writer-nogui"],
+    ]
+    assert any(kind == "pip" for kind, _ in apt_office_host.calls) == (not python_ready)
+    first_calls = list(apt_office_host.calls)
+
+    assert environment.run_environment(TOOL_ROOT, {"version": "test"}, "install",
+                                       output="jsonl", dependencies_only=True) == 0
+    *steps, final = events(capsys)
+    assert [event["phase"] for event in steps] == ["checking", "verifying"]
+    assert final["status"] == "ready" and apt_office_host.calls == first_calls
+
+
+def test_setup_reuses_configured_libreoffice_outside_path(environment, apt_office_host, monkeypatch, capsys):
+    configured = "/opt/office tools/program/soffice"
+    monkeypatch.setenv("DOCLING_LIBREOFFICE_CMD", configured)
+
+    def run(argv, **kwargs):
+        assert argv == [configured, "--version"]
+        return SimpleNamespace(stdout="LibreOffice 24.2.7.2\n", returncode=0)
+
+    monkeypatch.setattr(environment.subprocess, "run", run)
+
+    assert environment.run_environment(TOOL_ROOT, {"version": "test"}, "install",
+                                       output="json", dependencies_only=True) == 0
+    [report] = events(capsys)
+    assert report["status"] == "ready" and report["diagnostics"] == []
+    assert "log_path" not in report
+
+
+def test_setup_reports_broken_libreoffice_override_without_apt(environment, apt_office_host, monkeypatch, capsys):
+    configured = "/opt/missing/soffice"
+    monkeypatch.setenv("DOCLING_LIBREOFFICE_CMD", configured)
+    apt_office_host.installed = True
+
+    def run(argv, **kwargs):
+        assert argv == [configured, "--version"]
+        raise FileNotFoundError(configured)
+
+    monkeypatch.setattr(environment.subprocess, "run", run)
+
+    assert environment.run_environment(TOOL_ROOT, {"version": "test"}, "install",
+                                       output="json", dependencies_only=True) == 1
+    [report] = events(capsys)
+    assert report["code"] == "LIBREOFFICE_COMMAND_UNAVAILABLE"
+    assert "DOCLING_LIBREOFFICE_CMD" in report["message"]
+    assert apt_office_host.calls == []
+
+
+def test_libreoffice_probe_skips_relative_paths(environment, monkeypatch, tmp_path):
+    monkeypatch.setenv("PATH", os.pathsep.join((".", "", "relative", str(tmp_path))))
+    monkeypatch.delenv("DOCLING_LIBREOFFICE_CMD", raising=False)
+    looked_up = []
+
+    def which(name, *, path):
+        looked_up.append((name, path))
+        return None
+
+    monkeypatch.setattr(environment.shutil, "which", which)
+    monkeypatch.setattr(environment.subprocess, "run", lambda *a, **kw: pytest.fail("Unexpected execution"))
+    assert environment._libreoffice_gap()["code"] == "LIBREOFFICE_MISSING"
+    assert looked_up == [("libreoffice", str(tmp_path)), ("soffice", str(tmp_path))]
+
+    monkeypatch.setenv("DOCLING_LIBREOFFICE_CMD", "./soffice")
+    assert environment._libreoffice_gap()["code"] == "LIBREOFFICE_COMMAND_UNAVAILABLE"
+    assert len(looked_up) == 2
+
+
+@pytest.mark.parametrize(("changes", "code"), [
+    ({"sudo": False}, "LIBREOFFICE_INSTALL_PERMISSION_REQUIRED"),
+    ({"apt": False}, "LIBREOFFICE_PACKAGE_MANAGER_UNAVAILABLE"),
+    ({"apt_error": "sudo: a password is required"}, "LIBREOFFICE_INSTALL_PERMISSION_REQUIRED"),
+    ({"apt_error": "E: repository https://user:secret@packages.test/denied"}, "LIBREOFFICE_INSTALL_FAILED"),
+    ({"after_install": False}, "LIBREOFFICE_VERIFICATION_FAILED"),
+])
+def test_libreoffice_setup_fails_actionably(environment, apt_office_host, capsys, changes, code):
+    for key, value in changes.items():
+        setattr(apt_office_host, key, value)
+
+    assert environment.run_environment(TOOL_ROOT, {"version": "test"}, "install",
+                                       output="json", dependencies_only=True) == 1
+    [failure] = events(capsys)
+    assert failure["status"] == "failed" and failure["code"] == code
+    assert "libreoffice" in failure["message"].casefold()
+    assert "secret" not in failure["message"]
+    assert "secret" not in Path(failure["log_path"]).read_text(encoding="utf-8")
+    assert not apt_office_host.installed
 
 
 def test_check_and_retry_when_only_registration_is_needed(environment, runtime, monkeypatch, capsys):

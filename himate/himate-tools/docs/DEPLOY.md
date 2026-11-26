@@ -17,6 +17,8 @@ knowledge setup
 
 npm 注册全局 `knowledge` 命令。模型包校验并准备本机 OCR 模型，CLI 包安装运行代码。`knowledge setup` 使用选定的 Python 执行 `python -m pip install -r`，安装锁定依赖并复查。该解释器应有可用的 pip，安装位置应允许写入。
 
+在 Ubuntu 和 Debian 上，`knowledge setup` 也会检查用于渲染 Office 矢量图的 LibreOffice。它优先检查 `DOCLING_LIBREOFFICE_CMD`，未配置时从 PATH 查找 `libreoffice` 或 `soffice`。缺失时，通过 apt 安装无界面的 `libreoffice-writer-nogui` 及必需依赖，然后复查。安装需要 root 或执行账户能免交互执行相应的 sudo 命令。权限不足时，请管理员在实际执行端安装后再运行 `knowledge setup`。
+
 命令包含团队内网源，并为两个包分别授权安装脚本。[npm 发布与安装](NPM-PUBLISH.md#3-安装)
 
 ## 安装 Skills 与 Workflows
@@ -29,7 +31,7 @@ npm 注册全局 `knowledge` 命令。模型包校验并准备本机 OCR 模型�
 
 启动或重启 OpenFlow，使其加载部署好的能力。在知识库页选择含 `config.yml` 和 `docs-raw/` 的知识根，校验通过后保存绑定。非默认能力安装目录需与宿主实际加载的目录一致。
 
-本地执行时，OpenFlow 从启动账户的 PATH 查找 `knowledge`。绑定前可以打开「环境检查」。缺少 CLI 时，点「同意并安装」后由宿主尝试执行上面的两条 npm 命令。缺少 Python 依赖时可点「安装环境」。检查调用 `knowledge doctor --environment-only --json`，补齐依赖调用 `knowledge setup --jsonl`。页面按 CLI 输出显示进度和结果。
+本地执行时，OpenFlow 从启动账户的 PATH 查找 `knowledge`。绑定前可以打开「环境检查」。缺少 CLI 时，点「同意并安装」后由宿主尝试执行上面的两条 npm 命令。缺少执行端依赖时可点「安装环境」。检查调用 `knowledge doctor --environment-only --json`，补齐依赖调用 `knowledge setup --jsonl`。页面按 CLI 输出显示进度和结果。
 
 Windows 上选择 Samba 映射盘或共享路径时，在现有 SSH MCP 设置中确认连接并添加 Windows 到 Linux 的路径映射。CLI、模型和依赖在 Linux 对端安装。确认 SSH 账户的 PATH 能找到 `knowledge` 后，回到 OpenFlow 重新校验。Linux 原生部署使用宿主本地路径，浏览器通过反代访问时执行端仍是 Linux 宿主。知识根的 `config.yml` 和 `AGENTS.md` 由项目负责人维护。
 

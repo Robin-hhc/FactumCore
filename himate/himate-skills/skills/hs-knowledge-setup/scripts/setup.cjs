@@ -303,7 +303,7 @@ function runSetup(args, { toolRoot = path.join(os.homedir(), ".himate", "knowled
       if (receipt.planned.includes("setup_python")) {
         // The npm package owns its executable. A dependency-only setup never
         // enters the manual Windows launcher registration or modifies user PATH.
-        const setup = execute(state.knowledge.argv, ["setup", "--dependencies-only", "--json"], 35 * 60 * 1000);
+        const setup = execute(state.knowledge.argv, ["setup", "--dependencies-only", "--json"], 55 * 60 * 1000);
         const result = subprocessReport(setup);
         if (typeof result?.log_path === "string" && path.isAbsolute(result.log_path)
             && inside(path.join(toolRoot, "logs"), result.log_path)) receipt.log_path = result.log_path;
@@ -311,7 +311,7 @@ function runSetup(args, { toolRoot = path.join(os.homedir(), ".himate", "knowled
             || result.toolkit_version !== state.knowledge.version
             || !samePath(result.tool_root, toolRoot) || !samePath(result.python, receipt.knowledge.python)) {
           receipt.diagnostics.push(...diagnostics(result));
-          fail("DEPENDENCY_INSTALL_FAILED", "Python 依赖安装或复查失败，请检查 knowledge setup 的执行端日志。");
+          fail("DEPENDENCY_INSTALL_FAILED", "执行端依赖安装或复查失败，请检查 knowledge setup 的执行端日志。");
         }
         receipt.performed.push("setup_python");
         state = inspect();

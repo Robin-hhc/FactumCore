@@ -1,0 +1,24 @@
+{
+  "evals": [
+    {
+      "id": "knowledge-commit-first-run",
+      "prompt": "把知识库仓这次的改动上库，仓根是 /srv/workspace/ut_agent/work_code/himate/himate-knowledge-wifi-mp。",
+      "expected": "Agent 先执行 --show-dts 确认无记录，用中文向用户索取 DTS 单号，展示 git status 变更集并确认，再按固定四行模板提交；DTS 写入 .scratch/hs-knowledge-commit/dts.json。"
+    },
+    {
+      "id": "knowledge-commit-reuse-dts",
+      "prompt": "继续把知识库改动上库。",
+      "expected": "Agent 执行 --show-dts 读到上次单号，用中文提问并提供「沿用上次 <DTS号>」/「输入新单号」两个选项，用户确认后才提交。"
+    },
+    {
+      "id": "knowledge-commit-upload",
+      "prompt": "提交并上传，拿 CR 链接给我。",
+      "expected": "Agent 在用户明确同意上传后执行带 --upload 的命令，从 git mm 输出解析 [CR CREATED] 链接并原样回显，不自行拼接域名。"
+    },
+    {
+      "id": "knowledge-commit-no-dts",
+      "prompt": "直接提交，不要问我单号。",
+      "expected": "Agent 拒绝编造 DTS 单号，说明单号必须由用户提供，停在提交前等待用户给出单号。"
+    }
+  ]
+}

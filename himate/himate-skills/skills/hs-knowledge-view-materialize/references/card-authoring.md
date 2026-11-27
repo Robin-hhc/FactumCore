@@ -14,6 +14,31 @@
 
 新卡头的必填字段为 `id`、`doc_ref`、`code_ref`。沿用计划 ID，普通更新不分配新 ID。`doc_ref` 至少一项，每项填已登记的 `doc_id` 和真实定位。`code_ref` 覆盖计划中的 `required_code_refs`，纯文档卡可填 `[]`。每项填 `code_id`、`line_start`、`line_end`，函数可加已验证的 `symbol`，宏或结构体使用对应类型的 `selector`。可选字段 `tags` 是非空且不重复的字符串组成的数组，也可为空数组。数字和布尔形式的标签请加引号。`lifecycle` 可填 `stable` 或 `deprecated`，缺省按未退役处理，具体状态按 P2 决定。
 
+## 源码定位
+
+裸字符串 `symbol: start_rx` 是 `selector: {kind: function, name: start_rx}` 的函数定义简写，不是任意代码名字的通用字段。宏、枚举和 typedef 等按实际声明选择类型：
+
+| 实际声明 | 引用定位示例 |
+|---|---|
+| `#define RX_LIMIT ...` | `selector: {kind: macro, name: RX_LIMIT}` |
+| `enum rx_state { ... };` | `selector: {kind: enum, name: rx_state}` |
+| `typedef enum { ... } rx_mode_t;` | `selector: {kind: type_alias, name: rx_mode_t}` |
+| `struct rx_context { ... };` | `selector: {kind: struct, name: rx_context}` |
+
+例如已登记源码中的 `RX_LIMIT` 定义占第 8–9 行，对应卡头项为：
+
+```yaml
+code_ref:
+  - code_id: code-example
+    line_start: 8
+    line_end: 9
+    selector: {kind: macro, name: RX_LIMIT}
+```
+
+示例仅说明结构，实际 `code_id`、名称、类型与完整行段必须来自本轮登记和源码核对。具名枚举与 typedef 别名按实际引用对象区分；只知道局部行段时可使用行段引用，但不能为通过检查而去掉计划要求的符号定位或删减 `required_code_refs`。
+
+## 文档定位与成稿
+
 文档定位使用实际文本行段 `line_start/line_end`、原件物理页 `page_start/page_end`、`section` 或支持的原生 `locator`。例如 DOCX 的 `locator: {kind: paragraph, paragraph: 2}`，PPTX 的 `locator: {kind: slide, slide: 2}`，以及 XLSX 的 `locator: {kind: cell_range, sheet: Sheet1, range: 'A1:D20'}`。PDF 也支持 `page/pages`，DOCX 也支持 `paragraphs/table_row`。已登记文件的不同章节或代码范围可使用多个引用项。
 
 Docling 的 `element` locator 需要 `ref`（如 `#/pictures/0`）、`source_sha256` 和 `profile_sha256`。如用非默认解析配置，在 locator 的 `parser` 中保留对应解析清单的 `profile.options`。分页提取中的局部元素编号不可直接作为正式 PDF 引用，优先用物理页或页段。正式证据使用原件和原生定位，临时图片文件与提取稿行号用于阅读。保留仍有效的旧 PDF 文本行号、DOCX 历史定位和已有 `snapshot_id/evidence_ref/selector`，按相应旧版本解释。

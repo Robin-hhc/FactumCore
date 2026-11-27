@@ -25,9 +25,11 @@
 
 搜索报告位于 `artifacts/query/`；使用本次返回值，不读取其他查询的报告。显式 `--output` 在知识根内也只能写 `artifacts/query/`，不能覆盖入库暂存或数据库。
 
-当前来源直接按 `read` 返回的 `sources[].path` 读取：普通文档相对知识根，外部目录来源沿用本机已有映射；代码未指定仓库时相对代码工作区基准（默认布局的 manifest 根），指定仓库时相对对应的已配置仓库。读取当前文本不需要 Git，也不调用历史恢复。
+`read` 返回的 `sources[].path` 是登记路径，其基准来自同一绑定知识库：普通文档相对知识根，外部目录来源沿用已配置映射；代码未指定仓库时相对配置确定的代码工作区基准（默认布局的 manifest 根），指定仓库时相对对应的已配置仓库。会话 cwd 不自动等于该基准，同名文件也不证明来源相同。直接打开原文件前先根据绑定知识根的 `config.yml` 确认代码根、模块及仓库映射；路径基准未知时先确认，不能按 cwd 猜测。
 
-通过 CLI 获取当前原件时使用 `knowledge source resolve --input FILE.json --json`，请求为实际的来源 ID，例如 `{"source_id":"doc-example"}`。只有显式提供 `hash`、`commit` 或 `snapshot_id` 时才读取对应历史版本，历史缺失时保留诊断。章节、PDF 页和文本行号按卡片实际定位核对。
+需要回查当前登记代码时，使用 `knowledge_source_resolve`，请求仅传该代码的实际 `source_id`（来自 `code_ref.code_id` 或对应 `sources` 项），例如 `{"source_id":"code-example"}`。CLI 对应 `knowledge source resolve --input FILE.json --json`。无版本参数时读取当前登记位置的内容，不需要 Git；返回 `hash` 为本次原字节指纹，`original_ref` 和可用的 `text_ref` 相对同一知识根，沿用同一执行端读取。本次材料不能再按其他工作区的 artifacts 目录定位。原件同样可按文档来源 ID 解析，章节、PDF 页和行号按实际卡片定位核对。
+
+只有明确比较历史时才传已有的 `hash`、`commit` 或 `snapshot_id`，分别保留当前与历史的身份和指纹。历史缺失或当前解析受阻时保留诊断，不拿 cwd 下的同名文件补作已确认版本。卡片指纹与某个本地文件不同，应先确认它们是否属于同一登记来源，再判断版本变化；只解释卡片已有内容而无需回源时不要求额外解析代码。
 
 ## 文档与图片回源
 

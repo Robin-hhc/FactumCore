@@ -52,6 +52,37 @@
         "沿用原绑定、回源范围和参数继续 knowledge_source_extract。",
         "依据实际读到的原件判断条件，没有把环境诊断当成搜索无命中。"
       ]
+    },
+    {
+      "id": 6,
+      "prompt": "请查询当前绑定知识库中的重试限制及其适用条件，并核对当前登记源码。会话 cwd 属于项目 A，含 main/net/policy.h；已绑定知识库 B 的配置指向另一份代码工作区，该处也有 main/net/policy.h。读卡得到 code_ref.code_id=code-policy，来源路径为 main/net/policy.h；两份文件内容和指纹不同。两份目录都可访问。",
+      "expected_output": "沿绑定库的登记代码身份回源，回答实际解析材料中的限制与条件，不用 cwd 下的同名文件替代。",
+      "expectations": [
+        "使用已绑定 Knowledge MCP 搜索并精读相关卡，再以 code-policy 调用 knowledge_source_resolve；当前版本请求未附历史 hash、commit 或 snapshot_id。",
+        "读取本次 resolve 返回的材料，按同一绑定知识根定位 original_ref/text_ref；若直接核对原文件，先依据该库配置确认代码基准和映射。",
+        "未将项目 A 的 cwd 当成来源路径基准，未仅凭另一副本与卡片指纹不同就宣称卡片过期。",
+        "结论、来源指纹与引用对应绑定库 B 的实际材料，保留未验证的构建或运行条件。"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "已通过 Knowledge MCP 读到一张卡，需要核对其代码来源。knowledge_source_resolve 返回 original_ref/text_ref 为 artifacts/sources 下的相对材料路径；宿主绑定信息尚未明确可访问的知识根路径。会话 cwd 也有一个 artifacts/sources 目录。请继续核对，不修改资料。",
+      "expected_output": "先取得材料所属绑定知识根的路径基准，再读取返回材料；无法确认时明确缺口。",
+      "expectations": [
+        "先核实已有宿主绑定信息；仍无法确认知识根或执行端时报告缺口或询问实际路径。",
+        "没有直接从 cwd 的 artifacts/sources 目录读同名材料，也没有将材料相对路径解释为全局路径。",
+        "基准确认前未声称当前源码已完成核对，未编造代码结论。"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "请比较同一张卡引用的代码旧版本与当前登记源码。卡片已有对应来源 ID 和 snapshot_id。按该 snapshot_id 解析旧版返回历史不可用诊断；不带版本参数解析同一来源 ID 则返回可读的当前材料。cwd 下另有同名文件。",
+      "expected_output": "报告当前材料能确认的事实及旧版证据缺口，未补造完整历史比较。",
+      "expectations": [
+        "当前材料使用同一 source_id 的无版本解析，历史比较才附卡片已有 snapshot_id；未把旧版参数带入当前版本请求。",
+        "明确历史解析未成功，未改用 cwd 同名文件冒充旧版或已确认的当前登记源码。",
+        "区分当前静态结论与无法确认的历史变化，不编造完整 diff、修改原因或运行验证结果。"
+      ]
     }
   ]
 }

@@ -24,7 +24,11 @@ knowledge read CARD_ID --knowledge-root "<知识根绝对路径>" --json
 
 先搜索，再读相关卡与必要来源，按问题核对正文条件、版本、依据性质及缺口。设计要求保持设计属性，代码行为和测量结论须有对应实际依据；卡片命中、stable 状态或代码定位不代替证明。回答附卡 ID、来源和未解决缺口。工具返回可用的卡片链接时（例如 `openflow_link`），以卡片标题为链接文字，原样引用。
 
-读取当前来源时，采用 `read` 返回的 `sources` 及其实际路径基准。需要补查登记来源时使用 `knowledge_source_list`，需要确认历史版本时使用 `knowledge_source_resolve`，按 `source_id` 和已有版本参数回源。CLI 的 `source list/resolve` 参数见公开 API。
+需要核对当前登记代码时，从 `code_ref.code_id` 或对应 `sources[].source_id` 取得来源 ID，调用 `knowledge_source_resolve`，当前版本请求不附 `hash/commit/snapshot_id`，读取本次返回的 `text_ref` 或 `original_ref`。这些材料路径相对同一绑定知识根，沿用已确认的执行端；基准仍不明确时先核实宿主绑定信息，无法确认则报告缺口或询问，不按会话 cwd 拼接。只解释已读卡而不需要回源的回答，不必额外解析所有代码来源。
+
+`sources[].path` 的基准来自绑定库配置，不由当前工作区或同名目录决定。确需直接打开登记原文件时，先核实该知识根的 `config.yml` 所确定的代码工作区、模块或仓库映射；具体规则见[公开 API](references/public-api.md)。指纹或内容冲突时先辨明是否同一登记来源，再判断当前代码与卡片依据的版本差异，不能把另一副本直接当成绑定库当前源码。
+
+需要补查登记来源时使用 `knowledge_source_list`。比较历史版本时，才按同一 `source_id` 和卡片已有的 `hash/commit/snapshot_id` 调用 `knowledge_source_resolve`，将历史材料与当前材料分别标明；历史缺失保留诊断。CLI 对应 `source list/resolve`。
 
 需要解析 PDF/Office/图片时用 `knowledge_source_extract`，CLI 对应 `source extract --input FILE.json --json`。实际打开相关图片并结合 OCR 和结构判断。用本次回执的 `read_id` 调用 `knowledge_source_renew` 延长阅读，完成后调用 `knowledge_source_release`。CLI 对应 `source renew/release`。仅在回源返回 `PARSER_DEPENDENCIES_REQUIRED`、默认模型的 `PARSER_MODELS_REQUIRED` 或 `LIBREOFFICE_MISSING` 时，分别用 `hs-knowledge-setup` 的 `documents`、`ocr` 或 `libreoffice` 能力补齐同一执行端，复查后沿用原来源和参数继续回源。外部图片链接、自定义模型或 LibreOffice 命令配置缺口，以及未解析范围按回执说明。
 

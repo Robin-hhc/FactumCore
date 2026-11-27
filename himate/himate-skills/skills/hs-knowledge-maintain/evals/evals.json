@@ -6,7 +6,7 @@
       "prompt": "请对已绑定的测试库做一次正式卡引用审计。验收工具会记录调用，返回 phase=failed，findings 里有 SOURCE_MISSING，来源是 doc-retry，路径是 docs-raw/specs/retry.md。正式卡 retry-rule 引用了它。库里还有一批正在处理的候选卡，请把审计结果单独交给我。",
       "expected_output": "把回执判作发现引用问题，报告缺失来源、关联卡和未改变的入库现场。",
       "expectations": [
-        "在已确认的测试库运行 knowledge maintain audit --json，并根据此次回执整理结论。",
+        "在已确认执行端显式传同一 --knowledge-root 运行 knowledge maintain audit --json，并根据此次回执整理结论。",
         "报告缺失路径 docs-raw/specs/retry.md、对应 SOURCE_MISSING、来源 ID doc-retry 和关联卡 retry-rule。",
         "没有删除引用、编辑正式卡、清理 .build 或触发同步。"
       ]
@@ -16,8 +16,18 @@
       "prompt": "这次引用审计返回 phase=passed、findings=[]。我昨天还放了一份新 PDF 到原始资料，尚未被任何卡引用。这能说明那份 PDF 已入库吗？我只要这次审计的结论。",
       "expected_output": "准确解释空审计结果的覆盖范围，指出新 PDF 的处理状态需由入库记录确认。",
       "expectations": [
-        "说明本次审计在正式卡已引用的来源范围内未发现问题。",
+        "说明本次审计在正式卡已引用登记来源的路径解析和文件存在性范围内未发现问题。",
         "说明审计结果无法确认未被引用的新 PDF 是否已处理，未触发入库或巡检。"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "请用 hs-knowledge-maintain 解释本次来源审计结果：phase=passed、findings=[]。卡 rx-limit 的 code_ref 指向 driver/rx.c 中的 rx_buffer_limit，卡里写缓存上限64。driver/rx.c 文件还在，但开发者已经删除该符号并改了相关实现。这次审计能说明符号定位仍正确、当前上限仍是64吗？只解释本次结果，不执行修复。",
+      "expected_output": "准确区分路径和文件存在性审计与源码定位、内容证据复核，保留当前实现未知的结论。",
+      "expectations": [
+        "说明 passed 和空 findings 仅表示正式卡已引用登记来源的路径解析和文件存在性未检出问题。",
+        "没有据此认证 rx_buffer_limit 仍存在、行号有效或当前上限仍为64；说明实际代码定位和结论需另行核对。",
+        "没有修改卡片或来源、启动入库或巡检、清理 .build。"
       ]
     }
   ]

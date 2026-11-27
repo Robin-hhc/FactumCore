@@ -10,7 +10,7 @@
 
 也可直接发起查询、入库或巡检。业务 Skill 确认缺少 CLI、启动入口或运行依赖时，会转到本 Skill。文档解析、默认 OCR 模型和 LibreOffice 按实际缺项分别准备，也可主动指定能力预装。环境就绪后从原步骤继续。
 
-[执行指引](SKILL.md)包含已确认知识根的检查，以及 Windows Samba 映射通过现有 SSH MCP 在 Linux 对端运行的方法。
+[执行指引](SKILL.md)包含已确认知识根的检查，以及通过现有 SSH 工具或原生 `ssh/scp` 在远端运行的方法。Knowledge MCP 和 SSH MCP 均为可选入口，Setup 准备实际执行端的 CLI 与依赖。
 
 ## 验证
 
@@ -22,4 +22,4 @@
 node --test himate/himate-skills/evals/setup/setup.test.cjs
 ```
 
-复跑首次安装时，为主动调用和业务触发各建一份一次性执行账户或隔离环境。部署同版 Skill，绑定各自的测试知识根，在 CLI 和模型均缺失时验证基础准备。Linux 本机记录 CLI 搜索及读卡回执。Windows 绑定 Samba 目录时记录 SSH MCP 实际执行端和已有 Knowledge MCP 的读卡回执。基础准备完成后发起文档解析，按实际缺项补齐对应能力并续办。安装后对同一环境以相同能力再次执行 `check` 和 `install`，确认 `status` 为 `ready` 且 `performed` 为空。保留安装日志和业务回执，下一轮使用新的隔离环境。
+复跑首次安装时，为主动调用和业务触发各建一份一次性执行账户或隔离环境。部署同版 Skill，绑定各自的测试知识根，在 CLI 和模型均缺失时验证基础准备。Linux 本机记录 CLI 搜索及读卡回执。远端场景记录实际 SSH 主机、账户和知识根，并分别验证已有 Knowledge MCP 和无 MCP 的 CLI 调用。基础准备完成后发起文档解析，按实际缺项补齐对应能力并续办。安装后对同一环境以相同能力再次执行 `check` 和 `install`，确认 `status` 为 `ready` 且 `performed` 为空。保留安装日志和业务回执，下一轮使用新的隔离环境。

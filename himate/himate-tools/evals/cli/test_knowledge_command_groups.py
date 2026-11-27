@@ -123,6 +123,23 @@ def test_raw_group_preserves_list_paths_directory_writes_and_intake(knowledge, t
     assert (knowledge / "docs-raw" / saved["data"]["path"]).read_bytes() == source
 
 
+@pytest.mark.parametrize("command,action", [("raw", "path"), ("panel", "raw-path")])
+def test_raw_file_lookup_reuses_the_ingest_manifest_path(knowledge, command, action):
+    source = knowledge / "docs-raw/specs/uploaded.md"
+    source.write_bytes(b"# Uploaded material\n\nA complete source.\n")
+    registry = (knowledge / "governance/sources.lock.yaml").read_bytes()
+    full_path = "docs-raw/specs/uploaded.md"
+
+    status, receipt = invoke(knowledge, command, action,
+                             request={"path": full_path, "path_base": "knowledge-root"})
+    assert status == 0 and receipt["phase"] == "resolved", receipt
+    assert receipt["data"]["absolute_path"] == str(source)
+    assert receipt["data"]["path"] == "specs/uploaded.md"
+    assert invoke(knowledge, command, action, request={"path": "specs/uploaded.md"}) == (status, receipt)
+    assert (knowledge / "governance/sources.lock.yaml").read_bytes() == registry
+    assert not (knowledge / ".build").exists()
+
+
 def test_legacy_ingest_aliases_and_grouped_status_keep_one_workflow(knowledge):
     assert invoke(knowledge, "ingest", "status") == invoke(knowledge, "status")
     root = knowledge / "docs-raw/specs/airtime.md"

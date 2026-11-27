@@ -6,7 +6,7 @@
 
 用 `knowledge_source_list` 查询来源及关联，采用 CLI 时用 `knowledge source list --input QUERY.json --json`。`processing` 给出同版原件已评估且完成登记的 `reviewed_units`，按完整物理页登记的 PDF 使用 `reviewed_pages`。整份完成以当前原件和成功 hash 一致为准。
 
-用 `knowledge_source_resolve` 按来源 ID 和已有版本参数回源，采用 CLI 时用 `knowledge source resolve --input SOURCE.json --json`。恢复只限可用历史中的实际版本；没有提交且没有保存的旧内容无法凭 hash 找回。缺旧版时将缺口交 P2。
+用 `knowledge_source_resolve` 按来源 ID 回源，采用 CLI 时用 `knowledge source resolve --input SOURCE.json --json`。当前登记来源只传 `source_id`，不附历史 `hash`、`commit` 或 `snapshot_id`；比较或恢复指定旧版时才传已有的版本参数。返回的 `original_ref`、`text_ref` 和阅读材料相对同一知识根，在同一执行端读取，不按会话 cwd 拼接。恢复只限可用历史中的实际版本；没有提交且没有保存的旧内容无法凭 hash 找回。缺旧版时将缺口交 P2。
 
 P1 返回的是本次副本和关联卡入口，不要求一次加载全部正文。Git 仅用于按需回看历史，不参与日常变化判定。
 
@@ -22,4 +22,4 @@ PDF、DOCX、XLSX 的 `task.source.parsed` 用紧凑描述符交接全文 Markdo
 
 P2 自主缩短结束单元，并在计划写 `source_units`。只有实际选定、经过评估、P4 和 P5 的范围进入覆盖。
 
-回源用 `knowledge_source_extract`，按需指定 PDF 物理页范围。读取结束用返回的 `read_id` 调用 `knowledge_source_release`，较长读取先调用 `knowledge_source_renew`。采用 CLI 时用 CLI 的 `source extract/release/renew`。各读任务使用 `artifacts/source-read/<read_id>/`，与本轮 `.build` 独立。`source cleanup` 用于宿主回收过期且非转换中的产物。
+需要转换阅读稿时用 `knowledge_source_extract`，按需指定 PDF 物理页范围。任何来源回执带 `read_id` 时，读取结束用本次 ID 调用 `knowledge_source_release`，仍需阅读时调用 `knowledge_source_renew`；这也适用于 `resolve` 解析 XLSX 等来源后返回的阅读任务。CLI 对应 `knowledge source extract --input FILE.json --json`、`knowledge source release --input FILE.json --json` 和 `knowledge source renew --input FILE.json --json`。各读任务使用 `artifacts/source-read/<read_id>/`，与本轮 `.build` 独立；没有 `read_id` 不猜造任务。`source cleanup` 用于宿主回收过期且非转换中的产物。

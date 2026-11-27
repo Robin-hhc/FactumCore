@@ -634,8 +634,9 @@ def run(root, action, request):
         return {"path": path, "items": rows[:limit],
                 "next_cursor": _next(rows, limit, scope, lambda row: [row["name"]])}, "listed"
     if action == "raw-path":
-        _check(request, ("path",))
-        return raw_materials.file_path(root, _text(request, "path", 1024)), "resolved"
+        _check(request, ("path", "path_base"))
+        return raw_materials.file_path(root, _text(request, "path", 1024),
+                                       path_base=request.get("path_base", "docs-raw")), "resolved"
     if action == "raw-save":
         _check(request, ("path", "staged_path", "expected_size", "expected_sha256"))
         return raw_materials.save(root, request), "saved"

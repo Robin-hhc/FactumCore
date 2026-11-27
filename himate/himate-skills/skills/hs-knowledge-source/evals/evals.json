@@ -62,6 +62,36 @@
         "复查通过时沿用原解析选项和预算，调用同一个 knowledge_ingest_scan，source 使用 docs-raw/specs/scan-timing.docx。",
         "prepared 时核对任务类型、回执路径和哈希并交 P2，progressNote 保留原上传位置。第二项仍待处理。"
       ]
+    },
+    {
+      "id": 7,
+      "prompt": "当前 harness 没有 Knowledge MCP，已获准通过 SSH 连接 kb-lab；对端 knowledge 命令和 /srv/kb/himate-knowledge-radio 已确认可用。请只为 docs-raw/specs/scan.md 准备入库材料，沿用现有解析选项，不发布卡片。",
+      "expected_output": "在既有SSH对端使用CLI完成指定文档准备，无需安装MCP。",
+      "expectations": [
+        "使用现有获准 SSH 工具或 ssh，在 kb-lab 的已确认知识根核对 doctor，并执行 knowledge ingest scan --source docs-raw/specs/scan.md --json。",
+        "只处理该文档，沿用原解析选项和远端绝对知识根；没有要求配置 Knowledge MCP 或在本机代跑远端任务。",
+        "根据实际 status/phase 与 task_type 分流，prepared 时交接实际固定材料，未直接发布正式卡片。"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "沿用本次 upload_ingest 的 job-42/source_index=0，当前项 path 为 docs-raw/specs/scan.md，原件哈希与清单相同。先用Knowledge MCP处理一轮；另一次使用同一根的已确认CLI。请分别给出定位与scan参数，不执行。",
+      "expected_output": "两种入口均将同一完整清单路径传给定位和扫描。",
+      "expectations": [
+        "MCP 的 knowledge_raw_path.path 与 knowledge_ingest_scan.source 均为 docs-raw/specs/scan.md。",
+        "CLI 的 raw path 使用 --input JSON，path 为 docs-raw/specs/scan.md 且 path_base 为 knowledge-root；ingest scan 的 source 为同一完整路径，沿用同一知识根。",
+        "没有删除或重复添加 docs-raw/ 前缀，没有推进 source_index 或编造执行成功。"
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "为P1核对一份已登记XLSX时，source resolve 返回 text_ref、read_id=0123456789abcdef0123456789abcdef 和 expires_at。已读取所需行，不再需要这份阅读材料。当前只有已确认的CLI入口。",
+      "expected_output": "使用CLI释放resolve返回的这一个阅读任务。",
+      "expectations": [
+        "调用 knowledge source release --input FILE.json --json，请求 read_id 与本次 resolve 返回值相同，沿用同一知识根和执行端。",
+        "没有因未调用 extract 而跳过租约释放，也没有另做无关转换。",
+        "没有删除入库 .build、所有来源材料或来源登记。"
+      ]
     }
   ]
 }

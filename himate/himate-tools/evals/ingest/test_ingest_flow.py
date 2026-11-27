@@ -562,6 +562,68 @@ def test_deleted_function_is_reported_by_fixed_check(tmp_path):
     assert any(item["code"] == "CODE_SYMBOL_MISSING" for item in checked["findings"])
 
 
+def test_typed_macro_enum_and_alias_refs_cover_the_plan_without_function_symbols(tmp_path):
+    root, code, doc_id, code_id = code_project(tmp_path)
+    code.write_text("#define RETRY_CLASS 3\n"
+                    "typedef enum { RETRY_LOW, RETRY_HIGH } retry_class_t;\n"
+                    "enum retry_state { RETRY_READY };\n"
+                    "int wait_reply(void) { return RETRY_CLASS; }\n", encoding="utf-8")
+    task, phase = module("ingest").scan(root, {"source": doc_id, "reprocess": True})
+    assert phase == "prepared", task
+    names = ["RETRY_CLASS", "retry_class_t", "retry_state", "wait_reply"]
+    plan = {"cards": [{"id": "waiting", "path": "knowledge/waiting.md",
+                       "required_code_refs": [{"path": "wifi/wait.c", "symbol": name} for name in names]}]}
+    (root / ".build/plan.md").write_text("---\n" + yaml.safe_dump(plan) + "---\nKeep all four references.\n",
+                                      encoding="utf-8")
+    references = [{"code_id": code_id, "line_start": line, "line_end": line, "symbol": name}
+                  for line, name in enumerate(names, 1)]
+    draft(root, "waiting", [doc_id], code_refs=references)
+    checked, status = module("ingest").check(root, {})
+    assert status == "failed", checked
+    missing = [item for item in checked["findings"] if item["code"] == "CODE_SYMBOL_MISSING"]
+    assert len(missing) == 3
+    for name in names[:3]:
+        assert any(f"function {name}: symbol lookup missing" in item["message"] for item in missing)
+    assert sum(item["code"] == "PLANNED_CODE_REF_MISSING" for item in checked["findings"]) == 3
+    for reference, kind in zip(references, ("macro", "type_alias", "enum")):
+        reference["selector"] = {"kind": kind, "name": reference.pop("symbol")}
+    draft(root, "waiting", [doc_id], code_refs=references)
+    checked, status = module("ingest").check(root, {})
+    assert status == "passed", checked
+    assert checked["review_required"] is True
+
+
+def test_ingest_check_retains_why_source_parsing_is_unavailable(tmp_path):
+    root, code, doc_id, code_id = code_project(tmp_path)
+    code.write_bytes(b"int wait_reply(void) {\n    return 5;\0\n}\n")
+    module("ingest").scan(root, {"source": doc_id, "reprocess": True})
+    draft(root, "waiting", [doc_id], code_refs=[{
+        "code_id": code_id, "line_start": 1, "line_end": 3, "symbol": "wait_reply"}])
+    write_plan(root, [("waiting", "knowledge/waiting.md")])
+    checked, status = module("ingest").check(root, {})
+    assert status == "failed", checked
+    finding = next(item for item in checked["findings"] if item["code"] == "CODE_SYMBOL_UNAVAILABLE")
+    assert "NUL bytes prevent reliable source parsing" in finding["message"]
+    assert not (root / ".build/document-review-check.json").exists()
+
+
+def test_ingest_check_retains_ambiguous_function_lookup_reason(tmp_path):
+    root, code, doc_id, _ = code_project(tmp_path)
+    overloaded = code.with_suffix(".cpp")
+    overloaded.write_text("int wait_reply(int value) { return value; }\n"
+                          "int wait_reply(float value) { return 0; }\n", encoding="utf-8")
+    with module("catalog").Catalog(root) as catalog:
+        source = catalog.register("code", "code/wifi/wait.cpp")
+    module("ingest").scan(root, {"source": doc_id, "reprocess": True})
+    draft(root, "waiting", [doc_id], code_refs=[{
+        "code_id": source["id"], "line_start": 1, "line_end": 1, "symbol": "wait_reply"}])
+    write_plan(root, [("waiting", "knowledge/waiting.md")])
+    checked, status = module("ingest").check(root, {})
+    assert status == "failed", checked
+    finding = next(item for item in checked["findings"] if item["code"] == "CODE_SYMBOL_AMBIGUOUS")
+    assert "function wait_reply: symbol lookup ambiguous" in finding["message"]
+
+
 def test_code_review_cannot_finish_against_an_outdated_source(tmp_path):
     root, code, doc_id, code_id = code_project(tmp_path)
     ingest = module("ingest")

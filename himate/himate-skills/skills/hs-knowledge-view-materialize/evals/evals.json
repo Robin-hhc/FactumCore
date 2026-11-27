@@ -29,6 +29,16 @@
         "两个关键位置分别写有效code_ref，并在对应正文附近说明用途与适用条件。",
         "保留文档doc_ref，未把代码文件另行作为主来源入库。"
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "按本批计划完成一张源码解释卡。required_code_refs 包含 driver/policy.h 的 RX_LIMIT、rx_mode_t、rx_state 和 start_rx。实际材料中分别是宏、匿名 typedef 枚举的别名、具名枚举和函数定义，源码文件已登记。请自行核对定义和完整范围后写候选，保持原计划证据要求。",
+      "expected_output": "使用与真实声明对应的代码定位，覆盖全部计划位置，而非把所有名字都写成函数符号。",
+      "expectations": [
+        "每项采用真实登记的 code_id 和完整定义行段，宏使用 macro selector，typedef 别名使用 type_alias，具名枚举使用 enum。",
+        "函数可用裸字符串 symbol 或 function selector；不为宏、枚举或别名添加函数简写来满足检查。",
+        "四个 required_code_refs 都被有效覆盖，未删除必要定位或降低计划要求，正式知识保持不变。"
+      ]
     }
   ]
 }

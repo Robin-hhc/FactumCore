@@ -30,6 +30,26 @@
         "将必要位置缺失交 P2 判断并补充计划，后续再成稿审阅。",
         "没有仅因引用格式合法而批准候选。"
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "正式 ingest check 返回 CODE_SYMBOL_UNAVAILABLE，message 为 Source contains uncertain syntax for this symbol; uniqueness or absence cannot be established，另有同位置的 PLANNED_CODE_REF_MISSING。候选对 driver/policy.h 的 RX_LIMIT 使用裸字符串 symbol；实际源码文件可读。请核对并决定返工去向，不直接修改作者稿。",
+      "expected_output": "依据具体诊断和实际声明核查定位类型，避免把 unavailable 一概归因为缺少字段或解析器。",
+      "expectations": [
+        "读取实际文件确认 RX_LIMIT 的声明类型，再对照候选和原计划；若其为宏，指出函数简写与实际类型不符，交 P3 使用对应 selector。",
+        "没有直接断言补 symbol 字段即可，也没有仅凭 unavailable 宣称依赖缺失；若仍有解析或证据缺口，记录具体原因与受影响结论。",
+        "保留计划和必要引用，不绕过门禁；作者修订后重跑正式检查并独立核对，未提前交 P5。"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "同一份候选检查出现 CODE_SYMBOL_UNAVAILABLE，message 明确为 Source parser dependency unavailable。登记源码可读取、候选类型与定义一致。请决定如何处理。",
+      "expected_output": "保留真实解析依赖阻断，不把类型 selector 当成所有 unavailable 的通用修复。",
+      "expectations": [
+        "报告具体解析依赖原因及未能核实的引用，不把当前候选判为通过。",
+        "未删除必要引用或修改计划以消除报错，也未无依据要求把正确 selector 改为函数 symbol。",
+        "说明在同一执行端恢复解析能力后重跑检查与独立复核。"
+      ]
     }
   ]
 }

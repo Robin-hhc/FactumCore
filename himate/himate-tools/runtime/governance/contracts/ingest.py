@@ -644,7 +644,8 @@ def _reference_check(root, source, reference, staged=None, *, extractor=None, co
             result = resolve(data, selector, path=source["path"], extractor=extractor,
                              cache=context.setdefault("code_symbols", {}))
             if result["status"] != "resolved":
-                raise ContractError("CODE_SYMBOL_" + result["status"].upper(), str(symbol or selector), source["path"])
+                raise ContractError("CODE_SYMBOL_" + result["status"].upper(),
+                                    f"{symbol or selector}: {result['reason']}", source["path"])
             if "line_start" in reference and (
                 reference["line_start"] != result["range"]["start_line"]
                 or reference["line_end"] != result["range"]["end_line"]

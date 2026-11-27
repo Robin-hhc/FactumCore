@@ -16,6 +16,53 @@ _spec.loader.exec_module(_helper)
 module = _helper.module
 
 
+@pytest.mark.parametrize("query", [{"path": "specs/uploaded.md"},
+                                     {"path": "docs-raw/specs/uploaded.md", "path_base": "knowledge-root"}])
+def test_raw_file_lookup_accepts_manifest_and_legacy_paths(tmp_path, query):
+    root = tmp_path / "knowledge-root"
+    target = root / "docs-raw/specs/uploaded.md"
+    target.parent.mkdir(parents=True)
+    content = b"# Uploaded material\n"
+    target.write_bytes(content)
+
+    result, phase = module("panel").run(root, "raw-path", query)
+
+    assert phase == "resolved"
+    assert result == {"name": target.name, "path": "specs/uploaded.md", "kind": "file",
+                      "size": len(content), "absolute_path": str(target)}
+    assert target.read_bytes() == content
+
+
+def test_raw_file_lookup_preserves_a_category_named_docs_raw(tmp_path):
+    root = tmp_path / "knowledge-root"
+    ordinary = root / "docs-raw/specs/a.md"
+    nested = root / "docs-raw/docs-raw/specs/a.md"
+    for target, body in ((ordinary, b"Ordinary source"), (nested, b"Nested category source")):
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(body)
+    listed, _ = module("panel").run(root, "raw-list", {"path": "docs-raw/specs"})
+    legacy = listed["items"][0]["path"]
+    assert legacy == "docs-raw/specs/a.md"
+    original, _ = module("panel").run(root, "raw-path", {"path": legacy})
+    manifest, _ = module("panel").run(root, "raw-path", {"path": legacy, "path_base": "knowledge-root"})
+    assert Path(original["absolute_path"]).read_bytes() == b"Nested category source"
+    assert Path(manifest["absolute_path"]).read_bytes() == b"Ordinary source"
+
+
+@pytest.mark.parametrize("path", ["docs-raw/../outside.md", "docs-raw//specs/file.md",
+                                 "docs-raw/.private/file.md"])
+def test_manifest_raw_file_paths_keep_the_raw_directory_boundary(tmp_path, path):
+    root = tmp_path / "knowledge-root"
+    (root / "docs-raw").mkdir(parents=True)
+    with pytest.raises(module("validation").ContractError, match="RAW_UNSAFE_PATH"):
+        module("panel").run(root, "raw-path", {"path": path, "path_base": "knowledge-root"})
+
+
+def test_raw_file_lookup_rejects_unknown_bases(tmp_path):
+    with pytest.raises(module("validation").ContractError, match="RAW_INVALID_PATH_BASE"):
+        module("panel").run(tmp_path, "raw-path", {"path": "specs/a.md", "path_base": "cwd"})
+
+
 @pytest.mark.skipif(os.name != "nt", reason="Windows realpath prefix race")
 def test_raw_save_handles_artifact_directory_created_during_lock_path_resolution(tmp_path, monkeypatch):
     import ntpath

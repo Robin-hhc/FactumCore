@@ -196,10 +196,19 @@ def list_entries(root, path, after, count):
     return [directory_details(item) if item["kind"] == "directory" else item for item in rows]
 
 
-def file_path(root, path):
-    target = _raw_path(root, path)
+def file_path(root, path, *, path_base="docs-raw"):
+    # The explicit base avoids confusing a category named "docs-raw" with
+    # the raw root while preserving existing list-to-file references.
+    if path_base not in ("docs-raw", "knowledge-root"):
+        raise ContractError("RAW_INVALID_PATH_BASE", "Use docs-raw or knowledge-root")
+    relative = path
+    if path_base == "knowledge-root":
+        if not isinstance(path, str) or not path.startswith("docs-raw/"):
+            raise ContractError("RAW_UNSAFE_PATH", "Expected a docs-raw/ path relative to the knowledge root", path)
+        relative = path.removeprefix("docs-raw/")
+    target = _raw_path(root, relative)
     info = _info(target, path)
-    return {"name": target.name, "path": path, "kind": "file", "size": info.st_size,
+    return {"name": target.name, "path": relative, "kind": "file", "size": info.st_size,
             "absolute_path": str(target)}
 
 

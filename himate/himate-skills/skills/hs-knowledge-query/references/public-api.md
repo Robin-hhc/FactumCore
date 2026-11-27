@@ -2,7 +2,7 @@
 
 ## 搜索请求
 
-`knowledge search "关键词" --top-k 5 --json` 与 `knowledge query --input FILE.json --json` 使用同一整卡候选搜索能力。
+以下字段用于普通 CLI `knowledge search "关键词" --top-k 5 --json` 与 `knowledge query --input FILE.json --json`，两者使用同一整卡候选搜索能力。MCP 和 CLI 发布视图入口的差异见下文。
 
 | 请求字段 | 规则 |
 |---|---|
@@ -16,6 +16,14 @@
 标题、标签、正文权重分别为 8、5、1；同一归一化词项在同一卡的同一字段只计一次，平分按 card_id 稳定排序。仅改变查询大小写不改变分数、排序和截断结果。标签内部空格和标点仍参与完整值比较，例如 `80211` 不匹配标签 `80211BE`；`80211be` 与 `802.11be` 不自动等价。分数仅表示词项相关性。`matches` 包含 `card_id/path/title/tags/lifecycle/score`，另有 `truncated` 和本次独立 `report_ref`，不返回 Claim 资格集合。
 
 显式传入旧 `--purpose`，或 JSON 中含 `purpose/context`，在搜索或读卡执行前返回 `QUERY_PARAMETERS_REMOVED`、退出码 2，不生成正常命中报告。删除旧字段，改用关键词、可选标签，再通过正文与来源判断适用性；不把旧参数静默忽略。
+
+## 发布视图与执行入口
+
+`knowledge_search` / `knowledge_read` 查询宿主绑定的发布视图。搜索返回 `view_revision`，精读时将它和 `card_id` 一起传回；它们不提供 `include_deprecated`，不能把普通 CLI 的退役卡选项附加到 MCP 请求中。参数限制以当前工具 Schema 为准，宿主可比 CLI 更严格。链接和 `citation_markdown` 是宿主提供的引用字段，普通 CLI 没有它们时用卡 ID 和来源标明依据。
+
+没有 Knowledge MCP 时，直接使用已确认执行端的 CLI。若需与上述发布视图相同的版本化过程，用 `knowledge library search --input SEARCH.json --knowledge-root "<知识根绝对路径>" --json`，例如请求 `{"query":"关键词","tags":["标签"]}`；再用 `knowledge library read --input READ.json --knowledge-root "<同一知识根绝对路径>" --json`，请求为 `{"card_id":"实际卡ID","view_revision":"本次搜索返回的版本"}`。`library search` 同样不提供 `include_deprecated`。只有用户要查整卡退役资料时，才选用支持该选项的普通 CLI `search`。
+
+在远端运行时，用现有获准的 SSH 工具或 `ssh` 在已确认主机执行这些 CLI 命令，使用远端知识根和入口；不要求为当前 harness 安装 Knowledge MCP。已经选择 MCP 的调用被拒、失败或 `blocked` 时，先按该诊断处理，不把 CLI 当成绕过绑定或权限限制的退路。
 
 ## 精读
 
@@ -37,6 +45,6 @@
 
 PDF 可用 `page_range: [start, end]` 或旧 `page_start` / `page_end` 指定物理页。默认按像素与 PNG 字节配额逐页生成 `role: page_preview`，回执说明未生成范围；`page_preview: false` 仅取提取材料。正式 PDF 引用采用物理页定位。
 
-消费后以 `{"read_id":"本次返回的ID"}` 调用 `knowledge source release --input FILE.json --json`，只释放该阅读目录；仍需继续时用 `source renew`。ready 租约默认 1800 秒，到期入口失效；`source cleanup --json` 只回收过期且没有活跃转换的来源阅读产物。不要猜 ID、不批量删除 artifacts，也不要把临时图像路径写成正式卡唯一依据。图片需通过宿主实际图片工具读取，Markdown 链接本身不证明 Agent 已看图。
+按回执而非调用名管理阅读材料：`resolve` 对 XLSX 等来源也可能返回 `read_id`、`expires_at` 和 `parsed`。任何来源回执带 `read_id` 时，消费后以 `{"read_id":"本次返回的ID"}` 调用 `knowledge source release --input FILE.json --json`，只释放该阅读目录；仍需继续时用 `source renew`。MCP 对应 `knowledge_source_release` / `knowledge_source_renew`。ready 租约默认 1800 秒，到期入口失效；`source cleanup --json` 只回收过期且没有活跃转换的来源阅读产物。没有 `read_id` 不猜造 ID，也不批量删除 artifacts；临时图像路径不作为正式卡唯一依据。图片需通过宿主实际图片工具读取，Markdown 链接本身不证明 Agent 已看图。
 
 空命中先核关键词、显式标签、退役状态、截断和诊断。运行错误保持错误，不能当零命中。需重新入库或索引维护时使用相应入口。

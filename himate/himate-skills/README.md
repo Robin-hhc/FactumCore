@@ -2,7 +2,11 @@
 
 本仓维护 Agent 的步骤指引、参考资料、写作模板和工作流编排。`skills/` 提供各 Skill，`workflows/` 提供 OpenFlow 工作流，根目录的 deploy 脚本负责把这些能力包安装到宿主。
 
-安装能力包并打开知识库后，可以直接发起查询、入库或巡检。已有 Knowledge MCP 工具时，Agent 沿用工具绑定的知识根。采用 CLI 时，Agent 在实际执行端自检，明确缺少安装项时加载 [`hs-knowledge-setup`](skills/hs-knowledge-setup/README.md)，复查通过后接着处理原任务。也可以直接让 Agent 使用该 Skill 准备环境。
+各 Skill 提供完整的任务方法、判断标准和所需 CLI 指引，可在不同 harness 中独立使用。CLI 执行确定性的业务操作和校验，MCP 将这些能力适配为宿主工具，Workflow 维护节点顺序、角色和交接。模板、检索策略和内容判断仍由相应 Skill 维护。
+
+已有 Knowledge MCP 工具时，Agent 沿用工具绑定的知识根。没有 Knowledge MCP 时，沿已确认的知识根、账户和执行端，通过本机终端或已授权的 SSH 工具、`ssh` 命令调用 CLI；远端命令和路径均在同一执行端核对。只在明确缺少 CLI、启动入口或运行依赖时加载 [`hs-knowledge-setup`](skills/hs-knowledge-setup/README.md)，就绪后继续原任务。Setup 准备该执行端的 CLI 和依赖，不以配置 MCP 为前提，也不自动修改各 harness 的 MCP 配置。
+
+已采用 Knowledge MCP 的任务遇到工具缺失、权限拒绝、连接失败或 `blocked` 时，按该诊断处理，不自动改走终端或另一执行端绕过限制。独立使用 Skill 与宿主内受控 Workflow 的工具授权范围分别沿用所在环境的约束。
 
 ## 安装能力包
 

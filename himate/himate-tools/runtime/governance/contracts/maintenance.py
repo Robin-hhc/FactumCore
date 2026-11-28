@@ -114,7 +114,7 @@ def prepare(root, request, *, catalog=None):
             return {"pending": 0, "task_type": "card_maintenance"}, "unchanged"
         selected = pending[0]
         cards = [active.get_card(row["id"]) for row in active.cards_for(source["id"])]
-        evidence_states, code_contents = {}, {}
+        evidence_states, code_contents, body_reviews = {}, {}, {}
         mode = "semantic"
         if source["kind"] == "code":
             evidence_states, code_contents = evidence_review.observe(
@@ -123,7 +123,8 @@ def prepare(root, request, *, catalog=None):
                 item["source_id"] == source["id"] and item["status"] != "fresh"
                 for item in evidence_states[card["id"]])]
             evidence_states = {card["id"]: evidence_states[card["id"]] for card in cards}
-            if all(item["status"] in {"fresh", "relocated"}
+            body_reviews = evidence_review.body_location_reviews(root, active, cards, evidence_states)
+            if not body_reviews and all(item["status"] in {"fresh", "relocated"}
                    for rows in evidence_states.values() for item in rows):
                 mode = "mechanical"
         ingest._clear_build(root)
@@ -177,6 +178,8 @@ def prepare(root, request, *, catalog=None):
                 "source": fixed, "affected_cards": frozen_cards, "cards_dir": ".build/cards",
                 "plan_ref": ".build/plan.md", "gaps": gaps}
         task["mode"] = mode
+        if body_reviews:
+            task["body_location_reviews"] = body_reviews
         if source["kind"] == "code":
             task["evidence_states"] = _public_observations(evidence_states)
             task["code_inputs"] = {}
@@ -240,7 +243,8 @@ def state(root, catalog, task, drafts=(), deletes=()):
         raise ContractError("MAINTENANCE_TASK_CHANGED", "Run maintain prepare again for a fixed maintenance task")
     if task.get("affected_cards") != fixed["affected_cards"]:
         raise ContractError("MAINTENANCE_SCOPE", "Keep the prepared card scope and original-card material pointers")
-    if any(task.get(key) != fixed.get(key) for key in ("mode", "code_inputs", "evidence_states", "mechanical_check_ref")):
+    if any(task.get(key) != fixed.get(key) for key in (
+            "mode", "code_inputs", "evidence_states", "mechanical_check_ref", "body_location_reviews")):
         raise ContractError("MAINTENANCE_TASK_CHANGED", "Keep the fixed reference task and its publication lane")
     source = ingest._task_source(catalog, task)
     baseline = fixed["source"]
@@ -352,6 +356,11 @@ def _verify_mechanical(root, catalog, fixed, drafts, deletes):
     states, _ = evidence_review.observe(root, catalog, originals)
     if any(item["status"] not in {"fresh", "relocated"} for rows in states.values() for item in rows):
         raise ContractError("MECHANICAL_SCOPE", "Changed or unresolved evidence requires independent content review")
+    body_reviews = evidence_review.body_location_reviews(root, catalog, originals, states)
+    if body_reviews:
+        raise ContractError("MECHANICAL_BODY_LOCATION",
+                            "Explicit code locations in card bodies require independent content review",
+                            next(card["path"] for card in originals if card["id"] in body_reviews))
     expected = {}
     for original in originals:
         candidate = _relocated_card(original, states[original["id"]])

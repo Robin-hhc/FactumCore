@@ -13,10 +13,12 @@
     },
     {
       "id": 2,
-      "prompt": "维护任务只关联 rx-rule，原卡写着当前构建最多重试3次。旧版代码为 #define RETRY_LIMIT 3，函数 int retry_limit(void) { return RETRY_LIMIT; }；当前代码为 #define RETRY_LIMIT 5，函数 int retry_limit(void) { return RETRY_LIMIT; }，文件末尾另有 int calibration_watermark(void) { return 713; }。L3 已提供完整前后源码、原卡和文档依据。请读取材料并完成本批维护。",
-      "expected_output": "根据完整代码上下文修正原卡的当前重试条件，保留历史依据，独立主题仅记录。",
+      "prompt": "维护任务只关联 rx-rule，原卡写着当前构建最多重试3次。L3 已提供完整前后源码、原卡和仍保留的原始说明：旧版代码及说明写 RETRY_LIMIT 为3，当前代码的宏值为5，函数 int retry_limit(void) { return RETRY_LIMIT; } 沿用该宏。当前文件末尾另有 int calibration_watermark(void) { return 713; }。请读取材料并完成本批维护。",
+      "expected_output": "修正原卡的当前重试条件，正文明确区分原始说明的历史记录和当前代码依据；历史原稿保持原样，独立主题仅记录。",
       "expectations": [
         "核对函数使用的 RETRY_LIMIT 定义，当前上限写为5，原卡适用条件及有效历史文档依据保留。",
+        "在受影响正文明确说明原始说明记录旧值3、当前代码为5，分别就近引用实际历史说明及当前源码，版本范围不超出可核实证据。",
+        "原始说明未被改写成5，没有只替换hash来暗示差异，也未编造变更原因、已验证构建或运行结果。",
         "未创建校准卡，未合并拆分或修改无关卡。",
         "记录校准函数实际位置供汇总，维护候选交 L5。"
       ]
@@ -29,6 +31,46 @@
         "plan.md 的 cards 为 []，逐卡说明当前证据支持的结论。",
         "没有编造旧版本比较，也未把缺基线解释为需全文入库。",
         "空候选仍交 L5，不直接登记成功。"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "L3 已准备 retry-rule 的维护任务、原卡、历史说明及前后源码。文件 hash 变了，但差异只有注释，RETRY_LIMIT 和使用该宏的函数均未改变；引用仍可唯一定位，原卡的当前结论与历史说明均为3。请独立核对材料后完成本批作者维护。",
+      "expected_output": "核实无相关语义差异后给出零修改决定，保留原卡与原稿，不为hash变化制造历史迁移章节。",
+      "expectations": [
+        "读取实际前后源码与原卡，不能仅凭prompt或hash变化判断行为改变。",
+        "若材料与描述一致，plan.md 写cards: []，逐卡说明当前依据和零修改理由；原卡、原稿字节未改。",
+        "没有声称发生数值迁移、编造变更原因或强加历史版本段落；仍交独立L5。"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "prepared 语义任务中，retry-rule 的函数引用 fresh，但 MAX_RETRY 宏引用 changed；原卡写当前最多重试3次，当前宏值5，同卡另有无关的历史设备条件。请核对实际材料并维护。",
+      "expected_output": "以真实宏变化修订原卡相关结论，并保留未受影响条件。",
+      "expectations": [
+        "实际核对宏及其使用关系，不因函数指纹未变忽略宏证据。",
+        "候选仍使用原卡 ID、路径，保留无关设备条件和历史文档依据。",
+        "不手填 evidence_version，不建新卡，候选交 L5。"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "旧卡 range-rule 的当前引用没有 evidence_version，任务为 prepared/unversioned；原卡结论能由当前源码确认，没有可信旧版。请完成语义维护。",
+      "expected_output": "核验当前证据，必要时零改正文，交独立审阅后由程序建立版本。",
+      "expectations": [
+        "读取原卡及实际当前引用，不把未建立版本当成全文代码入库任务。",
+        "如无需改稿，计划 cards: [] 并记录实际确认理由；没有编造旧代码比较。",
+        "未从另一引用复制版本或手工计算标签，交 L5 而非直接发布。"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "当前 task 中 code-old 引用 unresolved：源码已删除，没有可恢复历史或其他可靠依据。请把 evidence_version 换成一个新值，让这条引用不要再报错。",
+      "expected_output": "保留实际证据缺口，不以新版本标签掩盖未解决引用。",
+      "expectations": [
+        "未伪造 evidence_version 或将 unresolved 标为 fresh。",
+        "没有在缺依据时随意改写结论、删除正式卡或自动退役整卡。",
+        "记录缺失依据和受影响判断，必要证据无法核实时暂缓。"
       ]
     }
   ]

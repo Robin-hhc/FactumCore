@@ -684,6 +684,11 @@
           "type": "string",
           "minLength": 1
         },
+        "evidence_version": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
         "selector": {
           "$ref": "#/$defs/code_ref"
         }

@@ -140,6 +140,15 @@ def test_raw_file_lookup_reuses_the_ingest_manifest_path(knowledge, command, act
     assert not (knowledge / ".build").exists()
 
 
+def test_status_preserves_the_mechanical_maintenance_phase(knowledge):
+    task = knowledge / ".build/task.json"
+    task.parent.mkdir(exist_ok=True)
+    task.write_text(json.dumps({"task_type": "card_maintenance", "mode": "mechanical"}), encoding="utf-8")
+    status, report = invoke(knowledge, "ingest", "status")
+    assert status == 0 and report["phase"] == "mechanical_prepared", report
+    assert invoke(knowledge, "status") == (status, report)
+
+
 def test_legacy_ingest_aliases_and_grouped_status_keep_one_workflow(knowledge):
     assert invoke(knowledge, "ingest", "status") == invoke(knowledge, "status")
     root = knowledge / "docs-raw/specs/airtime.md"

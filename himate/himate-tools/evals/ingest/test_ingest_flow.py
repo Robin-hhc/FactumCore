@@ -628,8 +628,16 @@ def test_code_review_cannot_finish_against_an_outdated_source(tmp_path):
     root, code, doc_id, code_id = code_project(tmp_path)
     ingest = module("ingest")
     catalog_type = module("catalog").Catalog
+    task, phase = ingest.scan(root, {"source": code_id, "code_review": True})
+    assert phase == "prepared" and task["source"]["change"] == "baseline_missing"
+    write_plan(root, [])
+    checked, phase = ingest.check(root, {})
+    assert phase == "passed", checked
+    assert ingest.commit(root, {"reason": "The initial source and its existing card were actually reviewed."})[1] == "completed"
     with catalog_type(root) as catalog:
         baseline = catalog.get_file(code_id)["processed_hash"]
+        assert catalog.get_card("waiting")["code_ref"][0]["evidence_version"]
+    original_card = (root / "knowledge/waiting.md").read_bytes()
     code.write_text("int wait_reply(void) {\n    return 6;\n}\n", encoding="utf-8")
     task, phase = ingest.scan(root, {"source": code_id, "code_review": True})
     assert phase == "prepared" and task["source"]["change"] == "modified"
@@ -639,6 +647,7 @@ def test_code_review_cannot_finish_against_an_outdated_source(tmp_path):
     code.write_text("int wait_reply(void) {\n    return 8;\n}\n", encoding="utf-8")
     with pytest.raises(ingest.ContractError, match="SOURCE_CHANGED"):
         ingest.commit(root, {"reason": "No change to the design requirement."})
+    assert (root / "knowledge/waiting.md").read_bytes() == original_card
     with catalog_type(root) as catalog:
         assert catalog.get_file(code_id)["processed_hash"] == baseline
         assert catalog.get_card("waiting")["doc_ref"][0]["doc_id"] == doc_id
@@ -650,6 +659,10 @@ def test_code_review_detects_a_deleted_source_and_its_return(tmp_path):
     root, code, _, code_id = code_project(tmp_path)
     ingest, library = module("ingest"), module("library")
     original = code.read_bytes()
+    original_card = (root / "knowledge/waiting.md").read_bytes()
+    with module("catalog").Catalog(root) as catalog:
+        baseline = catalog.get_file(code_id)["processed_hash"]
+        previous_review = catalog.get_file(code_id)["reference_review"]
     retain_fixture_history(root.parents[1])
     code.unlink()
     plan, phase = library.patrol(root, "plan", {})
@@ -658,13 +671,30 @@ def test_code_review_detects_a_deleted_source_and_its_return(tmp_path):
     assert phase == "prepared" and task["source"]["exists"] is False
     assert [card["id"] for card in task["affected_cards"]] == ["waiting"]
     write_plan(root, [])
-    assert ingest.check(root, {})[1] == "passed"
-    assert ingest.commit(root, {"reason": "Retain the documented requirement and past source reference."})[1] == "completed"
-    assert library.patrol(root, "plan", {})[0]["pending"] == 0
+    checked, phase = ingest.check(root, {})
+    assert phase == "failed", checked
+    assert any(item["code"] == "SOURCE_INPUT_UNAVAILABLE" for item in checked["findings"])
+    with pytest.raises(ingest.ContractError, match="SOURCE_INPUT_UNAVAILABLE"):
+        ingest.commit(root, {"reason": "A zero-change reason cannot confirm an absent current code reference."})
+    assert (root / "knowledge/waiting.md").read_bytes() == original_card
+    with module("catalog").Catalog(root) as catalog:
+        assert catalog.get_file(code_id)["processed_hash"] == baseline
+        assert catalog.get_file(code_id)["reference_review"] == previous_review
+    assert library.patrol(root, "plan", {})[1] == "needs_maintenance"
 
     code.write_bytes(original)
     plan, phase = library.patrol(root, "plan", {})
-    assert phase == "needs_maintenance" and plan["next_file"]["change"] == "modified"
+    assert phase == "needs_maintenance" and plan["next_file"]["change"] == "baseline_missing"
+    task, phase = ingest.scan(root, {"source": code_id, "code_review": True})
+    assert phase == "prepared" and task["source"]["change"] == "baseline_missing"
+    write_plan(root, [])
+    checked, phase = ingest.check(root, {})
+    assert phase == "passed", checked
+    assert ingest.commit(root, {"reason": "The restored actual code and existing card were reviewed."})[1] == "completed"
+    with module("catalog").Catalog(root) as catalog:
+        assert catalog.get_file(code_id)["processed_hash"] == baseline
+        assert catalog.get_card("waiting")["code_ref"][0]["evidence_version"]
+    assert library.patrol(root, "plan", {})[0]["pending"] == 0
 
 
 def test_code_review_rechecks_card_membership_before_publishing(tmp_path):
@@ -677,7 +707,7 @@ def test_code_review_rechecks_card_membership_before_publishing(tmp_path):
     assert ingest.check(root, {})[1] == "passed"
 
     formal(root, "waiting", [doc_id], body="Updated separately with no code reference.")
-    with pytest.raises(ingest.ContractError, match="MAINTENANCE_SCOPE"):
+    with pytest.raises(ingest.ContractError, match="MAINTENANCE_CARD_CHANGED"):
         ingest.commit(root, {})
     assert "Updated separately" in (root / "knowledge/waiting.md").read_text(encoding="utf-8")
 

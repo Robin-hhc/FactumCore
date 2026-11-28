@@ -51,6 +51,36 @@ def prepare(root):
     return task
 
 
+def establish_code_reference_baseline(root):
+    """Establish one real per-reference baseline without changing the shared fixture."""
+    ingest = module("ingest")
+    prepare(root)
+    write_plan(root, [])
+    checked, phase = ingest.maintenance_check(root, {})
+    assert phase == "passed", checked
+    receipt, phase = ingest.maintenance_commit(root, {"reason": "The current code reference was reviewed."})
+    assert phase == "completed", receipt
+    parsed = module("cards_v3").parse_card(
+        (root / "knowledge/waiting.md").read_bytes(), "knowledge/waiting.md")
+    assert parsed["code_ref"][0]["evidence_version"]
+
+
+def retain_snapshot(root, source_id, content):
+    """Register actual retained bytes without changing any author's reference."""
+    digest = hashlib.sha256(content).hexdigest()
+    reference = "artifacts/evidence/objects/" + digest + ".bin"
+    retained = root / reference
+    retained.parent.mkdir(parents=True, exist_ok=True)
+    retained.write_bytes(content)
+    registry_file = root / "governance/sources.lock.yaml"
+    registry = yaml.safe_load(registry_file.read_bytes())
+    registry["snapshots"].append({"snapshot_id": "retained-original", "source_id": source_id,
+                                  "sha256": digest, "bytes": len(content),
+                                  "recovery": {"method": "evidence_object", "path": reference}})
+    registry_file.write_text(yaml.safe_dump(registry), encoding="utf-8")
+    return "retained-original"
+
+
 def save_history(root):
     project = root.parents[1]
     for arguments in (["init"], ["config", "core.autocrlf", "false"], ["add", "."],
@@ -132,9 +162,8 @@ def test_changed_formal_card_or_source_cannot_be_overwritten(tmp_path):
 
 
 def test_deleted_document_routes_to_maintenance_while_ingest_skips_it(tmp_path):
-    root, code = fixture(tmp_path)
-    with module("catalog").Catalog(root) as catalog:
-        catalog.mark_reference_reviewed("code-wait", hashlib.sha256(code.read_bytes()).hexdigest(), True)
+    root, _ = fixture(tmp_path)
+    establish_code_reference_baseline(root)
     (root / "docs-raw/design.md").unlink()
     result, phase = module("library").patrol(root, "plan", {})
     assert phase == "needs_maintenance" and result["next_file"]["change"] == "deleted"
@@ -145,10 +174,9 @@ def test_deleted_document_routes_to_maintenance_while_ingest_skips_it(tmp_path):
 
 @pytest.mark.parametrize("changed", [False, True], ids=["same-hash", "changed-hash"])
 def test_restored_document_reopens_ingest_then_later_deletion_is_maintenance(tmp_path, changed):
-    root, code = fixture(tmp_path)
+    root, _ = fixture(tmp_path)
     ingest, library = module("ingest"), module("library")
-    with module("catalog").Catalog(root) as catalog:
-        catalog.mark_reference_reviewed("code-wait", hashlib.sha256(code.read_bytes()).hexdigest(), True)
+    establish_code_reference_baseline(root)
     document = root / "docs-raw/design.md"
     original = document.read_bytes()
     save_history(root)
@@ -182,8 +210,11 @@ def test_restored_document_reopens_ingest_then_later_deletion_is_maintenance(tmp
 def test_deleted_source_without_history_cannot_complete_zero_change_review(tmp_path, kind, legacy_label):
     root, code = fixture(tmp_path)
     ingest = module("ingest")
-    with module("catalog").Catalog(root) as catalog:
-        catalog.mark_reference_reviewed("code-wait", hashlib.sha256(code.read_bytes()).hexdigest(), True)
+    if kind == "doc":
+        establish_code_reference_baseline(root)
+    else:
+        with module("catalog").Catalog(root) as catalog:
+            catalog.mark_reference_reviewed("code-wait", hashlib.sha256(code.read_bytes()).hexdigest(), True)
     source_id = "code-wait" if kind == "code" else "doc-design"
     if legacy_label:
         for path in (root / "knowledge").glob("*.md"):
@@ -231,36 +262,39 @@ def test_registered_snapshot_from_another_source_cannot_be_treated_as_legacy_lab
 def test_deleted_source_zero_change_uses_actual_history_or_retained_snapshot(tmp_path, kind, history):
     root, code = fixture(tmp_path)
     ingest = module("ingest")
-    with module("catalog").Catalog(root) as catalog:
-        catalog.mark_reference_reviewed("code-wait", hashlib.sha256(code.read_bytes()).hexdigest(), True)
+    establish_code_reference_baseline(root)
     source_id = "code-wait" if kind == "code" else "doc-design"
     original = code if kind == "code" else root / "docs-raw/design.md"
     if history == "git":
         save_history(root)
     else:
-        content = original.read_bytes()
-        digest = hashlib.sha256(content).hexdigest()
-        reference = "artifacts/evidence/objects/" + digest + ".bin"
-        retained = root / reference
-        retained.parent.mkdir(parents=True)
-        retained.write_bytes(content)
-        registry_file = root / "governance/sources.lock.yaml"
-        registry = yaml.safe_load(registry_file.read_bytes())
-        registry["snapshots"].append({"snapshot_id": "retained-original", "source_id": source_id,
-                                      "sha256": digest, "bytes": len(content),
-                                      "recovery": {"method": "evidence_object", "path": reference}})
-        registry_file.write_text(yaml.safe_dump(registry), encoding="utf-8")
+        snapshot_id = retain_snapshot(root, source_id, original.read_bytes())
         for path in (root / "knowledge").glob("*.md"):
             _, frontmatter, body = path.read_text(encoding="utf-8").split("---", 2)
             metadata = yaml.safe_load(frontmatter)
             for ref in metadata[kind + "_ref"]:
                 if ref[kind + "_id"] == source_id:
-                    ref["snapshot_id"] = "retained-original"
+                    ref["snapshot_id"] = snapshot_id
             path.write_text("---\n" + yaml.safe_dump(metadata) + "---" + body, encoding="utf-8")
     original.unlink()
+    if kind == "code" and history == "snapshot":
+        # An explicitly retained historical reference is independent of current code deletion.
+        assert ingest.maintenance_prepare(root, {"source": source_id})[1] == "unchanged"
+        result, phase = ingest.check(root, {"formal": True})
+        assert phase == "passed", result
+        return
     assert ingest.maintenance_prepare(root, {"source": source_id})[1] == "prepared"
     write_plan(root, [])
     result, phase = ingest.maintenance_check(root, {})
+    if kind == "code":
+        # Git recovery is review material; it does not turn a missing current ref into history.
+        assert phase == "failed", result
+        assert any(item["code"] == "SOURCE_INPUT_UNAVAILABLE" for item in result["findings"])
+        with pytest.raises(ingest.ContractError):
+            ingest.maintenance_commit(root, {"reason": "Git history alone cannot confirm a current reference."})
+        selection, phase = module("library").patrol(root, "plan", {})
+        assert phase == "needs_maintenance" and selection["next_file"]["source_id"] == source_id
+        return
     assert phase == "passed", result
     receipt, phase = ingest.maintenance_commit(root, {"reason": "Verified each retained historical source reference."})
     assert phase == "completed" and receipt["maintenance_complete"] is True, receipt
@@ -447,6 +481,7 @@ def test_deleted_reviewed_code_can_retain_its_actual_historical_reference(tmp_pa
     registry_file.write_text(yaml.safe_dump(registry), encoding="utf-8")
     with module("catalog").Catalog(root) as catalog:
         catalog.mark_reference_reviewed("code-wait", hashlib.sha256(code.read_bytes()).hexdigest(), True)
+    snapshot_id = retain_snapshot(root, "code-wait", code.read_bytes())
     project = root.parents[1]
     for arguments in (["init"], ["config", "core.autocrlf", "false"], ["add", "."],
                       ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "Reviewed source history"]):
@@ -457,9 +492,23 @@ def test_deleted_reviewed_code_can_retain_its_actual_historical_reference(tmp_pa
     (root / ".build/cards/waiting.md").write_bytes(card(
         "waiting", referenced=True, body="Historical requirement and implementation reference; current source was removed."))
     result, phase = module("ingest").maintenance_check(root, {})
+    # A prose claim about history cannot silently reclassify an ordinary current-code ref.
+    assert phase == "failed", result
+    assert any(item["code"] == "SOURCE_INPUT_UNAVAILABLE" for item in result["findings"])
+    with pytest.raises(module("ingest").ContractError):
+        module("ingest").maintenance_commit(root, {})
+    candidate = root / ".build/cards/waiting.md"
+    _, frontmatter, body = candidate.read_text(encoding="utf-8").split("---", 2)
+    metadata = yaml.safe_load(frontmatter)
+    metadata["code_ref"][0]["snapshot_id"] = snapshot_id
+    candidate.write_text("---\n" + yaml.safe_dump(metadata) + "---" + body, encoding="utf-8")
+    result, phase = module("ingest").maintenance_check(root, {})
     assert phase == "passed", result
     receipt, phase = module("ingest").maintenance_commit(root, {})
     assert phase == "completed", receipt
+    published = module("cards_v3").parse_card(
+        (root / "knowledge/waiting.md").read_bytes(), "knowledge/waiting.md")
+    assert published["code_ref"][0]["snapshot_id"] == snapshot_id
     with module("catalog").Catalog(root) as catalog:
         source = catalog.get_file("code-wait")
         assert source["reference_review"]["exists"] is False

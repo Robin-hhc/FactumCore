@@ -30,6 +30,36 @@
         "清楚区分当前缺失和可恢复历史版本。",
         "未自动退役卡片或删除历史文档引用。"
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "L2 选中 code-wait；maintain prepare 实际返回 mechanical_prepared。固定任务 mode=mechanical，只有已有引用 relocated，程序计划和候选只修行号，mechanical_check_ref 指向本批机械检查。请交接。",
+      "expected_output": "采用实际机械回执，将同一固定任务直接交 L6。",
+      "expectations": [
+        "核对任务身份、mode、affected_cards 和 evidence_states，不重新创作候选。",
+        "将 mechanical_prepared 和 mechanical_check_ref 原样交 L6，不启动 L4 或 L5。",
+        "没有调用 maintain check 或手写内容通过凭据，正式卡和原件未改。"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "同一卡 flow-rule 同时引用 code-radio 与 code-policy。prepare 返回 prepared、mode=semantic，前者仅 relocated，后者 MAX_RETRY 引用 changed，任务材料覆盖两者。请安排下一步。",
+      "expected_output": "保持同一卡的固定语义任务，连同定位候选交 L4。",
+      "expectations": [
+        "采用实际 prepared，不因为存在 relocated 项把任务降级为 mechanical。",
+        "向 L4 交接两个实际来源及逐引用状态，不拆分成可能并发覆盖同一卡的两批发布。",
+        "未交文档 P 分支，也未自行扩大到同文件无关卡。"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "prepare 返回 blocked，diagnostics 指明实际源码编码无法解码。上次记录的同一引用是 relocated，请继续处理。",
+      "expected_output": "报告当前执行阻塞，不使用旧状态进入机械或语义发布。",
+      "expectations": [
+        "使用本次 blocked 和具体编码错误，不把失败当作 fresh 或 unversioned。",
+        "未凭上次状态向 L6 交接机械完成，也未伪造机械凭据。",
+        "保留待办及固定现场供恢复。"
+      ]
     }
   ]
 }

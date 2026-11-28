@@ -111,7 +111,8 @@ def _references(items, kind, path):
     if not isinstance(items, list) or (kind == "doc" and not items):
         raise ContractError("INVALID_CARD_REFERENCES", f"{kind}_ref must be a list", path)
     fields = {kind + "_id", "line_start", "line_end", "snapshot_id", "evidence_ref"}
-    fields.update({"page_start", "page_end", "section", "locator"} if kind == "doc" else {"symbol", "selector"})
+    fields.update({"page_start", "page_end", "section", "locator"} if kind == "doc"
+                  else {"symbol", "selector", "evidence_version"})
     result, seen = [], set()
     for item in items:
         if not isinstance(item, dict):
@@ -134,11 +135,14 @@ def _references(items, kind, path):
             if field in item and (not isinstance(item[field], str) or not item[field].strip()):
                 code = "INVALID_CODE_SYMBOL" if field == "symbol" else "INVALID_CARD_REFERENCE"
                 raise ContractError(code, f"{field} must be nonempty text", path)
+        if "evidence_version" in item and (
+                not isinstance(item["evidence_version"], str) or not item["evidence_version"].strip()):
+            raise ContractError("INVALID_CODE_EVIDENCE_VERSION", "evidence_version must be nonempty text", path)
         if "selector" in item:
             from .code_symbols import validate_code_ref
 
             validate_code_ref(item["selector"])
-        key = canonical_bytes(item)
+        key = canonical_bytes({key: value for key, value in item.items() if key != "evidence_version"})
         if key in seen:
             raise ContractError("DUPLICATE_CARD_REFERENCE", item[kind + "_id"], path)
         seen.add(key)

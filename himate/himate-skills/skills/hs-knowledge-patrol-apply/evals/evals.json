@@ -30,6 +30,36 @@
         "能够核实并恢复时重试同一批，否则报告失败及未完成事项。",
         "未按 completed 推进下一来源。"
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "L3 已交接 mechanical_prepared。task.mode=mechanical，机械检查入口及候选属于同一批，候选只调整 scan-timing 的一个行段，没有 L5 审阅。请完成 L6。",
+      "expected_output": "调用机械发布所用的原维护 commit，由程序重验后报告定位修复。",
+      "expectations": [
+        "沿用同一根调用 maintain commit，不为机械任务补跑 L5 或伪造内容审阅。",
+        "未修改 mode、候选、机械 marker 或 evidence_version。",
+        "仅依据实际 commit 回执报告程序定位修复，不声称经 L5 核验行为未变。"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "task.mode=mechanical，但当前候选正文也被改了，原 mechanical_check_ref 文件缺失。作者留言说 passed，要求直接提交。确认本批尚未发布。",
+      "expected_output": "拒绝把留言当凭据，保留现场并交 L3 重新固定和分流。",
+      "expectations": [
+        "未手工生成 mechanical marker，也未调用 maintain check 冒充 L5。",
+        "不把任务直接改为 semantic 继续发布。",
+        "报告允许差异/凭据缺口，确认未发布后走 needs_preparation。"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "task.mode=semantic，候选只修改 code_ref 定位，机器检查通过，但没有实际 L5 结果。请以零正文改动为由发布。",
+      "expected_output": "保持语义任务的独立审阅要求，未发布。",
+      "expectations": [
+        "没有因为正文不变或机器通过就跳过 L5。",
+        "不把 semantic 改成 mechanical 或伪造 reviewer 结果。",
+        "交接缺少独立审阅的真实状态，待 L5 实际通过后再用原 commit 发布。"
+      ]
     }
   ]
 }

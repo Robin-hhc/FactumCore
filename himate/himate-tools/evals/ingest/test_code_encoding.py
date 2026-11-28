@@ -132,10 +132,33 @@ def test_reregistering_encoding_does_not_advance_processed_hash(library):
     assert result["source"]["id"] == "code-reply"
     assert result["source"]["encoding"] == "gb18030"
     assert result["source"]["processed_hash"] == old_hash
-    task, status = module("ingest").scan(root, {"source": "code-reply"})
+    ingest = module("ingest")
+    task, status = ingest.scan(root, {"source": "code-reply"})
     assert status == "prepared", task
-    assert task["source"]["change"] == "modified"
+    # A legacy file-level review does not establish a checked fragment version.
+    assert task["source"]["change"] == "baseline_missing"
     assert task["source"]["hash"] != old_hash
+    reviewed_hash = task["source"]["hash"]
+    write_plan(root, [])
+    checked, status = ingest.check(root, {})
+    assert status == "passed", checked
+    assert ingest.commit(root, {"reason": "The decoded current function and its existing card were reviewed."})[1] == "completed"
+    with module("catalog").Catalog(root) as catalog:
+        version = catalog.get_card("wait-reply")["code_ref"][0]["evidence_version"]
+        assert version
+        assert catalog.get_file("code-reply")["processed_hash"] == old_hash
+
+    # Once actually confirmed, identical decoded text survives an encoding-only
+    # change even though the raw bytes and file hash differ from that review.
+    code.write_bytes(CODE.encode("utf-8"))
+    result, status = register(root, "utf-8")
+    assert status == "registered", result
+    assert hashlib.sha256(code.read_bytes()).hexdigest() != reviewed_hash
+    task, status = ingest.scan(root, {"source": "code-reply"})
+    assert status == "unchanged", task
+    with module("catalog").Catalog(root) as catalog:
+        assert catalog.get_file("code-reply")["processed_hash"] == old_hash
+        assert catalog.get_card("wait-reply")["code_ref"][0]["evidence_version"] == version
 
 
 def test_existing_catalog_without_encoding_column_accepts_new_code_registration(library):

@@ -171,6 +171,26 @@ def test_maintenance_revisions_and_input_refresh_stay_in_the_maintenance_branch(
     assert target == "__end__"
 
 
+def test_mechanical_reference_repairs_publish_without_content_author_or_review():
+    nodes = workflow_nodes("hs-knowledge-lint")
+    trace, target = follow(nodes, "plan_patrol", [
+        "needs_maintenance", "mechanical_prepared", "completed", "unchanged", "completed",
+    ])
+    assert trace == [
+        "plan_patrol", "prepare_maintenance", "apply_maintenance", "plan_patrol", "complete_patrol",
+    ]
+    assert target == "__end__"
+    assert not {"repair_cards", "review_maintenance", "prepare_sources", "apply_view"} & set(trace)
+
+
+@pytest.mark.parametrize("start", ["repair_cards", "review_maintenance", "apply_maintenance"])
+def test_reprepared_maintenance_can_be_reclassified_by_the_program(start):
+    nodes = workflow_nodes("hs-knowledge-lint")
+    trace, target = follow(nodes, start, ["needs_preparation", "mechanical_prepared"])
+    assert trace == [start, "prepare_maintenance"]
+    assert target == "apply_maintenance"
+
+
 @pytest.mark.parametrize("workflow,publish,failed", [
     ("hs-knowledge-ingest", "apply_view", "__end__"),
     ("hs-knowledge-lint", "apply_view", "complete_patrol"),
@@ -200,6 +220,9 @@ def test_index_refresh_returns_to_selection_before_summary():
     ("hs-knowledge-lint", "prepare_sources", "unchanged", "complete_patrol"),
     ("hs-knowledge-lint", "plan_change", "deferred", "plan_patrol"),
     ("hs-knowledge-lint", "plan_patrol", "needs_maintenance", "prepare_sources"),
+    ("hs-knowledge-lint", "prepare_maintenance", "mechanical_prepared", "apply_view"),
+    ("hs-knowledge-lint", "prepare_maintenance", "mechanical_prepared", "repair_cards"),
+    ("hs-knowledge-lint", "prepare_maintenance", "prepared", "apply_maintenance"),
     ("hs-knowledge-lint", "review_maintenance", "needs_revision", "materialize_view"),
     ("hs-knowledge-lint", "review_maintenance", "deferred", "prepare_maintenance"),
     ("hs-knowledge-lint", "apply_maintenance", "retry", "prepare_maintenance"),

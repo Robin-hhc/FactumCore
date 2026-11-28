@@ -711,23 +711,18 @@ def _code_review_change(root, catalog, source, data, digest):
     references = catalog.reference_rows(source["id"])
     if not references:
         return None
-    reviewed = source.get("reference_review", {})
-    if data is None:
-        return None if reviewed.get("exists") is False else "deleted"
-    if "exists" not in reviewed:
-        return "baseline_missing"
-    if not reviewed["exists"] or reviewed.get("source_sha256") != digest:
-        return "modified"
-
-    check_input = sha(canonical_bytes([digest, source["path"], source.get("encoding"), references]))
-    if catalog.code_references_checked(source["id"], check_input):
+    from . import evidence_review
+    cards = [catalog.get_card(row["id"]) for row in catalog.cards_for(source["id"])]
+    states, _ = evidence_review.observe(root, catalog, cards, data={source["id"]: data}, only_source=source["id"])
+    statuses = [item["status"] for rows in states.values() for item in rows
+                if item["source_id"] == source["id"]]
+    if not statuses or all(status == "fresh" for status in statuses):
         return None
-    findings = _code_reference_findings(
-        root, source, ((card_id, json.loads(value)) for card_id, value in references), data)
-    if findings:
-        return "reference_invalid"
-    catalog.record_code_reference_check(source["id"], check_input)
-    return None
+    if "unversioned" in statuses:
+        return "baseline_missing"
+    if "unresolved" in statuses:
+        return "deleted" if data is None else "reference_invalid"
+    return "modified" if "changed" in statuses else "relocated"
 
 
 def _snapshot_reference_check(root, source, reference, snapshot, registry, context):
@@ -797,7 +792,12 @@ def _card_reference_check(root, source, reference, kind, registry, context, stag
             frozen[snapshot_id], _ = recover_bound_source(root, source, snapshot)
         staged = frozen[snapshot_id]
     extractor = code_extractor(source, snapshot) if kind == "code" else None
-    return _reference_check(root, source, reference, staged, extractor=extractor, context=context)
+    result = _reference_check(root, source, reference, staged, extractor=extractor, context=context)
+    if kind == "code" and snapshot is None:
+        from . import evidence_review
+        actual = staged if staged is not None else context["data"][identity]
+        evidence_review.record(context, source, reference, actual)
+    return result
 
 
 def check(root, request, rules=None):
@@ -808,6 +808,8 @@ def check(root, request, rules=None):
     try:
         if not formal:
             safe_path(root, DOCUMENT_CHECK, [".build"]).unlink(missing_ok=True)
+            from . import evidence_review
+            safe_path(root, evidence_review.CHECK, [".build"]).unlink(missing_ok=True)
             from . import maintenance
             safe_path(root, maintenance.CHECK, [".build"]).unlink(missing_ok=True)
         planned = None if formal else _planned_cards(root)
@@ -848,7 +850,7 @@ def check(root, request, rules=None):
                     context["loaded"][(source["source_id"], source["hash"])] = loaded
                 document_batch = _review_batch(root, task, context["loaded"].get((source["source_id"], source["hash"])))
                 if maintenance.required(task, catalog):
-                    findings.extend(maintenance.findings(root, catalog, task, drafts, deletes))
+                    findings.extend(maintenance.findings(root, catalog, task, drafts, deletes, context=context))
                     if not findings:
                         maintenance_fixed = catalog.maintenance_input()
         except (ValueError, OSError, ContractError, yaml.YAMLError) as error:
@@ -937,6 +939,10 @@ def check(root, request, rules=None):
                     findings.append({"code": "BROKEN_CARD_LINK", "path": card["path"], "message": target})
                 elif parsed.fragment and unquote(parsed.fragment) not in structures[normalized]["anchors"]:
                     findings.append({"code": "BROKEN_CARD_ANCHOR", "path": card["path"], "message": target})
+    if not findings and not formal:
+        from . import evidence_review
+        atomic_write(safe_path(root, evidence_review.CHECK, [".build"]),
+                     canonical_bytes(evidence_review.receipt(task_bytes, drafts, context)))
     if not findings and document_batch is not None:
         try:
             checked = {"task_sha256": sha(task_bytes),
@@ -992,6 +998,14 @@ def commit(root, request):
             if (checked.get("task_sha256") != sha(task_bytes)
                     or checked.get("document_review_sha256") != _checked_document_digest(root, document_batch, drafts, deletes)):
                 raise ContractError("DOCUMENT_REVIEW_NOT_CHECKED", "Run P4 again for the current document range, plan and candidates")
+        from . import evidence_review
+        evidence_path = safe_path(root, evidence_review.CHECK, [".build"])
+        if evidence_path.is_file():
+            versions = evidence_review.verify(root, catalog, read_json(evidence_path), task_bytes, drafts)
+            drafts = evidence_review.stamp(drafts, versions)
+        elif any(ref for card in drafts for ref in card["code_ref"]
+                 if not evidence_review.historical(ref, catalog.registry)):
+            raise ContractError("CODE_EVIDENCE_NOT_CHECKED", "Run independent reference checks before publishing code references")
         for card in drafts:
             destination = safe_path(root, card["path"], ["knowledge"])
             destination.parent.mkdir(parents=True, exist_ok=True)

@@ -74,7 +74,8 @@ EDGES = {
             "retry": "apply_view", "failed": "complete_patrol",
         },
         "prepare_maintenance": {
-            "prepared": "repair_cards", "unchanged": "plan_patrol", "blocked": "complete_patrol",
+            "mechanical_prepared": "apply_maintenance", "prepared": "repair_cards",
+            "unchanged": "plan_patrol", "blocked": "complete_patrol",
         },
         "repair_cards": {
             "ready": "review_maintenance", "needs_preparation": "prepare_maintenance", "deferred": "complete_patrol",

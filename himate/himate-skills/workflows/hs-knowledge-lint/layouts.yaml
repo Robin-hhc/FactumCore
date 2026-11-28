@@ -35,7 +35,7 @@ canvas:
       x: 1160
       y: 780
     apply_maintenance:
-      x: 1160
+      x: 1450
       y: 1060
     refresh_index:
       x: 930

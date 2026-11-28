@@ -30,6 +30,16 @@
         "计划将代码位置对应到文档结论或回查入口，保留文档依据。",
         "缺少影响决定的实现证据时报告缺口，不凭函数名推断行为。"
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "文档与源码共同说明 FAST 模式最多重试三次。retry_limit 函数返回 MAX_RETRY，次数由 policy.h 的宏决定，外层 if(mode==FAST) 决定适用范围，另有不相关 TRACE_LEVEL。请制定流程卡计划。",
+      "expected_output": "计划覆盖决定结论的函数、宏和条件，保持必要范围。",
+      "expectations": [
+        "required_code_refs 包含函数、MAX_RETRY 定义和 FAST 条件的实际位置。",
+        "计划将每项证据对应到次数或适用条件，未仅列函数入口。",
+        "未递归纳入无关 TRACE_LEVEL 或整个调用图，保留文档依据。"
+      ]
     }
   ]
 }

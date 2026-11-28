@@ -1,7 +1,7 @@
 version: 1
 id: hs-knowledge-lint
 name: 知识治理巡检
-description: 同步并扫描知识库，分流文档入库与已有卡维护，独立审阅后发布并汇总。
+description: 同步并扫描知识库，分流文档入库、程序定位修复与独立审阅的语义维护，发布后汇总。
 kind: custom
 source: user_created
 entry:
@@ -156,16 +156,20 @@ nodes:
     condition: 当前错误无法恢复或无法确认发布状态，已记录具体错误及未完成范围。
     target: complete_patrol
 - id: prepare_maintenance
-  title: L3 准备关联卡维护材料
+  title: L3 准备并分流引用维护
   type: skill
   owner: coder
   skill: hs-knowledge-patrol-prepare
   prompt: |-
-    使用 hs-knowledge-patrol-prepare，接收 L2 的固定维护任务或本分支的重新备料请求。prepared 交接工具固定的任务、版本、关联卡及证据入口。unchanged 回 L2，blocked 向 L8 报告实际缺口，保留待办。
+    使用 hs-knowledge-patrol-prepare，接收 L2 的固定维护任务或本分支的重新备料请求。按工具实际 phase 分流：mechanical_prepared 交接 mode=mechanical 的固定任务、程序候选和机械检查入口，直接到 L6；prepared 将语义任务及实际引用状态、相关来源和证据入口交 L4。同一卡混合状态采用工具固定的语义任务，不自行降级。unchanged 回 L2，blocked 向 L8 报告实际缺口，保留待办。
   exits:
+  - id: mechanical_prepared
+    label: 程序定位修复已准备
+    condition: 工具实际返回 mechanical_prepared，同批 mode=mechanical 的任务、受限候选和机械检查入口已固定。
+    target: apply_maintenance
   - id: prepared
-    label: 维护材料已固定
-    condition: 工具已固定 card_maintenance 任务、来源版本与正式关联卡范围。
+    label: 语义维护材料已固定
+    condition: 工具实际返回 prepared，已固定需判断的引用、相关来源与已有卡范围。
     target: repair_cards
   - id: unchanged
     label: 选定维护任务已无待办
@@ -181,7 +185,7 @@ nodes:
   owner: coder
   skill: hs-knowledge-patrol-repair
   prompt: |-
-    使用 hs-knowledge-patrol-repair，仅维护本任务固定的已有卡。可信定位候选和语义修订均交 L5，零改卡也交接逐卡依据。ready 交接简短决定与必要候选，新主题仅作为待报告事项。可通过重备料解决的问题交 L3，无法恢复的必要证据缺口交 L8。
+    使用 hs-knowledge-patrol-repair，仅处理 prepared 语义任务的固定已有卡和引用。结合 changed、unresolved 或 unversioned 状态及同卡相关来源复核；定位候选是材料，不是内容通过。修订或零正文改动决定均交 L5。ready 交接简短决定与必要候选，新主题仅作为待报告事项。可通过重备料解决的问题交 L3，无法恢复的必要证据缺口交 L8；不手写 evidence_version。
   exits:
   - id: ready
     label: 维护候选或零修改决定已保存
@@ -201,7 +205,7 @@ nodes:
   owner: reviewer
   skill: hs-knowledge-patrol-review
   prompt: |-
-    独立 reviewer 使用 hs-knowledge-patrol-review 核对原卡、证据、候选和范围。零修改也须独立核验。passed 交接实际审阅结果，内容及候选问题回 L4，能通过重新备料解决的输入问题回 L3，必要证据无法恢复时交 L8，保留待办。
+    独立 reviewer 使用 hs-knowledge-patrol-review 审阅 prepared 语义任务，核对原卡、实际引用状态、相关来源、候选和范围。零正文改动也须独立核验；机械任务不在此伪造内容通过。passed 交接实际审阅结果，内容及候选问题回 L4，能通过重新备料解决的输入问题回 L3，必要证据无法恢复时交 L8，保留待办。
   exits:
   - id: passed
     label: 维护检查与独立审阅通过
@@ -220,24 +224,24 @@ nodes:
     condition: 必要证据无法恢复或核实，不能给出通过结论。
     target: complete_patrol
 - id: apply_maintenance
-  title: L6 发布关联卡维护结果
+  title: L6 发布定位或语义维护
   type: skill
   owner: coder
   skill: hs-knowledge-patrol-apply
   prompt: |-
-    收到 L5 通过结果后使用 hs-knowledge-patrol-apply。completed 交接关联卡、来源复核和索引的实际回执，回 L2。retry 保留同批已审稿。确认未发布且候选需修订时回 L4，输入需重新固定时回 L3。无法确认发布状态或当前无法恢复时交 failed，保留现场并由 L8 汇总。
+    使用 hs-knowledge-patrol-apply，按固定 task.mode 区分发布依据：mechanical 只采用 L3 实际 mechanical_prepared 任务及程序机械凭据；semantic 或旧任务缺省必须有真实 L5 通过。均由原 maintain commit 重验输入、范围和对应凭据，不手写 mode、marker 或 evidence_version，也不以机械检查冒充内容审阅。completed 据实际回执区分定位修复和语义维护，回 L2。retry 保留同批候选。确认未发布的语义候选需修订时回 L4；机械凭据/允许差异不成立或输入需重备料时回 L3。无法确认发布状态或当前无法恢复时交 failed，保留现场并由 L8 汇总。
   exits:
   - id: completed
     label: 关联卡维护已完成
-    condition: 维护发布或零修改复核登记成功，回执报告实际卡片及来源复核结果。
+    condition: 机械定位发布或经独立审阅的语义维护登记成功，回执报告实际卡片及引用处理结果。
     target: plan_patrol
   - id: needs_revision
     label: 修订尚未发布的维护候选
-    condition: 确认本批尚未写入正式库，需修改候选并重新通过 L5。
+    condition: 确认本语义批次尚未写入正式库，需修改候选并重新通过 L5。
     target: repair_cards
   - id: needs_preparation
     label: 刷新尚未发布的维护输入
-    condition: 确认本批尚未写入正式库，来源或关联卡版本已失效，需重新备料。
+    condition: 确认本批尚未写入正式库，机械凭据/允许差异不成立，或来源及关联卡输入已失效，需重新备料。
     target: prepare_maintenance
   - id: retry
     label: 重试原维护批次
@@ -269,7 +273,7 @@ nodes:
   owner: coder
   skill: hs-knowledge-patrol-complete
   prompt: |-
-    使用 hs-knowledge-patrol-complete，依据实际 P5、L6、L7 和统计回执汇总文档批次、关联卡维护、索引变动与剩余待办。新主题说明仅报告未立卡，失败、暂缓和未知发布状态保留实际缺口，不宣称全部完成。
+    使用 hs-knowledge-patrol-complete，依据实际 P5、L6、L7 和统计回执汇总文档批次、程序定位修复、经独立审阅的语义维护、索引变动与剩余待办。机械发布不表述为 L5 内容通过。新主题说明仅报告未立卡，失败、暂缓和未知发布状态保留实际缺口，不宣称全部完成。
   exits:
   - id: completed
     label: 本轮统计完成

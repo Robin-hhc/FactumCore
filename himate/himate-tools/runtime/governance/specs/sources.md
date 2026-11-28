@@ -12,9 +12,13 @@
 
 巡检发现待入库的 raw 文档时，`patrol plan` 返回 `needs_ingest` 和 `next_file.task_type=document_ingest`。代码关联卡复核和原文档删除返回 `needs_maintenance`、`task_type=card_maintenance`。`next_file.change` 区分首次缺基线、变更、删除和引用失效。未被正式卡引用的代码不产生入库任务。
 
-维护依次调用 `knowledge maintain prepare --source <source_id> --json`、`maintain check` 和 `maintain commit`。L3 固定当前来源版本及正式反向引用决定的卡 ID、路径和原卡摘要，交接原卡与当前、可信历史材料。L4 修订相关引用、正文结论或生命周期，L5 独立审阅，L6 发布。CLI 检查和发布再次核对固定输入及当前正式卡，拒绝新卡、无关卡、移动和物理删除。候选为空仍需实际复核，发布时以 reason 说明零修改依据。
+代码巡检逐条解析 `code_ref.evidence_version`，以片段内容及上下文锚点判定 fresh、relocated、changed、unresolved 或 unversioned。同一文件本轮只读取、分行一次；文件其他位置改变而引用未变时不进入内容治理。任一引用需要语义复核的卡整体进入语义任务，避免同卡被两条发布路径分别覆盖。有效的固定历史快照不跟随当前代码重新定位。
 
-`source.reference_review` 独立记录 `source_sha256`、`exists`、`reviewed_at` 和 `source_commit`。旧 `processed_hash` 仅表示来源入库处理事实，不自动充当代码关联卡复核基线。缺少 reference_review 的已引用代码须先核验既有卡。维护回执的 `maintenance_complete`、`reviewed_card_ids` 和 `reviewed_hash` 表达关联卡复核，不返回整份代码入库完成语义。原文档删除维护记录缺失事实，保留既有文档入库进度及历史依据。
+`knowledge maintain prepare --source <source_id> --json` 固定需处理的卡、原卡摘要及相关代码输入。仅位置变化返回 `mechanical_prepared`，程序生成受限候选和独立机械凭据，L6 直接调用 `maintain commit` 重验；只允许重算得到的行号变更，保留正文和原片段版本，不调用 L4/L5 或冒充内容审阅。包含 changed、unresolved、unversioned 时返回 `prepared`，L4 修订相关引用、正文结论或生命周期，L5 调用 `maintain check` 并独立审阅，L6 发布。候选为空仍需实际复核，发布时以 reason 说明零修改依据。
+
+CLI 检查和发布再次核对固定输入、正式卡及完整引用覆盖，拒绝新卡、无关卡、移动和物理删除。实际检查读取的代码片段版本记录在本批回执，发布前确认仍是同一代码输入并由程序写入正式卡；AI 不手填指纹。入库 P4/P5 同样建立新引用基线，失败和暂缓不更新版本。
+
+`source.reference_review` 保留 `source_sha256`、`exists`、`reviewed_at` 和 `source_commit` 作为历史审计及可信旧材料恢复依据，不再决定当前代码引用是否过期。`processed_hash` 仅表示来源入库处理事实；缺少有效 `evidence_version` 的普通引用须先核验既有卡。维护回执的 `maintenance_complete`、`reviewed_card_ids` 和 `reviewed_hash` 表达本次关联卡复核，不返回整份代码入库完成语义。原文档删除维护记录缺失事实，保留既有文档入库进度及历史依据。
 
 来源删除时 `source_sha256` 为 null、`exists` 为 false，已有真实版本的摘要保留为 `last_present_sha256`，供保留的历史引用按实际 Git 字节恢复。它不表示当前文件仍存在，不将旧处理版本自动视为复核基线。代码历史读取优先采用已复核版本或最后存在版本的摘要，必要旧字节不可恢复时仍报告缺口。
 
@@ -24,7 +28,9 @@
 
 原卡内容、路径或来源在备料后改变时重新备料，已写入且与原批候选完全相同的文件可沿同批重试。来源读取、位置检查和事务实现与文档入库共享。旧 `ingest scan --source <code_id>` 无论是否携带 code_review，都准备同样受限的维护任务，遗漏标记不能放开新卡权限。
 
-有按实际 hash 恢复的可信旧源码、原引用匹配且当前符号唯一时，L3 通过 `location_candidates_ref` 提供旧、新引用位置及片段是否相同的事实。候选始终标为 `requires_context_review`。L4 结合相关上下文确认行为和条件不变后才采用仅位置修订，所有候选仍经 L5。没有可信旧版、符号不唯一或仅片段相同都不构成自动语义结论。
+语义任务可附带由可信 Git 历史和 selector 得到的 `location_candidates_ref`，供作者参考；这些旧材料提示不等同于机械发布凭据。源码删除后仍保留普通当前引用不能仅靠零修改理由完成；应移除当前引用、转为有效历史快照、替换依据或暂缓。未注册旧标签不构成固定历史快照。
+
+片段版本借用 LangChain OpenWiki 的精确行段和上下文锚点算法，仅规范化 CRLF 到 LF。fresh/relocated 表示显式引用的文本未变，不证明引用之外的调用链、宏条件或运行行为等价；必要依赖由作者和独立 reviewer 覆盖，不构建通用 AST 或调用图证明。
 
 ## 完整转换与分轮阅读
 

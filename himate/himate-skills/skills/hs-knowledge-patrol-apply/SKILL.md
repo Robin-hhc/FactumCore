@@ -1,6 +1,6 @@
 ---
 name: hs-knowledge-patrol-apply
-description: 发布已经独立审阅的关联卡维护批次并记录复核结果，用于 L6。
+description: 发布程序校验的定位修复或已独立审阅的语义维护批次，记录实际引用结果，用于 L6。
 ---
 
 # 发布关联卡维护结果
@@ -9,8 +9,11 @@ description: 发布已经独立审阅的关联卡维护批次并记录复核结�
 
 采用 CLI 时，从知识根运行该执行端已确认的 `knowledge` 入口，每次传入同一 `--knowledge-root`。首次单独使用 CLI 时，先读取知识根的 `AGENTS.md` 和 `config.yml`，运行 `knowledge doctor --knowledge-root <知识根绝对路径> --json` 核对目标和版本。命令找不到、启动入口有明确缺项或诊断仅表明缺运行依赖时，加载 `hs-knowledge-setup`，在同一执行端补齐并复查。得到与知识根匹配的就绪回执后继续原任务。
 
-确认本批通过 L5 后调用 `knowledge_maintain_commit`。零改卡时传入实际复核理由 `reason`。采用 CLI 时运行 `knowledge maintain commit --json`。零改卡时，将 `reason` 写入 `.build/commit.json`，用 `knowledge maintain commit --input .build/commit.json --json` 登记。
+先读取固定任务，按 `mode` 区分发布依据，再调用 `knowledge_maintain_commit`（CLI：`knowledge maintain commit --json`）。
 
-以命令回执交接实际修改的 `card_ids`、本批复核的 `reviewed_card_ids`、`reviewed_hash`、`source_exists` 及 `maintenance_complete`。回执表达关联卡维护和来源复核结果，不表达整份代码入库或文档阅读覆盖。出现 `receipt_warning` 时以本次返回值为准，不使用可能陈旧的落盘回执。
+- `mechanical`：只接收 L3 的实际 mechanical_prepared 回执与同一任务。程序会重验 `mechanical_check_ref` 指向的机械凭据、实际输入及仅定位差异；不要求 L5，也不调用 maintain check 生成内容审阅凭据。调用者的 passed 声明或片段匹配数量不能代替这份程序检查。
+- `semantic` 或旧任务缺省：确认本批已由独立 L5 实际审阅通过后发布。正文无需改动时仍须交接真实确认理由，不能用机械路径绕过语义审阅。零改卡时将 `reason` 写入 `.build/commit.json`，用 `knowledge maintain commit --input .build/commit.json --json` 登记。
 
-执行失败时保留已审批次和 `.build`，修正执行问题后直接重试。确认尚未写入且候选必须改动时退回 L4，再经 L5。输入版本失效仅在确认未发布且可重新备料时回 L3，无法确认写入状态时保留现场并报告失败。`deferred` 保留实际缺口及待办，不宣称维护完成。成功后的后续选择由 Workflow 编排。
+以命令回执交接实际 `card_ids`、`reviewed_card_ids`、引用版本/定位处理结果及 `maintenance_complete`，明确是程序定位修复还是经独立审阅的语义维护。程序只保存本批实际核验引用的 evidence_version；不手工生成或批量刷新其他引用版本。兼容回执中的 `reviewed_hash`、`source_exists` 也只按实际含义报告，不表述为整份代码已入库或所有关联卡已复核。出现 `receipt_warning` 时以本次返回值为准，不使用可能陈旧的落盘回执。
+
+执行失败时保留固定批次和 `.build`，可恢复的执行问题修正后重试同批。确认尚未发布的语义候选必须改动时回 L4，再经 L5。机械凭据/允许差异不成立或输入需重新固定时，在确认未发布后回 L3；不手改 mode 或凭据继续发布。无法确认写入状态时保留现场并报告失败。`deferred` 保留实际缺口及待办，不宣称维护完成。成功后的后续选择由 Workflow 编排。

@@ -1,7 +1,7 @@
 {
   "assets": {
     "runtime/governance/framework.lock.yaml": {
-      "sha256": "1255b0c3c7c0a2348d93c104bcb4b7823ada46d7b14865592f52a187ee26dca2"
+      "sha256": "19eb5cae1591b6ff685bc9f9a9232aa701950a5f38502c5bf8cb1078416d910e"
     }
   },
   "entrypoints": {
@@ -14,7 +14,7 @@
       "sha256": "e4ae118eb0ebc99af582721a0ea74d1acaf24ac25b49f381c70911ac0708bb13"
     },
     "himate_knowledge/cli.py": {
-      "sha256": "201e8e24d83ebe34f1521e69f668c0547c42c7b19cae961f884a0567c8cb01a4"
+      "sha256": "c77ef3a2e039dcd0b4a76bc64effac0148ea9bcb6697e18175c1a196e458d725"
     },
     "himate_knowledge/command_install.py": {
       "sha256": "e485fe25c7324ea4a54dd4f7949cc954c8690a82d1d66ebf6613bf28a89c5107"
@@ -42,5 +42,5 @@
     }
   },
   "schema_version": "1.1",
-  "version": "0.26.10"
+  "version": "0.26.11"
 }

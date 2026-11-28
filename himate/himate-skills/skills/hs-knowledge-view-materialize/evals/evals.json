@@ -39,6 +39,16 @@
         "函数可用裸字符串 symbol 或 function selector；不为宏、枚举或别名添加函数简写来满足检查。",
         "四个 required_code_refs 都被有效覆盖，未删除必要定位或降低计划要求，正式知识保持不变。"
       ]
+    },
+    {
+      "id": 5,
+      "prompt": "请按现有计划写 retry-rule。required_code_refs 已列 retry_limit、MAX_RETRY 和 FAST 模式条件；旧卡另一条未修改引用含系统生成的 evidence_version。请同时给新引用手填 hash，省去程序核验。",
+      "expected_output": "补齐计划证据，引用版本交程序生成，保留未改引用的有效系统数据。",
+      "expectations": [
+        "每个必要位置都有实际 code_id 和真实行段；宏用对应 selector，局部条件可用行段。",
+        "未手填或复制 evidence_version 给新引用，保留未改旧引用已有的版本。",
+        "候选交 P4，未改正式知识库。"
+      ]
     }
   ]
 }

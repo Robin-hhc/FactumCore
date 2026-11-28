@@ -53,9 +53,9 @@ COMMAND_HELP = {
                  "  audit    Audit source references. This is the default.\n"
                  "  lint     Validate the formal knowledge cards.\n"
                  "  reindex  Update the published index. Use --full to rebuild it from scratch.\n"
-                 "  prepare  Fix the source version and existing-card scope with --source ID.\n"
+                 "  prepare  Fix existing-card scope; return semantic or mechanical work with --source ID.\n"
                  "  check    Validate the prepared existing-card maintenance candidates.\n"
-                 "  commit   Publish independently reviewed maintenance and record its baseline."),
+                 "  commit   Recheck and publish reviewed content or restricted reference positions."),
     "library": ("{" + ",".join(LIBRARY_ACTIONS) + "}", "Browse and read the published knowledge view.\n\n"
                 "Pass view_revision in the JSON input to pin the published snapshot."),
     "raw": ("ACTION", "Manage files in the raw materials directory.\n\n"
@@ -275,7 +275,8 @@ def execute(args, root, tool_root, manifest_digest):
                 # Existing roots can retain their last receipt without migration.
                 latest = root / "logs/ingest/latest.json"
             data = ingest.read_json(task if task.is_file() else latest) if task.is_file() or latest.is_file() else {}
-            phase = "prepared" if task.is_file() else "completed" if latest.is_file() else "idle"
+            phase = ("mechanical_prepared" if data.get("task_type") == "card_maintenance" and data.get("mode") == "mechanical"
+                     else "prepared") if task.is_file() else "completed" if latest.is_file() else "idle"
         else:
             raise CommandError("INVALID_ACTION", "Use ingest scan, check, commit or status")
     elif command == "source":

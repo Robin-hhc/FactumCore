@@ -7,17 +7,51 @@ in the local catalog so editing the author-facing task cannot expand its scope.
 from __future__ import annotations
 
 from contextlib import nullcontext
+import copy
 import json
 from pathlib import Path
 import subprocess
 from uuid import uuid4
 
+import yaml
+
 from .catalog import Catalog, atomic_write
 from .validation import ContractError, canonical_bytes, safe_path
-from . import ingest, source_resources
+from . import evidence_review, ingest, source_resources
+from .cards_v3 import parse_card
+from .code_reference_versions import reference_key
 
 
 CHECK = ".build/maintenance-review-check.json"
+MECHANICAL_CHECK = ".build/maintenance-mechanical-check.json"
+
+
+def _relocated_card(card, observations):
+    metadata = copy.deepcopy(card["metadata"])
+    positions = {reference_key(item["reference"]): item for item in observations if item["status"] == "relocated"}
+    changed = False
+    for reference in metadata.get("code_ref", []):
+        item = positions.get(reference_key(reference))
+        if item is not None:
+            reference.update(line_start=item["line_start"], line_end=item["line_end"])
+            changed = True
+    if not changed:
+        return card
+    raw = ("---\n" + yaml.safe_dump(metadata, allow_unicode=True, sort_keys=False)
+           + "---\n" + card["body"]).encode("utf-8")
+    return parse_card(raw, card["path"])
+
+
+def _public_observations(states):
+    result = {}
+    for identity, rows in states.items():
+        result[identity] = []
+        for item in rows:
+            visible = {key: value for key, value in item.items() if key not in {"content", "evidence_version"}}
+            for name in ("reference", "proposed_reference"):
+                visible[name] = {key: value for key, value in visible[name].items() if key != "evidence_version"}
+            result[identity].append(visible)
+    return result
 
 
 def _location_candidates(root, source, cards, previous, current):
@@ -79,7 +113,19 @@ def prepare(root, request, *, catalog=None):
         if not pending:
             return {"pending": 0, "task_type": "card_maintenance"}, "unchanged"
         selected = pending[0]
-        cards = active.cards_for(source["id"])
+        cards = [active.get_card(row["id"]) for row in active.cards_for(source["id"])]
+        evidence_states, code_contents = {}, {}
+        mode = "semantic"
+        if source["kind"] == "code":
+            evidence_states, code_contents = evidence_review.observe(
+                root, active, cards, data={source["id"]: selected["content"]})
+            cards = [card for card in cards if any(
+                item["source_id"] == source["id"] and item["status"] != "fresh"
+                for item in evidence_states[card["id"]])]
+            evidence_states = {card["id"]: evidence_states[card["id"]] for card in cards}
+            if all(item["status"] in {"fresh", "relocated"}
+                   for rows in evidence_states.values() for item in rows):
+                mode = "mechanical"
         ingest._clear_build(root)
         active.touch_attempt(source["id"])
         material = safe_path(root, ".build/materials")
@@ -130,6 +176,24 @@ def prepare(root, request, *, catalog=None):
         task = {"task_type": "card_maintenance", "maintenance_id": uuid4().hex,
                 "source": fixed, "affected_cards": frozen_cards, "cards_dir": ".build/cards",
                 "plan_ref": ".build/plan.md", "gaps": gaps}
+        task["mode"] = mode
+        if source["kind"] == "code":
+            task["evidence_states"] = _public_observations(evidence_states)
+            task["code_inputs"] = {}
+            used_sources = {item["source_id"] for rows in evidence_states.values() for item in rows}
+            for identity in sorted(used_sources):
+                content = code_contents[identity]
+                item = {"exists": content is not None, "hash": ingest.sha(content) if content is not None else None}
+                if content is not None:
+                    entry = material / ("code-" + ingest.sha(identity.encode())[:16] + ".bin")
+                    entry.write_bytes(content)
+                    item["original_ref"] = entry.relative_to(root).as_posix()
+                    code_source = active.get_file(identity)
+                    text = source_resources.extract_code_text(content, ingest.code_extractor(code_source))[0]
+                    preview = entry.with_suffix(".txt")
+                    preview.write_bytes(text.encode("utf-8"))
+                    item["text_ref"] = preview.relative_to(root).as_posix()
+                task["code_inputs"][identity] = item
         locations = _location_candidates(root, source, cards, previous, selected["content"])
         if locations:
             task["location_candidates_ref"] = ".build/materials/location-candidates.json"
@@ -139,6 +203,8 @@ def prepare(root, request, *, catalog=None):
         references.extend(card["original_ref"] for card in frozen_cards)
         if task.get("location_candidates_ref"):
             references.append(task["location_candidates_ref"])
+        for item in task.get("code_inputs", {}).values():
+            references.extend(item[key] for key in ("original_ref", "text_ref") if item.get(key))
         task["material_hashes"] = {
             reference: ingest.sha(safe_path(root, reference, [".build/materials"]).read_bytes())
             for reference in references
@@ -146,9 +212,26 @@ def prepare(root, request, *, catalog=None):
         # The caller-facing affected_cards is only a reading aid. This copy is
         # derived from formal refs and is used again before check/publication.
         active.set_maintenance_input(task)
+        if mode == "mechanical":
+            planned = []
+            for card in cards:
+                candidate = _relocated_card(card, evidence_states[card["id"]])
+                if candidate["raw"] != card["raw"]:
+                    relative = ".build/cards/" + card["path"][len("knowledge/"):]
+                    destination = safe_path(root, relative, [".build/cards"])
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    destination.write_bytes(candidate["raw"])
+                    planned.append({"id": card["id"], "path": card["path"]})
+            plan = "---\n" + yaml.safe_dump({"cards": planned}, sort_keys=False) + "---\n"
+            plan += "Program observations only: unchanged evidence was relocated. Semantic conclusions were not inferred.\n"
+            safe_path(root, ".build/plan.md", [".build"]).write_text(plan, encoding="utf-8")
+            task["mechanical_check_ref"] = MECHANICAL_CHECK
+            active.set_maintenance_input(task)
+            drafts = ingest._drafts(root, active)
+            ingest.write_json(root / MECHANICAL_CHECK, {"mode": "mechanical", "sha256": digest(root, task, drafts, ())})
         ingest.write_json(root / ".build/task.json", task)
         result = {**task, "task_ref": ".build/task.json", "pending_at_least": 1}
-        return result, "blocked" if gaps else "prepared"
+        return result, "blocked" if gaps else "mechanical_prepared" if mode == "mechanical" else "prepared"
 
 
 def state(root, catalog, task, drafts=(), deletes=()):
@@ -157,6 +240,8 @@ def state(root, catalog, task, drafts=(), deletes=()):
         raise ContractError("MAINTENANCE_TASK_CHANGED", "Run maintain prepare again for a fixed maintenance task")
     if task.get("affected_cards") != fixed["affected_cards"]:
         raise ContractError("MAINTENANCE_SCOPE", "Keep the prepared card scope and original-card material pointers")
+    if any(task.get(key) != fixed.get(key) for key in ("mode", "code_inputs", "evidence_states", "mechanical_check_ref")):
+        raise ContractError("MAINTENANCE_TASK_CHANGED", "Keep the fixed reference task and its publication lane")
     source = ingest._task_source(catalog, task)
     baseline = fixed["source"]
     if any(source.get(key) != baseline.get(key) for key in ("source_id", "kind", "path", "hash", "exists")):
@@ -179,6 +264,15 @@ def state(root, catalog, task, drafts=(), deletes=()):
         content = None
     if (content is not None) != source["exists"] or (ingest.sha(content) if content is not None else None) != source["hash"]:
         raise ContractError("SOURCE_CHANGED", "Prepare maintenance again for the current source version")
+    for identity, expected in fixed.get("code_inputs", {}).items():
+        registered = catalog.get_file(identity)
+        try:
+            current = ingest.source_path(root, registered).read_bytes()
+        except FileNotFoundError:
+            current = None
+        if ((current is not None) != expected["exists"]
+                or (ingest.sha(current) if current is not None else None) != expected["hash"]):
+            raise ContractError("SOURCE_CHANGED", "A bound code input changed; prepare maintenance again", identity)
     approved = {item["id"]: item for item in fixed["affected_cards"]}
     replacements = {card["id"]: card for card in drafts}
     current_ids = {identity for identity, _ in catalog.reference_rows(source["id"])}
@@ -188,8 +282,7 @@ def state(root, catalog, task, drafts=(), deletes=()):
         original = approved.get(card["id"])
         actual = catalog.get_card(card["id"])
         if (original is None or actual is None or original["path"] != card["path"]
-                or actual["path"] != original["path"]
-                or card["id"] not in current_ids and actual["raw"] != card["raw"]):
+                or actual["path"] != original["path"]):
             raise ContractError("MAINTENANCE_SCOPE", "Update only the prepared associated cards at their original paths", card["path"])
     for identity, original in approved.items():
         if ingest.sha(safe_path(root, original["original_ref"], [".build/materials"]).read_bytes()) != original["sha256"]:
@@ -200,13 +293,20 @@ def state(root, catalog, task, drafts=(), deletes=()):
         if ingest.sha(actual["raw"]) != original["sha256"]:
             candidate = replacements.get(identity)
             if candidate is None or actual["raw"] != candidate["raw"]:
-                raise ContractError("MAINTENANCE_CARD_CHANGED", "A prepared card changed; prepare again before overwriting", original["path"])
-    if current_ids - set(approved):
+                # A previous attempt may have saved system evidence versions
+                # before the index failed. Accept only those exact checked bytes.
+                marker = safe_path(root, evidence_review.CHECK, [".build"])
+                checked = ingest.read_json(marker) if marker.is_file() else {}
+                original_card = parse_card(safe_path(root, original["original_ref"], [".build/materials"]).read_bytes(), original["path"])
+                expected = evidence_review.stamp([candidate or original_card], checked.get("versions", {}))[0]
+                if actual["raw"] != expected["raw"]:
+                    raise ContractError("MAINTENANCE_CARD_CHANGED", "A prepared card changed; prepare again before overwriting", original["path"])
+    if source["kind"] != "code" and current_ids - set(approved):
         raise ContractError("MAINTENANCE_CARD_CHANGED", "New associated cards require a new maintenance task")
     return fixed, source, content
 
 
-def findings(root, catalog, task, drafts, deletes):
+def findings(root, catalog, task, drafts, deletes, *, context=None):
     try:
         fixed, source, content = state(root, catalog, task, drafts, deletes)
     except (ContractError, OSError, ValueError) as error:
@@ -217,12 +317,20 @@ def findings(root, catalog, task, drafts, deletes):
     for item in fixed["affected_cards"]:
         card = replacements.get(item["id"]) or catalog.get_card(item["id"])
         references.extend((card["id"], reference) for reference in card[kind + "_ref"]
-                          if reference[kind + "_id"] == source["id"])
-    context = {"formal": False, "loaded": {}, "legacy": {}, "data": {}, "descriptors": {}}
+                          if kind == "code" or reference[kind + "_id"] == source["id"])
+    context = context if context is not None else {"formal": False, "loaded": {}, "legacy": {}, "data": {}, "descriptors": {}}
     problems = []
     for identity, reference in references:
         try:
-            ingest._card_reference_check(root, source, reference, kind, catalog.registry, context, content)
+            actual_source = catalog.get_file(reference[kind + "_id"])
+            staged = content
+            if kind == "code":
+                observation = fixed.get("code_inputs", {}).get(actual_source["id"], {})
+                if observation.get("exists") is False and not reference.get("snapshot_id"):
+                    raise ContractError("SOURCE_INPUT_UNAVAILABLE", "Resolve the missing current code reference before confirming it", actual_source["path"])
+                staged = (safe_path(root, observation["original_ref"], [".build/materials"]).read_bytes()
+                          if observation.get("original_ref") else None)
+            ingest._card_reference_check(root, actual_source, reference, kind, catalog.registry, context, staged)
         except (ValueError, OSError, ContractError, subprocess.TimeoutExpired) as error:
             problems.append(ingest._finding(error, catalog.get_card(identity)["path"]))
     return problems
@@ -234,6 +342,27 @@ def digest(root, fixed, drafts, deletes):
         "cards": sorted((card["id"], card["path"], ingest.sha(card["raw"])) for card in drafts),
         "deleted": sorted(deletes),
     }))
+
+
+def _verify_mechanical(root, catalog, fixed, drafts, deletes):
+    if deletes:
+        raise ContractError("MECHANICAL_SCOPE", "A reference repair cannot delete cards")
+    originals = [parse_card(safe_path(root, item["original_ref"], [".build/materials"]).read_bytes(), item["path"])
+                 for item in fixed["affected_cards"]]
+    states, _ = evidence_review.observe(root, catalog, originals)
+    if any(item["status"] not in {"fresh", "relocated"} for rows in states.values() for item in rows):
+        raise ContractError("MECHANICAL_SCOPE", "Changed or unresolved evidence requires independent content review")
+    expected = {}
+    for original in originals:
+        candidate = _relocated_card(original, states[original["id"]])
+        if candidate["raw"] != original["raw"]:
+            expected[candidate["id"]] = candidate["raw"]
+    if {card["id"]: card["raw"] for card in drafts} != expected:
+        raise ContractError("MECHANICAL_SCOPE", "Mechanical publication permits only recomputed reference positions")
+    path = safe_path(root, MECHANICAL_CHECK, [".build"])
+    checked = ingest.read_json(path) if path.is_file() else {}
+    if checked.get("mode") != "mechanical" or checked.get("sha256") != digest(root, fixed, drafts, deletes):
+        raise ContractError("MECHANICAL_NOT_CHECKED", "Prepare a fixed mechanical reference repair again")
 
 
 def check(root, request, rules=None):
@@ -257,19 +386,33 @@ def commit(root, request):
         fixed, source, content = state(root, catalog, task, drafts, deletes)
         if request.get("defer"):
             return {"source_id": source["source_id"], "reason": request.get("reason", "Necessary evidence is missing")}, "deferred"
-        problems = findings(root, catalog, task, drafts, deletes)
-        if problems:
-            first = problems[0]
-            raise ContractError(first["code"], first["message"], first.get("path", ""))
-        marker = safe_path(root, CHECK, [".build"])
-        checked = ingest.read_json(marker) if marker.is_file() else {}
-        if checked.get("sha256") != digest(root, fixed, drafts, deletes):
-            raise ContractError("MAINTENANCE_NOT_CHECKED", "Run maintain check for the current plan and candidates")
-        if not drafts and not request.get("reason"):
-            raise ContractError("NO_CHANGE_REASON_REQUIRED", "Explain the reviewed zero-change result")
-        for card in drafts:
+        mechanical = fixed.get("mode") == "mechanical"
+        if mechanical:
+            _verify_mechanical(root, catalog, fixed, drafts, deletes)
+            published = drafts
+        else:
+            problems = findings(root, catalog, task, drafts, deletes)
+            if problems:
+                first = problems[0]
+                raise ContractError(first["code"], first["message"], first.get("path", ""))
+            marker = safe_path(root, CHECK, [".build"])
+            checked = ingest.read_json(marker) if marker.is_file() else {}
+            if checked.get("sha256") != digest(root, fixed, drafts, deletes):
+                raise ContractError("MAINTENANCE_NOT_CHECKED", "Run maintain check for the current plan and candidates")
+            if not drafts and not request.get("reason"):
+                raise ContractError("NO_CHANGE_REASON_REQUIRED", "Explain the reviewed zero-change result")
+            evidence_path = safe_path(root, evidence_review.CHECK, [".build"])
+            observed = ingest.read_json(evidence_path) if evidence_path.is_file() else {}
+            replacements = {card["id"]: card for card in drafts}
+            final = [replacements.get(item["id"]) or catalog.get_card(item["id"]) for item in fixed["affected_cards"]]
+            versions = evidence_review.verify(root, catalog, observed,
+                                              safe_path(root, ".build/task.json").read_bytes(), drafts,
+                                              reviewed_cards=final if source["kind"] == "code" else drafts)
+            published = evidence_review.stamp(final, versions)
+        for card in published:
             destination = safe_path(root, card["path"], ["knowledge"])
-            atomic_write(destination, card["raw"])
+            if not destination.is_file() or destination.read_bytes() != card["raw"]:
+                atomic_write(destination, card["raw"])
         catalog.refresh()
         from .library import build_search
         build_search(catalog, panel_sources={})
@@ -279,6 +422,8 @@ def commit(root, request):
                   "source_exists": source["exists"], "reviewed_hash": source["hash"],
                   "reviewed_card_ids": [item["id"] for item in fixed["affected_cards"]],
                   "card_ids": [card["id"] for card in drafts], "maintenance_complete": True,
+                  "mode": "mechanical" if mechanical else "semantic",
+                  "reference_updated_card_ids": [card["id"] for card in published],
                   "reason": request.get("reason", "Reviewed existing-card repairs published")}
         catalog.set_maintenance_input(None)
     receipt_ref = "artifacts/maintenance/latest.json"

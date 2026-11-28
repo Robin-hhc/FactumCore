@@ -30,6 +30,16 @@
         "没有编造内容来源或维护候选。",
         "后一次结果来自实际再次检查，不用上次状态宣称完成。"
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "patrol plan 返回 needs_maintenance，next_file 指向 code-radio；工具实际引用状态有 relocated 与 changed，候选任务限于 flow-rule。同文件还引用了另一张 fresh 卡。请安排下一步。",
+      "expected_output": "保持程序任务范围交 L3，不自行按文件变化扩容或选择机械发布。",
+      "expectations": [
+        "原样交接来源、task_type 和实际状态到 L3。",
+        "未扩大至该文件全部关联卡，也未以存在 relocated 项直接交 L6。",
+        "未把代码交 P1 入库。"
+      ]
     }
   ]
 }

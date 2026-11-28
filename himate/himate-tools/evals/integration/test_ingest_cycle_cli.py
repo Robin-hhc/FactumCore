@@ -437,6 +437,22 @@ def test_patrol_closes_document_and_code_reference_work_at_the_cli(knowledge):
     publish_patrol_candidates(knowledge, ["receive", "independent"])
     assert_processed(knowledge, [raw_path])
 
+    # P4/P5 already captured the actually checked code fragment. A newly
+    # ingested card must not need a second baseline-only maintenance pass.
+    published_bytes = (knowledge / related_path).read_bytes()
+    published_header = yaml.safe_load(published_bytes.decode("utf-8").split("---", 2)[1])
+    assert published_header["code_ref"][0]["evidence_version"]
+    status, selection = invoke(knowledge, "patrol", "plan")
+    assert status == 0 and selection["phase"] in {"unchanged", "needs_reindex"}, selection
+    assert selection["data"]["pending"] == 0
+
+    # Exercise the old-card migration explicitly, rather than treating a new
+    # P5 publication as if it lacked its system-managed fragment baseline.
+    legacy = {**published_header, "code_ref": [
+        {key: value for key, value in reference.items() if key != "evidence_version"}
+        for reference in published_header["code_ref"]]}
+    write_text(knowledge, related_path, card_text(legacy, related_body))
+
     task = patrol_task(knowledge, code_path, "baseline_missing", code_review=True)
     assert [(card["id"], card["path"]) for card in task["affected_cards"]] == [("receive", related_path)]
     formal = {path: (knowledge / path).read_bytes() for path in (related_path, unrelated_path)}
@@ -477,22 +493,26 @@ def test_patrol_closes_document_and_code_reference_work_at_the_cli(knowledge):
             task_file.write_bytes(original_task)
 
     assert publish_selected(knowledge, task)["card_ids"] == []
-    assert (knowledge / related_path).read_bytes() == formal[related_path]
+    assert (knowledge / related_path).read_bytes() == published_bytes
     assert_patrol_drained(knowledge)
 
     old_code = code.read_bytes()
-    invalid = {**linked, "code_ref": [{**linked["code_ref"][0], "line_start": 2}]}
+    # A moved hint with matching content is now a valid relocation. Break the
+    # declared identity instead, retaining the real checked evidence version.
+    invalid = {**published_header, "code_ref": [{**published_header["code_ref"][0], "symbol": "missing_receive_limit"}]}
     write_text(knowledge, related_path, card_text(invalid, related_body))
+    invalid_bytes = (knowledge / related_path).read_bytes()
     task = patrol_task(knowledge, code_path, "reference_invalid", code_review=True)
     assert code.read_bytes() == old_code
     assert [card["id"] for card in task["affected_cards"]] == ["receive"]
     synthetic_plan(knowledge, task)
     status, rejected = invoke(knowledge, "ingest", "commit", request={"reason": "Attempt to accept stale citation"})
-    assert status != 0 and rejected["diagnostics"][0]["code"] == "CODE_RANGE_CHANGED", rejected
+    assert status != 0 and rejected["diagnostics"][0]["code"] == "CODE_SYMBOL_MISSING", rejected
     status, rejected = invoke(knowledge, "ingest", "check")
     assert status != 0 and rejected["phase"] == "failed", rejected
-    assert any(finding["code"] == "CODE_RANGE_CHANGED" for finding in rejected["data"]["findings"]), rejected
-    stage_patrol_cards(knowledge, task, {related_path: (linked, related_body)})
+    assert any(finding["code"] == "CODE_SYMBOL_MISSING" for finding in rejected["data"]["findings"]), rejected
+    assert (knowledge / related_path).read_bytes() == invalid_bytes
+    stage_patrol_cards(knowledge, task, {related_path: (published_header, related_body)})
     publish_patrol_candidates(knowledge, ["receive"])
     assert_patrol_drained(knowledge)
 

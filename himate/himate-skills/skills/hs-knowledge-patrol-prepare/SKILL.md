@@ -1,6 +1,6 @@
 ---
 name: hs-knowledge-patrol-prepare
-description: 为巡检选定的已有卡维护任务固定来源版本、关联卡和证据入口，用于 L3。
+description: 固定已有卡的引用证据和维护范围，区分程序定位修复与语义维护，用于 L3。
 ---
 
 # 准备关联卡维护材料
@@ -11,8 +11,9 @@ description: 为巡检选定的已有卡维护任务固定来源版本、关联�
 
 使用 L2 交接的完整来源 ID 作为 `knowledge_maintain_prepare` 的 `source`。使用 CLI 时运行 `knowledge maintain prepare --source <source_id> --json`。采用回执根据正式来源登记与引用确定的任务，不自行选择另一来源或扩大卡片范围。
 
-- `prepared`：核对 `.build/task.json` 的 `task_type: card_maintenance`、`maintenance_id`、实际来源版本及 `affected_cards`。当前材料见 `source.original_ref/text_ref`，可信旧版可用时见 `source.previous_ref/previous_text_ref`，原卡见各项 `original_ref`。连同实际 `history_gap` 和可用的 `location_candidates_ref` 交给 L4。
+- `mechanical_prepared`：核对 `.build/task.json` 的 `task_type: card_maintenance`、`maintenance_id`、`mode: mechanical`、固定 `affected_cards` 和逐卡 `evidence_states`。采用程序生成的计划及定位候选，连同 `mechanical_check_ref` 指向的机械检查入口直接交 L6；本步不改候选，不调用内容检查伪造 L5 通过。
+- `prepared`：核对同一任务身份、`mode: semantic`（旧任务可缺省）、实际来源观察及 `affected_cards`。有 `evidence_states` 时按其读取本卡需要判断的 changed、unresolved 或 unversioned 引用；文档删除任务按实际缺失事实和材料处理。原卡见各项 `original_ref`，历史材料可用时按任务入口读取。连同实际缺口和定位候选交 L4。同一卡混合多种状态时采用程序固定的语义任务，不把其中 relocated 引用另拆成机械发布。
 - `unchanged`：如实交接本来源暂无维护待办，由 Workflow 重新选择。
 - `blocked` 或调用失败：报告具体材料、定位或执行缺口，保留待办。
 
-缺复核基线表示需要核验既有卡，不能据此将代码当作尚未全文入库的文档。当前与历史材料的可用性分开说明，无法恢复的旧版本不能冒充已读。原件及正式卡在本步保持只读。
+unversioned 或兼容的 baseline_missing 表示引用尚无已核验证据版本，不能据此将代码当作尚未全文入库的文档。缺版本、编码或权限等错误均不自行改成 mechanical_prepared；采用工具的实际 phase。当前与历史材料的可用性分开说明，无法恢复的旧版本不能冒充已读。原件及正式卡在本步保持只读，evidence_version 由程序管理。

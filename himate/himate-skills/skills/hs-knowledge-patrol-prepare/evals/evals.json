@@ -60,6 +60,16 @@
         "未凭上次状态向 L6 交接机械完成，也未伪造机械凭据。",
         "保留待办及固定现场供恢复。"
       ]
+    },
+    {
+      "id": 7,
+      "prompt": "maintain prepare 实际返回prepared、mode=semantic。固定卡7条引用都为relocated，task另列body_location_reviews，说明正文写了当前源码行号，纯更新code_ref可能留下陈旧说明。请安排交接。",
+      "expected_output": "采用程序实际语义分流，将正文定位提示和固定卡材料交L4，不降级机械。",
+      "expectations": [
+        "核对同一任务身份及卡片范围，读取正文定位提示与引用材料。",
+        "即使所有引用relocated，仍使用prepared出口交L4，不伪造mechanical_prepared或直接交L6。",
+        "不改正式卡、不手改task模式、不编造片段内容变化。"
+      ]
     }
   ]
 }

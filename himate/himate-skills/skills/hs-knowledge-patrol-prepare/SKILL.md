@@ -12,7 +12,7 @@ description: 固定已有卡的引用证据和维护范围，区分程序定位�
 使用 L2 交接的完整来源 ID 作为 `knowledge_maintain_prepare` 的 `source`。使用 CLI 时运行 `knowledge maintain prepare --source <source_id> --json`。采用回执根据正式来源登记与引用确定的任务，不自行选择另一来源或扩大卡片范围。
 
 - `mechanical_prepared`：核对 `.build/task.json` 的 `task_type: card_maintenance`、`maintenance_id`、`mode: mechanical`、固定 `affected_cards` 和逐卡 `evidence_states`。采用程序生成的计划及定位候选，连同 `mechanical_check_ref` 指向的机械检查入口直接交 L6；本步不改候选，不调用内容检查伪造 L5 通过。
-- `prepared`：核对同一任务身份、`mode: semantic`（旧任务可缺省）、实际来源观察及 `affected_cards`。有 `evidence_states` 时按其读取本卡需要判断的 changed、unresolved 或 unversioned 引用；文档删除任务按实际缺失事实和材料处理。原卡见各项 `original_ref`，历史材料可用时按任务入口读取。连同实际缺口和定位候选交 L4。同一卡混合多种状态时采用程序固定的语义任务，不把其中 relocated 引用另拆成机械发布。
+- `prepared`：核对同一任务身份、`mode: semantic`（旧任务可缺省）、实际来源观察及 `affected_cards`。有 `evidence_states` 时按其读取本卡需要判断的 changed、unresolved 或 unversioned 引用；正文定位需审阅时，即使引用都只是 relocated，也连同相应提示交 L4，不降级为 mechanical。文档删除任务按实际缺失事实和材料处理。原卡见各项 `original_ref`，历史材料可用时按任务入口读取。连同实际缺口和定位候选交 L4。同一卡混合多种状态时采用程序固定的语义任务，不把其中 relocated 引用另拆成机械发布。
 - `unchanged`：如实交接本来源暂无维护待办，由 Workflow 重新选择。
 - `blocked` 或调用失败：报告具体材料、定位或执行缺口，保留待办。
 
